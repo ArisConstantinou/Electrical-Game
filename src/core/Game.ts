@@ -35,7 +35,7 @@ export class Game {
   readonly hud: HUD;
   readonly fpsRig = new FPSRig();
   selectedTool: RigTool = 'spray';
-  sprayMode: 'dots' | 'live' = 'dots';
+  sprayMode: 'dots' | 'live' = 'live';
   sprayColorIndex = 0;
   started = false;
   private readonly chasing: ChasingSystem;
@@ -44,6 +44,7 @@ export class Game {
   private shake = 0;
   private resultShown = false;
   private actionCooldown = 0;
+  private wasSpraying = false;
 
   constructor(root: HTMLElement) {
     this.hud = new HUD(root);
@@ -80,12 +81,15 @@ export class Game {
     this.actionCooldown = Math.max(0, this.actionCooldown - dt);
     const requested = this.input.consumeAction();
     const repeatable = (this.selectedTool === 'spray' || this.selectedTool === 'hammer') && this.input.actionHeld && this.actionCooldown <= 0;
+    const spraying = this.selectedTool === 'spray' && this.input.actionHeld;
+    if (this.wasSpraying && !spraying) this.interaction.endSprayStroke();
+    this.wasSpraying = spraying;
     if (this.started && (requested || repeatable)) {
       this.performAction();
       this.actionCooldown = this.selectedTool === 'spray' ? 0.075 : this.selectedTool === 'hammer' ? 0.24 : 0.18;
     }
     this.chasing.update(dt);
-    this.fpsRig.update(dt, this.player.velocity.lengthSq() > 0.02, this.selectedTool === 'spray' && this.input.actionHeld);
+    this.fpsRig.update(dt, this.player.velocity.lengthSq() > 0.02, spraying);
     this.fpsRig.show(this.selectedTool);
     const wallAim = Boolean(this.room.brickWall.aim(this.renderer.camera));
     const pointAim = Boolean(this.mission.target(this.renderer.camera));

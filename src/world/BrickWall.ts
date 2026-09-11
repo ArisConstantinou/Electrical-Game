@@ -91,20 +91,36 @@ export class BrickWall extends THREE.Group {
       this.addSprayDab(hit.point, pointId, color, 0.018 + Math.random() * 0.012, 0.82);
       this.lastLivePoint = null;
     } else {
-      const from = this.lastLivePoint && this.lastLivePoint.distanceTo(hit.point) < 0.22 ? this.lastLivePoint : hit.point;
-      const steps = Math.max(1, Math.ceil(from.distanceTo(hit.point) / 0.018));
-      for (let index = 1; index <= steps; index += 1) {
-        const centre = from.clone().lerp(hit.point, index / steps);
-        this.addSprayDab(centre, pointId, color, 0.035 + Math.random() * 0.012, 0.58);
-        for (let mist = 0; mist < 2; mist += 1) {
-          const angle = Math.random() * Math.PI * 2;
-          const radius = 0.035 + Math.random() * 0.045;
-          this.addSprayDab(centre.clone().add(new THREE.Vector3(Math.cos(angle) * radius, Math.sin(angle) * radius, 0)), pointId, color, 0.003 + Math.random() * 0.006, 0.22 + Math.random() * 0.2);
-        }
+      const from = this.lastLivePoint ?? hit.point;
+      this.addSprayStroke(from, hit.point, pointId, color);
+      const centre = from.clone().lerp(hit.point, 0.5);
+      for (let mist = 0; mist < 2; mist += 1) {
+        const angle = Math.random() * Math.PI * 2;
+        const radius = 0.035 + Math.random() * 0.045;
+        this.addSprayDab(centre.clone().add(new THREE.Vector3(Math.cos(angle) * radius, Math.sin(angle) * radius, 0)), pointId, color, 0.0025 + Math.random() * 0.0045, 0.18 + Math.random() * 0.18);
       }
       this.lastLivePoint = hit.point.clone();
     }
     return hit.point;
+  }
+
+  endSprayStroke(): void { this.lastLivePoint = null; }
+
+  private addSprayStroke(from: THREE.Vector3, to: THREE.Vector3, pointId: string, color: number): void {
+    const delta = to.clone().sub(from);
+    const length = Math.max(delta.length(), 0.014);
+    const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.72, depthTest: false, depthWrite: false });
+    const stroke = new THREE.Mesh(new THREE.PlaneGeometry(length, 0.052), material);
+    stroke.name = `Continuous spray stroke ${pointId}`;
+    stroke.userData.studioEntityId = `point-${pointId}:live-stroke-${this.sprayMarks.length}`;
+    stroke.position.copy(from).lerp(to, 0.5);
+    stroke.position.z = -2.39;
+    stroke.rotation.z = Math.atan2(delta.y, delta.x);
+    stroke.renderOrder = 2;
+    stroke.raycast = () => undefined;
+    this.add(stroke);
+    this.sprayMarks.push({ pointId, mesh: stroke });
+    this.addSprayDab(to, pointId, color, 0.026, 0.72);
   }
 
   private addSprayDab(position: THREE.Vector3, pointId: string, color: number, radius: number, opacity: number): void {

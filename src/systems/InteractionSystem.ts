@@ -22,6 +22,7 @@ export class InteractionSystem {
     this.marking.mode = mode;
     this.marking.color = color;
   }
+  endSprayStroke(): void { this.marking.endStroke(); }
 
   action(point: InstallationPoint, tool: RigTool, camera: THREE.Camera): InteractionResult {
     if (tool === 'spray') {

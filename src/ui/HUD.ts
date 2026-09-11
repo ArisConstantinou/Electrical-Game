@@ -30,7 +30,7 @@ export class HUD {
           </div>
           <div id="tool-status" class="hud-card"></div>
           <div id="spray-controls" class="hud-card" aria-label="Spray settings">
-            <button id="spray-mode" aria-label="Change spray method">METHOD <b>DOTS</b></button>
+            <button id="spray-mode" aria-label="Change spray method">METHOD <b>LIVE</b></button>
             <button id="spray-color" aria-label="Change spray color">COLOR <i></i><b>BLUE</b></button>
           </div>
           <div id="reticle" aria-hidden="true"><span></span><span></span></div>

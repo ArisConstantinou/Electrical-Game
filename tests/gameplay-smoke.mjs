@@ -76,6 +76,9 @@ await desktop.keyboard.press('Digit3');
 await aimAtActive(desktop);
 await leftClickAction(desktop);
 if ((await state(desktop)).activePoint.stage !== 'marked') throw new Error('Desktop left mouse did not use the selected tool');
+if ((await state(desktop)).workSurface.sprayMode !== 'live') throw new Error('Realistic LIVE spray is not the default method');
+await desktop.keyboard.press('KeyV');
+if ((await state(desktop)).workSurface.sprayMode !== 'dots') throw new Error('Desktop could not retain the alternative DOTS method');
 await desktop.keyboard.press('KeyV');
 await desktop.keyboard.press('KeyC');
 const liveSettings = await state(desktop);
@@ -140,6 +143,8 @@ for (const selector of ['#mobile-action', '#tool-prev', '#tool-next', '#spray-mo
   const box = await mobile.locator(selector).boundingBox();
   if (!box || box.width < 44 || box.height < 44) throw new Error(`${selector} is below the 44px touch target`);
 }
+await mobileTap(mobile, '#spray-mode');
+if ((await state(mobile)).workSurface.sprayMode !== 'dots') throw new Error('Mobile could not select the alternative DOTS method');
 await mobileTap(mobile, '#spray-mode');
 await mobileTap(mobile, '#spray-color');
 const mobileSpraySettings = await state(mobile);

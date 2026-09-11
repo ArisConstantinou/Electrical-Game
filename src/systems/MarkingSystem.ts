@@ -3,7 +3,7 @@ import type { InstallationPoint } from '../electrical/InstallationPoint';
 import type { BrickWall, SprayMode } from '../world/BrickWall';
 
 export class MarkingSystem {
-  mode: SprayMode = 'dots';
+  mode: SprayMode = 'live';
   color = 0x087fce;
   constructor(private readonly wall: BrickWall) {}
   spray(camera: THREE.Camera, point: InstallationPoint): boolean {
@@ -15,4 +15,5 @@ export class MarkingSystem {
     }
     return true;
   }
+  endStroke(): void { this.wall.endSprayStroke(); }
 }
