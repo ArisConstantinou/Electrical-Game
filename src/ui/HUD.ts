@@ -33,6 +33,12 @@ export class HUD {
             <button id="spray-mode" aria-label="Change spray method">METHOD <b>LIVE</b></button>
             <button id="spray-color" aria-label="Change spray color">COLOR <i></i><b>BLUE</b></button>
           </div>
+          <aside id="desktop-key-guide" class="hud-card" aria-label="Keyboard and mouse controls">
+            <div><kbd>WASD</kbd><span>MOVE</span><kbd>MOUSE</kbd><span>LOOK</span><kbd>SHIFT</kbd><span>FAST</span></div>
+            <div><kbd>LMB</kbd><span>USE / HOLD</span><kbd>E</kbd><span>INTERACT</span><kbd>WHEEL</kbd><span>SWITCH TOOL</span></div>
+            <div><kbd>1–6</kbd><span>SELECT TOOL</span><kbd>V</kbd><span>SPRAY METHOD</span><kbd>C</kbd><span>COLOR</span></div>
+            <div><kbd>F</kbd><span>FULLSCREEN</span><kbd>ESC</kbd><span>RELEASE MOUSE</span></div>
+          </aside>
           <div id="reticle" aria-hidden="true"><span></span><span></span></div>
           <div id="interaction-prompt" role="status"></div>
           <div id="level-panel" class="hud-card" aria-label="Leveling controls">

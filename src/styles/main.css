@@ -24,6 +24,10 @@ button { font: inherit; }
 #spray-controls button:hover { border-color: #d99860; background: #373027; }
 #spray-controls b { margin-left: 5px; color: #fff; }
 #spray-controls i { display: inline-block; width: 13px; height: 13px; margin: 0 0 -2px 6px; border: 1px solid rgba(255,255,255,.7); border-radius: 50%; }
+#desktop-key-guide { left: 22px; bottom: 20px; display: grid; gap: 6px; max-width: calc(100% - 44px); padding: 10px 12px; font: 700 12px/1 'Barlow Condensed', sans-serif; letter-spacing: .045em; }
+#desktop-key-guide div { display: flex; align-items: center; gap: 6px; }
+#desktop-key-guide kbd { min-width: 30px; padding: 4px 6px; border: 1px solid #827563; border-bottom-width: 2px; border-radius: 3px; color: #fff; background: #302b25; font: 800 12px/1 'Barlow Condensed', sans-serif; text-align: center; }
+#desktop-key-guide span { margin-right: 6px; color: #bdb6ad; white-space: nowrap; }
 #reticle { position: absolute; z-index: 3; left: 50%; top: 50%; width: 24px; height: 24px; transform: translate(-50%,-50%); opacity: .72; transition: .15s ease; }
 #reticle span { position: absolute; left: 50%; top: 50%; width: 14px; height: 2px; background: #f6f0e7; transform: translate(-50%,-50%); box-shadow: 0 1px 3px #000; }
 #reticle span:last-child { transform: translate(-50%,-50%) rotate(90deg); }
@@ -75,6 +79,7 @@ button { font: inherit; }
   #spray-controls button { flex: 1; min-width: 0; min-height: 44px; padding: 0 3px; }
   #spray-controls button > b { display: block; margin: 3px 0 0; }
   #spray-controls i { margin-left: 3px; }
+  #desktop-key-guide { display: none; }
   #top-hud { top: max(10px, env(safe-area-inset-top)); left: 10px; width: calc(100% - 20px); padding: 11px 12px; }
   #objective { font-size: 17px; }
   #interaction-prompt { top: max(104px, calc(env(safe-area-inset-top) + 96px)); max-width: calc(100% - 32px); font-size: 14px; }

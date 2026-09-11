@@ -19,6 +19,7 @@ Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web gam
 - LIVE spray includes a color-matched animated nozzle plume and a bounded 1,400-mark wall budget. Desktop/mobile visual QA, full mission regression, Studio 10/10, typecheck and build passed.
 - LIVE rendering was corrected from overlapping large circles to connected ribbon strokes with rounded caps; DOTS remains the only deliberately dotted method.
 - LIVE is now the default spray method; DOTS is retained as the opt-in alternative via METHOD or V.
+- Added an always-visible desktop key guide for movement, looking, use/interact, tool switching, spray method/color, fullscreen and pointer-lock release; it is hidden on touch/mobile where equivalent buttons are already visible.
 
 ## Keep in mind
 

@@ -65,6 +65,11 @@ const response = await desktop.goto(baseUrl, { waitUntil: 'networkidle' });
 if (!response?.ok()) throw new Error(`Route did not load: ${response?.status()}`);
 await desktop.click('#start-button');
 await desktop.waitForTimeout(450);
+if (!await desktop.locator('#desktop-key-guide').isVisible()) throw new Error('Desktop key guide is not visible during gameplay');
+const keyGuideText = await desktop.locator('#desktop-key-guide').innerText();
+for (const required of ['WASD', 'LMB', 'E', 'WHEEL', '1–6', 'V', 'C', 'F', 'ESC']) {
+  if (!keyGuideText.includes(required)) throw new Error(`Desktop key guide is missing ${required}`);
+}
 const beforeMove = await state(desktop);
 await desktop.mouse.move(680, 380);
 await desktop.mouse.move(740, 330);
@@ -139,6 +144,7 @@ mobile.on('pageerror', error => errors.push(`mobile page: ${error.message}`));
 await mobile.goto(baseUrl, { waitUntil: 'networkidle' });
 await mobile.click('#start-button');
 await mobile.waitForTimeout(450);
+if (await mobile.locator('#desktop-key-guide').isVisible()) throw new Error('Desktop key guide overlaps the mobile HUD');
 for (const selector of ['#mobile-action', '#tool-prev', '#tool-next', '#spray-mode', '#spray-color']) {
   const box = await mobile.locator(selector).boundingBox();
   if (!box || box.width < 44 || box.height < 44) throw new Error(`${selector} is below the 44px touch target`);
