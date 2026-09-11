@@ -11,7 +11,8 @@ Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web gam
 
 ## Current
 
-- Final visual QA, GitHub milestones and Pages verification.
+- Freeform controls revision implemented after physical iPhone feedback: transient toast, global tool cycling, visible selected tools, held free spray, reticle-based brick removal and stuck-joystick recovery.
+- Full desktop mission and mobile interaction smoke pass are green locally; final build/Studio contract/deployment verification remains.
 
 ## Keep in mind
 

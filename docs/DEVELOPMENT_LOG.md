@@ -14,3 +14,12 @@
 - Added continuous extruded mortar with box-interior holes, interactive tilt/depth leveling and visible 20 mm rigid PVC routes.
 - Added desktop Pointer Lock/WASD/tool input, mobile joystick/touch-look/action/leveling input and deterministic browser-readable state.
 - Verified the project with Web Game Studio's own importer and runtime protocol validator: linked opening is eligible, the live scene snapshot validates, object/light patches apply, and `.studio` save/reload restores an edit.
+
+## 2026-09-11 — Freeform mobile work controls
+
+- Replaced stage-forced tool visuals with a six-tool inventory that can be cycled anywhere; the selected FPS tool changes immediately even away from a work point.
+- Spray marking now follows the centre reticle on any reachable brick surface. Holding ACTION while looking around paints a free blue construction stroke.
+- Demolition-hammer hits remove the aimed brick geometry and clear nearby spray marks with the removed masonry.
+- Added joystick fail-safe release for pointer loss, cancellation, tool/action interruption, focus loss and backgrounding.
+- Reworked mobile controls to previous/next tool cycling and changed action feedback into a compact 700 ms toast that does not occupy the controls area.
+- Replayed the full three-point desktop mission and the mobile mark/chase/fit/mortar/level flow in Chromium touch emulation, including a deliberately interrupted joystick pointer.

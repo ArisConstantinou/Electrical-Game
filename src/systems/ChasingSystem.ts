@@ -11,17 +11,19 @@ export class ChasingSystem {
 
   constructor(private readonly scene: THREE.Scene, private readonly wall: BrickWall) {}
 
-  hit(point: InstallationPoint): void {
+  hit(camera: THREE.Camera, point: InstallationPoint): boolean {
+    const impact = this.wall.removeAtAim(camera);
+    if (!impact) return false;
     point.chaseHits += 1;
     point.setStage(point.chaseHits >= 4 ? 'chased' : 'chasing');
-    const positions = this.wall.removeFraction(point.definition.id, point.chaseHits / 4);
-    for (const position of positions.slice(0, 7)) {
+    for (let index = 0; index < 7; index += 1) {
       const debris = new THREE.Mesh(this.debrisGeometry, this.debrisMaterial);
-      debris.position.copy(position).add(new THREE.Vector3((Math.random() - 0.5) * 0.12, (Math.random() - 0.5) * 0.08, 0.08));
+      debris.position.copy(impact).add(new THREE.Vector3((Math.random() - 0.5) * 0.12, (Math.random() - 0.5) * 0.08, 0.08));
       debris.scale.setScalar(0.55 + Math.random() * 0.65);
       this.scene.add(debris);
       this.particles.push({ mesh: debris, velocity: new THREE.Vector3((Math.random() - 0.5) * 0.45, Math.random() * 0.38, 0.45 + Math.random() * 0.35), life: 0.65 + Math.random() * 0.35 });
     }
+    return true;
   }
 
   update(dt: number): void {

@@ -7,12 +7,17 @@ interface RemovableBrick {
   marker: THREE.Group;
 }
 
+interface AimHit { point: THREE.Vector3; object: THREE.Object3D; instanceId?: number }
+
 const brickGeometry = new THREE.BoxGeometry(0.286, 0.125, 0.18);
 const brickMaterial = new THREE.MeshStandardMaterial({ color: 0xb84b2a, roughness: 0.96, metalness: 0, vertexColors: false });
 const removableMaterial = new THREE.MeshStandardMaterial({ color: 0xb94d2b, roughness: 0.97, metalness: 0 });
 
 export class BrickWall extends THREE.Group {
   private readonly removableByPoint = new Map<string, RemovableBrick[]>();
+  private readonly breakables: THREE.Object3D[] = [];
+  private readonly raycaster = new THREE.Raycaster();
+  private readonly sprayMarks: Array<{ pointId: string; mesh: THREE.Mesh }> = [];
 
   constructor(definitions: InstallationDefinition[]) {
     super();
@@ -50,6 +55,7 @@ export class BrickWall extends THREE.Group {
         const list = this.removableByPoint.get(owner.id) ?? [];
         list.push({ mesh: brick, marker });
         this.removableByPoint.set(owner.id, list);
+        this.breakables.push(brick);
         this.add(brick);
       }
     }
@@ -61,8 +67,64 @@ export class BrickWall extends THREE.Group {
     fixed.receiveShadow = true;
     fixedTransforms.forEach((matrix, index) => { fixed.setMatrixAt(index, matrix); });
     fixed.instanceMatrix.needsUpdate = true;
+    this.breakables.push(fixed);
     this.add(fixed);
   }
+
+  aim(camera: THREE.Camera, maxDistance = GAME_CONFIG.interaction.maxDistance): AimHit | null {
+    return this.cast(camera, 0, 0, maxDistance);
+  }
+
+  private cast(camera: THREE.Camera, screenX: number, screenY: number, maxDistance: number): AimHit | null {
+    this.raycaster.setFromCamera(new THREE.Vector2(screenX, screenY), camera);
+    const hit = this.raycaster.intersectObjects(this.breakables, false).find(candidate => candidate.distance <= maxDistance);
+    if (!hit) return null;
+    return { point: hit.point.clone(), object: hit.object, instanceId: hit.instanceId };
+  }
+
+  spray(camera: THREE.Camera, pointId: string): THREE.Vector3 | null {
+    const hit = this.aim(camera);
+    if (!hit) return null;
+    const material = new THREE.MeshBasicMaterial({ color: 0x087fce, transparent: true, opacity: 0.82, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+    const dab = new THREE.Mesh(new THREE.CircleGeometry(0.018 + Math.random() * 0.012, 10), material);
+    dab.name = `Free blue spray mark ${pointId}`;
+    dab.userData.studioEntityId = `point-${pointId}:free-mark-${this.sprayMarks.length}`;
+    dab.position.copy(hit.point);
+    dab.position.z += 0.004;
+    dab.scale.y = 0.55 + Math.random() * 0.45;
+    dab.rotation.z = Math.random() * Math.PI;
+    dab.raycast = () => undefined;
+    this.add(dab);
+    this.sprayMarks.push({ pointId, mesh: dab });
+    return hit.point;
+  }
+
+  removeAtAim(camera: THREE.Camera): THREE.Vector3 | null {
+    const offsets = [[0, 0], [0.045, 0], [-0.045, 0], [0, 0.065], [0, -0.065], [0.085, 0.05], [-0.085, 0.05], [0.085, -0.05], [-0.085, -0.05]];
+    const hit = offsets.map(([x, y]) => this.cast(camera, x, y, GAME_CONFIG.interaction.maxDistance)).find(Boolean) ?? null;
+    if (!hit) return null;
+    if (hit.object instanceof THREE.InstancedMesh && hit.instanceId !== undefined) {
+      const matrix = new THREE.Matrix4();
+      hit.object.getMatrixAt(hit.instanceId, matrix);
+      matrix.scale(new THREE.Vector3(0.0001, 0.0001, 0.0001));
+      hit.object.setMatrixAt(hit.instanceId, matrix);
+      hit.object.instanceMatrix.needsUpdate = true;
+    } else {
+      hit.object.visible = false;
+    }
+    for (let index = this.sprayMarks.length - 1; index >= 0; index -= 1) {
+      const mark = this.sprayMarks[index];
+      if (mark.mesh.position.distanceTo(hit.point) < 0.23) {
+        this.remove(mark.mesh);
+        mark.mesh.geometry.dispose();
+        (mark.mesh.material as THREE.Material).dispose();
+        this.sprayMarks.splice(index, 1);
+      }
+    }
+    return hit.point;
+  }
+
+  get freeMarkCount(): number { return this.sprayMarks.length; }
 
   showMarks(pointId: string): void {
     this.removableByPoint.get(pointId)?.forEach(item => { item.marker.visible = true; });

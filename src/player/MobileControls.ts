@@ -12,21 +12,36 @@ export class MobileControls {
     surface.addEventListener('pointermove', this.onPointerMove, { passive: false });
     surface.addEventListener('pointerup', this.onPointerUp, { passive: false });
     surface.addEventListener('pointercancel', this.onPointerUp, { passive: false });
-    document.querySelector<HTMLButtonElement>('#mobile-action')?.addEventListener('pointerdown', event => { event.preventDefault(); input.actionRequested = true; });
-    document.querySelector<HTMLButtonElement>('#tool-spring')?.addEventListener('pointerdown', event => { event.preventDefault(); window.dispatchEvent(new CustomEvent('wirehouse:select-tool', { detail: 'spring' })); });
-    document.querySelector<HTMLButtonElement>('#tool-cutter')?.addEventListener('pointerdown', event => { event.preventDefault(); window.dispatchEvent(new CustomEvent('wirehouse:select-tool', { detail: 'cutter' })); });
+    surface.addEventListener('lostpointercapture', this.onLostCapture);
+    addEventListener('pointerup', this.onPointerUp, { passive: false });
+    addEventListener('pointercancel', this.onPointerUp, { passive: false });
+    const action = document.querySelector<HTMLButtonElement>('#mobile-action');
+    action?.addEventListener('pointerdown', event => {
+      event.preventDefault();
+      this.releaseJoystick();
+      input.actionHeld = true;
+      input.actionRequested = true;
+      try { action.setPointerCapture(event.pointerId); } catch { /* Browser may reject synthetic capture. */ }
+    });
+    const releaseAction = (event: PointerEvent): void => { event.preventDefault(); input.actionHeld = false; };
+    action?.addEventListener('pointerup', releaseAction, { passive: false });
+    action?.addEventListener('pointercancel', releaseAction, { passive: false });
+    action?.addEventListener('lostpointercapture', () => { input.actionHeld = false; });
+    document.querySelector<HTMLButtonElement>('#tool-prev')?.addEventListener('pointerdown', event => { event.preventDefault(); this.releaseJoystick(); window.dispatchEvent(new CustomEvent('wirehouse:cycle-tool', { detail: -1 })); });
+    document.querySelector<HTMLButtonElement>('#tool-next')?.addEventListener('pointerdown', event => { event.preventDefault(); this.releaseJoystick(); window.dispatchEvent(new CustomEvent('wirehouse:cycle-tool', { detail: 1 })); });
   }
 
   private onPointerDown = (event: PointerEvent): void => {
     if ((event.target as HTMLElement).closest('button')) return;
     event.preventDefault();
-    try { this.surface.setPointerCapture(event.pointerId); } catch { /* Synthetic QA events do not own an active pointer. */ }
     const joystick = document.querySelector<HTMLElement>('#joystick');
     if (joystick?.contains(event.target as Node) && this.joystickPointer === null) {
       this.joystickPointer = event.pointerId;
+      try { joystick.setPointerCapture(event.pointerId); } catch { /* Synthetic QA events do not own an active pointer. */ }
       this.updateJoystick(event, joystick);
     } else if (this.lookPointer === null) {
       this.lookPointer = event.pointerId;
+      try { this.surface.setPointerCapture(event.pointerId); } catch { /* Synthetic QA events do not own an active pointer. */ }
       this.lookX = event.clientX;
       this.lookY = event.clientY;
     }
@@ -50,13 +65,22 @@ export class MobileControls {
   private onPointerUp = (event: PointerEvent): void => {
     if (event.pointerId === this.joystickPointer) {
       event.preventDefault();
-      this.joystickPointer = null;
-      this.input.mobileMove = { x: 0, y: 0 };
-      const thumb = document.querySelector<HTMLElement>('#joystick-thumb');
-      if (thumb) thumb.style.transform = 'translate(-50%, -50%)';
+      this.releaseJoystick();
     }
     if (event.pointerId === this.lookPointer) { event.preventDefault(); this.lookPointer = null; }
   };
+
+  private onLostCapture = (event: PointerEvent): void => {
+    if (event.pointerId === this.joystickPointer) this.releaseJoystick();
+    if (event.pointerId === this.lookPointer) this.lookPointer = null;
+  };
+
+  private releaseJoystick(): void {
+    this.joystickPointer = null;
+    this.input.resetMobileMove();
+    const thumb = document.querySelector<HTMLElement>('#joystick-thumb');
+    if (thumb) thumb.style.transform = 'translate(-50%, -50%)';
+  }
 
   private updateJoystick(event: PointerEvent, joystick: HTMLElement): void {
     const rect = joystick.getBoundingClientRect();

@@ -1,5 +1,5 @@
 import type { InstallationPoint } from '../electrical/InstallationPoint';
-import type { PvcTool } from '../systems/ConduitSystem';
+import type { RigTool } from '../player/FPSRig';
 
 const stageLabel: Record<string, string> = {
   inspect: 'INSPECT & MARK', marked: 'CHASE MASONRY', chasing: 'CHASE MASONRY', chased: 'FIT BOXES', fitted: 'APPLY MORTAR',
@@ -44,7 +44,7 @@ export class HUD {
             <div id="joystick" aria-label="Movement joystick"><div class="joystick-ring"></div><div id="joystick-thumb"></div></div>
             <div class="mobile-actions">
               <button id="mobile-action">ACTION</button>
-              <div><button id="tool-spring">SPRING</button><button id="tool-cutter">CUTTER</button></div>
+              <div><button id="tool-prev" aria-label="Previous tool">◀ TOOL</button><button id="tool-next" aria-label="Next tool">TOOL ▶</button></div>
             </div>
           </div>
           <section id="start-screen" class="screen-panel">
@@ -53,7 +53,7 @@ export class HUD {
             <p>Mark the clay brick. Chase real masonry. Set every recessed box level and flush. Finish the rigid PVC routes before the builders plaster.</p>
             <div class="brief-grid"><span>3 installation points</span><span>No cable pulling</span><span>Desktop + mobile</span></div>
             <button id="start-button">ENTER THE SITE</button>
-            <small>WASD · MOUSE LOOK · E ACTION · 1/2 TOOLS</small>
+            <small>WASD · MOUSE LOOK · E ACTION · WHEEL CYCLES TOOLS · 1/2 SPRING/CUTTER</small>
           </section>
           <section id="result-panel" class="screen-panel result-panel">
             <div class="eyebrow">LIVING ROOM · INSPECTION PASSED</div>
@@ -86,36 +86,33 @@ export class HUD {
     });
   }
 
-  update(point: InstallationPoint | null, targeted: boolean, missionProgress: number, selectedTool: PvcTool): void {
+  update(point: InstallationPoint | null, targeted: boolean, missionProgress: number, selectedTool: RigTool): void {
     this.progress.style.width = `${missionProgress}%`;
     this.reticle.classList.toggle('active', targeted);
+    if (performance.now() > this.messageUntil) {
+      this.prompt.textContent = '';
+      this.prompt.classList.remove('visible', 'warning');
+    }
     if (!point) {
       this.objective.textContent = 'Site ready for inspection';
-      this.prompt.textContent = '';
       return;
     }
     this.objective.textContent = `${point.definition.label} · ${stageLabel[point.stage]}`;
-    const contextual = point.stage === 'leveling' ? 'Use LEFT / RIGHT and IN / OUT, then CONFIRM'
-      : point.stage === 'chasing' ? `ACTION · HAMMER HIT ${point.chaseHits + 1}/4`
-      : point.stage === 'conduit' && point.pipeStep === 'cut' ? 'Select CUTTER, then ACTION'
-      : point.stage === 'conduit' && point.pipeStep === 'bend' ? 'Select SPRING, then ACTION'
-      : point.stage === 'conduit' && point.pipeStep === 'install' ? 'ACTION · INSTALL PIPE'
-      : `ACTION · ${stageLabel[point.stage]}`;
-    if (performance.now() > this.messageUntil) this.prompt.textContent = targeted || point.stage === 'leveling' ? contextual : 'Move closer and aim at the active point';
     this.levelPanel.classList.toggle('visible', point.stage === 'leveling');
-    this.tool.classList.toggle('leveling-hidden', point.stage === 'leveling');
     if (point.stage === 'leveling') {
       const tilt = point.boxGroup.tiltDegrees;
       const depth = point.boxGroup.depthError * 1000;
       this.levelReadout.innerHTML = `<span class="${point.boxGroup.isLevel ? 'ok' : ''}">LEVEL ${tilt >= 0 ? '+' : ''}${tilt.toFixed(2)}°</span><span class="${point.boxGroup.isFlush ? 'ok' : ''}">DEPTH ${depth >= 0 ? '+' : ''}${depth.toFixed(1)} mm</span>`;
     }
-    this.tool.innerHTML = `<span>TOOLS</span><b class="${selectedTool === 'spring' ? 'selected' : ''}">1 SPRING</b><b class="${selectedTool === 'cutter' ? 'selected' : ''}">2 CUTTER</b>`;
+    this.tool.innerHTML = `<span>SELECTED TOOL</span><b class="selected">${selectedTool.toUpperCase()}</b>`;
+    this.shell.dataset.aimed = targeted ? 'true' : 'false';
   }
 
   notify(message: string, good = true): void {
     this.prompt.textContent = message;
     this.prompt.classList.toggle('warning', !good);
-    this.messageUntil = performance.now() + 2100;
+    this.prompt.classList.add('visible');
+    this.messageUntil = performance.now() + 700;
   }
 
   showResult(): void { this.result.classList.add('visible'); }

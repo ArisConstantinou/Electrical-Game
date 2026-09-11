@@ -22,7 +22,8 @@ button { font: inherit; }
 #reticle span:last-child { transform: translate(-50%,-50%) rotate(90deg); }
 #reticle.active { transform: translate(-50%,-50%) scale(1.25); opacity: 1; }
 #reticle.active span { background: #e68a51; }
-#interaction-prompt { position: absolute; z-index: 5; left: 50%; bottom: 72px; transform: translateX(-50%); min-height: 38px; max-width: min(620px, 80vw); padding: 9px 16px; color: #fff; background: rgba(21,20,17,.75); border-bottom: 2px solid #d66d38; font: 700 16px/1.2 'Barlow Condensed', sans-serif; letter-spacing: .05em; text-align: center; }
+#interaction-prompt { position: absolute; z-index: 7; left: 50%; top: 92px; transform: translate(-50%, -5px); max-width: min(340px, calc(100% - 40px)); padding: 7px 12px; color: #fff; background: rgba(21,20,17,.82); border-left: 3px solid #d66d38; font: 700 14px/1.15 'Barlow Condensed', sans-serif; letter-spacing: .035em; text-align: center; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .16s ease, transform .16s ease, visibility .16s; }
+#interaction-prompt.visible { opacity: 1; visibility: visible; transform: translate(-50%, 0); }
 #interaction-prompt.warning { border-color: #d7ad43; }
 #level-panel { display: none; left: 50%; bottom: 120px; width: min(580px, calc(100% - 32px)); padding: 14px; transform: translateX(-50%); }
 #level-panel.visible { display: block; }
@@ -60,10 +61,11 @@ button { font: inherit; }
 @media (pointer: coarse), (max-width: 760px) {
   #game-shell { height: 100svh; min-height: 480px; }
   #mobile-controls { display: block; }
-  #tool-status { top: auto; right: 12px; bottom: 184px; }
+  #tool-status { top: auto; right: max(18px, env(safe-area-inset-right)); bottom: 184px; width: 154px; justify-content: center; padding: 9px 8px; }
+  #tool-status span { display: none; }
   #top-hud { top: max(10px, env(safe-area-inset-top)); left: 10px; width: calc(100% - 20px); padding: 11px 12px; }
   #objective { font-size: 17px; }
-  #interaction-prompt { bottom: 166px; max-width: calc(100% - 42px); font-size: 14px; }
+  #interaction-prompt { top: max(104px, calc(env(safe-area-inset-top) + 96px)); max-width: calc(100% - 32px); font-size: 14px; }
   #level-panel { bottom: 258px; }
   .level-buttons { grid-template-columns: repeat(5, minmax(50px, 1fr)); overflow-x: auto; }
   .level-buttons button { padding: 0 2px; font-size: 12px; letter-spacing: .02em; }
@@ -77,7 +79,7 @@ button { font: inherit; }
   #joystick { width: 116px; height: 116px; }
   #joystick-thumb { width: 50px; height: 50px; }
   .mobile-actions { width: 140px; }
-  #interaction-prompt { bottom: 130px; }
+  #interaction-prompt { top: max(92px, calc(env(safe-area-inset-top) + 82px)); }
   #level-panel { bottom: 148px; }
   .screen-panel p { margin: 6px 0 10px; }
   .brief-grid { margin-bottom: 12px; }

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
-export type RigTool = 'spray' | 'hammer' | 'fitting' | 'level' | 'pvc';
+export type RigTool = 'spray' | 'hammer' | 'fitting' | 'level' | 'spring' | 'cutter';
+export const RIG_TOOLS: RigTool[] = ['spray', 'hammer', 'fitting', 'level', 'spring', 'cutter'];
 
 const material = (color: number, roughness = 0.7, metalness = 0.05): THREE.MeshStandardMaterial => new THREE.MeshStandardMaterial({ color, roughness, metalness, depthTest: false });
 const place = (object: THREE.Object3D, x: number, y: number, z: number): THREE.Object3D => { object.position.set(x, y, z); object.renderOrder = 20; return object; };
@@ -19,7 +20,8 @@ export class FPSRig extends THREE.Group {
     this.addTool('hammer', this.createHammer());
     this.addTool('fitting', this.createFittingTool());
     this.addTool('level', this.createLevel());
-    this.addTool('pvc', this.createPvcTools());
+    this.addTool('spring', this.createPvcTool('spring'));
+    this.addTool('cutter', this.createPvcTool('cutter'));
     this.show('spray');
   }
 
@@ -90,16 +92,17 @@ export class FPSRig extends THREE.Group {
     group.add(bar, vial);
     return group;
   }
-  private createPvcTools(): THREE.Group {
+  private createPvcTool(selected: 'spring' | 'cutter'): THREE.Group {
     const group = new THREE.Group();
-    group.add(this.hand(-0.25, -0.22, 0.08, 0.12), this.hand(0.26, -0.2, 0.05, -0.12));
+    group.add(this.hand(selected === 'spring' ? -0.25 : 0.26, -0.21, 0.06, selected === 'spring' ? 0.12 : -0.12));
     const spring = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.008, 8, 28, Math.PI * 1.7), material(0x82827c, 0.35, 0.75));
     spring.rotation.x = 0.5; place(spring, -0.18, -0.08, -0.08);
     const cutterBody = new THREE.Mesh(new THREE.TorusGeometry(0.055, 0.018, 8, 18, Math.PI * 1.45), material(0xb53026, 0.5, 0.32));
     cutterBody.rotation.z = 1.2; place(cutterBody, 0.18, -0.06, -0.08);
     const blade = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.009, 16), material(0xc4c5c0, 0.25, 0.82));
     blade.rotation.x = Math.PI / 2; place(blade, 0.205, -0.04, -0.095);
-    group.add(spring, cutterBody, blade);
+    if (selected === 'spring') group.add(spring);
+    else group.add(cutterBody, blade);
     return group;
   }
 }

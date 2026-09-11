@@ -14,8 +14,9 @@ const aimAtActive = page => page.evaluate(() => {
   const game = window.__wireTheHouse;
   const point = game.mission.activePoint;
   if (!point) return;
-  game.renderer.camera.position.set(point.definition.x, 1.36, -0.72);
-  const targetY = point.definition.bottom + 0.037;
+  const targetX = point.position.x;
+  const targetY = point.position.y;
+  game.renderer.camera.position.set(targetX, 1.36, -0.72);
   const dy = targetY - game.renderer.camera.position.y;
   const dz = -2.41 - game.renderer.camera.position.z;
   game.player.yaw = 0;
@@ -23,21 +24,27 @@ const aimAtActive = page => page.evaluate(() => {
   game.renderer.camera.rotation.set(game.player.pitch, 0, 0);
   game.step(1 / 60);
 });
-const action = async page => { await page.keyboard.press('KeyE'); await page.waitForTimeout(35); };
+const action = async page => { await page.keyboard.press('KeyE'); await page.evaluate(() => window.advanceTime(34)); };
 const mobileTap = async (page, selector) => { await page.locator(selector).tap(); await page.evaluate(() => window.advanceTime(34)); };
 const reachLeveling = async page => {
+  await page.keyboard.press('Digit3');
   await action(page);
+  await page.keyboard.press('Digit4');
   for (let index = 0; index < 4; index += 1) await action(page);
   if ((await state(page)).activePoint.id === 'A') await page.screenshot({ path: outputPath('desktop-real-chase.png') });
+  await page.keyboard.press('Digit5');
+  await aimAtActive(page);
   await action(page);
   await action(page);
   if ((await state(page)).activePoint.id === 'A') await page.screenshot({ path: outputPath('desktop-mortar-flush.png') });
+  await page.keyboard.press('Digit6');
   await action(page);
   const current = await state(page);
   if (current.activePoint.stage !== 'leveling') throw new Error(`Expected leveling, got ${current.activePoint.stage}`);
   if (current.activePoint.id === 'A') await page.screenshot({ path: outputPath('desktop-leveling.png') });
 };
 const finishPipe = async page => {
+  await page.keyboard.press('Digit1');
   await action(page);
   await page.keyboard.press('Digit2');
   await action(page);
@@ -59,8 +66,8 @@ await desktop.mouse.move(740, 330);
 const afterLook = await state(desktop);
 if (afterLook.player.yaw === beforeMove.player.yaw || afterLook.player.pitch === beforeMove.player.pitch) throw new Error('Desktop Pointer Lock mouse look did not update yaw and pitch');
 await desktop.mouse.wheel(0, 120);
-if ((await state(desktop)).mission.selectedTool !== 'cutter') throw new Error('Desktop mouse wheel did not change the selected tool');
-await desktop.keyboard.press('Digit1');
+if ((await state(desktop)).mission.selectedTool !== 'hammer') throw new Error('Desktop mouse wheel did not cycle the visible work tool');
+await desktop.keyboard.press('Digit3');
 await desktop.keyboard.down('KeyS');
 await desktop.evaluate(() => window.advanceTime(500));
 await desktop.keyboard.up('KeyS');
@@ -95,7 +102,7 @@ mobile.on('pageerror', error => errors.push(`mobile page: ${error.message}`));
 await mobile.goto(baseUrl, { waitUntil: 'networkidle' });
 await mobile.click('#start-button');
 await mobile.waitForTimeout(450);
-for (const selector of ['#mobile-action', '#tool-spring', '#tool-cutter']) {
+for (const selector of ['#mobile-action', '#tool-prev', '#tool-next']) {
   const box = await mobile.locator(selector).boundingBox();
   if (!box || box.width < 44 || box.height < 44) throw new Error(`${selector} is below the 44px touch target`);
 }
@@ -133,12 +140,50 @@ await mobile.evaluate(async () => {
 });
 const mobileAfterMove = await state(mobile);
 if (Math.hypot(mobileAfterMove.player.x - mobileBeforeMove.player.x, mobileAfterMove.player.z - mobileBeforeMove.player.z) < 0.2) throw new Error('Mobile joystick did not move the player');
+const stuckCheck = await mobile.evaluate(async () => {
+  const game = window.__wireTheHouse;
+  const joystick = document.querySelector('#joystick');
+  const next = document.querySelector('#tool-next');
+  const rect = joystick.getBoundingClientRect();
+  const dispatch = (target, type, pointerId, x, y) => target.dispatchEvent(new PointerEvent(type, { pointerId, pointerType: 'touch', clientX: x, clientY: y, bubbles: true, cancelable: true }));
+  dispatch(joystick, 'pointerdown', 193, rect.left + rect.width / 2, rect.top + rect.height / 2);
+  dispatch(joystick, 'pointermove', 193, rect.left + rect.width / 2, rect.top + 8);
+  dispatch(next, 'pointerdown', 194, 320, 760);
+  const before = game.renderer.camera.position.clone();
+  window.advanceTime(500);
+  return { distance: before.distanceTo(game.renderer.camera.position), move: { ...game.input.mobileMove }, tool: game.selectedTool };
+});
+if (stuckCheck.distance > 0.01 || stuckCheck.move.x !== 0 || stuckCheck.move.y !== 0) throw new Error(`Joystick remained stuck after interrupted pointer: ${JSON.stringify(stuckCheck)}`);
+await mobileTap(mobile, '#tool-prev');
 await aimAtActive(mobile);
 await mobileTap(mobile, '#mobile-action');
 if ((await state(mobile)).activePoint.stage !== 'marked') throw new Error('Mobile ACTION did not mark the point');
+if ((await state(mobile)).workSurface.freeSprayMarks < 1) throw new Error('Free spray did not create a visible wall mark');
+const graffiti = await mobile.evaluate(() => {
+  const shell = document.querySelector('#game-shell');
+  const actionButton = document.querySelector('#mobile-action');
+  const dispatch = (target, type, pointerId, x, y) => target.dispatchEvent(new PointerEvent(type, { pointerId, pointerType: 'touch', clientX: x, clientY: y, bubbles: true, cancelable: true }));
+  dispatch(actionButton, 'pointerdown', 201, 330, 700);
+  dispatch(shell, 'pointerdown', 202, 260, 340);
+  for (const [x, y] of [[250, 335], [240, 345], [230, 360], [220, 375]]) {
+    dispatch(shell, 'pointermove', 202, x, y);
+    window.advanceTime(100);
+  }
+  dispatch(shell, 'pointerup', 202, 220, 375);
+  dispatch(actionButton, 'pointerup', 201, 330, 700);
+  return JSON.parse(window.render_game_to_text()).workSurface.freeSprayMarks;
+});
+if (graffiti < 4) throw new Error(`Held mobile spray did not paint a free stroke: ${graffiti} marks`);
+await mobile.screenshot({ path: outputPath('mobile-free-spray.png') });
+await mobile.waitForTimeout(800);
+if (await mobile.locator('#interaction-prompt.visible').isVisible()) throw new Error('Action notification did not dismiss after its short timeout');
+await mobileTap(mobile, '#tool-next');
 for (let index = 0; index < 4; index += 1) await mobileTap(mobile, '#mobile-action');
+await mobileTap(mobile, '#tool-next');
+await aimAtActive(mobile);
 await mobileTap(mobile, '#mobile-action');
 await mobileTap(mobile, '#mobile-action');
+await mobileTap(mobile, '#tool-next');
 await mobileTap(mobile, '#mobile-action');
 if ((await state(mobile)).activePoint.stage !== 'leveling') throw new Error('Mobile ACTION did not reach leveling mode');
 for (let index = 0; index < 3; index += 1) await mobileTap(mobile, '[data-level="left"]');

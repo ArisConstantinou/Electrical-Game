@@ -28,11 +28,18 @@ export class InstallationPoint extends THREE.Group {
     this.hotspot.userData.installationPoint = this;
     this.hotspot.position.z = 0.018;
     this.add(this.hotspot);
+    this.hotspot.visible = false;
+  }
+
+  placeAt(x: number, centreY: number): void {
+    const halfWidth = this.boxGroup.groupWidth / 2 + 0.12;
+    this.position.x = THREE.MathUtils.clamp(x, -GAME_CONFIG.room.width / 2 + halfWidth, GAME_CONFIG.room.width / 2 - halfWidth);
+    this.position.y = THREE.MathUtils.clamp(centreY, this.boxGroup.groupHeight / 2 + 0.06, GAME_CONFIG.room.height - this.boxGroup.groupHeight / 2 - 0.08);
   }
 
   setStage(stage: InstallationStage): void {
     this.stage = stage;
-    this.hotspot.visible = stage !== 'complete' && stage !== 'leveling';
+    this.hotspot.visible = false;
   }
 
   createMortar(): THREE.Mesh {

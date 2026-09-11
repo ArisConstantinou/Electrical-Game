@@ -1,4 +1,6 @@
+import * as THREE from 'three';
 import type { InstallationPoint } from '../electrical/InstallationPoint';
+import type { RigTool } from '../player/FPSRig';
 import type { ChasingSystem } from './ChasingSystem';
 import type { ConduitSystem } from './ConduitSystem';
 import type { LevelingSystem } from './LevelingSystem';
@@ -16,38 +18,42 @@ export class InteractionSystem {
     private readonly conduit: ConduitSystem,
   ) {}
 
-  action(point: InstallationPoint): InteractionResult {
-    if (point.stage === 'inspect') {
-      this.marking.mark(point);
-      return { success: true, message: `Point ${point.definition.id} inspected and marked on the brick face.` };
+  action(point: InstallationPoint, tool: RigTool, camera: THREE.Camera): InteractionResult {
+    if (tool === 'spray') {
+      const firstMark = point.stage === 'inspect';
+      const painted = this.marking.spray(camera, point);
+      return { success: painted, message: !painted ? 'Aim the spray at brick.' : firstMark ? `Point ${point.definition.id}: free mark started.` : '' };
     }
-    if (point.stage === 'marked' || point.stage === 'chasing') {
-      this.chasing.hit(point);
-      return { success: true, message: point.chaseHits >= 4 ? 'Real masonry opening complete.' : `Demolition hammer: ${point.chaseHits}/4` };
+    if (tool === 'hammer') {
+      if (point.stage !== 'marked' && point.stage !== 'chasing') return { success: false, message: point.stage === 'inspect' ? 'Use SPRAY first and draw your chase.' : 'The masonry opening is already complete.' };
+      const hit = this.chasing.hit(camera, point);
+      return { success: hit, message: !hit ? 'Aim the demolition hammer at intact brick.' : point.chaseHits >= 4 ? 'Real masonry opening complete.' : '' };
     }
-    if (point.stage === 'chased') {
+    if (tool === 'fitting' && point.stage === 'chased') {
       point.boxGroup.visible = true;
       const direction = point.definition.id === 'B' ? -1 : 1;
       point.boxGroup.setInitialError(direction * (2.25 + point.definition.id.charCodeAt(0) % 2), direction * 0.006);
       point.setStage('fitted');
       return { success: true, message: 'Box group fitted into the recess with a small alignment error.' };
     }
-    if (point.stage === 'fitted') {
+    if (tool === 'fitting' && point.stage === 'fitted') {
       this.mortar.apply(point);
       return { success: true, message: 'Continuous mortar bed applied around the complete group.' };
     }
-    if (point.stage === 'mortared') {
+    if (tool === 'level' && point.stage === 'mortared') {
       this.leveling.begin(point);
       return { success: true, message: 'Leveling mode: correct tilt and flush depth.' };
     }
-    if (point.stage === 'leveling') {
+    if (tool === 'level' && point.stage === 'leveling') {
       const passed = this.leveling.confirm(point);
       return { success: passed, message: passed ? 'LEVEL and FLUSH passed.' : 'Not yet: bubble and depth must both be inside tolerance.' };
     }
-    if (point.stage === 'leveled' || point.stage === 'conduit') {
+    if ((tool === 'spring' || tool === 'cutter') && (point.stage === 'leveled' || point.stage === 'conduit')) {
+      this.conduit.selectTool(tool);
       const result = this.conduit.action(point);
       return { success: result.changed, message: result.message };
     }
-    return { success: false, message: 'This point is complete.' };
+    const required: Record<string, string> = { inspect: 'SPRAY', marked: 'HAMMER', chasing: 'HAMMER', chased: 'FITTING TOOL', fitted: 'FITTING TOOL', mortared: 'SPIRIT LEVEL', leveling: 'SPIRIT LEVEL', leveled: 'SPRING / CUTTER', conduit: 'SPRING / CUTTER', complete: 'NONE' };
+    return { success: false, message: `Select ${required[point.stage]} for this step.` };
   }
 }
