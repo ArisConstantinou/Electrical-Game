@@ -12,7 +12,9 @@ Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web gam
 ## Current
 
 - Freeform controls revision implemented after physical iPhone feedback: transient toast, global tool cycling, visible selected tools, held free spray, reticle-based brick removal and stuck-joystick recovery.
-- Full desktop mission and mobile interaction smoke pass are green locally; final build/Studio contract/deployment verification remains.
+- Desktop left mouse now uses the selected tool; holding it continuously operates spray and hammer. E remains as an accessible alternate input.
+- The live desktop HUD explicitly shows `LEFT CLICK TO USE` beside the selected tool.
+- Desktop left-click/held-tool coverage, the full desktop mission, mobile interaction smoke, typecheck, production build, Studio contract, and final screenshot inspection are green locally.
 
 ## Keep in mind
 

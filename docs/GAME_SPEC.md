@@ -12,7 +12,7 @@ For every point: inspect, mark, chase real removable masonry, fit recessed boxes
 
 ## Controls
 
-- Desktop: WASD, mouse look after entering, E action/confirm, A/D tilt and W/S depth while leveling, wheel or 1/2 to select spring/cutter, Shift to walk faster, F fullscreen, Esc releases pointer lock.
+- Desktop: WASD, mouse look after entering, left mouse or E to use/hold the selected tool, A/D tilt and W/S depth while leveling, wheel or 1–6 to select tools, Shift to walk faster, F fullscreen, Esc releases pointer lock.
 - Mobile: left movement joystick, swipe the free game area to look, large ACTION / SPRING / CUTTER controls, and LEFT / RIGHT / IN / OUT / CONFIRM while leveling.
 
 ## Architecture and continuation

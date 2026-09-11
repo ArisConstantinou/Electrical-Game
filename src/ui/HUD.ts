@@ -53,7 +53,7 @@ export class HUD {
             <p>Mark the clay brick. Chase real masonry. Set every recessed box level and flush. Finish the rigid PVC routes before the builders plaster.</p>
             <div class="brief-grid"><span>3 installation points</span><span>No cable pulling</span><span>Desktop + mobile</span></div>
             <button id="start-button">ENTER THE SITE</button>
-            <small>WASD · MOUSE LOOK · E ACTION · WHEEL CYCLES TOOLS · 1/2 SPRING/CUTTER</small>
+            <small>WASD · MOUSE LOOK · LEFT CLICK / E USE TOOL · WHEEL CYCLES TOOLS · 1–6 SELECT TOOL</small>
           </section>
           <section id="result-panel" class="screen-panel result-panel">
             <div class="eyebrow">LIVING ROOM · INSPECTION PASSED</div>
@@ -104,7 +104,7 @@ export class HUD {
       const depth = point.boxGroup.depthError * 1000;
       this.levelReadout.innerHTML = `<span class="${point.boxGroup.isLevel ? 'ok' : ''}">LEVEL ${tilt >= 0 ? '+' : ''}${tilt.toFixed(2)}°</span><span class="${point.boxGroup.isFlush ? 'ok' : ''}">DEPTH ${depth >= 0 ? '+' : ''}${depth.toFixed(1)} mm</span>`;
     }
-    this.tool.innerHTML = `<span>SELECTED TOOL</span><b class="selected">${selectedTool.toUpperCase()}</b>`;
+    this.tool.innerHTML = `<span>SELECTED TOOL</span><b class="selected">${selectedTool.toUpperCase()}</b><em>LEFT CLICK TO USE</em>`;
     this.shell.dataset.aimed = targeted ? 'true' : 'false';
   }
 

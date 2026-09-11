@@ -25,6 +25,11 @@ const aimAtActive = page => page.evaluate(() => {
   game.step(1 / 60);
 });
 const action = async page => { await page.keyboard.press('KeyE'); await page.evaluate(() => window.advanceTime(34)); };
+const leftClickAction = async page => {
+  await page.mouse.down({ button: 'left' });
+  await page.evaluate(() => window.advanceTime(34));
+  await page.mouse.up({ button: 'left' });
+};
 const mobileTap = async (page, selector) => { await page.locator(selector).tap(); await page.evaluate(() => window.advanceTime(34)); };
 const reachLeveling = async page => {
   await page.keyboard.press('Digit3');
@@ -67,6 +72,18 @@ const afterLook = await state(desktop);
 if (afterLook.player.yaw === beforeMove.player.yaw || afterLook.player.pitch === beforeMove.player.pitch) throw new Error('Desktop Pointer Lock mouse look did not update yaw and pitch');
 await desktop.mouse.wheel(0, 120);
 if ((await state(desktop)).mission.selectedTool !== 'hammer') throw new Error('Desktop mouse wheel did not cycle the visible work tool');
+await desktop.keyboard.press('Digit3');
+await aimAtActive(desktop);
+await leftClickAction(desktop);
+if ((await state(desktop)).activePoint.stage !== 'marked') throw new Error('Desktop left mouse did not use the selected tool');
+await desktop.keyboard.press('Digit4');
+await desktop.mouse.down({ button: 'left' });
+await desktop.evaluate(() => window.advanceTime(800));
+await desktop.mouse.up({ button: 'left' });
+if ((await state(desktop)).activePoint.stage !== 'chased') throw new Error('Holding desktop left mouse did not repeatedly use the hammer');
+await desktop.reload({ waitUntil: 'networkidle' });
+await desktop.click('#start-button');
+await desktop.waitForTimeout(450);
 await desktop.keyboard.press('Digit3');
 await desktop.keyboard.down('KeyS');
 await desktop.evaluate(() => window.advanceTime(500));

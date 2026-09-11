@@ -50,7 +50,7 @@ export class Game {
     this.chasing = new ChasingSystem(this.renderer.scene, this.room.brickWall);
     this.conduit = new ConduitSystem(this.renderer.scene);
     this.interaction = new InteractionSystem(new MarkingSystem(this.room.brickWall), this.chasing, new MortarSystem(), this.leveling, this.conduit);
-    new DesktopControls(this.hud.shell, this.player);
+    new DesktopControls(this.hud.shell, this.player, this.input);
     new MobileControls(this.hud.shell, this.input, this.player);
     new MobileHUD();
     this.bindEvents();

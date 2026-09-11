@@ -1,10 +1,22 @@
 import type { PlayerController } from './PlayerController';
+import type { Input } from '../core/Input';
 
 export class DesktopControls {
-  constructor(surface: HTMLElement, player: PlayerController) {
+  constructor(surface: HTMLElement, player: PlayerController, input: Input) {
     surface.addEventListener('click', () => {
       if (!this.isTouchDevice && document.pointerLockElement !== surface) void surface.requestPointerLock();
     });
+    surface.addEventListener('pointerdown', event => {
+      if (this.isTouchDevice || event.button !== 0 || (event.target as Element).closest('button')) return;
+      event.preventDefault();
+      input.actionHeld = true;
+      input.actionRequested = true;
+    });
+    const releasePrimaryAction = (event: PointerEvent): void => {
+      if (event.button === 0) input.actionHeld = false;
+    };
+    addEventListener('pointerup', releasePrimaryAction);
+    addEventListener('pointercancel', () => { input.actionHeld = false; });
     document.addEventListener('mousemove', event => {
       if (document.pointerLockElement === surface) player.look(event.movementX, event.movementY);
     });
