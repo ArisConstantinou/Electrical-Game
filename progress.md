@@ -24,6 +24,8 @@ Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web gam
 - Verified a fifth post-objective demolition hit, real desktop LEFT/RIGHT clicks, right-mouse exit/resume, full mission completion, and a mobile leveling layout with full-width CONFIRM/EXIT and no clipping.
 - Desktop game height now fills 100svh instead of stopping at 920px. Demolition ray range is 4.5m for ceiling/floor-edge bricks. LIVE spray uses one 2048x1024 canvas texture with round feathered strokes and fine mist instead of overlapping rectangular meshes.
 - Verified at 1600x1200 that the game fills the viewport and the footer begins below it; verified separate demolition hits at wall heights 2.93m and 0.07m; full desktop/mobile mission smoke remains green with the canvas-based spray.
+- Full 472-position wall scan exposed phantom re-hits on already shrunken InstancedMesh bricks. Destroyed instance IDs are now permanently filtered from raycasts so every hammer hit advances to an actually visible brick.
+- Hammer targeting now uses a dense 5x5 chisel sampling grid around the reticle, and gameplay regression permanently asserts that all 472 wall bricks can be uniquely destroyed.
 
 ## Keep in mind
 

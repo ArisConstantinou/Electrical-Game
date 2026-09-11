@@ -113,6 +113,31 @@ await demolition.evaluate(() => {
   game.step(1 / 60);
 });
 await demolition.screenshot({ path: outputPath('desktop-top-bottom-demolition.png') });
+const fullWallResult = await demolition.evaluate(() => {
+  const game = window.__wireTheHouse;
+  const wall = game.room.brickWall;
+  const camera = game.renderer.camera;
+  camera.position.set(0, 1.5, 0.2);
+  let pass = 0;
+  let previous = -1;
+  while (pass < 4 && wall.destroyedBrickCount !== previous) {
+    previous = wall.destroyedBrickCount;
+    for (let row = 0; row < 23; row += 1) {
+      for (let col = 0; col < 21; col += 1) {
+        const x = -3 + (6 / 21) / 2 + col * (6 / 21) + (row % 2 ? (6 / 21) / 2 : 0);
+        if (x > 2.98) continue;
+        const y = (3 / 23) / 2 + row * (3 / 23);
+        camera.lookAt(x, y, -2.5);
+        camera.updateMatrixWorld(true);
+        wall.removeAtAim(camera);
+      }
+    }
+    pass += 1;
+  }
+  return { destroyed: wall.destroyedBrickCount, passes: pass };
+});
+if (fullWallResult.destroyed !== 472) throw new Error(`Not every wall brick can be destroyed: ${JSON.stringify(fullWallResult)}`);
+await demolition.screenshot({ path: outputPath('desktop-full-wall-demolished.png') });
 await demolition.close();
 
 const desktop = await browser.newPage({ viewport: { width: 1366, height: 768 } });

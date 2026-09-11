@@ -18,6 +18,7 @@ export class BrickWall extends THREE.Group {
   private readonly removableByPoint = new Map<string, RemovableBrick[]>();
   private readonly breakables: THREE.Object3D[] = [];
   private readonly raycaster = new THREE.Raycaster();
+  private readonly destroyedInstanceIds = new WeakMap<THREE.InstancedMesh, Set<number>>();
   private readonly sprayMarks: Array<{ pointId: string; mesh: THREE.Mesh }> = [];
   private readonly livePaintCanvas = document.createElement('canvas');
   private readonly livePaintContext: CanvasRenderingContext2D;
@@ -102,7 +103,11 @@ export class BrickWall extends THREE.Group {
 
   private cast(camera: THREE.Camera, screenX: number, screenY: number, maxDistance: number): AimHit | null {
     this.raycaster.setFromCamera(new THREE.Vector2(screenX, screenY), camera);
-    const hit = this.raycaster.intersectObjects(this.breakables, false).find(candidate => candidate.distance <= maxDistance);
+    const hit = this.raycaster.intersectObjects(this.breakables, false).find(candidate => {
+      if (candidate.distance > maxDistance) return false;
+      if (!(candidate.object instanceof THREE.InstancedMesh) || candidate.instanceId === undefined) return candidate.object.visible;
+      return !this.destroyedInstanceIds.get(candidate.object)?.has(candidate.instanceId);
+    });
     if (!hit) return null;
     return { point: hit.point.clone(), object: hit.object, instanceId: hit.instanceId };
   }
@@ -180,10 +185,18 @@ export class BrickWall extends THREE.Group {
   }
 
   removeAtAim(camera: THREE.Camera): THREE.Vector3 | null {
-    const offsets = [[0, 0], [0.045, 0], [-0.045, 0], [0, 0.065], [0, -0.065], [0.085, 0.05], [-0.085, 0.05], [0.085, -0.05], [-0.085, -0.05]];
+    const offsets: number[][] = [[0, 0]];
+    for (const y of [-0.12, -0.06, 0, 0.06, 0.12]) {
+      for (const x of [-0.16, -0.08, 0, 0.08, 0.16]) {
+        if (x !== 0 || y !== 0) offsets.push([x, y]);
+      }
+    }
     const hit = offsets.map(([x, y]) => this.cast(camera, x, y, 4.5)).find(Boolean) ?? null;
     if (!hit) return null;
     if (hit.object instanceof THREE.InstancedMesh && hit.instanceId !== undefined) {
+      const destroyed = this.destroyedInstanceIds.get(hit.object) ?? new Set<number>();
+      destroyed.add(hit.instanceId);
+      this.destroyedInstanceIds.set(hit.object, destroyed);
       const matrix = new THREE.Matrix4();
       hit.object.getMatrixAt(hit.instanceId, matrix);
       matrix.scale(new THREE.Vector3(0.0001, 0.0001, 0.0001));
