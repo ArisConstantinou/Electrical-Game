@@ -43,11 +43,16 @@ export class HUD {
           <div id="interaction-prompt" role="status"></div>
           <div id="level-panel" class="hud-card" aria-label="Leveling controls">
             <div class="level-title">SPIRIT LEVEL · FULL GROUP</div>
+            <div class="spirit-visual" aria-label="Live spirit level bubble">
+              <div class="spirit-vial"><span class="spirit-centre"></span><i id="spirit-bubble"></i></div>
+              <div class="depth-visual"><span>WALL</span><i id="depth-marker"></i><span>FLUSH</span></div>
+            </div>
             <div id="level-readout"></div>
             <div class="level-buttons">
               <button data-level="left">LEFT</button><button data-level="right">RIGHT</button>
               <button data-level="in">IN</button><button data-level="out">OUT</button>
               <button data-level="confirm" class="confirm">CONFIRM</button>
+              <button data-level="cancel" class="cancel">EXIT LEVEL<span class="desktop-only"> · RMB</span></button>
             </div>
           </div>
           <div id="mobile-controls" aria-label="Mobile controls">
@@ -115,6 +120,10 @@ export class HUD {
       const tilt = point.boxGroup.tiltDegrees;
       const depth = point.boxGroup.depthError * 1000;
       this.levelReadout.innerHTML = `<span class="${point.boxGroup.isLevel ? 'ok' : ''}">LEVEL ${tilt >= 0 ? '+' : ''}${tilt.toFixed(2)}°</span><span class="${point.boxGroup.isFlush ? 'ok' : ''}">DEPTH ${depth >= 0 ? '+' : ''}${depth.toFixed(1)} mm</span>`;
+      const bubble = this.levelPanel.querySelector<HTMLElement>('#spirit-bubble');
+      const depthMarker = this.levelPanel.querySelector<HTMLElement>('#depth-marker');
+      if (bubble) bubble.style.transform = `translate(calc(-50% + ${Math.max(-76, Math.min(76, -tilt * 24))}px), -50%)`;
+      if (depthMarker) depthMarker.style.left = `${50 + Math.max(-42, Math.min(42, depth * 2.5))}%`;
     }
     this.tool.innerHTML = `<span>SELECTED TOOL</span><b class="selected">${selectedTool.toUpperCase()}</b><em>LEFT CLICK TO USE</em>`;
     this.shell.dataset.aimed = targeted ? 'true' : 'false';

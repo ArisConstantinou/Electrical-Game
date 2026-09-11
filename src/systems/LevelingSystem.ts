@@ -22,4 +22,9 @@ export class LevelingSystem {
     point.setStage('leveled');
     return true;
   }
+  cancel(point: InstallationPoint): void {
+    if (point.stage !== 'leveling') return;
+    point.boxGroup.levelBar.visible = false;
+    point.setStage('mortared');
+  }
 }

@@ -38,12 +38,19 @@ button { font: inherit; }
 #interaction-prompt.warning { border-color: #d7ad43; }
 #level-panel { display: none; left: 50%; bottom: 120px; width: min(580px, calc(100% - 32px)); padding: 14px; transform: translateX(-50%); }
 #level-panel.visible { display: block; }
+.spirit-visual { display: grid; grid-template-columns: minmax(180px, 2fr) minmax(120px, 1fr); gap: 12px; margin: 10px 0; }
+.spirit-vial { position: relative; height: 42px; overflow: hidden; border: 5px solid #d3a218; border-radius: 22px; background: linear-gradient(#b9d44e, #829c29); box-shadow: inset 0 0 8px rgba(0,0,0,.45); }
+.spirit-centre { position: absolute; left: 50%; top: 3px; bottom: 3px; width: 54px; transform: translateX(-50%); border-left: 2px solid rgba(30,40,12,.7); border-right: 2px solid rgba(30,40,12,.7); }
+#spirit-bubble { position: absolute; left: 50%; top: 50%; width: 34px; height: 22px; border: 2px solid rgba(255,255,230,.9); border-radius: 50%; background: rgba(247,245,210,.72); transition: transform .12s ease; }
+.depth-visual { position: relative; display: flex; justify-content: space-between; align-items: flex-end; height: 42px; padding: 0 6px 4px; border-bottom: 3px solid #8b8174; color: #bcb5ab; font: 700 12px/1 'Barlow Condensed', sans-serif; }
+#depth-marker { position: absolute; left: 50%; top: 2px; width: 4px; height: 35px; transform: translateX(-50%); background: #ffc46f; box-shadow: 0 0 8px rgba(255,196,111,.55); transition: left .12s ease; }
 #level-readout { display: flex; gap: 8px; margin: 9px 0 12px; }
 #level-readout span { flex: 1; padding: 8px; color: #ffc46f; background: #26231e; border: 1px solid #5d5142; font: 700 15px/1 'Barlow Condensed', sans-serif; text-align: center; }
 #level-readout span.ok { color: #9ee08f; border-color: #4e764a; }
 .level-buttons { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; }
 .level-buttons button, .mobile-actions button { min-height: 48px; border: 1px solid #81715f; color: #fff; background: #34302a; font: 800 14px/1 'Barlow Condensed', sans-serif; letter-spacing: .06em; }
 .level-buttons .confirm { background: #b85930; border-color: #df8658; }
+.level-buttons .cancel { grid-column: 1 / -1; background: #292621; border-color: #756a5c; }
 #mobile-controls { display: none; position: absolute; z-index: 6; inset: 0; pointer-events: none; }
 #joystick { position: absolute; left: max(22px, env(safe-area-inset-left)); bottom: max(25px, env(safe-area-inset-bottom)); width: 142px; height: 142px; pointer-events: auto; touch-action: none; }
 .joystick-ring { position: absolute; inset: 0; border: 2px solid rgba(255,255,255,.32); border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.08), rgba(20,18,15,.35)); box-shadow: inset 0 0 0 15px rgba(255,255,255,.025); }
@@ -84,8 +91,11 @@ button { font: inherit; }
   #objective { font-size: 17px; }
   #interaction-prompt { top: max(104px, calc(env(safe-area-inset-top) + 96px)); max-width: calc(100% - 32px); font-size: 14px; }
   #level-panel { bottom: 258px; }
-  .level-buttons { grid-template-columns: repeat(5, minmax(50px, 1fr)); overflow-x: auto; }
+  .spirit-visual { grid-template-columns: 1fr; }
+  .level-buttons { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .level-buttons button { padding: 0 2px; font-size: 12px; letter-spacing: .02em; }
+  .level-buttons .confirm { grid-column: 1 / -1; }
+  .desktop-only { display: none; }
   .screen-panel { padding: 24px; justify-content: center; background: linear-gradient(90deg, rgba(20,18,15,.95), rgba(20,18,15,.68)); }
   .screen-panel h1 { font-size: clamp(62px, 20vw, 100px); }
   .screen-panel p { font-size: 16px; line-height: 1.45; }

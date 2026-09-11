@@ -20,6 +20,8 @@ Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web gam
 - LIVE rendering was corrected from overlapping large circles to connected ribbon strokes with rounded caps; DOTS remains the only deliberately dotted method.
 - LIVE is now the default spray method; DOTS is retained as the opt-in alternative via METHOD or V.
 - Added an always-visible desktop key guide for movement, looking, use/interact, tool switching, spray method/color, fullscreen and pointer-lock release; it is hidden on touch/mobile where equivalent buttons are already visible.
+- Demo hammer can continue removing any aimed intact wall brick beyond the four required mission hits. Leveling now exits pointer lock, provides a live bubble/depth graphic, supports clickable controls, and can be cancelled with right mouse or `EXIT LEVEL · RMB`.
+- Verified a fifth post-objective demolition hit, real desktop LEFT/RIGHT clicks, right-mouse exit/resume, full mission completion, and a mobile leveling layout with full-width CONFIRM/EXIT and no clipping.
 
 ## Keep in mind
 

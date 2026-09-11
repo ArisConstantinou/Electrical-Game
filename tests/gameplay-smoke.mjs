@@ -36,6 +36,20 @@ const reachLeveling = async page => {
   await action(page);
   await page.keyboard.press('Digit4');
   for (let index = 0; index < 4; index += 1) await action(page);
+  const chaseComplete = await state(page);
+  if (chaseComplete.activePoint.id === 'A') {
+    const destroyedBefore = chaseComplete.workSurface.destroyedBricks;
+    await page.evaluate(() => {
+      const game = window.__wireTheHouse;
+      game.player.yaw += 0.1;
+      game.renderer.camera.rotation.set(game.player.pitch, game.player.yaw, 0);
+      game.step(1 / 60);
+    });
+    await action(page);
+    const destroyedAfter = (await state(page)).workSurface.destroyedBricks;
+    if (destroyedAfter <= destroyedBefore) throw new Error('Demo hammer stopped after the required four mission hits');
+    await aimAtActive(page);
+  }
   if ((await state(page)).activePoint.id === 'A') await page.screenshot({ path: outputPath('desktop-real-chase.png') });
   await page.keyboard.press('Digit5');
   await aimAtActive(page);
@@ -121,6 +135,23 @@ for (const id of ['A', 'B', 'C']) {
   const aimed = await state(desktop);
   if (!aimed.activePoint.targeted || aimed.activePoint.id !== id) throw new Error(`Could not target Point ${id}`);
   await reachLeveling(desktop);
+  if (id === 'A') {
+    const pointerLocked = await desktop.evaluate(() => Boolean(document.pointerLockElement));
+    if (pointerLocked) throw new Error('Pointer lock was not released when leveling opened');
+    const tiltBeforeButtons = (await state(desktop)).activePoint.tiltDegrees;
+    await desktop.locator('[data-level="left"]').click();
+    const tiltAfterLeft = (await state(desktop)).activePoint.tiltDegrees;
+    if (tiltAfterLeft >= tiltBeforeButtons) throw new Error('LEFT leveling button is not clickable');
+    await desktop.locator('[data-level="right"]').click();
+    const tiltAfterRight = (await state(desktop)).activePoint.tiltDegrees;
+    if (Math.abs(tiltAfterRight - tiltBeforeButtons) > 0.01) throw new Error('RIGHT leveling button is not clickable');
+    await desktop.mouse.click(700, 400, { button: 'right' });
+    await desktop.evaluate(() => window.advanceTime(34));
+    if ((await state(desktop)).activePoint.stage !== 'mortared') throw new Error('Right mouse did not exit leveling mode');
+    await aimAtActive(desktop);
+    await action(desktop);
+    if ((await state(desktop)).activePoint.stage !== 'leveling') throw new Error('Could not resume leveling after right-mouse exit');
+  }
   if (id === 'A' || id === 'C') {
     for (let index = 0; index < 3; index += 1) await desktop.keyboard.press('KeyA');
     for (let index = 0; index < 2; index += 1) await desktop.keyboard.press('KeyW');

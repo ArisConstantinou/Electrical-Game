@@ -31,9 +31,9 @@ export class InteractionSystem {
       return { success: painted, message: !painted ? 'Aim the spray at brick.' : firstMark ? `Point ${point.definition.id}: free mark started.` : '' };
     }
     if (tool === 'hammer') {
-      if (point.stage !== 'marked' && point.stage !== 'chasing') return { success: false, message: point.stage === 'inspect' ? 'Use SPRAY first and draw your chase.' : 'The masonry opening is already complete.' };
-      const hit = this.chasing.hit(camera, point);
-      return { success: hit, message: !hit ? 'Aim the demolition hammer at intact brick.' : point.chaseHits >= 4 ? 'Real masonry opening complete.' : '' };
+      const missionChase = point.stage === 'marked' || point.stage === 'chasing';
+      const hit = missionChase ? this.chasing.hit(camera, point) : this.chasing.freeHit(camera);
+      return { success: hit, message: !hit ? 'Aim the demolition hammer at intact brick.' : missionChase && point.chaseHits >= 4 ? 'Required opening complete. Keep demolishing anywhere if needed.' : '' };
     }
     if (tool === 'fitting' && point.stage === 'chased') {
       point.boxGroup.visible = true;

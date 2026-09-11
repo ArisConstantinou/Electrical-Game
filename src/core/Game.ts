@@ -45,6 +45,7 @@ export class Game {
   private resultShown = false;
   private actionCooldown = 0;
   private wasSpraying = false;
+  private wasLeveling = false;
 
   constructor(root: HTMLElement) {
     this.hud = new HUD(root);
@@ -77,6 +78,8 @@ export class Game {
   step(dt: number): void {
     const active = this.mission.activePoint;
     const leveling = active?.stage === 'leveling';
+    if (leveling && !this.wasLeveling && document.pointerLockElement) void document.exitPointerLock();
+    this.wasLeveling = leveling;
     if (this.started && !leveling) this.player.update(Math.min(dt, 0.05));
     this.actionCooldown = Math.max(0, this.actionCooldown - dt);
     const requested = this.input.consumeAction();
@@ -114,7 +117,7 @@ export class Game {
       mode: !this.started ? 'start' : this.mission.complete ? 'mission-complete' : point?.stage === 'leveling' ? 'leveling' : 'playing',
       player: { x: Number(this.renderer.camera.position.x.toFixed(3)), y: Number(this.renderer.camera.position.y.toFixed(3)), z: Number(this.renderer.camera.position.z.toFixed(3)), yaw: Number(this.player.yaw.toFixed(3)), pitch: Number(this.player.pitch.toFixed(3)) },
       mission: { name: 'Living Room First Fix', progressPercent: this.mission.progress, selectedTool: this.selectedTool, complete: this.mission.complete },
-      workSurface: { freeSprayMarks: this.room.brickWall.freeMarkCount, sprayMode: this.sprayMode, sprayColor: SPRAY_COLORS[this.sprayColorIndex].name },
+      workSurface: { freeSprayMarks: this.room.brickWall.freeMarkCount, destroyedBricks: this.room.brickWall.destroyedBrickCount, sprayMode: this.sprayMode, sprayColor: SPRAY_COLORS[this.sprayColorIndex].name },
       activePoint: point ? { id: point.definition.id, kind: point.definition.kind, bottomHeightM: point.definition.bottom, boxes: point.definition.boxes, stage: point.stage, chaseHits: point.chaseHits, pipeStep: point.pipeStep, targeted: this.mission.target(this.renderer.camera) === point, tiltDegrees: Number(point.boxGroup.tiltDegrees.toFixed(2)), depthErrorMm: Number((point.boxGroup.depthError * 1000).toFixed(1)), levelPass: point.boxGroup.isLevel, flushPass: point.boxGroup.isFlush } : null,
       points: this.mission.points.map(item => ({ id: item.definition.id, stage: item.stage, conduitVisible: Boolean(item.conduit) })),
     });
@@ -126,9 +129,9 @@ export class Game {
     const spatialTool = this.selectedTool === 'spray' || this.selectedTool === 'hammer';
     const target = active.stage === 'leveling' ? active : spatialTool ? active : this.mission.target(this.renderer.camera);
     if (!target) { this.hud.notify('Aim at the work area you chose.', false); return; }
-    const wasChasing = this.selectedTool === 'hammer' && (target.stage === 'marked' || target.stage === 'chasing');
+    const hammering = this.selectedTool === 'hammer';
     const result = this.interaction.action(target, this.selectedTool, this.renderer.camera);
-    if (wasChasing && result.success) { this.fpsRig.strike(); this.shake = 1; }
+    if (hammering && result.success) { this.fpsRig.strike(); this.shake = 1; }
     if (result.message) this.hud.notify(result.message, result.success);
   }
 
@@ -146,11 +149,18 @@ export class Game {
       this.hud.notify(`Spray color: ${SPRAY_COLORS[this.sprayColorIndex].name}`);
     });
     addEventListener('wirehouse:level', event => {
-      const detail = (event as CustomEvent<LevelDirection | 'confirm'>).detail;
+      const detail = (event as CustomEvent<LevelDirection | 'confirm' | 'cancel'>).detail;
       const point = this.mission.activePoint;
       if (!point || point.stage !== 'leveling') return;
+      if (detail === 'cancel') { this.leveling.cancel(point); this.hud.notify('Leveling exited. Select the spirit level to resume.'); return; }
       if (detail === 'confirm') { this.input.actionRequested = true; return; }
       this.leveling.adjust(point, detail);
+    });
+    addEventListener('wirehouse:exit-leveling', () => {
+      const point = this.mission.activePoint;
+      if (!point || point.stage !== 'leveling') return;
+      this.leveling.cancel(point);
+      this.hud.notify('Leveling exited. Select the spirit level to resume.');
     });
     addEventListener('keydown', event => {
       const point = this.mission.activePoint;

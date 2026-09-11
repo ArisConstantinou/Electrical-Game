@@ -20,6 +20,7 @@ export class BrickWall extends THREE.Group {
   private readonly raycaster = new THREE.Raycaster();
   private readonly sprayMarks: Array<{ pointId: string; mesh: THREE.Mesh }> = [];
   private lastLivePoint: THREE.Vector3 | null = null;
+  private destroyedBricks = 0;
 
   constructor(definitions: InstallationDefinition[]) {
     super();
@@ -154,6 +155,7 @@ export class BrickWall extends THREE.Group {
     } else {
       hit.object.visible = false;
     }
+    this.destroyedBricks += 1;
     for (let index = this.sprayMarks.length - 1; index >= 0; index -= 1) {
       const mark = this.sprayMarks[index];
       if (mark.mesh.position.distanceTo(hit.point) < 0.23) {
@@ -167,6 +169,7 @@ export class BrickWall extends THREE.Group {
   }
 
   get freeMarkCount(): number { return this.sprayMarks.length; }
+  get destroyedBrickCount(): number { return this.destroyedBricks; }
 
   showMarks(pointId: string): void {
     this.removableByPoint.get(pointId)?.forEach(item => { item.marker.visible = true; });

@@ -8,11 +8,18 @@ export class DesktopControls {
       if (!this.isTouchDevice && document.pointerLockElement !== surface) void surface.requestPointerLock();
     });
     surface.addEventListener('pointerdown', event => {
-      if (this.isTouchDevice || event.button !== 0 || (event.target as Element).closest('button')) return;
+      if (this.isTouchDevice || (event.target as Element).closest('button')) return;
+      if (event.button === 2) {
+        event.preventDefault();
+        window.dispatchEvent(new CustomEvent('wirehouse:exit-leveling'));
+        return;
+      }
+      if (event.button !== 0) return;
       event.preventDefault();
       input.actionHeld = true;
       input.actionRequested = true;
     });
+    surface.addEventListener('contextmenu', event => event.preventDefault());
     const releasePrimaryAction = (event: PointerEvent): void => {
       if (event.button === 0) input.actionHeld = false;
     };
