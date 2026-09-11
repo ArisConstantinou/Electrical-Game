@@ -3,7 +3,8 @@ import type { Input } from '../core/Input';
 
 export class DesktopControls {
   constructor(surface: HTMLElement, player: PlayerController, input: Input) {
-    surface.addEventListener('click', () => {
+    surface.addEventListener('click', event => {
+      if ((event.target as Element).closest('button')) return;
       if (!this.isTouchDevice && document.pointerLockElement !== surface) void surface.requestPointerLock();
     });
     surface.addEventListener('pointerdown', event => {
@@ -27,6 +28,8 @@ export class DesktopControls {
     addEventListener('keydown', event => {
       const directTools: Partial<Record<string, string>> = { Digit1: 'spring', Digit2: 'cutter', Digit3: 'spray', Digit4: 'hammer', Digit5: 'fitting', Digit6: 'level' };
       if (directTools[event.code]) window.dispatchEvent(new CustomEvent('wirehouse:select-tool', { detail: directTools[event.code] }));
+      if (event.code === 'KeyV' && !event.repeat) window.dispatchEvent(new CustomEvent('wirehouse:cycle-spray-mode'));
+      if (event.code === 'KeyC' && !event.repeat) window.dispatchEvent(new CustomEvent('wirehouse:cycle-spray-color'));
       if (event.code === 'KeyF' && !event.repeat) {
         if (document.fullscreenElement) void document.exitFullscreen();
         else void surface.requestFullscreen();

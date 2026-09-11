@@ -15,6 +15,8 @@ Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web gam
 - Desktop left mouse now uses the selected tool; holding it continuously operates spray and hammer. E remains as an accessible alternate input.
 - The live desktop HUD explicitly shows `LEFT CLICK TO USE` beside the selected tool.
 - Desktop left-click/held-tool coverage, the full desktop mission, mobile interaction smoke, typecheck, production build, Studio contract, and final screenshot inspection are green locally.
+- Spray retains the original DOTS method and adds a LIVE aerosol method with connected coverage and fine overspray. Blue, red, yellow and white are selectable from desktop/mobile controls; V/C are desktop shortcuts.
+- LIVE spray includes a color-matched animated nozzle plume and a bounded 1,400-mark wall budget. Desktop/mobile visual QA, full mission regression, Studio 10/10, typecheck and build passed.
 
 ## Keep in mind
 

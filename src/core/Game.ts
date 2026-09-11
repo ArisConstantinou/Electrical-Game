@@ -16,6 +16,13 @@ import { InteractionSystem } from '../systems/InteractionSystem';
 import { HUD } from '../ui/HUD';
 import { MobileHUD } from '../ui/MobileHUD';
 
+const SPRAY_COLORS = [
+  { name: 'BLUE', value: 0x087fce, css: '#087fce' },
+  { name: 'RED', value: 0xe53935, css: '#e53935' },
+  { name: 'YELLOW', value: 0xffcc19, css: '#ffcc19' },
+  { name: 'WHITE', value: 0xf4f1e8, css: '#f4f1e8' },
+] as const;
+
 export class Game {
   readonly renderer: Renderer;
   readonly input = new Input();
@@ -28,6 +35,8 @@ export class Game {
   readonly hud: HUD;
   readonly fpsRig = new FPSRig();
   selectedTool: RigTool = 'spray';
+  sprayMode: 'dots' | 'live' = 'dots';
+  sprayColorIndex = 0;
   started = false;
   private readonly chasing: ChasingSystem;
   private readonly interaction: InteractionSystem;
@@ -50,6 +59,7 @@ export class Game {
     this.chasing = new ChasingSystem(this.renderer.scene, this.room.brickWall);
     this.conduit = new ConduitSystem(this.renderer.scene);
     this.interaction = new InteractionSystem(new MarkingSystem(this.room.brickWall), this.chasing, new MortarSystem(), this.leveling, this.conduit);
+    this.applySpraySettings();
     new DesktopControls(this.hud.shell, this.player, this.input);
     new MobileControls(this.hud.shell, this.input, this.player);
     new MobileHUD();
@@ -75,12 +85,14 @@ export class Game {
       this.actionCooldown = this.selectedTool === 'spray' ? 0.075 : this.selectedTool === 'hammer' ? 0.24 : 0.18;
     }
     this.chasing.update(dt);
-    this.fpsRig.update(dt, this.player.velocity.lengthSq() > 0.02);
+    this.fpsRig.update(dt, this.player.velocity.lengthSq() > 0.02, this.selectedTool === 'spray' && this.input.actionHeld);
     this.fpsRig.show(this.selectedTool);
     const wallAim = Boolean(this.room.brickWall.aim(this.renderer.camera));
     const pointAim = Boolean(this.mission.target(this.renderer.camera));
     const aimed = this.selectedTool === 'spray' || this.selectedTool === 'hammer' ? wallAim : pointAim;
     this.hud.update(active, aimed, this.mission.progress, this.selectedTool);
+    const sprayColor = SPRAY_COLORS[this.sprayColorIndex];
+    this.hud.updateSprayControls(this.sprayMode, sprayColor.name, sprayColor.css, this.selectedTool === 'spray');
     if (this.shake > 0) {
       this.shake = Math.max(0, this.shake - dt * 3.7);
       this.renderer.camera.rotation.set(this.player.pitch + (Math.random() - 0.5) * this.shake * 0.025, this.player.yaw + (Math.random() - 0.5) * this.shake * 0.02, 0);
@@ -98,7 +110,7 @@ export class Game {
       mode: !this.started ? 'start' : this.mission.complete ? 'mission-complete' : point?.stage === 'leveling' ? 'leveling' : 'playing',
       player: { x: Number(this.renderer.camera.position.x.toFixed(3)), y: Number(this.renderer.camera.position.y.toFixed(3)), z: Number(this.renderer.camera.position.z.toFixed(3)), yaw: Number(this.player.yaw.toFixed(3)), pitch: Number(this.player.pitch.toFixed(3)) },
       mission: { name: 'Living Room First Fix', progressPercent: this.mission.progress, selectedTool: this.selectedTool, complete: this.mission.complete },
-      workSurface: { freeSprayMarks: this.room.brickWall.freeMarkCount },
+      workSurface: { freeSprayMarks: this.room.brickWall.freeMarkCount, sprayMode: this.sprayMode, sprayColor: SPRAY_COLORS[this.sprayColorIndex].name },
       activePoint: point ? { id: point.definition.id, kind: point.definition.kind, bottomHeightM: point.definition.bottom, boxes: point.definition.boxes, stage: point.stage, chaseHits: point.chaseHits, pipeStep: point.pipeStep, targeted: this.mission.target(this.renderer.camera) === point, tiltDegrees: Number(point.boxGroup.tiltDegrees.toFixed(2)), depthErrorMm: Number((point.boxGroup.depthError * 1000).toFixed(1)), levelPass: point.boxGroup.isLevel, flushPass: point.boxGroup.isFlush } : null,
       points: this.mission.points.map(item => ({ id: item.definition.id, stage: item.stage, conduitVisible: Boolean(item.conduit) })),
     });
@@ -119,6 +131,16 @@ export class Game {
   private bindEvents(): void {
     addEventListener('wirehouse:select-tool', event => this.selectTool((event as CustomEvent<RigTool>).detail));
     addEventListener('wirehouse:cycle-tool', event => this.cycleTool((event as CustomEvent<number>).detail || 1));
+    addEventListener('wirehouse:cycle-spray-mode', () => {
+      this.sprayMode = this.sprayMode === 'dots' ? 'live' : 'dots';
+      this.applySpraySettings();
+      this.hud.notify(`Spray method: ${this.sprayMode.toUpperCase()}`);
+    });
+    addEventListener('wirehouse:cycle-spray-color', () => {
+      this.sprayColorIndex = (this.sprayColorIndex + 1) % SPRAY_COLORS.length;
+      this.applySpraySettings();
+      this.hud.notify(`Spray color: ${SPRAY_COLORS[this.sprayColorIndex].name}`);
+    });
     addEventListener('wirehouse:level', event => {
       const detail = (event as CustomEvent<LevelDirection | 'confirm'>).detail;
       const point = this.mission.activePoint;
@@ -146,6 +168,12 @@ export class Game {
     const current = RIG_TOOLS.indexOf(this.selectedTool);
     const next = (current + (direction < 0 ? -1 : 1) + RIG_TOOLS.length) % RIG_TOOLS.length;
     this.selectTool(RIG_TOOLS[next]);
+  }
+
+  private applySpraySettings(): void {
+    const color = SPRAY_COLORS[this.sprayColorIndex];
+    this.interaction.setSpray(this.sprayMode, color.value);
+    this.fpsRig.setSprayColor(color.value);
   }
 
   private loop = (time: number): void => {

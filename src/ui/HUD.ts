@@ -29,6 +29,10 @@ export class HUD {
             <div class="progress-track"><span id="mission-progress"></span></div>
           </div>
           <div id="tool-status" class="hud-card"></div>
+          <div id="spray-controls" class="hud-card" aria-label="Spray settings">
+            <button id="spray-mode" aria-label="Change spray method">METHOD <b>DOTS</b></button>
+            <button id="spray-color" aria-label="Change spray color">COLOR <i></i><b>BLUE</b></button>
+          </div>
           <div id="reticle" aria-hidden="true"><span></span><span></span></div>
           <div id="interaction-prompt" role="status"></div>
           <div id="level-panel" class="hud-card" aria-label="Leveling controls">
@@ -53,7 +57,7 @@ export class HUD {
             <p>Mark the clay brick. Chase real masonry. Set every recessed box level and flush. Finish the rigid PVC routes before the builders plaster.</p>
             <div class="brief-grid"><span>3 installation points</span><span>No cable pulling</span><span>Desktop + mobile</span></div>
             <button id="start-button">ENTER THE SITE</button>
-            <small>WASD · MOUSE LOOK · LEFT CLICK / E USE TOOL · WHEEL CYCLES TOOLS · 1–6 SELECT TOOL</small>
+            <small>WASD · MOUSE LOOK · LEFT CLICK / E USE TOOL · WHEEL / 1–6 TOOLS · V SPRAY METHOD · C COLOR</small>
           </section>
           <section id="result-panel" class="screen-panel result-panel">
             <div class="eyebrow">LIVING ROOM · INSPECTION PASSED</div>
@@ -77,6 +81,8 @@ export class HUD {
       event.preventDefault();
       window.dispatchEvent(new CustomEvent('wirehouse:level', { detail: button.dataset.level }));
     }));
+    root.querySelector('#spray-mode')?.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:cycle-spray-mode')));
+    root.querySelector('#spray-color')?.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:cycle-spray-color')));
   }
 
   onStart(callback: () => void): void {
@@ -116,4 +122,16 @@ export class HUD {
   }
 
   showResult(): void { this.result.classList.add('visible'); }
+
+  updateSprayControls(mode: string, colorName: string, colorCss: string, visible: boolean): void {
+    const panel = this.shell.querySelector<HTMLElement>('#spray-controls');
+    if (!panel) return;
+    panel.classList.toggle('visible', visible);
+    const modeText = panel.querySelector<HTMLElement>('#spray-mode b');
+    const colorText = panel.querySelector<HTMLElement>('#spray-color b');
+    const swatch = panel.querySelector<HTMLElement>('#spray-color i');
+    if (modeText) modeText.textContent = mode.toUpperCase();
+    if (colorText) colorText.textContent = colorName;
+    if (swatch) swatch.style.background = colorCss;
+  }
 }

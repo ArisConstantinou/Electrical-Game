@@ -18,6 +18,11 @@ export class InteractionSystem {
     private readonly conduit: ConduitSystem,
   ) {}
 
+  setSpray(mode: 'dots' | 'live', color: number): void {
+    this.marking.mode = mode;
+    this.marking.color = color;
+  }
+
   action(point: InstallationPoint, tool: RigTool, camera: THREE.Camera): InteractionResult {
     if (tool === 'spray') {
       const firstMark = point.stage === 'inspect';

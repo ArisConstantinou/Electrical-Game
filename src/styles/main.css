@@ -18,6 +18,12 @@ button { font: inherit; }
 #tool-status b.selected { color: #fff; border-color: #d99860; background: rgba(217,152,96,.15); }
 #tool-status em { color: #f0b37f; font: 800 12px/1 'Barlow Condensed', sans-serif; letter-spacing: .055em; font-style: normal; }
 #tool-status.leveling-hidden { display: none; }
+#spray-controls { display: none; top: 72px; right: 22px; gap: 7px; padding: 7px; pointer-events: auto; }
+#spray-controls.visible { display: flex; }
+#spray-controls button { min-height: 38px; padding: 0 10px; border: 1px solid #716557; color: #c9c3ba; background: #28241f; font: 700 12px/1 'Barlow Condensed', sans-serif; letter-spacing: .06em; cursor: pointer; }
+#spray-controls button:hover { border-color: #d99860; background: #373027; }
+#spray-controls b { margin-left: 5px; color: #fff; }
+#spray-controls i { display: inline-block; width: 13px; height: 13px; margin: 0 0 -2px 6px; border: 1px solid rgba(255,255,255,.7); border-radius: 50%; }
 #reticle { position: absolute; z-index: 3; left: 50%; top: 50%; width: 24px; height: 24px; transform: translate(-50%,-50%); opacity: .72; transition: .15s ease; }
 #reticle span { position: absolute; left: 50%; top: 50%; width: 14px; height: 2px; background: #f6f0e7; transform: translate(-50%,-50%); box-shadow: 0 1px 3px #000; }
 #reticle span:last-child { transform: translate(-50%,-50%) rotate(90deg); }
@@ -65,6 +71,10 @@ button { font: inherit; }
   #tool-status { top: auto; right: max(18px, env(safe-area-inset-right)); bottom: 184px; width: 154px; justify-content: center; padding: 9px 8px; }
   #tool-status span { display: none; }
   #tool-status em { display: none; }
+  #spray-controls { top: auto; right: max(18px, env(safe-area-inset-right)); bottom: 232px; width: 154px; padding: 5px; }
+  #spray-controls button { flex: 1; min-width: 0; min-height: 44px; padding: 0 3px; }
+  #spray-controls button > b { display: block; margin: 3px 0 0; }
+  #spray-controls i { margin-left: 3px; }
   #top-hud { top: max(10px, env(safe-area-inset-top)); left: 10px; width: calc(100% - 20px); padding: 11px 12px; }
   #objective { font-size: 17px; }
   #interaction-prompt { top: max(104px, calc(env(safe-area-inset-top) + 96px)); max-width: calc(100% - 32px); font-size: 14px; }

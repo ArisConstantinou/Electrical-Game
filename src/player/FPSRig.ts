@@ -8,6 +8,8 @@ const place = (object: THREE.Object3D, x: number, y: number, z: number): THREE.O
 
 export class FPSRig extends THREE.Group {
   private readonly tools = new Map<RigTool, THREE.Group>();
+  private sprayCanMaterial: THREE.MeshStandardMaterial | null = null;
+  private sprayMist: THREE.Points | null = null;
   private strikeAmount = 0;
 
   constructor() {
@@ -26,12 +28,27 @@ export class FPSRig extends THREE.Group {
   }
 
   show(tool: RigTool): void { this.tools.forEach((group, key) => { group.visible = key === tool; }); }
+  setSprayColor(color: number): void {
+    this.sprayCanMaterial?.color.setHex(color);
+    (this.sprayMist?.material as THREE.PointsMaterial | undefined)?.color.setHex(color);
+  }
   strike(): void { this.strikeAmount = 1; }
-  update(dt: number, moving: boolean): void {
+  update(dt: number, moving: boolean, spraying = false): void {
     const bob = moving ? Math.sin(performance.now() * 0.012) * 0.006 : 0;
     this.position.y = -0.1 + bob;
     this.strikeAmount = Math.max(0, this.strikeAmount - dt * 5.5);
     this.rotation.x = -Math.sin(this.strikeAmount * Math.PI) * 0.16;
+    if (this.sprayMist) {
+      this.sprayMist.visible = spraying;
+      if (spraying) {
+        const positions = this.sprayMist.geometry.getAttribute('position') as THREE.BufferAttribute;
+        for (let index = 0; index < positions.count; index += 1) {
+          const travel = (performance.now() * 0.0018 + index / positions.count) % 1;
+          positions.setXYZ(index, 0.17 + (Math.random() - 0.5) * travel * 0.055, 0.065 + (Math.random() - 0.5) * travel * 0.055, -0.05 - travel * 0.34);
+        }
+        positions.needsUpdate = true;
+      }
+    }
   }
 
   private addTool(key: RigTool, group: THREE.Group): void { group.name = `FPS ${key} tool`; group.userData.studioEntityId = `fps-rig:${key}`; this.tools.set(key, group); this.add(group); }
@@ -49,13 +66,19 @@ export class FPSRig extends THREE.Group {
   private createSpray(): THREE.Group {
     const group = new THREE.Group();
     group.add(this.hand(0.24, -0.22, 0.02, -0.2));
-    const can = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.19, 16), material(0x1d72a9, 0.45, 0.15));
+    this.sprayCanMaterial = material(0x087fce, 0.45, 0.15);
+    const can = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.19, 16), this.sprayCanMaterial);
     can.rotation.z = -0.16; place(can, 0.15, -0.08, -0.03);
     const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.029, 0.027, 12), material(0xd8d6cd, 0.45));
     place(cap, 0.165, 0.032, -0.03);
     const nozzle = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.018, 0.026), material(0x252826, 0.5));
     place(nozzle, 0.17, 0.052, -0.044);
-    group.add(can, cap, nozzle);
+    const mistGeometry = new THREE.BufferGeometry();
+    mistGeometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(54), 3));
+    this.sprayMist = new THREE.Points(mistGeometry, new THREE.PointsMaterial({ color: 0xffffff, size: 0.012, transparent: true, opacity: 0.42, depthTest: false, sizeAttenuation: true }));
+    this.sprayMist.visible = false;
+    this.sprayMist.renderOrder = 21;
+    group.add(can, cap, nozzle, this.sprayMist);
     return group;
   }
   private createHammer(): THREE.Group {

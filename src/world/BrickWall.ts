@@ -8,6 +8,7 @@ interface RemovableBrick {
 }
 
 interface AimHit { point: THREE.Vector3; object: THREE.Object3D; instanceId?: number }
+export type SprayMode = 'dots' | 'live';
 
 const brickGeometry = new THREE.BoxGeometry(0.286, 0.125, 0.18);
 const brickMaterial = new THREE.MeshStandardMaterial({ color: 0xb84b2a, roughness: 0.96, metalness: 0, vertexColors: false });
@@ -18,6 +19,7 @@ export class BrickWall extends THREE.Group {
   private readonly breakables: THREE.Object3D[] = [];
   private readonly raycaster = new THREE.Raycaster();
   private readonly sprayMarks: Array<{ pointId: string; mesh: THREE.Mesh }> = [];
+  private lastLivePoint: THREE.Vector3 | null = null;
 
   constructor(definitions: InstallationDefinition[]) {
     super();
@@ -82,21 +84,45 @@ export class BrickWall extends THREE.Group {
     return { point: hit.point.clone(), object: hit.object, instanceId: hit.instanceId };
   }
 
-  spray(camera: THREE.Camera, pointId: string): THREE.Vector3 | null {
+  spray(camera: THREE.Camera, pointId: string, mode: SprayMode = 'dots', color = 0x087fce): THREE.Vector3 | null {
     const hit = this.aim(camera);
     if (!hit) return null;
-    const material = new THREE.MeshBasicMaterial({ color: 0x087fce, transparent: true, opacity: 0.82, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
-    const dab = new THREE.Mesh(new THREE.CircleGeometry(0.018 + Math.random() * 0.012, 10), material);
-    dab.name = `Free blue spray mark ${pointId}`;
+    if (mode === 'dots') {
+      this.addSprayDab(hit.point, pointId, color, 0.018 + Math.random() * 0.012, 0.82);
+      this.lastLivePoint = null;
+    } else {
+      const from = this.lastLivePoint && this.lastLivePoint.distanceTo(hit.point) < 0.22 ? this.lastLivePoint : hit.point;
+      const steps = Math.max(1, Math.ceil(from.distanceTo(hit.point) / 0.018));
+      for (let index = 1; index <= steps; index += 1) {
+        const centre = from.clone().lerp(hit.point, index / steps);
+        this.addSprayDab(centre, pointId, color, 0.035 + Math.random() * 0.012, 0.58);
+        for (let mist = 0; mist < 2; mist += 1) {
+          const angle = Math.random() * Math.PI * 2;
+          const radius = 0.035 + Math.random() * 0.045;
+          this.addSprayDab(centre.clone().add(new THREE.Vector3(Math.cos(angle) * radius, Math.sin(angle) * radius, 0)), pointId, color, 0.003 + Math.random() * 0.006, 0.22 + Math.random() * 0.2);
+        }
+      }
+      this.lastLivePoint = hit.point.clone();
+    }
+    return hit.point;
+  }
+
+  private addSprayDab(position: THREE.Vector3, pointId: string, color: number, radius: number, opacity: number): void {
+    const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+    const dab = new THREE.Mesh(new THREE.CircleGeometry(radius, 10), material);
+    dab.name = `Spray mark ${pointId}`;
     dab.userData.studioEntityId = `point-${pointId}:free-mark-${this.sprayMarks.length}`;
-    dab.position.copy(hit.point);
-    dab.position.z += 0.004;
-    dab.scale.y = 0.55 + Math.random() * 0.45;
+    dab.position.copy(position);
+    dab.position.z += 0.004 + Math.random() * 0.001;
+    dab.scale.y = 0.78 + Math.random() * 0.32;
     dab.rotation.z = Math.random() * Math.PI;
     dab.raycast = () => undefined;
     this.add(dab);
     this.sprayMarks.push({ pointId, mesh: dab });
-    return hit.point;
+    if (this.sprayMarks.length > 1400) {
+      const oldest = this.sprayMarks.shift();
+      if (oldest) { this.remove(oldest.mesh); oldest.mesh.geometry.dispose(); (oldest.mesh.material as THREE.Material).dispose(); }
+    }
   }
 
   removeAtAim(camera: THREE.Camera): THREE.Vector3 | null {

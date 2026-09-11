@@ -76,6 +76,23 @@ await desktop.keyboard.press('Digit3');
 await aimAtActive(desktop);
 await leftClickAction(desktop);
 if ((await state(desktop)).activePoint.stage !== 'marked') throw new Error('Desktop left mouse did not use the selected tool');
+await desktop.keyboard.press('KeyV');
+await desktop.keyboard.press('KeyC');
+const liveSettings = await state(desktop);
+if (liveSettings.workSurface.sprayMode !== 'live' || liveSettings.workSurface.sprayColor !== 'RED') throw new Error(`Desktop spray settings did not change: ${JSON.stringify(liveSettings.workSurface)}`);
+const liveMarksBefore = liveSettings.workSurface.freeSprayMarks;
+await desktop.mouse.down({ button: 'left' });
+for (let index = 0; index < 7; index += 1) {
+  await desktop.evaluate(step => {
+    const game = window.__wireTheHouse;
+    game.player.pitch -= 0.012 * step;
+    window.advanceTime(90);
+  }, index);
+}
+await desktop.screenshot({ path: outputPath('desktop-live-red-spray.png') });
+await desktop.mouse.up({ button: 'left' });
+const liveMarksAfter = (await state(desktop)).workSurface.freeSprayMarks;
+if (liveMarksAfter - liveMarksBefore < 18) throw new Error(`LIVE spray did not create connected coverage and overspray: ${liveMarksAfter - liveMarksBefore} marks`);
 await desktop.keyboard.press('Digit4');
 await desktop.mouse.down({ button: 'left' });
 await desktop.evaluate(() => window.advanceTime(800));
@@ -119,10 +136,15 @@ mobile.on('pageerror', error => errors.push(`mobile page: ${error.message}`));
 await mobile.goto(baseUrl, { waitUntil: 'networkidle' });
 await mobile.click('#start-button');
 await mobile.waitForTimeout(450);
-for (const selector of ['#mobile-action', '#tool-prev', '#tool-next']) {
+for (const selector of ['#mobile-action', '#tool-prev', '#tool-next', '#spray-mode', '#spray-color']) {
   const box = await mobile.locator(selector).boundingBox();
   if (!box || box.width < 44 || box.height < 44) throw new Error(`${selector} is below the 44px touch target`);
 }
+await mobileTap(mobile, '#spray-mode');
+await mobileTap(mobile, '#spray-color');
+const mobileSpraySettings = await state(mobile);
+if (mobileSpraySettings.workSurface.sprayMode !== 'live' || mobileSpraySettings.workSurface.sprayColor !== 'RED') throw new Error(`Mobile spray settings did not change: ${JSON.stringify(mobileSpraySettings.workSurface)}`);
+await mobile.screenshot({ path: outputPath('mobile-spray-controls.png') });
 const mobileLayout = await mobile.evaluate(() => ({ innerWidth, scrollWidth: document.documentElement.scrollWidth, bodyScrollWidth: document.body.scrollWidth }));
 if (mobileLayout.scrollWidth > mobileLayout.innerWidth || mobileLayout.bodyScrollWidth > mobileLayout.innerWidth) throw new Error(`Mobile horizontal overflow: ${JSON.stringify(mobileLayout)}`);
 const touchResult = await mobile.evaluate(() => {
