@@ -19,13 +19,24 @@ export class BrickWall extends THREE.Group {
   private readonly breakables: THREE.Object3D[] = [];
   private readonly raycaster = new THREE.Raycaster();
   private readonly sprayMarks: Array<{ pointId: string; mesh: THREE.Mesh }> = [];
+  private readonly livePaintCanvas = document.createElement('canvas');
+  private readonly livePaintContext: CanvasRenderingContext2D;
+  private readonly livePaintTexture: THREE.CanvasTexture;
   private lastLivePoint: THREE.Vector3 | null = null;
+  private liveStrokeSamples = 0;
   private destroyedBricks = 0;
 
   constructor(definitions: InstallationDefinition[]) {
     super();
     this.name = 'Unplastered hollow clay brick wall';
     this.userData.studioEntityId = 'world:brick-wall';
+    this.livePaintCanvas.width = 2048;
+    this.livePaintCanvas.height = 1024;
+    const context = this.livePaintCanvas.getContext('2d');
+    if (!context) throw new Error('2D paint canvas is unavailable');
+    this.livePaintContext = context;
+    this.livePaintTexture = new THREE.CanvasTexture(this.livePaintCanvas);
+    this.livePaintTexture.colorSpace = THREE.SRGBColorSpace;
     const cols = 21;
     const rows = 23;
     const brickW = GAME_CONFIG.room.width / cols;
@@ -72,6 +83,17 @@ export class BrickWall extends THREE.Group {
     fixed.instanceMatrix.needsUpdate = true;
     this.breakables.push(fixed);
     this.add(fixed);
+
+    const paintSurface = new THREE.Mesh(
+      new THREE.PlaneGeometry(GAME_CONFIG.room.width, GAME_CONFIG.room.height),
+      new THREE.MeshBasicMaterial({ map: this.livePaintTexture, transparent: true, depthTest: false, depthWrite: false }),
+    );
+    paintSurface.name = 'Continuous live spray paint surface';
+    paintSurface.userData.studioEntityId = 'world:brick-wall:live-paint';
+    paintSurface.position.set(0, GAME_CONFIG.room.height / 2, -2.39);
+    paintSurface.renderOrder = 2;
+    paintSurface.raycast = () => undefined;
+    this.add(paintSurface);
   }
 
   aim(camera: THREE.Camera, maxDistance = GAME_CONFIG.interaction.maxDistance): AimHit | null {
@@ -93,13 +115,8 @@ export class BrickWall extends THREE.Group {
       this.lastLivePoint = null;
     } else {
       const from = this.lastLivePoint ?? hit.point;
-      this.addSprayStroke(from, hit.point, pointId, color);
-      const centre = from.clone().lerp(hit.point, 0.5);
-      for (let mist = 0; mist < 2; mist += 1) {
-        const angle = Math.random() * Math.PI * 2;
-        const radius = 0.035 + Math.random() * 0.045;
-        this.addSprayDab(centre.clone().add(new THREE.Vector3(Math.cos(angle) * radius, Math.sin(angle) * radius, 0)), pointId, color, 0.0025 + Math.random() * 0.0045, 0.18 + Math.random() * 0.18);
-      }
+      this.paintLiveStroke(from, hit.point, color);
+      this.liveStrokeSamples += 1;
       this.lastLivePoint = hit.point.clone();
     }
     return hit.point;
@@ -107,21 +124,41 @@ export class BrickWall extends THREE.Group {
 
   endSprayStroke(): void { this.lastLivePoint = null; }
 
-  private addSprayStroke(from: THREE.Vector3, to: THREE.Vector3, pointId: string, color: number): void {
-    const delta = to.clone().sub(from);
-    const length = Math.max(delta.length(), 0.014);
-    const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.72, depthTest: false, depthWrite: false });
-    const stroke = new THREE.Mesh(new THREE.PlaneGeometry(length, 0.052), material);
-    stroke.name = `Continuous spray stroke ${pointId}`;
-    stroke.userData.studioEntityId = `point-${pointId}:live-stroke-${this.sprayMarks.length}`;
-    stroke.position.copy(from).lerp(to, 0.5);
-    stroke.position.z = -2.39;
-    stroke.rotation.z = Math.atan2(delta.y, delta.x);
-    stroke.renderOrder = 2;
-    stroke.raycast = () => undefined;
-    this.add(stroke);
-    this.sprayMarks.push({ pointId, mesh: stroke });
-    this.addSprayDab(to, pointId, color, 0.026, 0.72);
+  private paintLiveStroke(from: THREE.Vector3, to: THREE.Vector3, color: number): void {
+    const context = this.livePaintContext;
+    const start = this.toPaintPixel(from);
+    const end = this.toPaintPixel(to);
+    const cssColor = `#${color.toString(16).padStart(6, '0')}`;
+    context.lineCap = 'round';
+    context.lineJoin = 'round';
+    for (const [width, alpha] of [[34, 0.1], [27, 0.2], [20, 0.62]] as const) {
+      context.beginPath();
+      context.moveTo(start.x, start.y);
+      context.lineTo(end.x, end.y);
+      context.lineWidth = width;
+      context.globalAlpha = alpha;
+      context.strokeStyle = cssColor;
+      context.stroke();
+    }
+    const centre = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
+    context.globalAlpha = 0.22;
+    context.fillStyle = cssColor;
+    for (let mist = 0; mist < 4; mist += 1) {
+      const angle = Math.random() * Math.PI * 2;
+      const radius = 15 + Math.random() * 18;
+      context.beginPath();
+      context.arc(centre.x + Math.cos(angle) * radius, centre.y + Math.sin(angle) * radius, 1 + Math.random() * 2.2, 0, Math.PI * 2);
+      context.fill();
+    }
+    context.globalAlpha = 1;
+    this.livePaintTexture.needsUpdate = true;
+  }
+
+  private toPaintPixel(point: THREE.Vector3): { x: number; y: number } {
+    return {
+      x: (point.x / GAME_CONFIG.room.width + 0.5) * this.livePaintCanvas.width,
+      y: (1 - point.y / GAME_CONFIG.room.height) * this.livePaintCanvas.height,
+    };
   }
 
   private addSprayDab(position: THREE.Vector3, pointId: string, color: number, radius: number, opacity: number): void {
@@ -144,7 +181,7 @@ export class BrickWall extends THREE.Group {
 
   removeAtAim(camera: THREE.Camera): THREE.Vector3 | null {
     const offsets = [[0, 0], [0.045, 0], [-0.045, 0], [0, 0.065], [0, -0.065], [0.085, 0.05], [-0.085, 0.05], [0.085, -0.05], [-0.085, -0.05]];
-    const hit = offsets.map(([x, y]) => this.cast(camera, x, y, GAME_CONFIG.interaction.maxDistance)).find(Boolean) ?? null;
+    const hit = offsets.map(([x, y]) => this.cast(camera, x, y, 4.5)).find(Boolean) ?? null;
     if (!hit) return null;
     if (hit.object instanceof THREE.InstancedMesh && hit.instanceId !== undefined) {
       const matrix = new THREE.Matrix4();
@@ -156,6 +193,14 @@ export class BrickWall extends THREE.Group {
       hit.object.visible = false;
     }
     this.destroyedBricks += 1;
+    const paintPoint = this.toPaintPixel(hit.point);
+    this.livePaintContext.save();
+    this.livePaintContext.globalCompositeOperation = 'destination-out';
+    this.livePaintContext.beginPath();
+    this.livePaintContext.arc(paintPoint.x, paintPoint.y, 78, 0, Math.PI * 2);
+    this.livePaintContext.fill();
+    this.livePaintContext.restore();
+    this.livePaintTexture.needsUpdate = true;
     for (let index = this.sprayMarks.length - 1; index >= 0; index -= 1) {
       const mark = this.sprayMarks[index];
       if (mark.mesh.position.distanceTo(hit.point) < 0.23) {
@@ -168,7 +213,7 @@ export class BrickWall extends THREE.Group {
     return hit.point;
   }
 
-  get freeMarkCount(): number { return this.sprayMarks.length; }
+  get freeMarkCount(): number { return this.sprayMarks.length + this.liveStrokeSamples; }
   get destroyedBrickCount(): number { return this.destroyedBricks; }
 
   showMarks(pointId: string): void {

@@ -22,6 +22,8 @@ Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web gam
 - Added an always-visible desktop key guide for movement, looking, use/interact, tool switching, spray method/color, fullscreen and pointer-lock release; it is hidden on touch/mobile where equivalent buttons are already visible.
 - Demo hammer can continue removing any aimed intact wall brick beyond the four required mission hits. Leveling now exits pointer lock, provides a live bubble/depth graphic, supports clickable controls, and can be cancelled with right mouse or `EXIT LEVEL · RMB`.
 - Verified a fifth post-objective demolition hit, real desktop LEFT/RIGHT clicks, right-mouse exit/resume, full mission completion, and a mobile leveling layout with full-width CONFIRM/EXIT and no clipping.
+- Desktop game height now fills 100svh instead of stopping at 920px. Demolition ray range is 4.5m for ceiling/floor-edge bricks. LIVE spray uses one 2048x1024 canvas texture with round feathered strokes and fine mist instead of overlapping rectangular meshes.
+- Verified at 1600x1200 that the game fills the viewport and the footer begins below it; verified separate demolition hits at wall heights 2.93m and 0.07m; full desktop/mobile mission smoke remains green with the canvas-based spray.
 
 ## Keep in mind
 

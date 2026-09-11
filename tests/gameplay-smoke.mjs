@@ -72,6 +72,49 @@ const finishPipe = async page => {
   await action(page);
 };
 
+const tallDesktop = await browser.newPage({ viewport: { width: 1600, height: 1200 } });
+await tallDesktop.goto(baseUrl, { waitUntil: 'networkidle' });
+const tallLayout = await tallDesktop.evaluate(() => {
+  const shell = document.querySelector('#game-shell').getBoundingClientRect();
+  const footer = document.querySelector('.page-footer').getBoundingClientRect();
+  return { innerHeight, shellHeight: shell.height, shellBottom: shell.bottom, footerTop: footer.top };
+});
+if (Math.abs(tallLayout.shellHeight - tallLayout.innerHeight) > 1 || tallLayout.footerTop < tallLayout.innerHeight - 1) throw new Error(`Tall desktop game does not fill viewport: ${JSON.stringify(tallLayout)}`);
+await tallDesktop.screenshot({ path: outputPath('desktop-tall-viewport.png') });
+await tallDesktop.close();
+
+const demolition = await browser.newPage({ viewport: { width: 1366, height: 768 } });
+await demolition.goto(baseUrl, { waitUntil: 'networkidle' });
+await demolition.click('#start-button');
+await demolition.waitForTimeout(450);
+await demolition.keyboard.press('Digit4');
+const destroyAtHeight = async targetY => {
+  await demolition.evaluate(y => {
+    const game = window.__wireTheHouse;
+    game.renderer.camera.position.set(0, 1.65, -0.35);
+    game.player.yaw = 0;
+    game.player.pitch = Math.atan2(y - 1.65, 2.06);
+    game.renderer.camera.rotation.set(game.player.pitch, 0, 0);
+    game.step(1 / 60);
+  }, targetY);
+  const before = (await state(demolition)).workSurface.destroyedBricks;
+  await leftClickAction(demolition);
+  const after = (await state(demolition)).workSurface.destroyedBricks;
+  if (after <= before) throw new Error(`Demo hammer could not destroy brick at wall height ${targetY}`);
+};
+await destroyAtHeight(2.93);
+await destroyAtHeight(0.07);
+await demolition.evaluate(() => {
+  const game = window.__wireTheHouse;
+  game.renderer.camera.position.set(0, 1.5, 0.2);
+  game.player.yaw = 0;
+  game.player.pitch = 0;
+  game.renderer.camera.rotation.set(0, 0, 0);
+  game.step(1 / 60);
+});
+await demolition.screenshot({ path: outputPath('desktop-top-bottom-demolition.png') });
+await demolition.close();
+
 const desktop = await browser.newPage({ viewport: { width: 1366, height: 768 } });
 desktop.on('console', message => { if (message.type() === 'error') errors.push(`desktop console: ${message.text()}`); });
 desktop.on('pageerror', error => errors.push(`desktop page: ${error.message}`));
@@ -114,7 +157,7 @@ for (let index = 0; index < 7; index += 1) {
 await desktop.screenshot({ path: outputPath('desktop-live-red-spray.png') });
 await desktop.mouse.up({ button: 'left' });
 const liveMarksAfter = (await state(desktop)).workSurface.freeSprayMarks;
-if (liveMarksAfter - liveMarksBefore < 18) throw new Error(`LIVE spray did not create connected coverage and overspray: ${liveMarksAfter - liveMarksBefore} marks`);
+if (liveMarksAfter - liveMarksBefore < 5) throw new Error(`LIVE spray did not record a continuous held stroke: ${liveMarksAfter - liveMarksBefore} samples`);
 await desktop.keyboard.press('Digit4');
 await desktop.mouse.down({ button: 'left' });
 await desktop.evaluate(() => window.advanceTime(800));
