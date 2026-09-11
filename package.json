@@ -1,0 +1,26 @@
+{
+  "name": "wire-the-house",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5362 --strictPort",
+    "studio:webgame": "vite --host 127.0.0.1 --port 5362 --strictPort",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 5363 --strictPort",
+    "typecheck": "tsc -b --pretty false",
+    "test:gameplay": "node tests/gameplay-smoke.mjs",
+    "test:studio": "node tests/studio-contract.mjs",
+    "test:studio-live": "node tests/studio-live-smoke.mjs"
+  },
+  "dependencies": {
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.180.0",
+    "@vitejs/plugin-basic-ssl": "^2.1.0",
+    "playwright": "^1.55.0",
+    "typescript": "~5.9.2",
+    "vite": "^7.1.5"
+  }
+}

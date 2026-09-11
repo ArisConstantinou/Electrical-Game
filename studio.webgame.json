@@ -1,0 +1,25 @@
+{
+  "format": "web-game-studio-linked-game",
+  "version": 1,
+  "gameId": "wire-the-house-electrical-game",
+  "name": "WIRE THE HOUSE",
+  "runtime": {
+    "host": "127.0.0.1",
+    "port": 5362,
+    "strictPort": true,
+    "npmScript": "studio:webgame",
+    "entrypoints": [
+      {
+        "id": "living-room-first-fix",
+        "name": { "el": "Σαλόνι — Πρώτη εγκατάσταση", "en": "Living room — First fix" },
+        "route": "/Electrical-Game/?studio=1"
+      }
+    ]
+  },
+  "adapter": {
+    "protocol": "web-game-studio-adapter",
+    "version": 1,
+    "capabilities": ["scene-hierarchy", "object-transforms", "materials", "cameras-lights", "animations", "physics-bodies", "physics-colliders", "physics-joints", "gameplay-state", "save-overrides"],
+    "persistence": { "mode": "sidecar", "path": ".studio/wire-the-house-overrides.json" }
+  }
+}
