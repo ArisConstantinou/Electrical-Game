@@ -62,11 +62,11 @@ const unitBoxGeometry = new THREE.BoxGeometry(1, 1, 1);
 const brickMaterial = new THREE.MeshStandardMaterial({ color: 0xb84b2a, roughness: 0.96, metalness: 0 });
 const removableMaterial = new THREE.MeshStandardMaterial({ color: 0xb94d2b, roughness: 0.97, metalness: 0 });
 const chasedBrickMaterial = new THREE.MeshStandardMaterial({ color: 0xb24a2a, roughness: 0.99, metalness: 0 });
-const fracturedWallSurfaceMaterial = new THREE.MeshStandardMaterial({ color: 0xb24a2a, roughness: 1, metalness: 0, flatShading: true });
+const fracturedWallSurfaceMaterial = new THREE.MeshStandardMaterial({ color: 0xb24a2a, roughness: 1, metalness: 0 });
 const chaseBackMaterial = new THREE.MeshStandardMaterial({ color: 0x8f3c25, roughness: 1, metalness: 0, emissive: 0x1d0804, emissiveIntensity: 0.12 });
 const chaseSideMaterial = new THREE.MeshStandardMaterial({ color: 0x74301f, roughness: 1, metalness: 0, side: THREE.DoubleSide });
 const chaseVoidMaterial = new THREE.MeshStandardMaterial({ color: 0x35120d, roughness: 1, metalness: 0 });
-const fractureMaterial = new THREE.MeshStandardMaterial({ color: 0x592016, roughness: 1, metalness: 0, polygonOffset: true, polygonOffsetFactor: -4 });
+const fractureMaterial = new THREE.MeshStandardMaterial({ color: 0x4a2118, roughness: 1, metalness: 0, transparent: true, opacity: 0.34, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
 const CHASE_GRID_X = 20;
 const CHASE_GRID_Y = 10;
 const CHASE_DEPTH = 0.055;
@@ -81,6 +81,7 @@ const DEMOLISH_HITS = 4;
 const DEMOLISH_THROUGH_DEPTH = 0.165;
 const WALL_COLUMNS = 21;
 const WALL_ROWS = 23;
+const MAX_FRACTURE_GROUPS = 18;
 const WALL_BRICK_WIDTH = GAME_CONFIG.room.width / WALL_COLUMNS;
 const WALL_COURSE_HEIGHT = GAME_CONFIG.room.height / WALL_ROWS;
 
@@ -454,6 +455,8 @@ export class BrickWall extends THREE.Group {
   get uniqueFracturePatternCount(): number { return this.wallFractures.length; }
   get fractureSegmentCount(): number { return this.wallFractures.reduce((count, group) => count + Number(group.userData.segmentCount ?? 0), 0); }
   get maximumFractureSpan(): number { return this.wallFractures.reduce((span, group) => Math.max(span, Number(group.userData.span ?? 0)), 0); }
+  get maximumFractureSegmentLength(): number { return this.wallFractures.reduce((length, group) => Math.max(length, Number(group.userData.maximumSegmentLength ?? 0)), 0); }
+  get maximumFractureWidthMm(): number { return this.wallFractures.reduce((width, group) => Math.max(width, Number(group.userData.maximumWidthMm ?? 0)), 0); }
   get partialBreachBrickCount(): number { return this.targets.filter(target => target.breachCells.size > 0 && target.breachCells.size < DEMOLISH_GRID_X * DEMOLISH_GRID_Y).length; }
   get breachedWallCellCount(): number { return this.targets.reduce((count, target) => count + target.breachCells.size, 0); }
   get deformedWallCellCount(): number { return this.targets.reduce((count, target) => count + Number(target.replacement?.userData.deformedCells ?? 0), 0); }
@@ -1040,7 +1043,7 @@ export class BrickWall extends THREE.Group {
       const response = this.demolitionResponse(new THREE.Vector2(worldX, worldY), 1, relevantSites);
       if (response.excavationDepth <= 0.002) return 0;
       const roughSeed = hashString(`brittle-face:${Math.round(worldX * 10000)}:${Math.round(worldY * 10000)}`);
-      const brittleVariation = ((roughSeed % 2001) - 1000) / 1000000;
+      const brittleVariation = ((roughSeed % 2001) - 1000) / 2500000;
       const chippedDepth = response.excavationDepth + Math.max(0, response.deformation) * 0.2 + brittleVariation;
       return THREE.MathUtils.clamp(Math.round(chippedDepth / 0.002) * 0.002, 0, target.size.z - 0.012);
     };
@@ -1048,8 +1051,8 @@ export class BrickWall extends THREE.Group {
       const baseX = -target.size.x / 2 + col * cellW;
       const baseY = -target.size.y / 2 + row * cellH;
       const vertexSeed = hashString(`brittle-grid:${target.id}:${row}:${col}`);
-      const jitterX = col === 0 || col === DEMOLISH_GRID_X ? 0 : (((vertexSeed >>> 7) % 1001) / 1000 - 0.5) * cellW * 0.28;
-      const jitterY = row === 0 || row === DEMOLISH_GRID_Y ? 0 : (((vertexSeed >>> 17) % 1001) / 1000 - 0.5) * cellH * 0.28;
+      const jitterX = col === 0 || col === DEMOLISH_GRID_X ? 0 : (((vertexSeed >>> 7) % 1001) / 1000 - 0.5) * cellW * 0.08;
+      const jitterY = row === 0 || row === DEMOLISH_GRID_Y ? 0 : (((vertexSeed >>> 17) % 1001) / 1000 - 0.5) * cellH * 0.08;
       const localX = baseX + jitterX;
       const localY = baseY + jitterY;
       const inset = surfaceInsetAt(localX, localY);
@@ -1106,15 +1109,18 @@ export class BrickWall extends THREE.Group {
     const cavityPositions: number[] = [];
     const cavityBackZ = -target.size.z / 2 + 0.004;
     let perimeterWallSegments = 0;
-    const addCavityWall = (from: THREE.Vector3, to: THREE.Vector3): void => {
+    const addCavityWall = (from: THREE.Vector3, to: THREE.Vector3, backZ = cavityBackZ): void => {
       cavityPositions.push(
         from.x, from.y, from.z,
         to.x, to.y, to.z,
-        to.x, to.y, cavityBackZ,
+        to.x, to.y, backZ,
         from.x, from.y, from.z,
-        to.x, to.y, cavityBackZ,
-        from.x, from.y, cavityBackZ,
+        to.x, to.y, backZ,
+        from.x, from.y, backZ,
       );
+    };
+    const addShallowPerimeterWall = (from: THREE.Vector3, to: THREE.Vector3): void => {
+      addCavityWall(from, to, Math.max(cavityBackZ, Math.min(from.z, to.z) - 0.014));
     };
     for (let row = 0; row < DEMOLISH_GRID_Y; row += 1) for (let col = 0; col < DEMOLISH_GRID_X; col += 1) {
       if (cells[row][col].breached) continue;
@@ -1122,10 +1128,10 @@ export class BrickWall extends THREE.Group {
       if (col < DEMOLISH_GRID_X - 1 && cells[row][col + 1].breached) addCavityWall(surfacePoint(row + 1, col + 1), surfacePoint(row, col + 1));
       if (row > 0 && cells[row - 1][col].breached) addCavityWall(surfacePoint(row, col + 1), surfacePoint(row, col));
       if (row < DEMOLISH_GRID_Y - 1 && cells[row + 1][col].breached) addCavityWall(surfacePoint(row + 1, col), surfacePoint(row + 1, col + 1));
-      if (col === 0) { addCavityWall(surfacePoint(row, col), surfacePoint(row + 1, col)); perimeterWallSegments += 1; }
-      if (col === DEMOLISH_GRID_X - 1) { addCavityWall(surfacePoint(row + 1, col + 1), surfacePoint(row, col + 1)); perimeterWallSegments += 1; }
-      if (row === 0) { addCavityWall(surfacePoint(row, col + 1), surfacePoint(row, col)); perimeterWallSegments += 1; }
-      if (row === DEMOLISH_GRID_Y - 1) { addCavityWall(surfacePoint(row + 1, col), surfacePoint(row + 1, col + 1)); perimeterWallSegments += 1; }
+      if (col === 0) { addShallowPerimeterWall(surfacePoint(row, col), surfacePoint(row + 1, col)); perimeterWallSegments += 1; }
+      if (col === DEMOLISH_GRID_X - 1) { addShallowPerimeterWall(surfacePoint(row + 1, col + 1), surfacePoint(row, col + 1)); perimeterWallSegments += 1; }
+      if (row === 0) { addShallowPerimeterWall(surfacePoint(row, col + 1), surfacePoint(row, col)); perimeterWallSegments += 1; }
+      if (row === DEMOLISH_GRID_Y - 1) { addShallowPerimeterWall(surfacePoint(row + 1, col), surfacePoint(row + 1, col + 1)); perimeterWallSegments += 1; }
     }
     let expectedPerimeterSegments = 0;
     for (let row = 0; row < DEMOLISH_GRID_Y; row += 1) {
@@ -1216,11 +1222,14 @@ export class BrickWall extends THREE.Group {
     const indices: number[] = [];
     const pathPoints: THREE.Vector2[] = [];
     let segmentCount = 0;
+    let maximumSegmentLength = 0;
+    let maximumWidth = 0;
     const addRibbonSegment = (from: THREE.Vector2, to: THREE.Vector2, width: number): void => {
       const direction = to.clone().sub(from);
       if (direction.lengthSq() < 0.000001) return;
       const midpoint = from.clone().add(to).multiplyScalar(0.5);
-      if (damage >= DEMOLISH_HITS && this.demolitionResponse(midpoint, 0.94, relevantSites).breached) return;
+      const response = this.demolitionResponse(midpoint, 0.94, relevantSites);
+      if (response.breached || damage >= DEMOLISH_HITS && response.excavationDepth > 0.006) return;
       const normal = new THREE.Vector2(-direction.y, direction.x).normalize().multiplyScalar(width / 2);
       const offset = vertices.length / 3;
       const fromZ = this.wallFrontZAt(from, target, relevantSites);
@@ -1234,57 +1243,60 @@ export class BrickWall extends THREE.Group {
       indices.push(offset, offset + 1, offset + 2, offset, offset + 2, offset + 3);
       pathPoints.push(from.clone(), to.clone());
       segmentCount += 1;
+      maximumSegmentLength = Math.max(maximumSegmentLength, direction.length());
+      maximumWidth = Math.max(maximumWidth, width);
     };
     const buildPath = (start: THREE.Vector2, heading: number, length: number, initialWidth: number, jointAffinity: number, curveBias: number): THREE.Vector2[] => {
       const points = [start.clone()];
       let current = start.clone();
       let travelled = 0;
       while (travelled < length) {
-        const segment = Math.min(length - travelled, 0.022 + random() * 0.064);
+        const segment = Math.min(length - travelled, 0.012 + random() * 0.022);
         const mortarStep = random() < jointAffinity;
-        const direction = heading + (random() - 0.5) * (0.18 + random() * 0.42);
+        const direction = heading + (random() - 0.5) * (0.28 + random() * 0.65);
         const next = current.clone().add(new THREE.Vector2(Math.cos(direction), Math.sin(direction)).multiplyScalar(segment));
         if (mortarStep) {
           if (Math.abs(Math.cos(heading)) >= Math.abs(Math.sin(heading))) {
             const jointY = Math.round(next.y / WALL_COURSE_HEIGHT) * WALL_COURSE_HEIGHT;
-            if (Math.abs(jointY - next.y) <= 0.028) next.y = jointY;
+            if (Math.abs(jointY - next.y) <= 0.012) next.y = jointY;
           } else {
             const course = THREE.MathUtils.clamp(Math.floor(next.y / WALL_COURSE_HEIGHT), 0, WALL_ROWS - 1);
             const stagger = course % 2 === 0 ? 0 : WALL_BRICK_WIDTH / 2;
             const wallLeft = -GAME_CONFIG.room.width / 2;
             const jointX = wallLeft + stagger + Math.round((next.x - wallLeft - stagger) / WALL_BRICK_WIDTH) * WALL_BRICK_WIDTH;
-            if (Math.abs(jointX - next.x) <= 0.03) next.x = jointX;
+            if (Math.abs(jointX - next.x) <= 0.012) next.x = jointX;
           }
         }
         addRibbonSegment(current, next, initialWidth * (0.95 - 0.52 * travelled / Math.max(length, 0.001)));
         points.push(next);
         current = next;
         travelled += segment;
-        heading += curveBias + (random() - 0.5) * 0.34;
+        heading += curveBias + (random() - 0.5) * 0.55;
       }
       return points;
     };
 
     const origin = new THREE.Vector2(impact.x, impact.y);
     const baseHeading = random() * Math.PI * 2;
-    const trunkCount = THREE.MathUtils.clamp(1 + Math.floor(random() * 4) + Math.floor((damage - 1) / 2), 1, 5);
-    const width = 0.00125 + damage * (0.00032 + random() * 0.00018);
+    const trunkCount = THREE.MathUtils.clamp(1 + Math.floor(random() * 2) + (damage >= DEMOLISH_HITS ? 1 : 0), 1, 3);
+    const width = 0.00035 + damage * (0.00006 + random() * 0.00005);
     const trunks: THREE.Vector2[][] = [];
     for (let trunkIndex = 0; trunkIndex < trunkCount; trunkIndex += 1) {
       const heading = trunkIndex === 0 ? baseHeading : baseHeading + (random() - 0.5) * Math.PI * 1.75;
-      const length = (0.065 + damage * 0.045) * (0.48 + random() * 1.08);
-      const startOffset = random() < 0.35 ? random() * 0.025 : 0;
+      const length = (0.022 + damage * 0.016) * (0.55 + random() * 0.55);
+      const startOffset = random() < 0.35 ? random() * 0.012 : 0;
       const start = origin.clone().add(new THREE.Vector2(Math.cos(heading), Math.sin(heading)).multiplyScalar(startOffset));
-      trunks.push(buildPath(start, heading, length, width * (0.72 + random() * 0.45), random() * 0.58, (random() - 0.5) * 0.08));
+      trunks.push(buildPath(start, heading, length, width * (0.72 + random() * 0.36), random() * 0.38, (random() - 0.5) * 0.045));
     }
-    const branchCount = Math.floor(random() * (damage + 1));
+    const branchCount = random() < 0.18 + damage * 0.09 ? 1 : 0;
     for (let branch = 0; branch < branchCount; branch += 1) {
       const trunk = trunks[Math.floor(random() * trunks.length)];
       if (trunk.length < 2) continue;
       const branchStart = trunk[1 + Math.floor(random() * (trunk.length - 1))];
       const heading = Math.atan2(branchStart.y - origin.y, branchStart.x - origin.x) + (random() < 0.5 ? -1 : 1) * (0.38 + random() * 1.04);
-      buildPath(branchStart, heading, 0.035 + random() * (0.055 + damage * 0.026), width * (0.38 + random() * 0.42), random() * 0.42, (random() - 0.5) * 0.12);
+      buildPath(branchStart, heading, 0.018 + random() * (0.018 + damage * 0.008), width * (0.32 + random() * 0.3), random() * 0.32, (random() - 0.5) * 0.065);
     }
+    if (vertices.length === 0) return;
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
     geometry.setIndex(indices);
@@ -1298,11 +1310,13 @@ export class BrickWall extends THREE.Group {
     for (let first = 0; first < pathPoints.length; first += 1) for (let second = first + 1; second < pathPoints.length; second += 1) span = Math.max(span, pathPoints[first].distanceTo(pathPoints[second]));
     group.userData.segmentCount = segmentCount;
     group.userData.span = span;
+    group.userData.maximumSegmentLength = maximumSegmentLength;
+    group.userData.maximumWidthMm = maximumWidth * 1000;
     group.userData.samples = pathPoints.map(point => ({ x: point.x, y: point.y }));
     this.add(group);
     target.cracks = group;
     this.wallFractures.push(group);
-    while (this.wallFractures.length > 72) {
+    while (this.wallFractures.length > MAX_FRACTURE_GROUPS) {
       const oldest = this.wallFractures.shift();
       if (!oldest) break;
       const owner = typeof oldest.userData.ownerId === 'string' ? this.targetsById.get(oldest.userData.ownerId) : null;
