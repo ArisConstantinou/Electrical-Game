@@ -175,6 +175,7 @@ const variedWallDamage = (await state(demolition)).workSurface;
 if (variedWallDamage.anchoredRemnants < 2 || variedWallDamage.fracturePatterns < 2) {
   throw new Error(`Different bricks reused the same empty-hole fracture result: ${JSON.stringify(variedWallDamage)}`);
 }
+if (variedWallDamage.floatingStaticPieces !== 0) throw new Error(`Destroyed bricks retained interior static pieces: ${JSON.stringify(variedWallDamage)}`);
 await demolition.evaluate(() => {
   const game = window.__wireTheHouse;
   game.renderer.camera.position.set(0, 1.5, 0.2);
@@ -200,16 +201,39 @@ const clusterSupportResult = await demolition.evaluate(() => {
     }
   }
   const interior = targets.find(target => !Object.values(wall.structuralSupport(target)).some(Boolean));
+  let offEdgeStaticPieces = 0;
+  const staticPieceNames = [];
+  for (const target of targets) {
+    if (!target.replacement) continue;
+    const support = wall.structuralSupport(target);
+    for (const child of target.replacement.children) {
+      if (!child.isInstancedMesh) continue;
+      staticPieceNames.push(child.name);
+      for (let instance = 0; instance < child.count; instance += 1) {
+        const offset = instance * 16;
+        const x = child.instanceMatrix.array[offset + 12];
+        const y = child.instanceMatrix.array[offset + 13];
+        const touchesSupportedEdge = (support.left && x <= -target.size.x / 2 + target.size.x / 9 * 0.75)
+          || (support.right && x >= target.size.x / 2 - target.size.x / 9 * 0.75)
+          || (support.bottom && y <= -target.size.y / 2 + target.size.y / 5 * 0.75)
+          || (support.top && y >= target.size.y / 2 - target.size.y / 5 * 0.75);
+        if (!touchesSupportedEdge) offEdgeStaticPieces += 1;
+      }
+    }
+  }
   game.renderer.render();
   return {
     targetCount: targets.length,
     destroyedCount: targets.filter(target => target.destroyed).length,
     interiorId: interior?.id ?? null,
     interiorHasReplacement: Boolean(interior?.replacement),
+    offEdgeStaticPieces,
+    staticPieceNames: [...new Set(staticPieceNames)],
+    floatingStaticPieces: wall.floatingStaticPieceCount,
     unsupportedAnchoredRemnants: wall.unsupportedAnchoredRemnantCount,
   };
 });
-if (clusterSupportResult.targetCount < 9 || clusterSupportResult.destroyedCount !== clusterSupportResult.targetCount || !clusterSupportResult.interiorId || clusterSupportResult.interiorHasReplacement || clusterSupportResult.unsupportedAnchoredRemnants !== 0) {
+if (clusterSupportResult.targetCount < 9 || clusterSupportResult.destroyedCount !== clusterSupportResult.targetCount || !clusterSupportResult.interiorId || clusterSupportResult.interiorHasReplacement || clusterSupportResult.offEdgeStaticPieces !== 0 || clusterSupportResult.floatingStaticPieces !== 0 || clusterSupportResult.unsupportedAnchoredRemnants !== 0) {
   throw new Error(`Contiguous demolition left floating static geometry: ${JSON.stringify(clusterSupportResult)}`);
 }
 await demolition.screenshot({ path: outputPath('desktop-demolition-supported-shells.png') });
@@ -289,7 +313,7 @@ const solidFragmentMaterials = await demolitionDetail.evaluate(() => {
   });
   return materials;
 });
-if (solidFragmentMaterials.length < 2 || solidFragmentMaterials.some(material => material.transparent || !material.depthWrite || material.opacity !== 1)) {
+if (solidFragmentMaterials.length < 1 || solidFragmentMaterials.some(material => material.transparent || !material.depthWrite || material.opacity !== 1)) {
   throw new Error(`Fracture remnants are not solid opaque geometry: ${JSON.stringify(solidFragmentMaterials)}`);
 }
 await demolitionDetail.evaluate(() => window.advanceTime(2200));

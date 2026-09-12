@@ -39,7 +39,6 @@ const removableMaterial = new THREE.MeshStandardMaterial({ color: 0xb94d2b, roug
 const chasedBrickMaterial = new THREE.MeshStandardMaterial({ color: 0xb24a2a, roughness: 0.99, metalness: 0 });
 const chaseBackMaterial = new THREE.MeshStandardMaterial({ color: 0x914126, roughness: 1, metalness: 0, emissive: 0x210904, emissiveIntensity: 0.22 });
 const chaseSideMaterial = new THREE.MeshStandardMaterial({ color: 0x3e1812, roughness: 1, metalness: 0 });
-const chaseInteriorMaterial = new THREE.MeshStandardMaterial({ color: 0x672717, roughness: 1, metalness: 0 });
 const fractureMaterial = new THREE.LineBasicMaterial({ color: 0x4f1c13, transparent: true, opacity: 0.92, depthTest: true });
 const CHASE_GRID_X = 20;
 const CHASE_GRID_Y = 10;
@@ -360,6 +359,9 @@ export class BrickWall extends THREE.Group {
   get chaseSideWallCount(): number { return this.targets.reduce((count, target) => count + Number(target.replacement?.userData.chaseSideWalls ?? 0), 0); }
   get uniqueFracturePatternCount(): number { return this.fractureSignatures.size; }
   get anchoredRemnantCount(): number { return this.targets.filter(target => target.destroyed && target.replacement !== null).length; }
+  get floatingStaticPieceCount(): number {
+    return this.targets.reduce((count, target) => count + (target.destroyed ? Number(target.replacement?.userData.interiorPieceCount ?? 0) : 0), 0);
+  }
   get unsupportedAnchoredRemnantCount(): number {
     return this.targets.filter(target => target.destroyed && target.replacement !== null && !Object.values(this.structuralSupport(target)).some(Boolean)).length;
   }
@@ -635,58 +637,38 @@ export class BrickWall extends THREE.Group {
       }
     }
 
-    // Only retain cells connected to an edge that still touches intact masonry or the room frame.
+    // A surviving wall chip must itself touch an intact neighbouring brick.
+    // Do not flood-fill inward: those cells looked like loose brick pieces
+    // frozen in mid-air after demolition.
     const connected = new Set<number>();
-    const queue: number[] = [];
     for (const index of candidates) {
       const row = Math.floor(index / cols);
       const col = index % cols;
       const attached = (row === 0 && support.bottom) || (row === rows - 1 && support.top)
         || (col === 0 && support.left) || (col === cols - 1 && support.right);
-      if (attached) {
-        connected.add(index);
-        queue.push(index);
-      }
-    }
-    while (queue.length > 0) {
-      const index = queue.shift()!;
-      const row = Math.floor(index / cols);
-      const col = index % cols;
-      for (const [nextRow, nextCol] of [[row - 1, col], [row + 1, col], [row, col - 1], [row, col + 1]]) {
-        if (nextRow < 0 || nextRow >= rows || nextCol < 0 || nextCol >= cols) continue;
-        const next = nextRow * cols + nextCol;
-        if (candidates.has(next) && !connected.has(next)) { connected.add(next); queue.push(next); }
-      }
+      if (attached) connected.add(index);
     }
 
     const outerMatrices: THREE.Matrix4[] = [];
-    const innerMatrices: THREE.Matrix4[] = [];
     for (const index of connected) {
       const row = Math.floor(index / cols);
       const col = index % cols;
       const depthFactor = 0.42 + random() * 0.58;
       const depth = target.size.z * depthFactor;
-      const frontReached = random() > 0.34;
-      const z = frontReached ? (target.size.z - depth) / 2 : -target.size.z / 2 + depth / 2;
+      const anchoredLeft = col === 0 && support.left;
+      const anchoredRight = col === cols - 1 && support.right;
+      const anchoredBottom = row === 0 && support.bottom;
+      const anchoredTop = row === rows - 1 && support.top;
+      const width = cellW * (0.9 + random() * 0.22) * (anchoredLeft || anchoredRight ? 1.14 : 1);
+      const height = cellH * (0.88 + random() * 0.24) * (anchoredBottom || anchoredTop ? 1.14 : 1);
+      const x = -target.size.x / 2 + cellW * (col + 0.5) + (anchoredLeft ? -cellW * 0.07 : anchoredRight ? cellW * 0.07 : 0);
+      const y = -target.size.y / 2 + cellH * (row + 0.5) + (anchoredBottom ? -cellH * 0.07 : anchoredTop ? cellH * 0.07 : 0);
       const matrix = new THREE.Matrix4().compose(
-        new THREE.Vector3(-target.size.x / 2 + cellW * (col + 0.5) + (random() - 0.5) * cellW * 0.16, -target.size.y / 2 + cellH * (row + 0.5) + (random() - 0.5) * cellH * 0.18, z),
-        new THREE.Quaternion().setFromEuler(new THREE.Euler((random() - 0.5) * 0.12, (random() - 0.5) * 0.12, (random() - 0.5) * 0.2)),
-        new THREE.Vector3(cellW * (0.78 + random() * 0.35), cellH * (0.74 + random() * 0.4), depth),
+        new THREE.Vector3(x, y, (target.size.z - depth) / 2),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler((random() - 0.5) * 0.06, (random() - 0.5) * 0.06, (random() - 0.5) * 0.12)),
+        new THREE.Vector3(width, height, depth),
       );
-      (frontReached ? outerMatrices : innerMatrices).push(matrix);
-    }
-
-    const ribMatrices: THREE.Matrix4[] = [];
-    const ribCount = support.top || support.bottom ? 1 + ((seed >>> 11) % 3) : 0;
-    for (let rib = 0; rib < ribCount; rib += 1) {
-      const x = -target.size.x * 0.3 + (rib + 1) / (ribCount + 1) * target.size.x * 0.6 + (random() - 0.5) * cellW;
-      const gapCenter = (random() - 0.5) * target.size.y * 0.18;
-      const gapHeight = target.size.y * (0.3 + random() * 0.25);
-      const bottomHeight = Math.max(0.008, gapCenter - gapHeight / 2 + target.size.y / 2);
-      const topHeight = Math.max(0.008, target.size.y / 2 - (gapCenter + gapHeight / 2));
-      const ribWidth = cellW * (0.18 + random() * 0.22);
-      if (support.bottom) ribMatrices.push(new THREE.Matrix4().compose(new THREE.Vector3(x, -target.size.y / 2 + bottomHeight / 2, -target.size.z * 0.28), new THREE.Quaternion(), new THREE.Vector3(ribWidth, bottomHeight, target.size.z * 0.42)));
-      if (support.top) ribMatrices.push(new THREE.Matrix4().compose(new THREE.Vector3(x, target.size.y / 2 - topHeight / 2, -target.size.z * 0.28), new THREE.Quaternion(), new THREE.Vector3(ribWidth, topHeight, target.size.z * 0.42)));
+      outerMatrices.push(matrix);
     }
 
     const addInstances = (matrices: THREE.Matrix4[], material: THREE.Material, name: string): void => {
@@ -701,12 +683,12 @@ export class BrickWall extends THREE.Group {
       group.add(mesh);
     };
     addInstances(outerMatrices, chasedBrickMaterial, `Attached face fragments ${target.id}`);
-    addInstances(innerMatrices, chaseInteriorMaterial, `Attached inner fragments ${target.id}`);
-    addInstances(ribMatrices, chaseInteriorMaterial, `Broken hollow-brick ribs ${target.id}`);
-    group.userData.attachedPieceCount = outerMatrices.length + innerMatrices.length + ribMatrices.length;
-    if (outerMatrices.length === 0 && innerMatrices.length === 0 && ribMatrices.length === 0) return;
+    group.userData.attachedPieceCount = outerMatrices.length;
+    group.userData.interiorPieceCount = 0;
+    group.userData.ribPieceCount = 0;
+    if (outerMatrices.length === 0) return;
     const supportKey = `${Number(support.top)}${Number(support.right)}${Number(support.bottom)}${Number(support.left)}`;
-    const signature = `${pattern}:${supportKey}:${[...connected].join(',')}:${ribCount}`;
+    const signature = `${pattern}:${supportKey}:${[...connected].join(',')}`;
     group.userData.fractureSignature = signature;
     this.fractureSignatures.add(signature);
     this.add(group);
