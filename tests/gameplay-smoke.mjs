@@ -184,13 +184,13 @@ const destroyAtHeight = async targetY => {
     }, targetY);
   }
   const after = (await state(demolition)).workSurface;
-  if (after.destroyedBricks <= before.destroyedBricks || after.activeFragments < 10) throw new Error(`Four DEMOLISH impacts did not fracture the brick at wall height ${targetY}`);
+  if (after.destroyedBricks <= before.destroyedBricks || after.activeFragments < 10) throw new Error(`Four DEMOLISH impacts did not fracture the brick at wall height ${targetY}: ${JSON.stringify({ before, after })}`);
 };
 await destroyAtHeight(2.93);
 await destroyAtHeight(0.07);
 const variedWallDamage = (await state(demolition)).workSurface;
-if (variedWallDamage.anchoredRemnants !== 0 || variedWallDamage.floatingStaticPieces !== 0 || variedWallDamage.fracturePatterns !== 0) {
-  throw new Error(`Destroyed bricks retained static fracture geometry: ${JSON.stringify(variedWallDamage)}`);
+if (variedWallDamage.floatingStaticPieces !== 0 || variedWallDamage.unsupportedAnchoredRemnants !== 0 || variedWallDamage.fracturePatterns < 2 || variedWallDamage.partialBreachBricks < 4 || variedWallDamage.breachedWallCells < 100 || variedWallDamage.deformedWallCells < 100 || variedWallDamage.maximumFractureSpan < 0.3) {
+  throw new Error(`DEMOLISH did not produce supported wall-scale damage: ${JSON.stringify(variedWallDamage)}`);
 }
 await demolition.evaluate(() => {
   const game = window.__wireTheHouse;
@@ -218,7 +218,7 @@ const clusterSupportResult = await demolition.evaluate(() => {
     }
   }
   window.advanceTime(2200);
-  const retainedStaticTargets = targets.filter(target => target.replacement).map(target => target.id);
+  const retainedStaticTargets = targets.filter(target => target.replacement).map(target => ({ id: target.id, supportedComponents: Number(target.replacement.userData.supportedComponents ?? 0), unsupportedComponents: Number(target.replacement.userData.unsupportedComponents ?? 0) }));
   game.renderer.render();
   return {
     targetCount: targets.length,
@@ -236,7 +236,7 @@ const clusterSupportResult = await demolition.evaluate(() => {
     rubblePileHeight: game.chasing.rubblePileHeight,
   };
 });
-if (clusterSupportResult.targetCount < 9 || clusterSupportResult.destroyedCount !== clusterSupportResult.targetCount || clusterSupportResult.retainedStaticTargets.length !== 0 || clusterSupportResult.floatingStaticPieces !== 0 || clusterSupportResult.unsupportedAnchoredRemnants !== 0 || clusterSupportResult.airborneFragments !== 0 || clusterSupportResult.unsupportedSettledFragments !== 0 || clusterSupportResult.rubblePileHeight > 0.161) {
+if (clusterSupportResult.targetCount < 9 || clusterSupportResult.destroyedCount !== clusterSupportResult.targetCount || clusterSupportResult.retainedStaticTargets.some(target => target.supportedComponents < 1 || target.unsupportedComponents !== 0) || clusterSupportResult.floatingStaticPieces !== 0 || clusterSupportResult.unsupportedAnchoredRemnants !== 0 || clusterSupportResult.airborneFragments !== 0 || clusterSupportResult.unsupportedSettledFragments !== 0 || clusterSupportResult.rubblePileHeight > 0.161) {
   throw new Error(`Contiguous demolition left floating static geometry: ${JSON.stringify(clusterSupportResult)}`);
 }
 const supportExpiryResult = await demolition.evaluate(() => {
@@ -280,10 +280,14 @@ const fullWallResult = await demolition.evaluate(() => {
     destroyed: wall.destroyedBrickCount,
     passes: pass,
     retainedStaticTargets: wall.targets.filter(target => target.destroyed && target.replacement).length,
+    unsupportedRetainedTargets: wall.targets.filter(target => target.destroyed && target.replacement && Number(target.replacement.userData.supportedComponents ?? 0) < 1).length,
+    affectedTargets: wall.targets.filter(target => target.originalHidden).length,
+    breachedWallCells: wall.breachedWallCellCount,
+    deformedWallCells: wall.deformedWallCellCount,
     unsupportedAnchoredRemnants: wall.unsupportedAnchoredRemnantCount,
   };
 });
-if (fullWallResult.destroyed !== 472 || fullWallResult.retainedStaticTargets !== 0 || fullWallResult.unsupportedAnchoredRemnants !== 0) throw new Error(`Not every wall brick can be cleanly destroyed: ${JSON.stringify(fullWallResult)}`);
+if (fullWallResult.destroyed < 10 || fullWallResult.affectedTargets !== 472 || fullWallResult.breachedWallCells < 2000 || fullWallResult.deformedWallCells < 30000 || fullWallResult.unsupportedRetainedTargets !== 0 || fullWallResult.unsupportedAnchoredRemnants !== 0) throw new Error(`Full-wall hammer scan did not preserve a connected wall-scale damage field: ${JSON.stringify(fullWallResult)}`);
 await demolition.screenshot({ path: outputPath('desktop-full-wall-demolished.png') });
 await demolition.close();
 
@@ -319,7 +323,7 @@ for (let hit = 0; hit < 3; hit += 1) {
   });
 }
 const crackedState = await state(demolitionDetail);
-if (crackedState.workSurface.destroyedBricks !== 0 || crackedState.workSurface.damagedBricks !== 1) throw new Error(`DEMOLISH skipped progressive cracking: ${JSON.stringify(crackedState.workSurface)}`);
+if (crackedState.workSurface.destroyedBricks !== 0 || crackedState.workSurface.damagedBricks !== 1 || crackedState.workSurface.fractureSegments < 8 || crackedState.workSurface.maximumFractureSpan < 0.3 || crackedState.workSurface.deformedWallCells < 100) throw new Error(`DEMOLISH skipped wall-scale progressive cracking and deformation: ${JSON.stringify(crackedState.workSurface)}`);
 await demolitionDetail.screenshot({ path: outputPath('desktop-progressive-demolition-cracks.png') });
 await demolitionDetail.evaluate(() => {
   const game = window.__wireTheHouse;
@@ -330,8 +334,8 @@ await demolitionDetail.evaluate(() => {
   game.renderer.render();
 });
 const fracturedState = await state(demolitionDetail);
-if (fracturedState.workSurface.destroyedBricks !== 1 || fracturedState.workSurface.damagedBricks !== 0 || fracturedState.workSurface.activeFragments < 20 || fracturedState.workSurface.anchoredRemnants !== 0) {
-  throw new Error(`DEMOLISH did not finish with varied fragment debris: ${JSON.stringify(fracturedState.workSurface)}`);
+if (fracturedState.workSurface.destroyedBricks !== 1 || fracturedState.workSurface.damagedBricks !== 0 || fracturedState.workSurface.activeFragments < 20 || fracturedState.workSurface.partialBreachBricks < 3 || fracturedState.workSurface.deformedWallCells < 80 || fracturedState.workSurface.floatingStaticPieces !== 0) {
+  throw new Error(`DEMOLISH did not finish with bonded, deformed wall damage: ${JSON.stringify(fracturedState.workSurface)}`);
 }
 await demolitionDetail.screenshot({ path: outputPath('desktop-progressive-demolition-fragments.png') });
 const solidFragmentMaterials = await demolitionDetail.evaluate(() => {
@@ -450,11 +454,11 @@ if (chasePasses.at(-1).paintedPixels !== 0 || routedResult.workSurface.freeSpray
   throw new Error(`Completed CHASE left visible spray residue: ${JSON.stringify({ paintedPixels: chasePasses.at(-1).paintedPixels, freeSprayMarks: routedResult.workSurface.freeSprayMarks })}`);
 }
 if (routedResult.activePoint.stage !== 'chased' || routedResult.activePoint.chaseCoverage < 0.98) throw new Error(`CHASE did not consume the complete painted route: ${JSON.stringify(routedResult)}`);
-if (routedResult.workSurface.carvedCells < 20 || routedResult.workSurface.recessedBricks < 5 || routedResult.workSurface.destroyedBricks !== 0 || routedResult.workSurface.chaseDepthMm !== 55 || routedResult.workSurface.chaseBackSurfaces < 20 || routedResult.workSurface.chaseSideWalls < 20) {
+if (routedResult.workSurface.carvedCells < 20 || routedResult.workSurface.recessedBricks < 5 || routedResult.workSurface.destroyedBricks !== 0 || routedResult.workSurface.chaseMinimumDepthMm > 42 || routedResult.workSurface.chaseMaximumDepthMm < 68 || routedResult.workSurface.chaseBackSurfaces < 20 || routedResult.workSurface.chaseSideWalls < 20 || routedResult.workSurface.deformedWallCells < 10) {
   throw new Error(`CHASE did not form a narrow multi-brick groove: ${JSON.stringify(routedResult.workSurface)}`);
 }
 const chaseDepthGeometry = await routedChase.evaluate(() => {
-  const result = { backs: 0, sides: 0, measuredDepthMm: 0, solidMaterials: true };
+  const result = { backs: 0, sides: 0, minimumDepthMm: Number.POSITIVE_INFINITY, maximumDepthMm: 0, solidMaterials: true };
   window.__wireTheHouse.renderer.scene.traverse(object => {
     if (!object.isInstancedMesh || (!object.name.includes('recessed back surfaces') && !object.name.includes('dark chase side walls'))) return;
     const material = object.material;
@@ -463,13 +467,18 @@ const chaseDepthGeometry = await routedChase.evaluate(() => {
     if (object.name.includes('recessed back surfaces')) {
       result.backs += object.count;
       const matrix = object.instanceMatrix.array;
-      result.measuredDepthMm = Math.max(result.measuredDepthMm, Math.round((0.09 - (matrix[14] + Math.abs(matrix[10]) / 2)) * 1000));
+      for (let index = 0; index < object.count; index += 1) {
+        const offset = index * 16;
+        const depth = Math.round((0.09 - (matrix[offset + 14] + Math.abs(matrix[offset + 10]) / 2)) * 1000);
+        result.minimumDepthMm = Math.min(result.minimumDepthMm, depth);
+        result.maximumDepthMm = Math.max(result.maximumDepthMm, depth);
+      }
     }
   });
   return result;
 });
-if (chaseDepthGeometry.backs < 20 || chaseDepthGeometry.sides < 20 || chaseDepthGeometry.measuredDepthMm !== 55 || !chaseDepthGeometry.solidMaterials) {
-  throw new Error(`CHASE lacks solid 55 mm back/side geometry: ${JSON.stringify(chaseDepthGeometry)}`);
+if (chaseDepthGeometry.backs < 20 || chaseDepthGeometry.sides < 20 || chaseDepthGeometry.minimumDepthMm > 42 || chaseDepthGeometry.maximumDepthMm < 68 || chaseDepthGeometry.maximumDepthMm - chaseDepthGeometry.minimumDepthMm < 22 || !chaseDepthGeometry.solidMaterials) {
+  throw new Error(`CHASE lacks solid variable-depth back/side geometry: ${JSON.stringify(chaseDepthGeometry)}`);
 }
 await routedChase.waitForTimeout(300);
 await routedChase.screenshot({ path: outputPath('desktop-complete-jagged-chase-route.png') });
