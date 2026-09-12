@@ -65,8 +65,9 @@ const chasedBrickMaterial = new THREE.MeshStandardMaterial({ color: 0xb24a2a, ro
 const fracturedWallSurfaceMaterial = new THREE.MeshStandardMaterial({ color: 0xb24a2a, roughness: 1, metalness: 0 });
 const chaseBackMaterial = new THREE.MeshStandardMaterial({ color: 0x8f3c25, roughness: 1, metalness: 0, emissive: 0x1d0804, emissiveIntensity: 0.12 });
 const chaseSideMaterial = new THREE.MeshStandardMaterial({ color: 0x74301f, roughness: 1, metalness: 0, side: THREE.DoubleSide });
+const bondedPerimeterMaterial = new THREE.MeshStandardMaterial({ color: 0xa94428, roughness: 1, metalness: 0, side: THREE.DoubleSide });
 const chaseVoidMaterial = new THREE.MeshStandardMaterial({ color: 0x35120d, roughness: 1, metalness: 0 });
-const fractureMaterial = new THREE.MeshStandardMaterial({ color: 0x4a2118, roughness: 1, metalness: 0, transparent: true, opacity: 0.34, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+const fractureMaterial = new THREE.MeshStandardMaterial({ color: 0x64291d, roughness: 1, metalness: 0, transparent: true, opacity: 0.2, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
 const CHASE_GRID_X = 20;
 const CHASE_GRID_Y = 10;
 const CHASE_DEPTH = 0.055;
@@ -81,7 +82,7 @@ const DEMOLISH_HITS = 4;
 const DEMOLISH_THROUGH_DEPTH = 0.165;
 const WALL_COLUMNS = 21;
 const WALL_ROWS = 23;
-const MAX_FRACTURE_GROUPS = 18;
+const MAX_FRACTURE_GROUPS = 12;
 const WALL_BRICK_WIDTH = GAME_CONFIG.room.width / WALL_COLUMNS;
 const WALL_COURSE_HEIGHT = GAME_CONFIG.room.height / WALL_ROWS;
 
@@ -463,6 +464,7 @@ export class BrickWall extends THREE.Group {
   get maximumDemolitionDepthMm(): number { return this.targets.reduce((depth, target) => Math.max(depth, Number(target.replacement?.userData.maximumExcavationDepthMm ?? 0)), 0); }
   get demolitionMicroCellBoxCount(): number { return this.targets.reduce((count, target) => count + Number(target.replacement?.userData.microCellBoxes ?? 0), 0); }
   get demolitionSurfaceTriangleCount(): number { return this.targets.reduce((count, target) => count + Number(target.replacement?.userData.surfaceTriangles ?? 0), 0); }
+  get demolitionPerimeterWallTriangleCount(): number { return this.targets.reduce((count, target) => count + Number(target.replacement?.userData.perimeterWallTriangles ?? 0), 0); }
   get maximumDemolitionSurfaceTrianglesPerTarget(): number { return this.targets.reduce((count, target) => Math.max(count, Number(target.replacement?.userData.surfaceTriangles ?? 0)), 0); }
   get maximumRelevantDemolitionSitesPerTarget(): number { return this.targets.reduce((count, target) => Math.max(count, Number(target.replacement?.userData.relevantDemolitionSites ?? 0)), 0); }
   get openDemolitionSeamCount(): number { return this.targets.reduce((count, target) => count + Number(target.replacement?.userData.openPerimeterSegments ?? 0), 0); }
@@ -1090,7 +1092,9 @@ export class BrickWall extends THREE.Group {
       const surfaceGeometry = new THREE.BufferGeometry();
       surfaceGeometry.setAttribute('position', new THREE.Float32BufferAttribute(surfacePositions, 3));
       surfaceGeometry.setIndex(surfaceIndices);
-      surfaceGeometry.computeVertexNormals();
+      const surfaceNormals = new Float32Array(surfacePositions.length);
+      for (let index = 2; index < surfaceNormals.length; index += 3) surfaceNormals[index] = 1;
+      surfaceGeometry.setAttribute('normal', new THREE.BufferAttribute(surfaceNormals, 3));
       surfaceGeometry.computeBoundingSphere();
       const surface = new THREE.Mesh(surfaceGeometry, fracturedWallSurfaceMaterial);
       surface.name = `Continuous mortar-bonded wall surface ${target.id}`;
@@ -1107,31 +1111,31 @@ export class BrickWall extends THREE.Group {
       return new THREE.Vector3(surfacePositions[offset], surfacePositions[offset + 1], surfacePositions[offset + 2]);
     };
     const cavityPositions: number[] = [];
+    const perimeterPositions: number[] = [];
     const cavityBackZ = -target.size.z / 2 + 0.004;
     let perimeterWallSegments = 0;
-    const addCavityWall = (from: THREE.Vector3, to: THREE.Vector3, backZ = cavityBackZ): void => {
-      cavityPositions.push(
+    const addWall = (positions: number[], from: THREE.Vector3, to: THREE.Vector3): void => {
+      positions.push(
         from.x, from.y, from.z,
         to.x, to.y, to.z,
-        to.x, to.y, backZ,
+        to.x, to.y, cavityBackZ,
         from.x, from.y, from.z,
-        to.x, to.y, backZ,
-        from.x, from.y, backZ,
+        to.x, to.y, cavityBackZ,
+        from.x, from.y, cavityBackZ,
       );
     };
-    const addShallowPerimeterWall = (from: THREE.Vector3, to: THREE.Vector3): void => {
-      addCavityWall(from, to, Math.max(cavityBackZ, Math.min(from.z, to.z) - 0.014));
-    };
+    const addCavityWall = (from: THREE.Vector3, to: THREE.Vector3): void => addWall(cavityPositions, from, to);
+    const addBondedPerimeterWall = (from: THREE.Vector3, to: THREE.Vector3): void => addWall(perimeterPositions, from, to);
     for (let row = 0; row < DEMOLISH_GRID_Y; row += 1) for (let col = 0; col < DEMOLISH_GRID_X; col += 1) {
       if (cells[row][col].breached) continue;
       if (col > 0 && cells[row][col - 1].breached) addCavityWall(surfacePoint(row, col), surfacePoint(row + 1, col));
       if (col < DEMOLISH_GRID_X - 1 && cells[row][col + 1].breached) addCavityWall(surfacePoint(row + 1, col + 1), surfacePoint(row, col + 1));
       if (row > 0 && cells[row - 1][col].breached) addCavityWall(surfacePoint(row, col + 1), surfacePoint(row, col));
       if (row < DEMOLISH_GRID_Y - 1 && cells[row + 1][col].breached) addCavityWall(surfacePoint(row + 1, col), surfacePoint(row + 1, col + 1));
-      if (col === 0) { addShallowPerimeterWall(surfacePoint(row, col), surfacePoint(row + 1, col)); perimeterWallSegments += 1; }
-      if (col === DEMOLISH_GRID_X - 1) { addShallowPerimeterWall(surfacePoint(row + 1, col + 1), surfacePoint(row, col + 1)); perimeterWallSegments += 1; }
-      if (row === 0) { addShallowPerimeterWall(surfacePoint(row, col + 1), surfacePoint(row, col)); perimeterWallSegments += 1; }
-      if (row === DEMOLISH_GRID_Y - 1) { addShallowPerimeterWall(surfacePoint(row + 1, col), surfacePoint(row + 1, col + 1)); perimeterWallSegments += 1; }
+      if (col === 0) { addBondedPerimeterWall(surfacePoint(row, col), surfacePoint(row + 1, col)); perimeterWallSegments += 1; }
+      if (col === DEMOLISH_GRID_X - 1) { addBondedPerimeterWall(surfacePoint(row + 1, col + 1), surfacePoint(row, col + 1)); perimeterWallSegments += 1; }
+      if (row === 0) { addBondedPerimeterWall(surfacePoint(row, col + 1), surfacePoint(row, col)); perimeterWallSegments += 1; }
+      if (row === DEMOLISH_GRID_Y - 1) { addBondedPerimeterWall(surfacePoint(row + 1, col), surfacePoint(row + 1, col + 1)); perimeterWallSegments += 1; }
     }
     let expectedPerimeterSegments = 0;
     for (let row = 0; row < DEMOLISH_GRID_Y; row += 1) {
@@ -1148,11 +1152,23 @@ export class BrickWall extends THREE.Group {
       cavityGeometry.computeVertexNormals();
       cavityGeometry.computeBoundingSphere();
       const cavity = new THREE.Mesh(cavityGeometry, chaseSideMaterial);
-      cavity.name = `Bonded brick perimeter and through-breach walls ${target.id}`;
+      cavity.name = `Through-breach cavity walls ${target.id}`;
       cavity.userData.ownsGeometry = true;
       cavity.castShadow = true;
       cavity.receiveShadow = true;
       group.add(cavity);
+    }
+    if (perimeterPositions.length > 0) {
+      const perimeterGeometry = new THREE.BufferGeometry();
+      perimeterGeometry.setAttribute('position', new THREE.Float32BufferAttribute(perimeterPositions, 3));
+      perimeterGeometry.computeVertexNormals();
+      perimeterGeometry.computeBoundingSphere();
+      const perimeter = new THREE.Mesh(perimeterGeometry, bondedPerimeterMaterial);
+      perimeter.name = `Mortar-coloured sealed brick perimeter ${target.id}`;
+      perimeter.userData.ownsGeometry = true;
+      perimeter.castShadow = true;
+      perimeter.receiveShadow = true;
+      group.add(perimeter);
     }
     group.userData.supportedComponents = support.supportedComponents;
     group.userData.unsupportedComponents = support.unsupportedComponents;
@@ -1167,6 +1183,7 @@ export class BrickWall extends THREE.Group {
     group.userData.microCellBoxes = group.children.reduce((count, child) => count + (child instanceof THREE.InstancedMesh ? child.count : 0), 0);
     group.userData.surfaceTriangles = surfaceIndices.length / 3;
     group.userData.cavityWallTriangles = cavityPositions.length / 9;
+    group.userData.perimeterWallTriangles = perimeterPositions.length / 9;
     this.add(group);
     target.replacement = group;
   }

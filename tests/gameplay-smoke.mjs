@@ -212,13 +212,21 @@ const variedWallDamage = (await state(demolition)).workSurface;
 const variedImpactProfiles = await demolition.evaluate(() => window.__wireTheHouse.room.brickWall.demolitionSites.filter(site => site.severity >= 1).map(site => ({ rotation: Number(site.rotation.toFixed(3)), aspect: Number((site.radiusX / site.radiusY).toFixed(3)), lobes: `${site.lobeFrequencyA}:${site.lobeFrequencyB}`, depth: Number((site.excavationDepth * 1000).toFixed(1)) })));
 const brittleSurfaceIntegrity = await demolition.evaluate(() => ({
   openSeams: window.__wireTheHouse.room.brickWall.openDemolitionSeamCount,
+  sealedPerimeterTriangles: window.__wireTheHouse.room.brickWall.demolitionPerimeterWallTriangleCount,
   maximumSurfaceWarpMm: window.__wireTheHouse.room.brickWall.maximumDemolitionSurfaceWarpMm,
   maximumSurfaceTrianglesPerTarget: window.__wireTheHouse.room.brickWall.maximumDemolitionSurfaceTrianglesPerTarget,
   maximumRelevantSitesPerTarget: window.__wireTheHouse.room.brickWall.maximumRelevantDemolitionSitesPerTarget,
   maximumFractureSegmentLength: window.__wireTheHouse.room.brickWall.maximumFractureSegmentLength,
   maximumFractureWidthMm: window.__wireTheHouse.room.brickWall.maximumFractureWidthMm,
+  surfaceNormalDeviation: window.__wireTheHouse.room.brickWall.targets.reduce((maximum, target) => {
+    const surface = target.replacement?.children.find(child => child.name.startsWith('Continuous mortar-bonded wall surface'));
+    const normals = surface?.geometry?.getAttribute('normal');
+    if (!normals) return maximum;
+    for (let index = 0; index < normals.count; index += 1) maximum = Math.max(maximum, Math.hypot(normals.getX(index), normals.getY(index)) + Math.abs(normals.getZ(index) - 1));
+    return maximum;
+  }, 0),
 }));
-if (variedWallDamage.floatingStaticPieces !== 0 || variedWallDamage.unsupportedAnchoredRemnants !== 0 || variedWallDamage.demolitionMicroCellBoxes !== 0 || variedWallDamage.demolitionSurfaceTriangles < 2 || brittleSurfaceIntegrity.openSeams !== 0 || brittleSurfaceIntegrity.maximumSurfaceWarpMm > 6.1 || brittleSurfaceIntegrity.maximumSurfaceTrianglesPerTarget > 400 || brittleSurfaceIntegrity.maximumRelevantSitesPerTarget > 12 || brittleSurfaceIntegrity.maximumFractureSegmentLength > 0.04 || brittleSurfaceIntegrity.maximumFractureWidthMm > 1 || variedWallDamage.fracturePatterns < 2 || variedWallDamage.breachedWallCells !== 0 || variedWallDamage.deformedWallCells < 100 || variedWallDamage.maximumFractureSpan < 0.015 || variedWallDamage.maximumFractureSpan > 0.22 || new Set(variedImpactProfiles.map(profile => JSON.stringify(profile))).size < 2) {
+if (variedWallDamage.floatingStaticPieces !== 0 || variedWallDamage.unsupportedAnchoredRemnants !== 0 || variedWallDamage.demolitionMicroCellBoxes !== 0 || variedWallDamage.demolitionSurfaceTriangles < 2 || brittleSurfaceIntegrity.openSeams !== 0 || brittleSurfaceIntegrity.sealedPerimeterTriangles < 2 || brittleSurfaceIntegrity.surfaceNormalDeviation > 0.0001 || brittleSurfaceIntegrity.maximumSurfaceWarpMm > 6.1 || brittleSurfaceIntegrity.maximumSurfaceTrianglesPerTarget > 400 || brittleSurfaceIntegrity.maximumRelevantSitesPerTarget > 12 || brittleSurfaceIntegrity.maximumFractureSegmentLength > 0.04 || brittleSurfaceIntegrity.maximumFractureWidthMm > 1 || variedWallDamage.fracturePatterns < 2 || variedWallDamage.breachedWallCells !== 0 || variedWallDamage.deformedWallCells < 100 || variedWallDamage.maximumFractureSpan < 0.015 || variedWallDamage.maximumFractureSpan > 0.22 || new Set(variedImpactProfiles.map(profile => JSON.stringify(profile))).size < 2) {
   throw new Error(`DEMOLISH did not produce distinct brittle partial-depth wall damage: ${JSON.stringify({ variedWallDamage, variedImpactProfiles, brittleSurfaceIntegrity })}`);
 }
 await demolition.evaluate(() => {
