@@ -16,11 +16,8 @@ interface BrickTarget {
   carvedCells: Set<number>;
   replacement: THREE.Group | null;
   cracks: THREE.Group | null;
-  fractureSeed: number;
-  fractureImpact: THREE.Vector3 | null;
 }
 interface AimHit { point: THREE.Vector3; target: BrickTarget }
-interface StructuralSupport { top: boolean; right: boolean; bottom: boolean; left: boolean }
 
 export type SprayMode = 'dots' | 'live';
 export type MasonryImpactKind = 'chase-chip' | 'demolish-chip' | 'demolish-crack' | 'demolish-spall' | 'demolish-break';
@@ -76,7 +73,6 @@ export class BrickWall extends THREE.Group {
   private readonly liveSpraySamplesByPoint = new Map<string, number>();
   private readonly chasedSamplesByPoint = new Map<string, Set<number>>();
   private readonly chasePassByPoint = new Map<string, number>();
-  private readonly fractureSignatures = new Set<string>();
   private readonly livePaintCanvas = document.createElement('canvas');
   private readonly livePaintContext: CanvasRenderingContext2D;
   private readonly livePaintTexture: THREE.CanvasTexture;
@@ -170,8 +166,8 @@ export class BrickWall extends THREE.Group {
     return this.cast(camera, 0, 0, maxDistance);
   }
 
-  private registerTarget(source: Omit<BrickTarget, 'damage' | 'destroyed' | 'originalHidden' | 'carvedCells' | 'replacement' | 'cracks' | 'fractureSeed' | 'fractureImpact'>): BrickTarget {
-    const target: BrickTarget = { ...source, center: source.center.clone(), size: source.size.clone(), damage: 0, destroyed: false, originalHidden: false, carvedCells: new Set(), replacement: null, cracks: null, fractureSeed: 0, fractureImpact: null };
+  private registerTarget(source: Omit<BrickTarget, 'damage' | 'destroyed' | 'originalHidden' | 'carvedCells' | 'replacement' | 'cracks'>): BrickTarget {
+    const target: BrickTarget = { ...source, center: source.center.clone(), size: source.size.clone(), damage: 0, destroyed: false, originalHidden: false, carvedCells: new Set(), replacement: null, cracks: null };
     this.targets.push(target);
     this.targetsById.set(target.id, target);
     return target;
@@ -313,9 +309,6 @@ export class BrickWall extends THREE.Group {
       this.hideOriginal(target);
       this.removeReplacement(target);
       this.removeCracks(target);
-      target.fractureSeed = seed;
-      target.fractureImpact = hit.point.clone();
-      impactPoints.push(...this.refreshDestroyedShellsAround(target));
       this.heldDemolitionTarget = null;
     }
     return { points: impactPoints, kind, brickSize: target.size.clone(), seed, destroyed };
@@ -366,18 +359,13 @@ export class BrickWall extends THREE.Group {
   get chaseDepthMm(): number { return CHASE_DEPTH * 1000; }
   get chaseBackSurfaceCount(): number { return this.targets.reduce((count, target) => count + Number(target.replacement?.userData.chaseBackSurfaces ?? 0), 0); }
   get chaseSideWallCount(): number { return this.targets.reduce((count, target) => count + Number(target.replacement?.userData.chaseSideWalls ?? 0), 0); }
-  get uniqueFracturePatternCount(): number { return this.fractureSignatures.size; }
+  get uniqueFracturePatternCount(): number { return 0; }
   get anchoredRemnantCount(): number { return this.targets.filter(target => target.destroyed && target.replacement !== null).length; }
   get floatingStaticPieceCount(): number {
-    return this.targets.reduce((count, target) => {
-      if (!target.destroyed || !target.replacement) return count;
-      const interior = Number(target.replacement.userData.interiorPieceCount ?? 0);
-      const attached = Number(target.replacement.userData.attachedPieceCount ?? 0);
-      return count + interior + (this.structuralSupport(target).bottom ? 0 : attached);
-    }, 0);
+    return this.targets.filter(target => target.destroyed && target.replacement !== null).length;
   }
   get unsupportedAnchoredRemnantCount(): number {
-    return this.targets.filter(target => target.destroyed && target.replacement !== null && !this.structuralSupport(target).bottom).length;
+    return this.floatingStaticPieceCount;
   }
   getChaseCoverage(pointId: string): number {
     const total = this.spraySamplesByPoint.get(pointId)?.length ?? 0;
@@ -579,131 +567,6 @@ export class BrickWall extends THREE.Group {
     target.cracks.traverse(object => { if (object instanceof THREE.LineSegments) object.geometry.dispose(); });
     this.remove(target.cracks);
     target.cracks = null;
-  }
-
-  private refreshDestroyedShellsAround(source: BrickTarget): THREE.Vector3[] {
-    const detachedPoints: THREE.Vector3[] = [];
-    const nearby = this.targets.filter(target => target.destroyed
-      && Math.abs(target.center.x - source.center.x) <= source.size.x * 1.2
-      && Math.abs(target.center.y - source.center.y) <= source.size.y * 1.5);
-    for (const target of nearby) {
-      const previousCount = Number(target.replacement?.userData.attachedPieceCount ?? 0);
-      this.removeReplacement(target);
-      if (target.fractureImpact) this.addAnchoredFractureShell(target, target.fractureSeed, target.fractureImpact);
-      const nextCount = Number(target.replacement?.userData.attachedPieceCount ?? 0);
-      if (previousCount > nextCount) detachedPoints.push(target.center.clone().add(new THREE.Vector3(0, 0, target.size.z / 2)));
-    }
-    return detachedPoints;
-  }
-
-  private structuralSupport(target: BrickTarget): StructuralSupport {
-    const support: StructuralSupport = { top: false, right: false, bottom: false, left: false };
-    for (const other of this.targets) {
-      if (other === target || other.destroyed) continue;
-      const dx = other.center.x - target.center.x;
-      const dy = other.center.y - target.center.y;
-      const horizontalOverlap = Math.abs(dx) < (target.size.x + other.size.x) / 2 - 0.008;
-      const verticalOverlap = Math.abs(dy) < (target.size.y + other.size.y) / 2 - 0.008;
-      if (horizontalOverlap && dy > 0 && dy < (target.size.y + other.size.y) * 0.7) support.top = true;
-      if (horizontalOverlap && dy < 0 && -dy < (target.size.y + other.size.y) * 0.7) support.bottom = true;
-      if (verticalOverlap && dx > 0 && dx < (target.size.x + other.size.x) * 0.7) support.right = true;
-      if (verticalOverlap && dx < 0 && -dx < (target.size.x + other.size.x) * 0.7) support.left = true;
-      if (support.top && support.right && support.bottom && support.left) break;
-    }
-    return support;
-  }
-
-  private addAnchoredFractureShell(target: BrickTarget, seed: number, impact: THREE.Vector3): void {
-    const support = this.structuralSupport(target);
-    // Mortar can leave a small grounded chip on the brick below. Fragments
-    // attached only above or at a side read as frozen in the opening, so they
-    // become loose rubble instead of static replacement geometry.
-    if (!support.bottom) return;
-    const random = seeded(seed ^ 0x9e3779b9);
-    const group = new THREE.Group();
-    group.name = `Anchored irregular fracture shell ${target.id}`;
-    group.userData.studioEntityId = `world:brick-wall:fracture-shell-${target.id}`;
-    group.position.copy(target.center);
-    group.rotation.z = target.rotationZ;
-
-    const cols = 9;
-    const rows = 5;
-    const cellW = target.size.x / cols;
-    const cellH = target.size.y / rows;
-    const dx = impact.x - target.center.x;
-    const dy = impact.y - target.center.y;
-    const cosine = Math.cos(-target.rotationZ);
-    const sine = Math.sin(-target.rotationZ);
-    const impactX = THREE.MathUtils.clamp((dx * cosine - dy * sine) / (target.size.x / 2), -0.3, 0.3);
-    const impactY = THREE.MathUtils.clamp((dx * sine + dy * cosine) / (target.size.y / 2), -0.3, 0.3);
-    const pattern = seed % 4;
-    const candidates = new Set<number>();
-
-    for (let row = 0; row < rows; row += 1) {
-      for (let col = 0; col < cols; col += 1) {
-        const nx = (col + 0.5) / cols * 2 - 1 - impactX;
-        const ny = (row + 0.5) / rows * 2 - 1 - impactY;
-        const noise = (random() - 0.5) * 0.32;
-        const radial = Math.hypot(nx * (0.83 + (pattern === 2 ? 0.18 : 0)), ny * (1.06 + (pattern === 0 ? 0.12 : 0)));
-        const bias = pattern === 0 ? (nx + ny) * 0.12
-          : pattern === 1 ? (nx - ny) * 0.16
-            : pattern === 2 ? Math.sin((nx + ny) * Math.PI) * 0.14
-              : -ny * 0.18;
-        const craterRadius = 0.72 + ((seed >>> 5) % 13) / 100;
-        if (radial + noise + bias >= craterRadius) candidates.add(row * cols + col);
-      }
-    }
-
-    // A surviving wall chip must itself touch an intact neighbouring brick.
-    // Do not flood-fill inward: those cells looked like loose brick pieces
-    // frozen in mid-air after demolition.
-    const connected = new Set<number>();
-    for (const index of candidates) {
-      const row = Math.floor(index / cols);
-      const attached = row === 0;
-      if (attached) connected.add(index);
-    }
-
-    const outerMatrices: THREE.Matrix4[] = [];
-    for (const index of connected) {
-      const row = Math.floor(index / cols);
-      const col = index % cols;
-      const depthFactor = 0.42 + random() * 0.58;
-      const depth = target.size.z * depthFactor;
-      const width = cellW * (0.9 + random() * 0.22);
-      const height = cellH * (0.88 + random() * 0.24) * 1.14;
-      const x = -target.size.x / 2 + cellW * (col + 0.5);
-      const y = -target.size.y / 2 + cellH * (row + 0.5) - cellH * 0.07;
-      const matrix = new THREE.Matrix4().compose(
-        new THREE.Vector3(x, y, (target.size.z - depth) / 2),
-        new THREE.Quaternion().setFromEuler(new THREE.Euler((random() - 0.5) * 0.06, (random() - 0.5) * 0.06, (random() - 0.5) * 0.12)),
-        new THREE.Vector3(width, height, depth),
-      );
-      outerMatrices.push(matrix);
-    }
-
-    const addInstances = (matrices: THREE.Matrix4[], material: THREE.Material, name: string): void => {
-      if (matrices.length === 0) return;
-      const mesh = new THREE.InstancedMesh(unitBoxGeometry, material, matrices.length);
-      mesh.name = name;
-      mesh.raycast = () => undefined;
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      matrices.forEach((matrix, index) => mesh.setMatrixAt(index, matrix));
-      mesh.instanceMatrix.needsUpdate = true;
-      group.add(mesh);
-    };
-    addInstances(outerMatrices, chasedBrickMaterial, `Attached face fragments ${target.id}`);
-    group.userData.attachedPieceCount = outerMatrices.length;
-    group.userData.interiorPieceCount = 0;
-    group.userData.ribPieceCount = 0;
-    if (outerMatrices.length === 0) return;
-    const supportKey = `grounded-${Number(support.bottom)}`;
-    const signature = `${pattern}:${supportKey}:${[...connected].join(',')}`;
-    group.userData.fractureSignature = signature;
-    this.fractureSignatures.add(signature);
-    this.add(group);
-    target.replacement = group;
   }
 
   private inChaseZone(definition: InstallationDefinition, x: number, y: number, brickW: number, brickH: number): boolean {

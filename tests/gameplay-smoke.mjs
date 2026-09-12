@@ -189,10 +189,9 @@ const destroyAtHeight = async targetY => {
 await destroyAtHeight(2.93);
 await destroyAtHeight(0.07);
 const variedWallDamage = (await state(demolition)).workSurface;
-if (variedWallDamage.anchoredRemnants < 1 || variedWallDamage.fracturePatterns < 1) {
-  throw new Error(`Ground-supported demolition edge did not retain a varied chip: ${JSON.stringify(variedWallDamage)}`);
+if (variedWallDamage.anchoredRemnants !== 0 || variedWallDamage.floatingStaticPieces !== 0 || variedWallDamage.fracturePatterns !== 0) {
+  throw new Error(`Destroyed bricks retained static fracture geometry: ${JSON.stringify(variedWallDamage)}`);
 }
-if (variedWallDamage.floatingStaticPieces !== 0) throw new Error(`Destroyed bricks retained interior static pieces: ${JSON.stringify(variedWallDamage)}`);
 await demolition.evaluate(() => {
   const game = window.__wireTheHouse;
   game.renderer.camera.position.set(0, 1.5, 0.2);
@@ -219,32 +218,12 @@ const clusterSupportResult = await demolition.evaluate(() => {
     }
   }
   window.advanceTime(2200);
-  const interior = targets.find(target => !Object.values(wall.structuralSupport(target)).some(Boolean));
-  let hangingStaticPieces = 0;
-  const staticPieceNames = [];
-  for (const target of targets) {
-    if (!target.replacement) continue;
-    const support = wall.structuralSupport(target);
-    for (const child of target.replacement.children) {
-      if (!child.isInstancedMesh) continue;
-      staticPieceNames.push(child.name);
-      for (let instance = 0; instance < child.count; instance += 1) {
-        const offset = instance * 16;
-        const x = child.instanceMatrix.array[offset + 12];
-        const y = child.instanceMatrix.array[offset + 13];
-        const restsOnSupportedBottom = support.bottom && y <= -target.size.y / 2 + target.size.y / 5 * 0.75;
-        if (!restsOnSupportedBottom) hangingStaticPieces += 1;
-      }
-    }
-  }
+  const retainedStaticTargets = targets.filter(target => target.replacement).map(target => target.id);
   game.renderer.render();
   return {
     targetCount: targets.length,
     destroyedCount: targets.filter(target => target.destroyed).length,
-    interiorId: interior?.id ?? null,
-    interiorHasReplacement: Boolean(interior?.replacement),
-    hangingStaticPieces,
-    staticPieceNames: [...new Set(staticPieceNames)],
+    retainedStaticTargets,
     floatingStaticPieces: wall.floatingStaticPieceCount,
     unsupportedAnchoredRemnants: wall.unsupportedAnchoredRemnantCount,
     airborneFragments: game.chasing.airborneFragmentCount,
@@ -257,7 +236,7 @@ const clusterSupportResult = await demolition.evaluate(() => {
     rubblePileHeight: game.chasing.rubblePileHeight,
   };
 });
-if (clusterSupportResult.targetCount < 9 || clusterSupportResult.destroyedCount !== clusterSupportResult.targetCount || !clusterSupportResult.interiorId || clusterSupportResult.interiorHasReplacement || clusterSupportResult.hangingStaticPieces !== 0 || clusterSupportResult.floatingStaticPieces !== 0 || clusterSupportResult.unsupportedAnchoredRemnants !== 0 || clusterSupportResult.airborneFragments !== 0 || clusterSupportResult.unsupportedSettledFragments !== 0 || clusterSupportResult.rubblePileHeight > 0.161) {
+if (clusterSupportResult.targetCount < 9 || clusterSupportResult.destroyedCount !== clusterSupportResult.targetCount || clusterSupportResult.retainedStaticTargets.length !== 0 || clusterSupportResult.floatingStaticPieces !== 0 || clusterSupportResult.unsupportedAnchoredRemnants !== 0 || clusterSupportResult.airborneFragments !== 0 || clusterSupportResult.unsupportedSettledFragments !== 0 || clusterSupportResult.rubblePileHeight > 0.161) {
   throw new Error(`Contiguous demolition left floating static geometry: ${JSON.stringify(clusterSupportResult)}`);
 }
 const supportExpiryResult = await demolition.evaluate(() => {
@@ -297,9 +276,14 @@ const fullWallResult = await demolition.evaluate(() => {
     }
     pass += 1;
   }
-  return { destroyed: wall.destroyedBrickCount, passes: pass, unsupportedAnchoredRemnants: wall.unsupportedAnchoredRemnantCount };
+  return {
+    destroyed: wall.destroyedBrickCount,
+    passes: pass,
+    retainedStaticTargets: wall.targets.filter(target => target.destroyed && target.replacement).length,
+    unsupportedAnchoredRemnants: wall.unsupportedAnchoredRemnantCount,
+  };
 });
-if (fullWallResult.destroyed !== 472 || fullWallResult.unsupportedAnchoredRemnants !== 0) throw new Error(`Not every wall brick can be cleanly destroyed: ${JSON.stringify(fullWallResult)}`);
+if (fullWallResult.destroyed !== 472 || fullWallResult.retainedStaticTargets !== 0 || fullWallResult.unsupportedAnchoredRemnants !== 0) throw new Error(`Not every wall brick can be cleanly destroyed: ${JSON.stringify(fullWallResult)}`);
 await demolition.screenshot({ path: outputPath('desktop-full-wall-demolished.png') });
 await demolition.close();
 
@@ -346,14 +330,14 @@ await demolitionDetail.evaluate(() => {
   game.renderer.render();
 });
 const fracturedState = await state(demolitionDetail);
-if (fracturedState.workSurface.destroyedBricks !== 1 || fracturedState.workSurface.damagedBricks !== 0 || fracturedState.workSurface.activeFragments < 20 || fracturedState.workSurface.anchoredRemnants !== 1) {
+if (fracturedState.workSurface.destroyedBricks !== 1 || fracturedState.workSurface.damagedBricks !== 0 || fracturedState.workSurface.activeFragments < 20 || fracturedState.workSurface.anchoredRemnants !== 0) {
   throw new Error(`DEMOLISH did not finish with varied fragment debris: ${JSON.stringify(fracturedState.workSurface)}`);
 }
 await demolitionDetail.screenshot({ path: outputPath('desktop-progressive-demolition-fragments.png') });
 const solidFragmentMaterials = await demolitionDetail.evaluate(() => {
   const materials = [];
   window.__wireTheHouse.renderer.scene.traverse(object => {
-    if (!object.isMesh || (!object.name.includes('fragments') && !object.name.includes('ribs'))) return;
+    if (!object.isMesh || object.name !== 'Loose masonry fragment') return;
     const list = Array.isArray(object.material) ? object.material : [object.material];
     for (const material of list) materials.push({ transparent: material.transparent, depthWrite: material.depthWrite, opacity: material.opacity });
   });

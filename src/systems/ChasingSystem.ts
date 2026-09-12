@@ -112,6 +112,7 @@ export class ChasingSystem {
         geometry,
         fragmentMaterials[Math.floor(random() * fragmentMaterials.length)],
       );
+      fragment.name = 'Loose masonry fragment';
       const width = largeBreak ? 0.022 + Math.pow(random(), 1.35) * 0.068 : 0.007 + Math.pow(random(), 1.7) * 0.024;
       const height = largeBreak ? 0.014 + Math.pow(random(), 1.45) * 0.038 : 0.005 + Math.pow(random(), 1.8) * 0.017;
       const depth = largeBreak ? 0.014 + Math.pow(random(), 1.5) * 0.045 : 0.005 + Math.pow(random(), 1.8) * 0.019;
