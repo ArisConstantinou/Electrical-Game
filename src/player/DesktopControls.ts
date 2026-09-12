@@ -3,6 +3,7 @@ import type { Input } from '../core/Input';
 
 export class DesktopControls {
   constructor(surface: HTMLElement, player: PlayerController, input: Input) {
+    let primaryDown = false;
     surface.addEventListener('pointerdown', event => {
       if (this.isTouchDevice || (event.target as Element).closest('button')) return;
       if (event.button === 2) {
@@ -15,9 +16,15 @@ export class DesktopControls {
       }
       if (event.button !== 0) return;
       event.preventDefault();
-      if (document.pointerLockElement !== surface) {
-        input.actionHeld = false;
-        input.actionRequested = false;
+      const relocking = document.pointerLockElement !== surface;
+      if (primaryDown) return;
+      primaryDown = true;
+      if (relocking) {
+        // Standard FPS return-to-play behavior: the first primary press both
+        // restores centred mouse look and uses the selected tool. Right mouse
+        // remains a relock/cancel-only input and can never queue an action.
+        input.actionHeld = true;
+        input.actionRequested = true;
         void surface.requestPointerLock();
         return;
       }
@@ -26,10 +33,16 @@ export class DesktopControls {
     });
     surface.addEventListener('contextmenu', event => event.preventDefault());
     const releasePrimaryAction = (event: PointerEvent): void => {
-      if (event.button === 0) input.actionHeld = false;
+      if (event.button === 0) {
+        primaryDown = false;
+        input.actionHeld = false;
+      }
     };
     addEventListener('pointerup', releasePrimaryAction);
-    addEventListener('pointercancel', () => { input.actionHeld = false; });
+    addEventListener('pointercancel', () => {
+      primaryDown = false;
+      input.actionHeld = false;
+    });
     document.addEventListener('pointerlockchange', () => {
       if (document.pointerLockElement !== surface) {
         input.actionHeld = false;

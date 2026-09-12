@@ -29,6 +29,15 @@ const leftClickAction = async page => {
   await page.mouse.down({ button: 'left' });
   await page.evaluate(() => window.advanceTime(34));
   await page.mouse.up({ button: 'left' });
+  await page.waitForTimeout(100);
+};
+const unlockedLeftClickAction = async (page, holdMs = 34) => {
+  await page.evaluate(() => document.exitPointerLock());
+  await page.waitForTimeout(80);
+  if (await page.evaluate(() => Boolean(document.pointerLockElement))) throw new Error('Could not release Pointer Lock before primary-click regression');
+  await page.mouse.down({ button: 'left' });
+  await page.evaluate(ms => window.advanceTime(ms), holdMs);
+  await page.mouse.up({ button: 'left' });
 };
 const mobileAimAction = async page => {
   await page.evaluate(() => {
@@ -171,7 +180,7 @@ if (fullWallResult.destroyed !== 472) throw new Error(`Not every wall brick can 
 await demolition.screenshot({ path: outputPath('desktop-full-wall-demolished.png') });
 await demolition.close();
 
-const desktop = await browser.newPage({ viewport: { width: 1366, height: 768 } });
+const desktop = await browser.newPage({ viewport: { width: 1792, height: 864 } });
 desktop.on('console', message => { if (message.type() === 'error') errors.push(`desktop console: ${message.text()}`); });
 desktop.on('pageerror', error => errors.push(`desktop page: ${error.message}`));
 const response = await desktop.goto(baseUrl, { waitUntil: 'networkidle' });
@@ -266,10 +275,31 @@ const liveMarksAfter = afterPointerUnlock.marks;
 if (liveMarksAfter - liveMarksBefore < 5) throw new Error(`LIVE spray did not record a continuous held stroke: ${liveMarksAfter - liveMarksBefore} samples`);
 await desktop.keyboard.press('Digit4');
 await aimAtActive(desktop);
-await desktop.mouse.down({ button: 'left' });
-await desktop.evaluate(() => window.advanceTime(800));
-await desktop.mouse.up({ button: 'left' });
+await unlockedLeftClickAction(desktop, 800);
 if ((await state(desktop)).activePoint.stage !== 'chased') throw new Error(`Holding desktop left mouse did not repeatedly use the hammer: ${JSON.stringify(await state(desktop))}`);
+const destroyedBeforeDesktopDemolish = (await state(desktop)).workSurface.destroyedBricks;
+await desktop.keyboard.press('KeyX');
+await desktop.waitForTimeout(140);
+await desktop.evaluate(() => {
+  const game = window.__wireTheHouse;
+  game.renderer.camera.position.set(0.8, 1.65, -0.35);
+  game.player.yaw = 0;
+  game.player.pitch = 0;
+  game.renderer.camera.rotation.set(0, 0, 0);
+  game.step(1 / 60);
+});
+await leftClickAction(desktop);
+const destroyedAfterDesktopDemolish = (await state(desktop)).workSurface.destroyedBricks;
+if (destroyedAfterDesktopDemolish <= destroyedBeforeDesktopDemolish) throw new Error(`DEMOLISH did not work from desktop left click: ${JSON.stringify(await state(desktop))}`);
+await desktop.keyboard.press('Digit5');
+await aimAtActive(desktop);
+const beforeDesktopFitting = await state(desktop);
+await leftClickAction(desktop);
+const afterDesktopFitting = await state(desktop);
+if (afterDesktopFitting.activePoint.stage !== 'fitted') throw new Error(`FITTING did not work exactly once from desktop left click: ${JSON.stringify({ beforeDesktopFitting, afterDesktopFitting })}`);
+await desktop.evaluate(() => window.advanceTime(200));
+await leftClickAction(desktop);
+if ((await state(desktop)).activePoint.stage !== 'mortared') throw new Error('Second FITTING action did not apply mortar from desktop left click');
 await desktop.reload({ waitUntil: 'networkidle' });
 await desktop.click('#start-button');
 await desktop.waitForTimeout(450);

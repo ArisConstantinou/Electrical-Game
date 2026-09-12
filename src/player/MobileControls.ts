@@ -56,6 +56,7 @@ export class MobileControls {
   }
 
   private onPointerDown = (event: PointerEvent): void => {
+    if (event.pointerType === 'mouse') return;
     if ((event.target as HTMLElement).closest('button')) return;
     event.preventDefault();
     const joystick = document.querySelector<HTMLElement>('#joystick');
@@ -84,6 +85,7 @@ export class MobileControls {
   };
 
   private onPointerMove = (event: PointerEvent): void => {
+    if (event.pointerType === 'mouse') return;
     if (event.pointerId === this.joystickPointer) {
       event.preventDefault();
       const joystick = document.querySelector<HTMLElement>('#joystick');
@@ -102,6 +104,7 @@ export class MobileControls {
   };
 
   private onPointerUp = (event: PointerEvent): void => {
+    if (event.pointerType === 'mouse') return;
     if (event.pointerId === this.joystickPointer) {
       event.preventDefault();
       this.releaseJoystick();
@@ -116,6 +119,7 @@ export class MobileControls {
   };
 
   private onLostCapture = (event: PointerEvent): void => {
+    if (event.pointerType === 'mouse') return;
     if (event.pointerId === this.joystickPointer) this.releaseJoystick();
     if (event.pointerId === this.lookPointer || event.pointerId === this.lookActionPointer) this.releaseLook(event.pointerId);
   };

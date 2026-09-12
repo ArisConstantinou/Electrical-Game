@@ -64,7 +64,11 @@ export class FPSRig extends THREE.Group {
   private addTool(key: RigTool, group: THREE.Group): void { group.name = `FPS ${key} tool`; group.userData.studioEntityId = `fps-rig:${key}`; this.tools.set(key, group); this.add(group); }
   private hand(x: number, y: number, z: number, rotation = 0): THREE.Group {
     const hand = new THREE.Group();
-    const sleeve = new THREE.Mesh(new THREE.CapsuleGeometry(0.055, 0.18, 5, 10), material(0x263e35, 0.95));
+    // Keep the authored hand/tool scale, but extend the forearm beyond the
+    // lower viewport edge. The body is then implied by an off-screen shoulder
+    // instead of a visibly capped, floating arm.
+    const sleeve = new THREE.Mesh(new THREE.CapsuleGeometry(0.062, 0.5, 6, 12), material(0x263e35, 0.95));
+    sleeve.position.y = -0.19;
     const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.058, 0.062, 0.04, 12), material(0x1d3129, 0.94));
     cuff.position.y = 0.115;
     const glove = new THREE.Mesh(new THREE.SphereGeometry(0.062, 12, 9), material(0x494842, 0.92));
