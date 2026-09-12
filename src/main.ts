@@ -5,6 +5,10 @@ import { Game } from './core/Game';
 const root = document.querySelector<HTMLElement>('#app');
 if (!root) throw new Error('Application root not found');
 
+for (const eventName of ['selectstart', 'dragstart'] as const) {
+  document.addEventListener(eventName, event => event.preventDefault());
+}
+
 const game = new Game(root);
 window.__wireTheHouse = game;
 window.render_game_to_text = () => game.renderState();

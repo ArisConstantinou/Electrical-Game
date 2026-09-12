@@ -1,7 +1,10 @@
 :root { color: #f3eee6; background: #171512; font-family: Inter, Arial, system-ui, sans-serif; font-synthesis: none; }
 * { box-sizing: border-box; }
-html { background: #171512; overscroll-behavior-y: auto; }
-body { margin: 0; min-width: 320px; min-height: 100vh; background: #171512; }
+html, body, #app { width: 100%; height: 100%; overflow: hidden; }
+html { background: #171512; overscroll-behavior: none; }
+body { margin: 0; min-width: 320px; background: #171512; }
+body, body * { -webkit-user-select: none !important; user-select: none !important; -webkit-touch-callout: none !important; }
+body ::selection { color: inherit; background: transparent; }
 button {
   font: inherit;
   -webkit-tap-highlight-color: transparent;
@@ -9,8 +12,8 @@ button {
   user-select: none;
   touch-action: manipulation;
 }
-.page-shell { min-height: 100vh; }
-#game-shell { position: relative; width: 100%; height: 100svh; min-height: 540px; overflow: hidden; background: #768589; touch-action: none; overscroll-behavior: contain; user-select: none; }
+.page-shell { width: 100%; height: 100%; overflow: hidden; }
+#game-shell { position: relative; width: 100%; height: 100dvh; min-height: 0; overflow: hidden; background: #768589; touch-action: none; overscroll-behavior: contain; user-select: none; }
 #game-shell, #game-shell * { -webkit-user-select: none !important; user-select: none !important; -webkit-touch-callout: none !important; }
 #game-shell ::selection { color: inherit; background: transparent; }
 #game-stage, #game-canvas { width: 100%; height: 100%; display: block; }
@@ -20,20 +23,33 @@ button {
 #objective { margin-top: 5px; font: 700 20px/1.12 'Barlow Condensed', sans-serif; letter-spacing: .02em; }
 .progress-track { height: 3px; margin-top: 10px; background: rgba(255,255,255,.15); overflow: hidden; }
 #mission-progress { display: block; width: 0; height: 100%; background: #e27a42; transition: width .25s ease; }
-#tool-status { top: max(18px, env(safe-area-inset-top)); right: 22px; display: flex; gap: 9px; align-items: center; padding: 11px 13px; font: 700 12px/1 'Barlow Condensed', sans-serif; letter-spacing: .08em; }
+#tool-status { top: max(18px, env(safe-area-inset-top)); right: 78px; display: flex; gap: 9px; align-items: center; padding: 11px 13px; font: 700 12px/1 'Barlow Condensed', sans-serif; letter-spacing: .08em; }
 #tool-status span { color: #aaa49b; }
 #tool-status b { padding: 5px 7px; color: #a8a49d; border: 1px solid rgba(255,255,255,.11); }
 #tool-status b.selected { color: #fff; border-color: #d99860; background: rgba(217,152,96,.15); }
 #tool-status em { color: #f0b37f; font: 800 12px/1 'Barlow Condensed', sans-serif; letter-spacing: .055em; font-style: normal; }
 #tool-status.leveling-hidden { display: none; }
-#spray-controls, #hammer-controls { display: none; top: 72px; right: 22px; gap: 7px; padding: 7px; pointer-events: auto; }
-#spray-controls.visible, #hammer-controls.visible { display: flex; }
-#spray-controls button, #hammer-controls button { min-height: 38px; padding: 0 10px; border: 1px solid #716557; color: #c9c3ba; background: #28241f; font: 700 12px/1 'Barlow Condensed', sans-serif; letter-spacing: .06em; cursor: pointer; }
+#settings-toggle { position: absolute; z-index: 9; top: max(18px, env(safe-area-inset-top)); right: max(18px, env(safe-area-inset-right)); width: 46px; height: 46px; display: grid; place-items: center; padding: 0; color: #f4eee6; border: 1px solid rgba(255,255,255,.32); border-radius: 50%; background: rgba(28,26,22,.86); box-shadow: 0 8px 24px rgba(0,0,0,.28); backdrop-filter: blur(8px); cursor: pointer; }
+#settings-toggle svg { width: 25px; height: 25px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+#settings-toggle[aria-expanded="true"] { color: #ffc08d; border-color: #e5915e; background: #3a2d24; }
+#settings-scrim { position: absolute; z-index: 7; inset: 0; visibility: hidden; opacity: 0; background: rgba(9,8,7,.38); pointer-events: none; transition: opacity .18s ease; }
+#game-shell.settings-open #settings-scrim { visibility: visible; opacity: 1; pointer-events: auto; }
+#settings-panel { z-index: 8; top: max(74px, calc(env(safe-area-inset-top) + 66px)); right: max(18px, env(safe-area-inset-right)); width: min(310px, calc(100% - 36px)); padding: 12px; visibility: hidden; opacity: 0; transform: translateY(-8px) scale(.98); transform-origin: top right; pointer-events: none; transition: opacity .18s ease, transform .18s ease; }
+#settings-panel.open { visibility: visible; opacity: 1; transform: none; pointer-events: auto; }
+#settings-panel header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px; padding: 2px 2px 10px; border-bottom: 1px solid rgba(255,255,255,.14); }
+#settings-panel header div { display: flex; gap: 7px; align-items: baseline; }
+#settings-panel header span { color: #d99860; font: 700 12px/1 'Barlow Condensed', sans-serif; letter-spacing: .14em; }
+#settings-panel header strong { color: #fff; font: 800 16px/1 'Barlow Condensed', sans-serif; letter-spacing: .08em; }
+#settings-close { width: 44px; height: 44px; padding: 0; color: #ddd6cd; border: 1px solid #665d52; background: #29251f; font: 400 28px/1 Arial, sans-serif; cursor: pointer; }
+#spray-controls, #hammer-controls { display: grid; gap: 7px; }
+#hammer-controls { margin-top: 7px; }
+#spray-controls button, #hammer-controls button { min-height: 48px; display: flex; align-items: center; justify-content: space-between; padding: 0 13px; border: 1px solid #716557; color: #c9c3ba; background: #28241f; font: 700 12px/1 'Barlow Condensed', sans-serif; letter-spacing: .06em; cursor: pointer; }
 @media (hover: hover) and (pointer: fine) {
-  #spray-controls button:hover, #hammer-controls button:hover { border-color: #d99860; background: #373027; }
+  #settings-toggle:hover, #settings-close:hover, #spray-controls button:hover, #hammer-controls button:hover { border-color: #d99860; background: #373027; }
 }
-#spray-controls b, #hammer-controls b { margin-left: 5px; color: #fff; }
-#spray-controls i { display: inline-block; width: 13px; height: 13px; margin: 0 0 -2px 6px; border: 1px solid rgba(255,255,255,.7); border-radius: 50%; }
+#spray-controls b, #hammer-controls b { margin-left: 7px; color: #fff; }
+#spray-controls .setting-value { display: flex; align-items: center; }
+#spray-controls i { display: inline-block; width: 16px; height: 16px; border: 1px solid rgba(255,255,255,.7); border-radius: 50%; }
 #desktop-key-guide { left: 22px; bottom: 20px; display: grid; gap: 6px; max-width: calc(100% - 44px); padding: 10px 12px; font: 700 12px/1 'Barlow Condensed', sans-serif; letter-spacing: .045em; }
 #desktop-key-guide div { display: flex; align-items: center; gap: 6px; }
 #desktop-key-guide kbd { min-width: 30px; padding: 4px 6px; border: 1px solid #827563; border-bottom-width: 2px; border-radius: 3px; color: #fff; background: #302b25; font: 800 12px/1 'Barlow Condensed', sans-serif; text-align: center; }
@@ -93,21 +109,16 @@ button {
 .result-panel ul { width: min(520px, 90vw); margin: 12px 0; padding: 0; list-style: none; }
 .result-panel li { display: flex; justify-content: space-between; padding: 11px 4px; border-bottom: 1px solid rgba(255,255,255,.13); font-size: 15px; }
 .result-panel li b { color: #9ad88e; }
-.page-footer { display: flex; gap: 18px; justify-content: center; padding: 26px; color: #999289; background: #171512; font-size: 14px; touch-action: auto; overscroll-behavior: auto; }
-.page-footer b { color: #d36a38; font-family: 'Barlow Condensed', sans-serif; letter-spacing: .06em; }
-
 @media (pointer: coarse), (max-width: 760px) {
-  #game-shell { height: 100svh; min-height: 480px; }
+  #game-shell { height: 100dvh; min-height: 0; }
   #mobile-controls { display: block; }
   #tool-status { top: auto; right: max(18px, env(safe-area-inset-right)); bottom: 184px; width: 154px; justify-content: center; padding: 9px 8px; }
   #tool-status span { display: none; }
   #tool-status em { display: none; }
-  #spray-controls, #hammer-controls { top: auto; right: max(18px, env(safe-area-inset-right)); bottom: 232px; width: 154px; padding: 5px; }
-  #spray-controls button, #hammer-controls button { flex: 1; min-width: 0; min-height: 44px; padding: 0 3px; }
-  #spray-controls button > b { display: block; margin: 3px 0 0; }
-  #spray-controls i { margin-left: 3px; }
+  #settings-toggle { top: max(10px, env(safe-area-inset-top)); right: max(10px, env(safe-area-inset-right)); width: 48px; height: 48px; }
+  #settings-panel { top: max(68px, calc(env(safe-area-inset-top) + 62px)); right: max(10px, env(safe-area-inset-right)); width: min(310px, calc(100% - 20px)); }
   #desktop-key-guide { display: none; }
-  #top-hud { top: max(10px, env(safe-area-inset-top)); left: 10px; width: calc(100% - 20px); padding: 11px 12px; }
+  #top-hud { top: max(10px, env(safe-area-inset-top)); left: 10px; width: calc(100% - 76px); padding: 11px 12px; }
   #objective { font-size: 17px; }
   #interaction-prompt { top: max(104px, calc(env(safe-area-inset-top) + 96px)); max-width: calc(100% - 32px); font-size: 14px; }
   #level-panel { bottom: 258px; }
@@ -119,7 +130,6 @@ button {
   .screen-panel { padding: 24px; justify-content: center; background: linear-gradient(90deg, rgba(20,18,15,.95), rgba(20,18,15,.68)); }
   .screen-panel h1 { font-size: clamp(62px, 20vw, 100px); }
   .screen-panel p { font-size: 16px; line-height: 1.45; }
-  .page-footer { min-height: 140px; flex-direction: column; align-items: center; text-align: center; }
 }
 
 @media (max-height: 650px) and (pointer: coarse) {

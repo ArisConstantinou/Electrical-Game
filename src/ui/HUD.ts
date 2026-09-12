@@ -29,13 +29,20 @@ export class HUD {
             <div class="progress-track"><span id="mission-progress"></span></div>
           </div>
           <div id="tool-status" class="hud-card"></div>
-          <div id="spray-controls" class="hud-card" aria-label="Spray settings">
-            <button id="spray-mode" aria-label="Change spray method">METHOD <b>LIVE</b></button>
-            <button id="spray-color" aria-label="Change spray color">COLOR <i></i><b>BLUE</b></button>
-          </div>
-          <div id="hammer-controls" class="hud-card" aria-label="Demolition hammer settings">
-            <button id="hammer-mode" aria-label="Change hammer method">METHOD <b>CHASE</b></button>
-          </div>
+          <button id="settings-toggle" type="button" aria-label="Open settings" aria-expanded="false" aria-controls="settings-panel">
+            <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M13.2 3.5h5.6l.8 3.1 2.3 1.3 3-.9 2.8 4.8-2.2 2.2v2.7l2.2 2.2-2.8 4.8-3-.9-2.3 1.3-.8 3.1h-5.6l-.8-3.1-2.3-1.3-3 .9-2.8-4.8 2.2-2.2V14l-2.2-2.2L7.1 7l3 .9 2.3-1.3z"/><circle cx="16" cy="15.4" r="4.2"/></svg>
+          </button>
+          <div id="settings-scrim" aria-hidden="true"></div>
+          <section id="settings-panel" class="hud-card" aria-label="Game settings" aria-hidden="true">
+            <header><div><span>GAME</span><strong>SETTINGS</strong></div><button id="settings-close" type="button" aria-label="Close settings">×</button></header>
+            <div id="spray-controls" aria-label="Spray settings">
+              <button id="spray-mode" type="button" aria-label="Change spray method"><span>SPRAY METHOD</span><b>LIVE</b></button>
+              <button id="spray-color" type="button" aria-label="Change spray color"><span>SPRAY COLOR</span><span class="setting-value"><i></i><b>BLUE</b></span></button>
+            </div>
+            <div id="hammer-controls" aria-label="Demolition hammer settings">
+              <button id="hammer-mode" type="button" aria-label="Change hammer method"><span>HAMMER MODE</span><b>CHASE</b></button>
+            </div>
+          </section>
           <aside id="desktop-key-guide" class="hud-card" aria-label="Keyboard and mouse controls">
             <div><kbd>WASD</kbd><span>MOVE</span><kbd>MOUSE</kbd><span>LOOK</span><kbd>SHIFT</kbd><span>FAST</span></div>
             <div><kbd>LMB</kbd><span>USE / HOLD</span><kbd>E</kbd><span>INTERACT</span><kbd>WHEEL</kbd><span>SWITCH TOOL</span></div>
@@ -85,7 +92,6 @@ export class HUD {
             <p>Cable pulling happens only after the builders plaster and the electrician returns.</p>
           </section>
         </section>
-        <footer class="page-footer"><b>WIRE THE HOUSE</b><span>A focused first-fix vertical slice based on Cyprus field practice.</span></footer>
       </main>`;
     this.shell = root.querySelector('#game-shell')!;
     this.objective = root.querySelector('#objective')!;
@@ -103,6 +109,20 @@ export class HUD {
     root.querySelector('#spray-mode')?.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:cycle-spray-mode')));
     root.querySelector('#spray-color')?.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:cycle-spray-color')));
     root.querySelector('#hammer-mode')?.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:cycle-hammer-mode')));
+    const settingsToggle = root.querySelector<HTMLButtonElement>('#settings-toggle');
+    const settingsPanel = root.querySelector<HTMLElement>('#settings-panel');
+    const setSettingsOpen = (open: boolean): void => {
+      settingsPanel?.classList.toggle('open', open);
+      settingsPanel?.setAttribute('aria-hidden', String(!open));
+      settingsToggle?.setAttribute('aria-expanded', String(open));
+      settingsToggle?.setAttribute('aria-label', open ? 'Close settings' : 'Open settings');
+      this.shell.classList.toggle('settings-open', open);
+      if (open && document.pointerLockElement) void document.exitPointerLock();
+    };
+    settingsToggle?.addEventListener('click', () => setSettingsOpen(settingsToggle.getAttribute('aria-expanded') !== 'true'));
+    root.querySelector('#settings-close')?.addEventListener('click', () => setSettingsOpen(false));
+    root.querySelector('#settings-scrim')?.addEventListener('click', () => setSettingsOpen(false));
+    addEventListener('keydown', event => { if (event.key === 'Escape' && settingsToggle?.getAttribute('aria-expanded') === 'true') setSettingsOpen(false); });
   }
 
   onStart(callback: () => void): void {
@@ -155,7 +175,7 @@ export class HUD {
   updateSprayControls(mode: string, colorName: string, colorCss: string, visible: boolean): void {
     const panel = this.shell.querySelector<HTMLElement>('#spray-controls');
     if (!panel) return;
-    panel.classList.toggle('visible', visible);
+    panel.dataset.activeTool = String(visible);
     const modeText = panel.querySelector<HTMLElement>('#spray-mode b');
     const colorText = panel.querySelector<HTMLElement>('#spray-color b');
     const swatch = panel.querySelector<HTMLElement>('#spray-color i');
@@ -167,7 +187,7 @@ export class HUD {
   updateHammerControls(mode: string, visible: boolean): void {
     const panel = this.shell.querySelector<HTMLElement>('#hammer-controls');
     if (!panel) return;
-    panel.classList.toggle('visible', visible);
+    panel.dataset.activeTool = String(visible);
     const modeText = panel.querySelector<HTMLElement>('#hammer-mode b');
     if (modeText) modeText.textContent = mode.toUpperCase();
   }

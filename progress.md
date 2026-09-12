@@ -11,6 +11,9 @@ Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web gam
 
 ## Current
 
+- Mobile cleanup moves spray method, spray color, and hammer mode into a top-right settings popover; removes the below-game footer; uses the dynamic viewport height; and blocks selection/drag highlighting across the whole document.
+- Verified settings open/change/close with touch at 390×844, 44px+ touch targets, `shellHeight === scrollHeight === innerHeight`, no footer or overflow, full desktop/mobile mission completion, Studio 10/10 and live Studio roundtrip.
+
 - Mobile controls now use a Trials-style dual-stick contract: independent captured pointers, normalized vectors, dead zone, bounded knob travel, and pointer-specific reset for MOVE and AIM.
 - The right AIM joystick center performs selected-tool action on double-tap-and-hold; the old ACTION and previous/next tool buttons are replaced by a six-icon horizontal tool slider.
 - Verified at 390×844 with distinct simultaneous pointers: movement advanced, aim yaw changed, held spray created marks, both vectors reset on release, all six icons rendered, legacy buttons were absent, and horizontal overflow stayed zero.

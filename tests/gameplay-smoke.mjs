@@ -96,10 +96,9 @@ const tallDesktop = await browser.newPage({ viewport: { width: 1600, height: 120
 await tallDesktop.goto(baseUrl, { waitUntil: 'networkidle' });
 const tallLayout = await tallDesktop.evaluate(() => {
   const shell = document.querySelector('#game-shell').getBoundingClientRect();
-  const footer = document.querySelector('.page-footer').getBoundingClientRect();
-  return { innerHeight, shellHeight: shell.height, shellBottom: shell.bottom, footerTop: footer.top };
+  return { innerHeight, shellHeight: shell.height, shellBottom: shell.bottom, footerCount: document.querySelectorAll('.page-footer').length, scrollHeight: document.documentElement.scrollHeight };
 });
-if (Math.abs(tallLayout.shellHeight - tallLayout.innerHeight) > 1 || tallLayout.footerTop < tallLayout.innerHeight - 1) throw new Error(`Tall desktop game does not fill viewport: ${JSON.stringify(tallLayout)}`);
+if (Math.abs(tallLayout.shellHeight - tallLayout.innerHeight) > 1 || tallLayout.footerCount !== 0 || tallLayout.scrollHeight !== tallLayout.innerHeight) throw new Error(`Tall desktop game does not fill viewport: ${JSON.stringify(tallLayout)}`);
 await tallDesktop.screenshot({ path: outputPath('desktop-tall-viewport.png') });
 await tallDesktop.close();
 
@@ -267,11 +266,19 @@ await mobile.goto(baseUrl, { waitUntil: 'networkidle' });
 await mobile.click('#start-button');
 await mobile.waitForTimeout(450);
 if (await mobile.locator('#desktop-key-guide').isVisible()) throw new Error('Desktop key guide overlaps the mobile HUD');
-for (const selector of ['#joystick', '#look-joystick', '[data-tool="spray"]', '[data-tool="hammer"]', '[data-tool="fitting"]', '[data-tool="level"]', '[data-tool="spring"]', '[data-tool="cutter"]', '#spray-mode', '#spray-color']) {
+for (const selector of ['#joystick', '#look-joystick', '[data-tool="spray"]', '[data-tool="hammer"]', '[data-tool="fitting"]', '[data-tool="level"]', '[data-tool="spring"]', '[data-tool="cutter"]', '#settings-toggle']) {
   const box = await mobile.locator(selector).boundingBox();
   if (!box || box.width < 44 || box.height < 44) throw new Error(`${selector} is below the 44px touch target`);
 }
 if (await mobile.locator('button#mobile-action, #tool-prev, #tool-next').count()) throw new Error('Legacy mobile ACTION or previous/next tool buttons still exist');
+if (await mobile.locator('#settings-panel').isVisible()) throw new Error('Settings panel covers gameplay before it is opened');
+await mobileTap(mobile, '#settings-toggle');
+await mobile.waitForTimeout(220);
+if (!await mobile.locator('#settings-panel').isVisible()) throw new Error('Settings icon did not open the settings panel');
+for (const selector of ['#spray-mode', '#spray-color', '#hammer-mode', '#settings-close']) {
+  const box = await mobile.locator(selector).boundingBox();
+  if (!box || box.width < 44 || box.height < 44) throw new Error(`${selector} is below the 44px settings touch target`);
+}
 await mobileTap(mobile, '#spray-mode');
 if ((await state(mobile)).workSurface.sprayMode !== 'dots') throw new Error('Mobile could not select the alternative DOTS method');
 await mobileTap(mobile, '#spray-mode');
@@ -279,12 +286,16 @@ await mobileTap(mobile, '#spray-color');
 const mobileSpraySettings = await state(mobile);
 if (mobileSpraySettings.workSurface.sprayMode !== 'live' || mobileSpraySettings.workSurface.sprayColor !== 'RED') throw new Error(`Mobile spray settings did not change: ${JSON.stringify(mobileSpraySettings.workSurface)}`);
 await mobile.screenshot({ path: outputPath('mobile-spray-controls.png') });
-const mobileLayout = await mobile.evaluate(() => ({ innerWidth, scrollWidth: document.documentElement.scrollWidth, bodyScrollWidth: document.body.scrollWidth }));
-if (mobileLayout.scrollWidth > mobileLayout.innerWidth || mobileLayout.bodyScrollWidth > mobileLayout.innerWidth) throw new Error(`Mobile horizontal overflow: ${JSON.stringify(mobileLayout)}`);
+await mobileTap(mobile, '#settings-close');
+if (await mobile.locator('#settings-panel').isVisible()) throw new Error('Settings close button did not dismiss the panel');
+const mobileLayout = await mobile.evaluate(() => {
+  const shell = document.querySelector('#game-shell').getBoundingClientRect();
+  return { innerWidth, innerHeight, scrollWidth: document.documentElement.scrollWidth, bodyScrollWidth: document.body.scrollWidth, scrollHeight: document.documentElement.scrollHeight, shellHeight: shell.height, footerCount: document.querySelectorAll('.page-footer').length };
+});
+if (mobileLayout.scrollWidth > mobileLayout.innerWidth || mobileLayout.bodyScrollWidth > mobileLayout.innerWidth || mobileLayout.scrollHeight !== mobileLayout.innerHeight || Math.abs(mobileLayout.shellHeight - mobileLayout.innerHeight) > 1 || mobileLayout.footerCount !== 0) throw new Error(`Mobile viewport is clipped or overflowing: ${JSON.stringify(mobileLayout)}`);
 const touchResult = await mobile.evaluate(() => {
   const game = window.__wireTheHouse;
   const shell = document.querySelector('#game-shell');
-  const footer = document.querySelector('.page-footer');
   const before = { yaw: game.player.yaw, pitch: game.player.pitch, scrollY };
   const dispatch = (type, x, y) => {
     const event = new PointerEvent(type, { pointerId: 91, pointerType: 'touch', clientX: x, clientY: y, bubbles: true, cancelable: true });
@@ -294,7 +305,7 @@ const touchResult = await mobile.evaluate(() => {
   const down = dispatch('pointerdown', 260, 300);
   const move = dispatch('pointermove', 215, 235);
   dispatch('pointerup', 215, 235);
-  return { before, after: { yaw: game.player.yaw, pitch: game.player.pitch, scrollY }, down, move, shellTouchAction: getComputedStyle(shell).touchAction, footerTouchAction: getComputedStyle(footer).touchAction };
+  return { before, after: { yaw: game.player.yaw, pitch: game.player.pitch, scrollY }, down, move, shellTouchAction: getComputedStyle(shell).touchAction };
 });
 if (touchResult.after.pitch === touchResult.before.pitch || touchResult.after.yaw === touchResult.before.yaw) throw new Error('Mobile swipe did not update yaw and pitch');
 const mobileButtonStyles = await mobile.evaluate(() => {
