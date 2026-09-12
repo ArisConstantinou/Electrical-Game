@@ -25,7 +25,7 @@ const fragmentMaterials = [
   new THREE.MeshStandardMaterial({ color: 0xcf6840, roughness: 0.98, transparent: false, depthWrite: true }),
   new THREE.MeshStandardMaterial({ color: 0x6c2b1d, roughness: 1, transparent: false, depthWrite: true }),
 ];
-const MAX_RUBBLE_PIECES = 320;
+const MAX_RUBBLE_PIECES = 144;
 const MAX_RUBBLE_HEIGHT = 0.16;
 const MIN_SUPPORT_COVERAGE = 0.55;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));

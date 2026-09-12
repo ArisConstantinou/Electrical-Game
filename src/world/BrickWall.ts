@@ -72,6 +72,7 @@ const CHASE_GRID_Y = 10;
 const CHASE_DEPTH = 0.055;
 const DEMOLISH_GRID_X = 36;
 const DEMOLISH_GRID_Y = 18;
+const DEMOLISH_SURFACE_BLOCK = 3;
 const DEMOLISH_RADIUS_X = 0.245;
 const DEMOLISH_RADIUS_Y = 0.165;
 const DEMOLISH_SPALL_RADIUS_X = 0.39;
@@ -337,7 +338,7 @@ export class BrickWall extends THREE.Group {
       const wallAim = this.raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 0, 1), 2.39), new THREE.Vector3());
       heldAimStillAligned = Boolean(wallAim && wallAim.distanceToSquared(this.heldDemolitionPoint) <= 0.15 * 0.15);
     }
-    if ((continuing || heldAimStillAligned) && this.heldDemolitionTarget && !this.heldDemolitionTarget.destroyed && this.heldDemolitionPoint) {
+    if (continuing && heldAimStillAligned && this.heldDemolitionTarget && !this.heldDemolitionTarget.destroyed && this.heldDemolitionPoint) {
       const target = this.heldDemolitionTarget;
       hit = { target, point: this.heldDemolitionPoint.clone() };
     } else {
@@ -459,6 +460,8 @@ export class BrickWall extends THREE.Group {
   get maximumDemolitionDepthMm(): number { return this.targets.reduce((depth, target) => Math.max(depth, Number(target.replacement?.userData.maximumExcavationDepthMm ?? 0)), 0); }
   get demolitionMicroCellBoxCount(): number { return this.targets.reduce((count, target) => count + Number(target.replacement?.userData.microCellBoxes ?? 0), 0); }
   get demolitionSurfaceTriangleCount(): number { return this.targets.reduce((count, target) => count + Number(target.replacement?.userData.surfaceTriangles ?? 0), 0); }
+  get maximumDemolitionSurfaceTrianglesPerTarget(): number { return this.targets.reduce((count, target) => Math.max(count, Number(target.replacement?.userData.surfaceTriangles ?? 0)), 0); }
+  get maximumRelevantDemolitionSitesPerTarget(): number { return this.targets.reduce((count, target) => Math.max(count, Number(target.replacement?.userData.relevantDemolitionSites ?? 0)), 0); }
   get openDemolitionSeamCount(): number { return this.targets.reduce((count, target) => count + Number(target.replacement?.userData.openPerimeterSegments ?? 0), 0); }
   get maximumDemolitionSurfaceWarpMm(): number { return this.targets.reduce((depth, target) => Math.max(depth, Number(target.replacement?.userData.maximumSurfaceWarpMm ?? 0)), 0); }
   get demolitionSiteCount(): number { return this.demolitionSites.length; }
@@ -526,9 +529,9 @@ export class BrickWall extends THREE.Group {
     return { carved: target.carvedCells.has(index), depth: target.carvedDepths.get(index) ?? CHASE_DEPTH };
   }
 
-  private wallFrontZAt(point: THREE.Vector2, fallback: BrickTarget): number {
+  private wallFrontZAt(point: THREE.Vector2, fallback: BrickTarget, sites: readonly DemolitionSite[] = this.demolitionSites): number {
     const target = this.findTargetAtWallPoint(point, null, 0.025) ?? fallback;
-    const response = this.demolitionResponse(point);
+    const response = this.demolitionResponse(point, 1, sites);
     const inset = THREE.MathUtils.clamp(response.excavationDepth + response.deformation, -0.012, target.size.z - 0.012);
     return target.center.z + target.size.z / 2 - inset + 0.006;
   }
@@ -760,6 +763,18 @@ export class BrickWall extends THREE.Group {
     return THREE.MathUtils.clamp(1 + lobes, 0.54, 1.48);
   }
 
+  private siteTouchesTarget(site: DemolitionSite, target: BrickTarget, includeSpall = false): boolean {
+    const radiusX = includeSpall ? site.spallRadiusX : site.radiusX;
+    const radiusY = includeSpall ? site.spallRadiusY : site.radiusY;
+    const local = this.siteCoordinates(site, new THREE.Vector2(target.center.x, target.center.y));
+    const targetExtent = Math.hypot(target.size.x / (2 * radiusX), target.size.y / (2 * radiusY));
+    return Math.hypot(local.x / radiusX, local.y / radiusY) <= this.siteIrregularity(site, local.angle) + targetExtent;
+  }
+
+  private demolitionSitesForTarget(target: BrickTarget, includeSpall = true): DemolitionSite[] {
+    return this.demolitionSites.filter(site => this.siteTouchesTarget(site, target, includeSpall));
+  }
+
   private applyWallScaleImpact(primary: BrickTarget, impact: THREE.Vector3, seed: number, appendSite = false): THREE.Vector3[] {
     const site = this.createDemolitionSite(`${primary.id}:impact:${seed}`, impact, seed, 1);
     if (appendSite) site.excavationDepth *= 0.22 + seeded(seed ^ 0x7f4a7c15)() * 0.1;
@@ -770,11 +785,7 @@ export class BrickWall extends THREE.Group {
     this.demolitionSites.push(site);
     this.removeFracturesInside(site);
     const impactPoints: THREE.Vector3[] = [impact.clone()];
-    const effectRadius = Math.max(site.spallRadiusX, site.spallRadiusY) * 1.18;
-    const affected = this.targets.filter(target => (
-      Math.abs(target.center.x - site.point.x) <= effectRadius + target.size.x / 2
-      && Math.abs(target.center.y - site.point.y) <= effectRadius + target.size.y / 2
-    ));
+    const affected = this.targets.filter(target => target === primary || this.siteTouchesTarget(site, target));
     const previousBreaches = new Map(affected.map(target => [target, new Set(target.breachCells)]));
     affected.forEach(target => this.updateAnalyticBreachCells(target));
     const supportByTarget = new Map(affected.map(target => [target, this.pruneUnsupportedBreachCells(target)]));
@@ -811,8 +822,7 @@ export class BrickWall extends THREE.Group {
     for (let index = this.demolitionSites.length - 1; index >= 0; index -= 1) if (this.demolitionSites[index].ownerId === progressiveOwner) this.demolitionSites.splice(index, 1);
     const site = this.createDemolitionSite(progressiveOwner, impact, seed, severity);
     this.demolitionSites.push(site);
-    const effectRadius = Math.max(site.spallRadiusX, site.spallRadiusY) * (0.58 + severity * 0.42);
-    const affected = this.targets.filter(target => Math.abs(target.center.x - site.point.x) <= effectRadius + target.size.x / 2 && Math.abs(target.center.y - site.point.y) <= effectRadius + target.size.y / 2);
+    const affected = this.targets.filter(target => target === primary || this.siteTouchesTarget(site, target));
     affected.forEach(target => this.updateAnalyticBreachCells(target));
     const supportByTarget = new Map(affected.map(target => [target, this.pruneUnsupportedBreachCells(target)]));
     for (const target of affected) {
@@ -832,11 +842,7 @@ export class BrickWall extends THREE.Group {
   }
 
   private targetTouchesExcavationField(target: BrickTarget): boolean {
-    return this.demolitionSites.some(site => {
-      const local = this.siteCoordinates(site, new THREE.Vector2(target.center.x, target.center.y));
-      const extent = Math.hypot(target.size.x / (2 * site.radiusX), target.size.y / (2 * site.radiusY));
-      return Math.hypot(local.x / site.radiusX, local.y / site.radiusY) <= this.siteIrregularity(site, local.angle) + extent;
-    });
+    return this.demolitionSites.some(site => this.siteTouchesTarget(site, target));
   }
 
   private demolitionCellWorldPoint(target: BrickTarget, row: number, col: number): THREE.Vector3 {
@@ -860,10 +866,10 @@ export class BrickWall extends THREE.Group {
     return site.excavationDepth * site.severity >= 0.012 && coreDistance <= irregularity * bondFactor;
   }
 
-  private demolitionResponse(point: THREE.Vector2, bondFactor = 1): { breached: boolean; deformation: number; excavationDepth: number } {
+  private demolitionResponse(point: THREE.Vector2, bondFactor = 1, sites: readonly DemolitionSite[] = this.demolitionSites): { breached: boolean; deformation: number; excavationDepth: number } {
     let deformation = 0;
     let excavationDepth = 0;
-    for (const site of this.demolitionSites) {
+    for (const site of sites) {
       const local = this.siteCoordinates(site, point);
       if (Math.abs(local.x) > site.spallRadiusX * 1.5 || Math.abs(local.y) > site.spallRadiusY * 1.5) continue;
       const irregularity = this.siteIrregularity(site, local.angle);
@@ -892,13 +898,14 @@ export class BrickWall extends THREE.Group {
   private updateAnalyticBreachCells(target: BrickTarget): void {
     const cellW = target.size.x / DEMOLISH_GRID_X;
     const cellH = target.size.y / DEMOLISH_GRID_Y;
+    const relevantSites = this.demolitionSitesForTarget(target, false);
     target.breachCells.clear();
     for (let row = 0; row < DEMOLISH_GRID_Y; row += 1) for (let col = 0; col < DEMOLISH_GRID_X; col += 1) {
       const point = this.demolitionCellWorldPoint(target, row, col);
       const edgeDistance = Math.min(col + 0.5, DEMOLISH_GRID_X - col - 0.5) * cellW;
       const verticalEdgeDistance = Math.min(row + 0.5, DEMOLISH_GRID_Y - row - 0.5) * cellH;
       const bondedAtMortar = Math.min(edgeDistance, verticalEdgeDistance) <= Math.max(cellW, cellH) * 1.15;
-      if (this.demolitionResponse(new THREE.Vector2(point.x, point.y), bondedAtMortar ? 0.78 : 1).breached) {
+      if (this.demolitionResponse(new THREE.Vector2(point.x, point.y), bondedAtMortar ? 0.78 : 1, relevantSites).breached) {
         target.breachCells.add(row * DEMOLISH_GRID_X + col);
       }
     }
@@ -983,6 +990,7 @@ export class BrickWall extends THREE.Group {
     group.rotation.z = target.rotationZ;
     const cellW = target.size.x / DEMOLISH_GRID_X;
     const cellH = target.size.y / DEMOLISH_GRID_Y;
+    const relevantSites = this.demolitionSitesForTarget(target);
     let deformedCells = 0;
     let maximumExcavationDepth = 0;
     let maximumSurfaceWarp = 0;
@@ -998,7 +1006,7 @@ export class BrickWall extends THREE.Group {
       outside.x += localOffsetX * cosine - localOffsetY * sine;
       outside.y += localOffsetX * sine + localOffsetY * cosine;
       if (outside.x <= -GAME_CONFIG.room.width / 2 || outside.x >= GAME_CONFIG.room.width / 2 || outside.y <= 0 || outside.y >= GAME_CONFIG.room.height) return true;
-      return this.demolitionResponse(new THREE.Vector2(outside.x, outside.y), 0.84).breached;
+      return this.demolitionResponse(new THREE.Vector2(outside.x, outside.y), 0.84, relevantSites).breached;
     };
 
     const cells: Array<Array<{ breached: boolean }>> = Array.from(
@@ -1010,7 +1018,7 @@ export class BrickWall extends THREE.Group {
       const index = row * DEMOLISH_GRID_X + col;
       const breached = target.breachCells.has(index);
       const worldPoint = this.demolitionCellWorldPoint(target, row, col);
-      const response = this.demolitionResponse(new THREE.Vector2(worldPoint.x, worldPoint.y));
+      const response = this.demolitionResponse(new THREE.Vector2(worldPoint.x, worldPoint.y), 1, relevantSites);
       const boundary = isBreached(row, col - 1) || isBreached(row, col + 1) || isBreached(row - 1, col) || isBreached(row + 1, col);
       const worked = response.excavationDepth > 0.002;
       cells[row][col] = { breached };
@@ -1029,7 +1037,7 @@ export class BrickWall extends THREE.Group {
     const surfaceInsetAt = (localX: number, localY: number): number => {
       const worldX = target.center.x + localX * cosine - localY * sine;
       const worldY = target.center.y + localX * sine + localY * cosine;
-      const response = this.demolitionResponse(new THREE.Vector2(worldX, worldY));
+      const response = this.demolitionResponse(new THREE.Vector2(worldX, worldY), 1, relevantSites);
       if (response.excavationDepth <= 0.002) return 0;
       const roughSeed = hashString(`brittle-face:${Math.round(worldX * 10000)}:${Math.round(worldY * 10000)}`);
       const brittleVariation = ((roughSeed % 2001) - 1000) / 1000000;
@@ -1051,14 +1059,29 @@ export class BrickWall extends THREE.Group {
         frontZ - inset,
       );
     }
-    for (let row = 0; row < DEMOLISH_GRID_Y; row += 1) for (let col = 0; col < DEMOLISH_GRID_X; col += 1) {
-      if (cells[row][col].breached) continue;
-      const bottomLeft = vertexIndex(row, col);
-      const bottomRight = vertexIndex(row, col + 1);
-      const topLeft = vertexIndex(row + 1, col);
-      const topRight = vertexIndex(row + 1, col + 1);
-      if (hashString(`surface-split:${target.id}:${row}:${col}`) % 2 === 0) surfaceIndices.push(bottomLeft, bottomRight, topRight, bottomLeft, topRight, topLeft);
+    const coveredCells = new Set<number>();
+    const addSurfaceQuad = (bottomRow: number, leftCol: number, topRow: number, rightCol: number): void => {
+      const bottomLeft = vertexIndex(bottomRow, leftCol);
+      const bottomRight = vertexIndex(bottomRow, rightCol);
+      const topLeft = vertexIndex(topRow, leftCol);
+      const topRight = vertexIndex(topRow, rightCol);
+      if (hashString(`surface-split:${target.id}:${bottomRow}:${leftCol}:${topRow}:${rightCol}`) % 2 === 0) surfaceIndices.push(bottomLeft, bottomRight, topRight, bottomLeft, topRight, topLeft);
       else surfaceIndices.push(bottomLeft, bottomRight, topLeft, bottomRight, topRight, topLeft);
+    };
+    for (let row = 0; row < DEMOLISH_GRID_Y; row += DEMOLISH_SURFACE_BLOCK) for (let col = 0; col < DEMOLISH_GRID_X; col += DEMOLISH_SURFACE_BLOCK) {
+      const topRow = Math.min(row + DEMOLISH_SURFACE_BLOCK, DEMOLISH_GRID_Y);
+      const rightCol = Math.min(col + DEMOLISH_SURFACE_BLOCK, DEMOLISH_GRID_X);
+      let fullyIntact = true;
+      for (let cellRow = row; cellRow < topRow && fullyIntact; cellRow += 1) for (let cellCol = col; cellCol < rightCol; cellCol += 1) {
+        if (cells[cellRow][cellCol].breached) { fullyIntact = false; break; }
+      }
+      if (!fullyIntact) continue;
+      addSurfaceQuad(row, col, topRow, rightCol);
+      for (let cellRow = row; cellRow < topRow; cellRow += 1) for (let cellCol = col; cellCol < rightCol; cellCol += 1) coveredCells.add(cellRow * DEMOLISH_GRID_X + cellCol);
+    }
+    for (let row = 0; row < DEMOLISH_GRID_Y; row += 1) for (let col = 0; col < DEMOLISH_GRID_X; col += 1) {
+      if (cells[row][col].breached || coveredCells.has(row * DEMOLISH_GRID_X + col)) continue;
+      addSurfaceQuad(row, col, row + 1, col + 1);
     }
     if (surfaceIndices.length > 0) {
       const surfaceGeometry = new THREE.BufferGeometry();
@@ -1133,6 +1156,7 @@ export class BrickWall extends THREE.Group {
     group.userData.deformedCells = deformedCells;
     group.userData.maximumExcavationDepthMm = maximumExcavationDepth * 1000;
     group.userData.maximumSurfaceWarpMm = maximumSurfaceWarp * 1000;
+    group.userData.relevantDemolitionSites = relevantSites.length;
     group.userData.openPerimeterSegments = Math.max(0, expectedPerimeterSegments - perimeterWallSegments);
     group.userData.microCellBoxes = group.children.reduce((count, child) => count + (child instanceof THREE.InstancedMesh ? child.count : 0), 0);
     group.userData.surfaceTriangles = surfaceIndices.length / 3;
@@ -1183,6 +1207,7 @@ export class BrickWall extends THREE.Group {
   private addFractures(target: BrickTarget, impact: THREE.Vector3, damage: number, seed: number): void {
     this.removeCracks(target);
     const random = seeded(seed);
+    const relevantSites = this.demolitionSitesForTarget(target);
     const group = new THREE.Group();
     group.name = `Wall-scale bonded masonry fractures ${target.id}`;
     group.userData.ownerId = target.id;
@@ -1195,11 +1220,11 @@ export class BrickWall extends THREE.Group {
       const direction = to.clone().sub(from);
       if (direction.lengthSq() < 0.000001) return;
       const midpoint = from.clone().add(to).multiplyScalar(0.5);
-      if (damage >= DEMOLISH_HITS && this.demolitionResponse(midpoint, 0.94).breached) return;
+      if (damage >= DEMOLISH_HITS && this.demolitionResponse(midpoint, 0.94, relevantSites).breached) return;
       const normal = new THREE.Vector2(-direction.y, direction.x).normalize().multiplyScalar(width / 2);
       const offset = vertices.length / 3;
-      const fromZ = this.wallFrontZAt(from, target);
-      const toZ = this.wallFrontZAt(to, target);
+      const fromZ = this.wallFrontZAt(from, target, relevantSites);
+      const toZ = this.wallFrontZAt(to, target, relevantSites);
       vertices.push(
         from.x + normal.x, from.y + normal.y, fromZ,
         from.x - normal.x, from.y - normal.y, fromZ,

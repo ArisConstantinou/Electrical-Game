@@ -147,6 +147,26 @@ await demolition.waitForTimeout(450);
 await demolition.keyboard.press('Digit4');
 await demolition.keyboard.press('KeyX');
 if ((await state(demolition)).workSurface.hammerMode !== 'demolish') throw new Error('Standalone demolition mode did not activate');
+const heldTargetSwitch = await demolition.evaluate(() => {
+  const game = window.__wireTheHouse;
+  const wall = game.room.brickWall;
+  const camera = game.renderer.camera;
+  const rowTargets = wall.targets.filter(target => !target.destroyed && Math.abs(target.center.y - 1.5) < 0.12);
+  const first = rowTargets.find(target => target.center.x < -0.8);
+  const second = rowTargets.find(target => target.center.x > 0.8);
+  if (!first || !second) throw new Error('Could not find separated targets for held DEMOLISH retargeting');
+  camera.position.set(0, 1.5, -0.35);
+  camera.lookAt(first.center);
+  camera.updateMatrixWorld(true);
+  wall.removeAtAim(camera, false);
+  camera.lookAt(second.center);
+  camera.updateMatrixWorld(true);
+  wall.removeAtAim(camera, true);
+  return { firstId: first.id, secondId: second.id, firstDamage: first.damage, secondDamage: second.damage, distance: first.center.distanceTo(second.center) };
+});
+if (heldTargetSwitch.firstDamage !== 1 || heldTargetSwitch.secondDamage !== 1 || heldTargetSwitch.distance <= 0.15) {
+  throw new Error(`Held DEMOLISH did not retarget immediately after the camera moved: ${JSON.stringify(heldTargetSwitch)}`);
+}
 const excavateAtHeight = async targetY => {
   await demolition.evaluate(y => {
     const game = window.__wireTheHouse;
@@ -190,8 +210,13 @@ await excavateAtHeight(2.93);
 await excavateAtHeight(0.07);
 const variedWallDamage = (await state(demolition)).workSurface;
 const variedImpactProfiles = await demolition.evaluate(() => window.__wireTheHouse.room.brickWall.demolitionSites.filter(site => site.severity >= 1).map(site => ({ rotation: Number(site.rotation.toFixed(3)), aspect: Number((site.radiusX / site.radiusY).toFixed(3)), lobes: `${site.lobeFrequencyA}:${site.lobeFrequencyB}`, depth: Number((site.excavationDepth * 1000).toFixed(1)) })));
-const brittleSurfaceIntegrity = await demolition.evaluate(() => ({ openSeams: window.__wireTheHouse.room.brickWall.openDemolitionSeamCount, maximumSurfaceWarpMm: window.__wireTheHouse.room.brickWall.maximumDemolitionSurfaceWarpMm }));
-if (variedWallDamage.floatingStaticPieces !== 0 || variedWallDamage.unsupportedAnchoredRemnants !== 0 || variedWallDamage.demolitionMicroCellBoxes !== 0 || variedWallDamage.demolitionSurfaceTriangles < 2 || brittleSurfaceIntegrity.openSeams !== 0 || brittleSurfaceIntegrity.maximumSurfaceWarpMm > 6.1 || variedWallDamage.fracturePatterns < 2 || variedWallDamage.breachedWallCells !== 0 || variedWallDamage.deformedWallCells < 100 || variedWallDamage.maximumFractureSpan < 0.2 || new Set(variedImpactProfiles.map(profile => JSON.stringify(profile))).size < 2) {
+const brittleSurfaceIntegrity = await demolition.evaluate(() => ({
+  openSeams: window.__wireTheHouse.room.brickWall.openDemolitionSeamCount,
+  maximumSurfaceWarpMm: window.__wireTheHouse.room.brickWall.maximumDemolitionSurfaceWarpMm,
+  maximumSurfaceTrianglesPerTarget: window.__wireTheHouse.room.brickWall.maximumDemolitionSurfaceTrianglesPerTarget,
+  maximumRelevantSitesPerTarget: window.__wireTheHouse.room.brickWall.maximumRelevantDemolitionSitesPerTarget,
+}));
+if (variedWallDamage.floatingStaticPieces !== 0 || variedWallDamage.unsupportedAnchoredRemnants !== 0 || variedWallDamage.demolitionMicroCellBoxes !== 0 || variedWallDamage.demolitionSurfaceTriangles < 2 || brittleSurfaceIntegrity.openSeams !== 0 || brittleSurfaceIntegrity.maximumSurfaceWarpMm > 6.1 || brittleSurfaceIntegrity.maximumSurfaceTrianglesPerTarget > 400 || brittleSurfaceIntegrity.maximumRelevantSitesPerTarget > 12 || variedWallDamage.fracturePatterns < 2 || variedWallDamage.breachedWallCells !== 0 || variedWallDamage.deformedWallCells < 100 || variedWallDamage.maximumFractureSpan < 0.2 || new Set(variedImpactProfiles.map(profile => JSON.stringify(profile))).size < 2) {
   throw new Error(`DEMOLISH did not produce distinct brittle partial-depth wall damage: ${JSON.stringify({ variedWallDamage, variedImpactProfiles, brittleSurfaceIntegrity })}`);
 }
 await demolition.evaluate(() => {
