@@ -180,11 +180,11 @@ export class HUD {
     this.shell.dataset.aimed = targeted ? 'true' : 'false';
   }
 
-  notify(message: string, good = true): void {
+  notify(message: string, good = true, duration = 700): void {
     this.prompt.textContent = message;
     this.prompt.classList.toggle('warning', !good);
     this.prompt.classList.add('visible');
-    this.messageUntil = performance.now() + 700;
+    this.messageUntil = performance.now() + duration;
   }
 
   showResult(): void { this.result.classList.add('visible'); }

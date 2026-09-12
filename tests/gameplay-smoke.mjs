@@ -312,6 +312,11 @@ if (mobileSpraySettings.workSurface.sprayMode !== 'live' || mobileSpraySettings.
 await mobile.screenshot({ path: outputPath('mobile-spray-controls.png') });
 await mobileTap(mobile, '#settings-close');
 if (await mobile.locator('#settings-panel').isVisible()) throw new Error('Settings close button did not dismiss the panel');
+for (const tool of ['spray', 'hammer', 'fitting', 'level', 'spring', 'cutter']) {
+  await mobileTap(mobile, `[data-tool="${tool}"]`);
+  if ((await state(mobile)).mission.selectedTool !== tool) throw new Error(`Could not select ${tool} for viewmodel QA`);
+  await mobile.screenshot({ path: outputPath(`mobile-tool-${tool}.png`) });
+}
 await mobileTap(mobile, '[data-tool="hammer"]');
 if (!await mobile.locator('#tool-mode-toggle').isVisible() || !((await mobile.locator('#tool-mode-toggle').innerText()).includes('CHASE'))) throw new Error('Hammer contextual CHASE mode is not visible');
 await mobileTap(mobile, '#tool-mode-toggle');
@@ -462,7 +467,7 @@ const graffiti = await mobile.evaluate(() => {
 });
 if (graffiti < 4) throw new Error(`Held mobile spray did not paint a free stroke: ${graffiti} marks`);
 await mobile.screenshot({ path: outputPath('mobile-free-spray.png') });
-await mobile.waitForTimeout(800);
+await mobile.waitForTimeout(1350);
 if (await mobile.locator('#interaction-prompt.visible').isVisible()) throw new Error('Action notification did not dismiss after its short timeout');
 await mobileTap(mobile, '[data-tool="hammer"]');
 await aimAtActive(mobile);

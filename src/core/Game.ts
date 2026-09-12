@@ -18,6 +18,15 @@ import type { HammerMode } from '../systems/InteractionSystem';
 import { HUD } from '../ui/HUD';
 import { MobileHUD } from '../ui/MobileHUD';
 
+const TOOL_HINTS: Record<RigTool, string> = {
+  spray: 'SPRAY CAN · mark the chase route',
+  hammer: 'DEMO HAMMER · chase or remove masonry',
+  fitting: 'BACK BOX · fit the recessed socket box',
+  level: 'SPIRIT LEVEL · align the box group',
+  spring: 'BENDING SPRING · shape the 20 mm PVC',
+  cutter: 'PVC CUTTER · trim the conduit to length',
+};
+
 const SPRAY_COLORS = [
   { name: 'BLUE', value: 0x087fce, css: '#087fce' },
   { name: 'RED', value: 0xe53935, css: '#e53935' },
@@ -215,6 +224,7 @@ export class Game {
     this.selectedTool = tool;
     if (tool === 'spring' || tool === 'cutter') this.conduit.selectTool(tool as PvcTool);
     this.input.actionHeld = false;
+    this.hud.notify(TOOL_HINTS[tool], true, 1200);
   }
 
   private cycleTool(direction: number): void {
