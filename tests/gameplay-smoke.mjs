@@ -187,21 +187,25 @@ await paintedChase.waitForTimeout(450);
 await paintedChase.evaluate(() => {
   const game = window.__wireTheHouse;
   const targetY = 0.72;
-  game.renderer.camera.position.set(-0.8, 1.65, -0.35);
+  game.renderer.camera.position.set(-0.8, 1.65, -2);
   game.player.yaw = 0;
-  game.player.pitch = Math.atan2(targetY - 1.65, 2.04);
+  game.player.pitch = Math.atan2(targetY - 1.65, 0.39);
   game.renderer.camera.rotation.set(game.player.pitch, 0, 0);
   game.step(1 / 60);
 });
 await paintedChase.keyboard.press('Digit3');
-await action(paintedChase);
+await paintedChase.mouse.down({ button: 'left' });
+await paintedChase.evaluate(() => window.advanceTime(80));
 if ((await state(paintedChase)).activePoint.stage !== 'marked') throw new Error('Off-centre freehand spray did not mark the active point');
+const heldAfterSpray = await paintedChase.evaluate(() => window.__wireTheHouse.input.actionHeld);
 const offRouteSurfaceBefore = (await state(paintedChase)).workSurface;
 await paintedChase.keyboard.press('Digit4');
-await action(paintedChase);
+const heldAfterToolSwitch = await paintedChase.evaluate(() => window.__wireTheHouse.input.actionHeld);
+await paintedChase.evaluate(() => window.advanceTime(300));
+await paintedChase.mouse.up({ button: 'left' });
 const offRouteChase = await state(paintedChase);
-if (offRouteChase.activePoint.stage !== 'chasing' || offRouteChase.activePoint.chaseHits !== 1 || offRouteChase.workSurface.recessedBricks <= offRouteSurfaceBefore.recessedBricks) {
-  throw new Error(`CHASE did not follow the player's actual off-centre paint: ${JSON.stringify(offRouteChase)}`);
+if (!['chasing', 'chased'].includes(offRouteChase.activePoint.stage) || offRouteChase.activePoint.chaseHits < 1 || offRouteChase.workSurface.recessedBricks <= offRouteSurfaceBefore.recessedBricks) {
+  throw new Error(`CHASE did not start while the player kept holding action after switching from spray: ${JSON.stringify({ heldAfterSpray, heldAfterToolSwitch, offRouteChase })}`);
 }
 if (offRouteChase.workSurface.destroyedBricks !== offRouteSurfaceBefore.destroyedBricks) throw new Error('Off-centre CHASE destroyed masonry instead of recessing it');
 await paintedChase.screenshot({ path: outputPath('desktop-chase-follows-painted-line.png') });

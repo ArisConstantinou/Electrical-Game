@@ -223,7 +223,6 @@ export class Game {
     if (!RIG_TOOLS.includes(tool)) return;
     this.selectedTool = tool;
     if (tool === 'spring' || tool === 'cutter') this.conduit.selectTool(tool as PvcTool);
-    this.input.actionHeld = false;
     this.hud.notify(TOOL_HINTS[tool], true, 1200);
   }
 
