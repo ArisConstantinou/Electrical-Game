@@ -88,6 +88,15 @@ button {
 #joystick-thumb, #look-joystick-thumb { position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; display: grid; place-items: center; transform: translate(-50%,-50%); border: 2px solid rgba(255,255,255,.72); border-radius: 50%; background: linear-gradient(145deg, rgba(218,116,65,.94), rgba(123,55,29,.94)); box-shadow: 0 6px 18px rgba(0,0,0,.35); pointer-events: none; }
 #look-joystick-thumb { border-color: rgba(159,220,244,.9); background: radial-gradient(circle at 35% 30%, #4d9ec0, #20536b); }
 #look-joystick-thumb span { color: #fff; font: 800 13px/1 'Barlow Condensed', sans-serif; }
+#drag-aim-cue { display: none; position: absolute; inset: 0; place-content: center; justify-items: center; gap: 5px; color: rgba(217,238,247,.92); pointer-events: none; }
+#drag-aim-cue span { font: 400 28px/1 Arial, sans-serif; }
+#drag-aim-cue b { font: 800 12px/1 'Barlow Condensed', sans-serif; letter-spacing: .1em; }
+#game-shell.aim-input-drag #look-joystick { width: 168px; height: 140px; }
+#game-shell.aim-input-drag .look-joystick-ring { border-radius: 20px; border-style: dashed; background: linear-gradient(145deg, rgba(55,101,120,.35), rgba(20,18,15,.42)); }
+#game-shell.aim-input-drag .look-joystick-ring::before,
+#game-shell.aim-input-drag .look-joystick-ring::after,
+#game-shell.aim-input-drag #look-joystick-thumb { display: none; }
+#game-shell.aim-input-drag #drag-aim-cue { display: grid; }
 #look-joystick > small { position: absolute; left: 50%; top: -22px; width: 140px; color: rgba(255,255,255,.82); font: 800 12px/1 'Barlow Condensed', sans-serif; letter-spacing: .06em; text-align: center; transform: translateX(-50%); }
 #tool-mode-toggle { position: absolute; z-index: 8; right: max(8px, env(safe-area-inset-right)); bottom: calc(max(7px, env(safe-area-inset-bottom)) + 65px); min-width: 142px; height: 52px; display: none; align-items: center; justify-content: center; gap: 9px; padding: 0 14px; color: #fff; border: 1px solid #d88a58; background: rgba(39,34,28,.94); box-shadow: 0 7px 20px rgba(0,0,0,.3); font: 800 14px/1 'Barlow Condensed', sans-serif; letter-spacing: .08em; pointer-events: auto; }
 #tool-mode-toggle.visible { display: flex; }
@@ -136,6 +145,7 @@ button {
 
 @media (max-height: 650px) and (pointer: coarse) {
   #joystick, #look-joystick { width: 106px; height: 106px; }
+  #game-shell.aim-input-drag #look-joystick { width: 142px; height: 106px; }
   #joystick-thumb, #look-joystick-thumb { width: 46px; height: 46px; }
   #interaction-prompt { top: max(92px, calc(env(safe-area-inset-top) + 82px)); }
   #level-panel { bottom: 148px; }

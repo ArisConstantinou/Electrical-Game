@@ -11,6 +11,9 @@ Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web gam
 
 ## Current
 
+- Physical-iPhone follow-up replaces the default right velocity joystick with direct relative drag aiming: camera rotation is applied only from new finger movement, so it stops the instant the finger stops instead of continuing toward a stale knob direction. Pointer coalescing is consumed when Safari supplies it, AUTO USE still paints continuously while held, and the legacy velocity stick remains selectable under Settings > AIM INPUT.
+- The right control is now visibly a rounded DRAG AIM pad in direct mode (no misleading displaced knob). Aim speed profiles and near-wall precision scaling also tune direct drag sensitivity.
+- Verified locally at 390×844 that DRAG is the default, the thumb is hidden, Settings cycles DRAG→STICK→DRAG, aim responds immediately, held spray continues, and yaw drift remains exactly zero while the finger is stationary. Simultaneous move + drag aim produced eight spray marks; full desktop/mobile mission, typecheck, build, Studio 10/10, live Studio roundtrip, bundled web-game client, overflow checks, and screenshot inspection passed.
 - Physical-iPhone control revision removes the mobile selected-tool badge, adds a contextual mode switch above the tool strip for SPRAY and HAMMER, defaults the right stick to immediate AUTO USE, and adds PRECISE/NORMAL/FAST aim profiles. WALL ASSIST defaults to AUTO: normal handling away from the work wall blends smoothly into a larger dead zone, exponential fine aim, slower vertical rotation and slower walking near the wall.
 - Verified at 390×844: contextual LIVE/DOTS and CHASE/DEMOLISH switching, no mode control for FITTING, immediate spray on aim-stick deflection, simultaneous left-stick movement + right-stick aim + continuous spray, independent release, far/near precision scaling, full mission completion, zero overflow and readable resting/settings layouts.
 

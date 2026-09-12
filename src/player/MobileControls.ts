@@ -3,6 +3,7 @@ import type { MobileAimProfile, PlayerController } from './PlayerController';
 import type { RigTool } from './FPSRig';
 
 export type AimControlMode = 'auto-use' | 'double-tap';
+export type AimInputMode = 'drag' | 'stick';
 
 export class MobileControls {
   private joystickPointer: number | null = null;
@@ -16,6 +17,8 @@ export class MobileControls {
   private lastLookTapY = 0;
   private aimControlMode: AimControlMode = 'auto-use';
   private aimProfile: MobileAimProfile = 'normal';
+  private aimInputMode: AimInputMode = 'drag';
+  private dragDistance = 0;
 
   constructor(private readonly surface: HTMLElement, private readonly input: Input, private readonly player: PlayerController, private readonly selectedTool: () => RigTool) {
     surface.addEventListener('pointerdown', this.onPointerDown, { passive: false });
@@ -47,6 +50,11 @@ export class MobileControls {
     this.player.setMobileAimProfile(profile);
   }
 
+  setAimInputMode(mode: AimInputMode): void {
+    this.aimInputMode = mode;
+    this.releaseLook(this.lookPointer ?? this.lookActionPointer ?? -1);
+  }
+
   private onPointerDown = (event: PointerEvent): void => {
     if ((event.target as HTMLElement).closest('button')) return;
     event.preventDefault();
@@ -58,9 +66,14 @@ export class MobileControls {
       this.updateJoystick(event, joystick);
     } else if (lookJoystick?.contains(event.target as Node) && this.lookPointer === null) {
       this.lookPointer = event.pointerId;
-      this.lookJoystickActive = true;
+      this.lookJoystickActive = this.aimInputMode === 'stick';
       try { lookJoystick.setPointerCapture(event.pointerId); } catch { /* Synthetic QA events do not own an active pointer. */ }
-      this.updateLookJoystick(event, lookJoystick);
+      if (this.lookJoystickActive) this.updateLookJoystick(event, lookJoystick);
+      else {
+        this.lookX = event.clientX;
+        this.lookY = event.clientY;
+        this.dragDistance = 0;
+      }
       if (this.aimControlMode === 'double-tap' || !this.isRepeatableTool) this.detectDoubleTapAction(event, lookJoystick);
     } else if (this.lookPointer === null) {
       this.lookPointer = event.pointerId;
@@ -82,11 +95,9 @@ export class MobileControls {
         if (lookJoystick) this.updateLookJoystick(event, lookJoystick);
         return;
       }
-      const dx = event.clientX - this.lookX;
-      const dy = event.clientY - this.lookY;
-      this.lookX = event.clientX;
-      this.lookY = event.clientY;
-      this.player.look(dx, dy, 0.0042);
+      const coalesced = typeof event.getCoalescedEvents === 'function' ? event.getCoalescedEvents() : [];
+      const samples = coalesced.length ? coalesced : [event];
+      for (const sample of samples) this.applyDirectAimSample(sample);
     }
   };
 
@@ -158,6 +169,7 @@ export class MobileControls {
     if (pointerId !== this.lookPointer && pointerId !== this.lookActionPointer) return;
     this.lookPointer = null;
     this.lookJoystickActive = false;
+    this.dragDistance = 0;
     this.input.resetMobileLook();
     const thumb = document.querySelector<HTMLElement>('#look-joystick-thumb');
     if (thumb) thumb.style.transform = 'translate(-50%, -50%)';
@@ -183,6 +195,20 @@ export class MobileControls {
     this.lastLookTapAt = now;
     this.lastLookTapX = event.clientX;
     this.lastLookTapY = event.clientY;
+  }
+
+  private applyDirectAimSample(event: PointerEvent): void {
+    const dx = event.clientX - this.lookX;
+    const dy = event.clientY - this.lookY;
+    this.lookX = event.clientX;
+    this.lookY = event.clientY;
+    this.dragDistance += Math.hypot(dx, dy);
+    this.player.lookMobileDrag(dx, dy);
+    if (this.aimControlMode === 'auto-use' && this.isRepeatableTool && this.dragDistance >= 3 && this.lookActionPointer === null) {
+      this.lookActionPointer = event.pointerId;
+      this.input.actionHeld = true;
+      this.input.actionRequested = true;
+    }
   }
 
   private get isRepeatableTool(): boolean {

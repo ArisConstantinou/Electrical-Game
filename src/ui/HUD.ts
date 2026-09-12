@@ -39,10 +39,11 @@ export class HUD {
               <button id="spray-color" type="button" aria-label="Change spray color"><span>SPRAY COLOR</span><span class="setting-value"><i></i><b>BLUE</b></span></button>
             </div>
             <div id="mobile-control-settings" aria-label="Mobile aim settings">
-              <button id="aim-control-mode" type="button" aria-label="Change aim stick action mode"><span>AIM STICK</span><b>AUTO USE</b></button>
-              <button id="aim-speed" type="button" aria-label="Change aim stick speed"><span>AIM SPEED</span><b>NORMAL</b></button>
+              <button id="aim-input-mode" type="button" aria-label="Change aim input style"><span>AIM INPUT</span><b>DRAG</b></button>
+              <button id="aim-control-mode" type="button" aria-label="Change aim action mode"><span>AIM ACTION</span><b>AUTO USE</b></button>
+              <button id="aim-speed" type="button" aria-label="Change aim sensitivity"><span>AIM SPEED</span><b>NORMAL</b></button>
               <button id="wall-assist" type="button" aria-label="Toggle automatic wall precision"><span>WALL ASSIST</span><b>AUTO</b></button>
-              <small>AUTO USE sprays or hammers while you aim. WALL ASSIST slows movement and aim near the work wall.</small>
+              <small>DRAG follows your finger directly. AUTO USE sprays or hammers while you aim. WALL ASSIST adds precision near the wall.</small>
             </div>
           </section>
           <aside id="desktop-key-guide" class="hud-card" aria-label="Keyboard and mouse controls">
@@ -69,7 +70,7 @@ export class HUD {
           </div>
           <div id="mobile-controls" aria-label="Mobile controls">
             <div id="joystick" aria-label="Movement joystick"><div class="joystick-ring"></div><div id="joystick-thumb"></div></div>
-            <div id="look-joystick" aria-label="Aim joystick; move it to use spray or hammer"><div class="look-joystick-ring"></div><div id="look-joystick-thumb"><span id="mobile-action" aria-hidden="true">USE</span></div><small id="aim-control-label">AIM · AUTO TOOL</small></div>
+            <div id="look-joystick" aria-label="Drag aim pad; drag to aim and use spray or hammer"><div class="look-joystick-ring"></div><div id="look-joystick-thumb"><span id="mobile-action" aria-hidden="true">USE</span></div><div id="drag-aim-cue" aria-hidden="true"><span>＋</span><b>DRAG AIM</b></div><small id="aim-control-label">DRAG · AIM + SPRAY</small></div>
             <button id="tool-mode-toggle" type="button" aria-label="Change selected tool mode">
               <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 10h15l-3-3m3 3-3 3M25 22H10l3 3m-3-3 3-3"/></svg><span>LIVE</span>
             </button>
@@ -113,6 +114,7 @@ export class HUD {
     }));
     root.querySelector('#spray-color')?.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:cycle-spray-color')));
     root.querySelector('#aim-control-mode')?.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:cycle-aim-control')));
+    root.querySelector('#aim-input-mode')?.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:cycle-aim-input')));
     root.querySelector('#aim-speed')?.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:cycle-aim-speed')));
     root.querySelector('#wall-assist')?.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:toggle-wall-assist')));
     root.querySelector('#tool-mode-toggle')?.addEventListener('click', event => {
@@ -223,5 +225,16 @@ export class HUD {
   updateWallAssist(enabled: boolean): void {
     const assistText = this.shell.querySelector<HTMLElement>('#wall-assist b');
     if (assistText) assistText.textContent = enabled ? 'AUTO' : 'OFF';
+  }
+
+  updateAimInput(mode: 'drag' | 'stick'): void {
+    const inputText = this.shell.querySelector<HTMLElement>('#aim-input-mode b');
+    if (inputText) inputText.textContent = mode.toUpperCase();
+    this.shell.classList.toggle('aim-input-drag', mode === 'drag');
+    const look = this.shell.querySelector<HTMLElement>('#look-joystick');
+    look?.setAttribute('aria-label', mode === 'drag' ? 'Drag aim pad; drag to aim and use spray or hammer' : 'Aim joystick; move it to use spray or hammer');
+    const hint = this.shell.querySelector<HTMLElement>('#aim-control-label');
+    const autoUse = this.shell.querySelector<HTMLElement>('#aim-control-mode b')?.textContent === 'AUTO USE';
+    if (hint) hint.textContent = mode === 'drag' ? (autoUse ? 'DRAG · AIM + SPRAY' : 'DRAG · AIM') : (autoUse ? 'AIM · AUTO TOOL' : 'AIM · 2× HOLD');
   }
 }

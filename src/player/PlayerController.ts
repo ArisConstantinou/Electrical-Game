@@ -11,6 +11,7 @@ export class PlayerController {
   wallAssistAmount = 0;
   private mobileAimSpeed = 1.55;
   private mobileVerticalScale = 0.72;
+  private mobileDragSensitivity = 0.0032;
   private wallAssistEnabled = true;
 
   constructor(readonly camera: THREE.PerspectiveCamera, private readonly input: Input) {
@@ -53,12 +54,19 @@ export class PlayerController {
 
   setMobileAimProfile(profile: MobileAimProfile): void {
     const settings = {
-      precise: { speed: 1.08, vertical: 0.62 },
-      normal: { speed: 1.55, vertical: 0.72 },
-      fast: { speed: 2.05, vertical: 0.82 },
+      precise: { speed: 1.08, vertical: 0.62, drag: 0.00235 },
+      normal: { speed: 1.55, vertical: 0.72, drag: 0.0032 },
+      fast: { speed: 2.05, vertical: 0.82, drag: 0.00415 },
     }[profile];
     this.mobileAimSpeed = settings.speed;
     this.mobileVerticalScale = settings.vertical;
+    this.mobileDragSensitivity = settings.drag;
+  }
+
+  lookMobileDrag(deltaX: number, deltaY: number): void {
+    const sensitivity = THREE.MathUtils.lerp(this.mobileDragSensitivity, Math.min(this.mobileDragSensitivity, 0.0017), this.wallAssistAmount);
+    const vertical = THREE.MathUtils.lerp(this.mobileVerticalScale, Math.min(this.mobileVerticalScale, 0.5), this.wallAssistAmount);
+    this.look(deltaX, deltaY * vertical, sensitivity);
   }
 
   setWallAssist(enabled: boolean): void {

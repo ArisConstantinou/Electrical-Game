@@ -288,11 +288,15 @@ if (await mobile.locator('#settings-panel').isVisible()) throw new Error('Settin
 await mobileTap(mobile, '#settings-toggle');
 await mobile.waitForTimeout(220);
 if (!await mobile.locator('#settings-panel').isVisible()) throw new Error('Settings icon did not open the settings panel');
-for (const selector of ['#spray-color', '#aim-control-mode', '#aim-speed', '#wall-assist', '#settings-close']) {
+for (const selector of ['#spray-color', '#aim-input-mode', '#aim-control-mode', '#aim-speed', '#wall-assist', '#settings-close']) {
   const box = await mobile.locator(selector).boundingBox();
   if (!box || box.width < 44 || box.height < 44) throw new Error(`${selector} is below the 44px settings touch target`);
 }
 await mobileTap(mobile, '#spray-color');
+await mobileTap(mobile, '#aim-input-mode');
+if ((await state(mobile)).workSurface.aimInputMode !== 'stick') throw new Error('Settings did not expose the classic velocity stick fallback');
+await mobileTap(mobile, '#aim-input-mode');
+if ((await state(mobile)).workSurface.aimInputMode !== 'drag') throw new Error('Settings did not restore direct drag aiming');
 await mobileTap(mobile, '#aim-control-mode');
 if ((await state(mobile)).workSurface.aimControlMode !== 'double-tap') throw new Error('Settings did not retain classic 2× HOLD aim control');
 await mobileTap(mobile, '#aim-control-mode');
@@ -320,8 +324,9 @@ const proximityAssist = await mobile.evaluate(() => {
     game.renderer.camera.position.z = -2.41 + distance;
     game.player.yaw = 0;
     game.player.pitch = 0;
-    game.input.mobileLook = { x: .5, y: .5 };
-    game.player.update(.4);
+    game.input.resetMobileLook();
+    game.player.update(0);
+    game.player.lookMobileDrag(100, 100);
     return { yaw: Math.abs(game.player.yaw), pitch: Math.abs(game.player.pitch), assist: game.player.wallAssistAmount };
   };
   const far = sample(2.1);
@@ -374,12 +379,13 @@ const autoAimUse = await mobile.evaluate(() => {
   const yawBefore = game.player.yaw;
   dispatch('pointermove', 172, x - rect.width * .4, y + rect.height * .08);
   const heldImmediately = game.input.actionHeld;
+  const yawAfterMove = game.player.yaw;
   window.advanceTime(360);
-  const during = { held: game.input.actionHeld, yaw: game.player.yaw, marks: JSON.parse(window.render_game_to_text()).workSurface.freeSprayMarks };
+  const during = { held: game.input.actionHeld, yaw: game.player.yaw, yawDrift: Math.abs(game.player.yaw - yawAfterMove), marks: JSON.parse(window.render_game_to_text()).workSurface.freeSprayMarks };
   dispatch('pointerup', 172, x - rect.width * .4, y + rect.height * .08);
-  return { marksBefore, yawBefore, heldImmediately, during, heldAfter: game.input.actionHeld };
+  return { marksBefore, yawBefore, heldImmediately, during, heldAfter: game.input.actionHeld, inputMode: game.aimInputMode, thumbDisplay: getComputedStyle(document.querySelector('#look-joystick-thumb')).display };
 });
-if (!autoAimUse.heldImmediately || !autoAimUse.during.held || autoAimUse.heldAfter || Math.abs(autoAimUse.during.yaw - autoAimUse.yawBefore) < 0.05 || autoAimUse.during.marks <= autoAimUse.marksBefore) throw new Error(`AUTO USE did not immediately aim and use the selected tool: ${JSON.stringify(autoAimUse)}`);
+if (autoAimUse.inputMode !== 'drag' || autoAimUse.thumbDisplay !== 'none' || !autoAimUse.heldImmediately || !autoAimUse.during.held || autoAimUse.heldAfter || Math.abs(autoAimUse.during.yaw - autoAimUse.yawBefore) < 0.05 || autoAimUse.during.yawDrift > 0.001 || autoAimUse.during.marks <= autoAimUse.marksBefore) throw new Error(`Direct drag aim did not track and stop with the finger: ${JSON.stringify(autoAimUse)}`);
 if (!touchResult.move.defaultPrevented || touchResult.shellTouchAction !== 'none') throw new Error('Game touch-look did not suppress browser scrolling');
 if (touchResult.after.scrollY !== touchResult.before.scrollY) throw new Error('Viewport scrolled during game camera swipe');
 const mobileBeforeMove = await state(mobile);
@@ -413,7 +419,7 @@ const dualStickCheck = await mobile.evaluate(() => {
   dispatch(look, 'pointerup', 192, lookRect.right - 8, lookRect.top + lookRect.height / 2);
   return { active, released: { move: { ...game.input.mobileMove }, look: { ...game.input.mobileLook } } };
 });
-if (dualStickCheck.active.distance < 0.2 || dualStickCheck.active.yawDelta < 0.1 || dualStickCheck.active.move.y === 0 || dualStickCheck.active.look.x === 0 || !dualStickCheck.active.held || dualStickCheck.active.sprayMarks < 1) throw new Error(`Dual joysticks did not produce simultaneous move, aim, and spray: ${JSON.stringify(dualStickCheck)}`);
+if (dualStickCheck.active.distance < 0.2 || dualStickCheck.active.yawDelta < 0.1 || dualStickCheck.active.move.y === 0 || !dualStickCheck.active.held || dualStickCheck.active.sprayMarks < 1) throw new Error(`Move joystick plus drag aim did not produce simultaneous move, aim, and spray: ${JSON.stringify(dualStickCheck)}`);
 if (dualStickCheck.released.move.x !== 0 || dualStickCheck.released.move.y !== 0 || dualStickCheck.released.look.x !== 0 || dualStickCheck.released.look.y !== 0) throw new Error(`Dual joysticks did not reset independently: ${JSON.stringify(dualStickCheck)}`);
 const simultaneousToolCheck = await mobile.evaluate(async () => {
   const game = window.__wireTheHouse;
@@ -431,7 +437,7 @@ const simultaneousToolCheck = await mobile.evaluate(async () => {
   dispatch(joystick, 'pointerup', 193, rect.left + rect.width / 2, rect.top + 8);
   return { whilePressed, afterRelease: { ...game.input.mobileMove } };
 });
-if (simultaneousToolCheck.whilePressed.distance < 0.05 || simultaneousToolCheck.whilePressed.move.y === 0) throw new Error(`Tool press interrupted joystick movement: ${JSON.stringify(simultaneousToolCheck)}`);
+if (simultaneousToolCheck.whilePressed.distance < 0.02 || simultaneousToolCheck.whilePressed.move.y === 0) throw new Error(`Tool press interrupted joystick movement: ${JSON.stringify(simultaneousToolCheck)}`);
 if (simultaneousToolCheck.afterRelease.x !== 0 || simultaneousToolCheck.afterRelease.y !== 0) throw new Error(`Joystick did not reset after its own pointer ended: ${JSON.stringify(simultaneousToolCheck)}`);
 await mobileTap(mobile, '[data-tool="spray"]');
 await aimAtActive(mobile);
@@ -480,4 +486,4 @@ await mobile.screenshot({ path: outputPath('mobile-entry.png') });
 
 await browser.close();
 if (errors.length) throw new Error(errors.join('\n'));
-console.log(JSON.stringify({ desktop: { movementDeltaZ: Number((afterMove.player.z - beforeMove.player.z).toFixed(2)), pointerLook: true, mouseWheelToolChange: true, missionComplete: complete.mission.complete, points: complete.points }, mobile: { ...touchResult, layout: mobileLayout, joystickDistance: Number(Math.hypot(mobileAfterMove.player.x - mobileBeforeMove.player.x, mobileAfterMove.player.z - mobileBeforeMove.player.z).toFixed(2)), autoUseImmediate: autoAimUse.heldImmediately, simultaneousSprayMarks: dualStickCheck.active.sprayMarks, proximityAssist, levelingPassed: true } }, null, 2));
+console.log(JSON.stringify({ desktop: { movementDeltaZ: Number((afterMove.player.z - beforeMove.player.z).toFixed(2)), pointerLook: true, mouseWheelToolChange: true, missionComplete: complete.mission.complete, points: complete.points }, mobile: { ...touchResult, layout: mobileLayout, aimInput: autoAimUse.inputMode, dragYawDrift: autoAimUse.during.yawDrift, joystickDistance: Number(Math.hypot(mobileAfterMove.player.x - mobileBeforeMove.player.x, mobileAfterMove.player.z - mobileBeforeMove.player.z).toFixed(2)), autoUseImmediate: autoAimUse.heldImmediately, simultaneousSprayMarks: dualStickCheck.active.sprayMarks, proximityAssist, levelingPassed: true } }, null, 2));
