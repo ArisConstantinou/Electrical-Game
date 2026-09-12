@@ -36,11 +36,13 @@ export class HUD {
           <section id="settings-panel" class="hud-card" aria-label="Game settings" aria-hidden="true">
             <header><div><span>GAME</span><strong>SETTINGS</strong></div><button id="settings-close" type="button" aria-label="Close settings">×</button></header>
             <div id="spray-controls" aria-label="Spray settings">
-              <button id="spray-mode" type="button" aria-label="Change spray method"><span>SPRAY METHOD</span><b>LIVE</b></button>
               <button id="spray-color" type="button" aria-label="Change spray color"><span>SPRAY COLOR</span><span class="setting-value"><i></i><b>BLUE</b></span></button>
             </div>
-            <div id="hammer-controls" aria-label="Demolition hammer settings">
-              <button id="hammer-mode" type="button" aria-label="Change hammer method"><span>HAMMER MODE</span><b>CHASE</b></button>
+            <div id="mobile-control-settings" aria-label="Mobile aim settings">
+              <button id="aim-control-mode" type="button" aria-label="Change aim stick action mode"><span>AIM STICK</span><b>AUTO USE</b></button>
+              <button id="aim-speed" type="button" aria-label="Change aim stick speed"><span>AIM SPEED</span><b>NORMAL</b></button>
+              <button id="wall-assist" type="button" aria-label="Toggle automatic wall precision"><span>WALL ASSIST</span><b>AUTO</b></button>
+              <small>AUTO USE sprays or hammers while you aim. WALL ASSIST slows movement and aim near the work wall.</small>
             </div>
           </section>
           <aside id="desktop-key-guide" class="hud-card" aria-label="Keyboard and mouse controls">
@@ -67,7 +69,10 @@ export class HUD {
           </div>
           <div id="mobile-controls" aria-label="Mobile controls">
             <div id="joystick" aria-label="Movement joystick"><div class="joystick-ring"></div><div id="joystick-thumb"></div></div>
-            <div id="look-joystick" aria-label="Aim joystick; double tap and hold center to use selected tool"><div class="look-joystick-ring"></div><div id="look-joystick-thumb"><span id="mobile-action" aria-hidden="true">2×</span></div><small>AIM · HOLD TOOL</small></div>
+            <div id="look-joystick" aria-label="Aim joystick; move it to use spray or hammer"><div class="look-joystick-ring"></div><div id="look-joystick-thumb"><span id="mobile-action" aria-hidden="true">USE</span></div><small id="aim-control-label">AIM · AUTO TOOL</small></div>
+            <button id="tool-mode-toggle" type="button" aria-label="Change selected tool mode">
+              <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 10h15l-3-3m3 3-3 3M25 22H10l3 3m-3-3 3-3"/></svg><span>LIVE</span>
+            </button>
             <nav id="mobile-tool-slider" aria-label="Select tool">
               <button type="button" data-tool="spray" aria-label="Spray"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M10 9h11l3 5v14H7V14zM12 4h8v5h-8z"/><path d="M24 11h5M26 7l4-2M26 15l4 2"/></svg><span>SPRAY</span></button>
               <button type="button" data-tool="hammer" aria-label="Demolition hammer"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 8h17l5 5-5 5H5zM16 18v11"/></svg><span>HAMMER</span></button>
@@ -106,9 +111,15 @@ export class HUD {
       event.preventDefault();
       window.dispatchEvent(new CustomEvent('wirehouse:level', { detail: button.dataset.level }));
     }));
-    root.querySelector('#spray-mode')?.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:cycle-spray-mode')));
     root.querySelector('#spray-color')?.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:cycle-spray-color')));
-    root.querySelector('#hammer-mode')?.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:cycle-hammer-mode')));
+    root.querySelector('#aim-control-mode')?.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:cycle-aim-control')));
+    root.querySelector('#aim-speed')?.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:cycle-aim-speed')));
+    root.querySelector('#wall-assist')?.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:toggle-wall-assist')));
+    root.querySelector('#tool-mode-toggle')?.addEventListener('click', event => {
+      const kind = (event.currentTarget as HTMLButtonElement).dataset.modeKind;
+      if (kind === 'spray') window.dispatchEvent(new CustomEvent('wirehouse:cycle-spray-mode'));
+      if (kind === 'hammer') window.dispatchEvent(new CustomEvent('wirehouse:cycle-hammer-mode'));
+    });
     const settingsToggle = root.querySelector<HTMLButtonElement>('#settings-toggle');
     const settingsPanel = root.querySelector<HTMLElement>('#settings-panel');
     const setSettingsOpen = (open: boolean): void => {
@@ -160,6 +171,10 @@ export class HUD {
       button.classList.toggle('selected', selected);
       button.setAttribute('aria-pressed', String(selected));
     });
+    const modeToggle = this.shell.querySelector<HTMLButtonElement>('#tool-mode-toggle');
+    const hasContextMode = selectedTool === 'spray' || selectedTool === 'hammer';
+    modeToggle?.classList.toggle('visible', hasContextMode);
+    if (modeToggle) modeToggle.dataset.modeKind = hasContextMode ? selectedTool : '';
     this.shell.dataset.aimed = targeted ? 'true' : 'false';
   }
 
@@ -176,19 +191,37 @@ export class HUD {
     const panel = this.shell.querySelector<HTMLElement>('#spray-controls');
     if (!panel) return;
     panel.dataset.activeTool = String(visible);
-    const modeText = panel.querySelector<HTMLElement>('#spray-mode b');
+    const modeText = this.shell.querySelector<HTMLElement>('#tool-mode-toggle span');
     const colorText = panel.querySelector<HTMLElement>('#spray-color b');
     const swatch = panel.querySelector<HTMLElement>('#spray-color i');
-    if (modeText) modeText.textContent = mode.toUpperCase();
+    if (visible && modeText) modeText.textContent = mode.toUpperCase();
     if (colorText) colorText.textContent = colorName;
     if (swatch) swatch.style.background = colorCss;
   }
 
   updateHammerControls(mode: string, visible: boolean): void {
-    const panel = this.shell.querySelector<HTMLElement>('#hammer-controls');
-    if (!panel) return;
-    panel.dataset.activeTool = String(visible);
-    const modeText = panel.querySelector<HTMLElement>('#hammer-mode b');
-    if (modeText) modeText.textContent = mode.toUpperCase();
+    const modeText = this.shell.querySelector<HTMLElement>('#tool-mode-toggle span');
+    if (visible && modeText) modeText.textContent = mode.toUpperCase();
+  }
+
+  updateAimControl(mode: 'auto-use' | 'double-tap'): void {
+    const modeText = this.shell.querySelector<HTMLElement>('#aim-control-mode b');
+    const thumbText = this.shell.querySelector<HTMLElement>('#mobile-action');
+    const hint = this.shell.querySelector<HTMLElement>('#aim-control-label');
+    if (modeText) modeText.textContent = mode === 'auto-use' ? 'AUTO USE' : '2× HOLD';
+    if (thumbText) thumbText.textContent = mode === 'auto-use' ? 'USE' : '2×';
+    if (hint) hint.textContent = mode === 'auto-use' ? 'AIM · AUTO TOOL' : 'AIM · 2× HOLD';
+    const look = this.shell.querySelector<HTMLElement>('#look-joystick');
+    look?.setAttribute('aria-label', mode === 'auto-use' ? 'Aim joystick; move it to use spray or hammer' : 'Aim joystick; double tap and hold center to use selected tool');
+  }
+
+  updateAimSpeed(profile: 'precise' | 'normal' | 'fast'): void {
+    const profileText = this.shell.querySelector<HTMLElement>('#aim-speed b');
+    if (profileText) profileText.textContent = profile.toUpperCase();
+  }
+
+  updateWallAssist(enabled: boolean): void {
+    const assistText = this.shell.querySelector<HTMLElement>('#wall-assist b');
+    if (assistText) assistText.textContent = enabled ? 'AUTO' : 'OFF';
   }
 }

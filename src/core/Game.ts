@@ -2,8 +2,9 @@ import { Renderer } from './Renderer';
 import { Input } from './Input';
 import { AssetManager } from './AssetManager';
 import { PlayerController } from '../player/PlayerController';
+import type { MobileAimProfile } from '../player/PlayerController';
 import { DesktopControls } from '../player/DesktopControls';
-import { MobileControls } from '../player/MobileControls';
+import { MobileControls, type AimControlMode } from '../player/MobileControls';
 import { FPSRig, RIG_TOOLS, type RigTool } from '../player/FPSRig';
 import { Room } from '../world/Room';
 import { MissionSystem } from '../systems/MissionSystem';
@@ -39,6 +40,9 @@ export class Game {
   sprayMode: 'dots' | 'live' = 'live';
   sprayColorIndex = 0;
   hammerMode: HammerMode = 'chase';
+  aimControlMode: AimControlMode = 'auto-use';
+  aimProfile: MobileAimProfile = 'normal';
+  wallAssistEnabled = true;
   started = false;
   private readonly chasing: ChasingSystem;
   private readonly interaction: InteractionSystem;
@@ -48,6 +52,7 @@ export class Game {
   private actionCooldown = 0;
   private wasSpraying = false;
   private wasLeveling = false;
+  private readonly mobileControls: MobileControls;
 
   constructor(root: HTMLElement) {
     this.hud = new HUD(root);
@@ -65,7 +70,7 @@ export class Game {
     this.interaction = new InteractionSystem(new MarkingSystem(this.room.brickWall), this.chasing, new MortarSystem(), this.leveling, this.conduit);
     this.applySpraySettings();
     new DesktopControls(this.hud.shell, this.player, this.input);
-    new MobileControls(this.hud.shell, this.input, this.player);
+    this.mobileControls = new MobileControls(this.hud.shell, this.input, this.player, () => this.selectedTool);
     new MobileHUD();
     this.bindEvents();
     this.hud.onStart(() => {
@@ -91,7 +96,7 @@ export class Game {
     this.wasSpraying = spraying;
     if (this.started && (requested || repeatable)) {
       this.performAction();
-      this.actionCooldown = this.selectedTool === 'spray' ? 0.075 : this.selectedTool === 'hammer' ? 0.24 : 0.18;
+      this.actionCooldown = this.selectedTool === 'spray' ? 0.045 : this.selectedTool === 'hammer' ? 0.24 : 0.18;
     }
     this.chasing.update(dt);
     this.fpsRig.update(dt, this.player.velocity.lengthSq() > 0.02, spraying);
@@ -103,6 +108,9 @@ export class Game {
     const sprayColor = SPRAY_COLORS[this.sprayColorIndex];
     this.hud.updateSprayControls(this.sprayMode, sprayColor.name, sprayColor.css, this.selectedTool === 'spray');
     this.hud.updateHammerControls(this.hammerMode, this.selectedTool === 'hammer');
+    this.hud.updateAimControl(this.aimControlMode);
+    this.hud.updateAimSpeed(this.aimProfile);
+    this.hud.updateWallAssist(this.wallAssistEnabled);
     if (this.shake > 0) {
       this.shake = Math.max(0, this.shake - dt * 3.7);
       this.renderer.camera.rotation.set(this.player.pitch + (Math.random() - 0.5) * this.shake * 0.025, this.player.yaw + (Math.random() - 0.5) * this.shake * 0.02, 0);
@@ -120,7 +128,7 @@ export class Game {
       mode: !this.started ? 'start' : this.mission.complete ? 'mission-complete' : point?.stage === 'leveling' ? 'leveling' : 'playing',
       player: { x: Number(this.renderer.camera.position.x.toFixed(3)), y: Number(this.renderer.camera.position.y.toFixed(3)), z: Number(this.renderer.camera.position.z.toFixed(3)), yaw: Number(this.player.yaw.toFixed(3)), pitch: Number(this.player.pitch.toFixed(3)) },
       mission: { name: 'Living Room First Fix', progressPercent: this.mission.progress, selectedTool: this.selectedTool, complete: this.mission.complete },
-      workSurface: { freeSprayMarks: this.room.brickWall.freeMarkCount, destroyedBricks: this.room.brickWall.destroyedBrickCount, recessedBricks: this.room.brickWall.recessedBrickCount, sprayMode: this.sprayMode, sprayColor: SPRAY_COLORS[this.sprayColorIndex].name, hammerMode: this.hammerMode },
+      workSurface: { freeSprayMarks: this.room.brickWall.freeMarkCount, destroyedBricks: this.room.brickWall.destroyedBrickCount, recessedBricks: this.room.brickWall.recessedBrickCount, sprayMode: this.sprayMode, sprayColor: SPRAY_COLORS[this.sprayColorIndex].name, hammerMode: this.hammerMode, aimControlMode: this.aimControlMode, aimProfile: this.aimProfile, wallAssist: this.wallAssistEnabled, proximityPrecision: Number(this.player.wallAssistAmount.toFixed(3)) },
       activePoint: point ? { id: point.definition.id, kind: point.definition.kind, bottomHeightM: point.definition.bottom, boxes: point.definition.boxes, stage: point.stage, chaseHits: point.chaseHits, pipeStep: point.pipeStep, targeted: this.mission.target(this.renderer.camera) === point, tiltDegrees: Number(point.boxGroup.tiltDegrees.toFixed(2)), depthErrorMm: Number((point.boxGroup.depthError * 1000).toFixed(1)), levelPass: point.boxGroup.isLevel, flushPass: point.boxGroup.isFlush } : null,
       points: this.mission.points.map(item => ({ id: item.definition.id, stage: item.stage, conduitVisible: Boolean(item.conduit) })),
     });
@@ -155,6 +163,22 @@ export class Game {
       this.hammerMode = this.hammerMode === 'chase' ? 'demolish' : 'chase';
       this.interaction.setHammerMode(this.hammerMode);
       this.hud.notify(`Hammer method: ${this.hammerMode.toUpperCase()}`);
+    });
+    addEventListener('wirehouse:cycle-aim-control', () => {
+      this.aimControlMode = this.aimControlMode === 'auto-use' ? 'double-tap' : 'auto-use';
+      this.mobileControls.setAimControlMode(this.aimControlMode);
+      this.hud.notify(this.aimControlMode === 'auto-use' ? 'Aim stick: move to spray or hammer.' : 'Aim stick: double tap and hold to use tool.');
+    });
+    addEventListener('wirehouse:cycle-aim-speed', () => {
+      const profiles: MobileAimProfile[] = ['precise', 'normal', 'fast'];
+      this.aimProfile = profiles[(profiles.indexOf(this.aimProfile) + 1) % profiles.length];
+      this.mobileControls.setAimProfile(this.aimProfile);
+      this.hud.notify(`Aim speed: ${this.aimProfile.toUpperCase()}`);
+    });
+    addEventListener('wirehouse:toggle-wall-assist', () => {
+      this.wallAssistEnabled = !this.wallAssistEnabled;
+      this.player.setWallAssist(this.wallAssistEnabled);
+      this.hud.notify(`Wall precision assist: ${this.wallAssistEnabled ? 'AUTO' : 'OFF'}`);
     });
     addEventListener('wirehouse:level', event => {
       const detail = (event as CustomEvent<LevelDirection | 'confirm' | 'cancel'>).detail;

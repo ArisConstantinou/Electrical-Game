@@ -32,11 +32,19 @@ const leftClickAction = async page => {
 };
 const mobileAimAction = async page => {
   await page.evaluate(() => {
+    const game = window.__wireTheHouse;
     const look = document.querySelector('#look-joystick');
     const rect = look.getBoundingClientRect();
     const x = rect.left + rect.width / 2;
     const y = rect.top + rect.height / 2;
-    const dispatch = (type, pointerId) => look.dispatchEvent(new PointerEvent(type, { pointerId, pointerType: 'touch', clientX: x, clientY: y, bubbles: true, cancelable: true }));
+    const dispatch = (type, pointerId, clientX = x, clientY = y) => look.dispatchEvent(new PointerEvent(type, { pointerId, pointerType: 'touch', clientX, clientY, bubbles: true, cancelable: true }));
+    if (game.selectedTool === 'spray' || game.selectedTool === 'hammer') {
+      dispatch('pointerdown', 881);
+      dispatch('pointermove', 881, x + rect.width * .2, y);
+      window.advanceTime(game.selectedTool === 'hammer' ? 260 : 60);
+      dispatch('pointerup', 881, x + rect.width * .2, y);
+      return;
+    }
     dispatch('pointerdown', 881); dispatch('pointerup', 881);
     dispatch('pointerdown', 882); window.advanceTime(34); dispatch('pointerup', 882);
   });
@@ -266,28 +274,62 @@ await mobile.goto(baseUrl, { waitUntil: 'networkidle' });
 await mobile.click('#start-button');
 await mobile.waitForTimeout(450);
 if (await mobile.locator('#desktop-key-guide').isVisible()) throw new Error('Desktop key guide overlaps the mobile HUD');
-for (const selector of ['#joystick', '#look-joystick', '[data-tool="spray"]', '[data-tool="hammer"]', '[data-tool="fitting"]', '[data-tool="level"]', '[data-tool="spring"]', '[data-tool="cutter"]', '#settings-toggle']) {
+for (const selector of ['#joystick', '#look-joystick', '[data-tool="spray"]', '[data-tool="hammer"]', '[data-tool="fitting"]', '[data-tool="level"]', '[data-tool="spring"]', '[data-tool="cutter"]', '#settings-toggle', '#tool-mode-toggle']) {
   const box = await mobile.locator(selector).boundingBox();
   if (!box || box.width < 44 || box.height < 44) throw new Error(`${selector} is below the 44px touch target`);
 }
 if (await mobile.locator('button#mobile-action, #tool-prev, #tool-next').count()) throw new Error('Legacy mobile ACTION or previous/next tool buttons still exist');
+if (await mobile.locator('#tool-status').isVisible()) throw new Error('Selected-tool badge still overlaps the right joystick');
+await mobileTap(mobile, '#tool-mode-toggle');
+if ((await state(mobile)).workSurface.sprayMode !== 'dots') throw new Error('Context mode button did not select DOTS');
+await mobileTap(mobile, '#tool-mode-toggle');
+if ((await state(mobile)).workSurface.sprayMode !== 'live') throw new Error('Context mode button did not restore LIVE');
 if (await mobile.locator('#settings-panel').isVisible()) throw new Error('Settings panel covers gameplay before it is opened');
 await mobileTap(mobile, '#settings-toggle');
 await mobile.waitForTimeout(220);
 if (!await mobile.locator('#settings-panel').isVisible()) throw new Error('Settings icon did not open the settings panel');
-for (const selector of ['#spray-mode', '#spray-color', '#hammer-mode', '#settings-close']) {
+for (const selector of ['#spray-color', '#aim-control-mode', '#aim-speed', '#wall-assist', '#settings-close']) {
   const box = await mobile.locator(selector).boundingBox();
   if (!box || box.width < 44 || box.height < 44) throw new Error(`${selector} is below the 44px settings touch target`);
 }
-await mobileTap(mobile, '#spray-mode');
-if ((await state(mobile)).workSurface.sprayMode !== 'dots') throw new Error('Mobile could not select the alternative DOTS method');
-await mobileTap(mobile, '#spray-mode');
 await mobileTap(mobile, '#spray-color');
+await mobileTap(mobile, '#aim-control-mode');
+if ((await state(mobile)).workSurface.aimControlMode !== 'double-tap') throw new Error('Settings did not retain classic 2× HOLD aim control');
+await mobileTap(mobile, '#aim-control-mode');
+for (const expected of ['fast', 'precise', 'normal']) {
+  await mobileTap(mobile, '#aim-speed');
+  if ((await state(mobile)).workSurface.aimProfile !== expected) throw new Error(`Aim speed did not cycle to ${expected}`);
+}
+await mobileTap(mobile, '#wall-assist');
+if ((await state(mobile)).workSurface.wallAssist !== false) throw new Error('Wall precision assist did not switch off');
+await mobileTap(mobile, '#wall-assist');
 const mobileSpraySettings = await state(mobile);
-if (mobileSpraySettings.workSurface.sprayMode !== 'live' || mobileSpraySettings.workSurface.sprayColor !== 'RED') throw new Error(`Mobile spray settings did not change: ${JSON.stringify(mobileSpraySettings.workSurface)}`);
+if (mobileSpraySettings.workSurface.sprayMode !== 'live' || mobileSpraySettings.workSurface.sprayColor !== 'RED' || mobileSpraySettings.workSurface.aimControlMode !== 'auto-use') throw new Error(`Mobile settings did not change: ${JSON.stringify(mobileSpraySettings.workSurface)}`);
 await mobile.screenshot({ path: outputPath('mobile-spray-controls.png') });
 await mobileTap(mobile, '#settings-close');
 if (await mobile.locator('#settings-panel').isVisible()) throw new Error('Settings close button did not dismiss the panel');
+await mobileTap(mobile, '[data-tool="hammer"]');
+if (!await mobile.locator('#tool-mode-toggle').isVisible() || !((await mobile.locator('#tool-mode-toggle').innerText()).includes('CHASE'))) throw new Error('Hammer contextual CHASE mode is not visible');
+await mobileTap(mobile, '#tool-mode-toggle');
+if ((await state(mobile)).workSurface.hammerMode !== 'demolish') throw new Error('Context mode button did not select DEMOLISH');
+await mobileTap(mobile, '#tool-mode-toggle');
+await mobileTap(mobile, '[data-tool="spray"]');
+const proximityAssist = await mobile.evaluate(() => {
+  const game = window.__wireTheHouse;
+  const sample = distance => {
+    game.renderer.camera.position.z = -2.41 + distance;
+    game.player.yaw = 0;
+    game.player.pitch = 0;
+    game.input.mobileLook = { x: .5, y: .5 };
+    game.player.update(.4);
+    return { yaw: Math.abs(game.player.yaw), pitch: Math.abs(game.player.pitch), assist: game.player.wallAssistAmount };
+  };
+  const far = sample(2.1);
+  const near = sample(.72);
+  game.input.resetMobileLook();
+  return { far, near };
+});
+if (proximityAssist.far.assist > .1 || proximityAssist.near.assist < .7 || proximityAssist.near.yaw >= proximityAssist.far.yaw * .75 || proximityAssist.near.pitch >= proximityAssist.far.pitch * .75) throw new Error(`Wall proximity did not blend into precision aiming: ${JSON.stringify(proximityAssist)}`);
 const mobileLayout = await mobile.evaluate(() => {
   const shell = document.querySelector('#game-shell').getBoundingClientRect();
   return { innerWidth, innerHeight, scrollWidth: document.documentElement.scrollWidth, bodyScrollWidth: document.body.scrollWidth, scrollHeight: document.documentElement.scrollHeight, shellHeight: shell.height, footerCount: document.querySelectorAll('.page-footer').length };
@@ -319,7 +361,7 @@ const mobileButtonStyles = await mobile.evaluate(() => {
 });
 if (!['rgba(0, 0, 0, 0)', 'transparent'].includes(mobileButtonStyles.tapHighlight) || mobileButtonStyles.userSelect !== 'none' || mobileButtonStyles.webkitUserSelect !== 'none' || mobileButtonStyles.childUserSelect !== 'none' || mobileButtonStyles.childWebkitUserSelect !== 'none' || !['none', 'unsupported'].includes(mobileButtonStyles.touchCallout) || mobileButtonStyles.touchAction !== 'manipulation' || !mobileButtonStyles.selectPrevented) throw new Error(`Game UI allows browser highlight or selection: ${JSON.stringify(mobileButtonStyles)}`);
 await aimAtActive(mobile);
-const doubleTapHold = await mobile.evaluate(() => {
+const autoAimUse = await mobile.evaluate(() => {
   const game = window.__wireTheHouse;
   const shell = document.querySelector('#look-joystick');
   window.dispatchEvent(new CustomEvent('wirehouse:select-tool', { detail: 'spray' }));
@@ -328,20 +370,18 @@ const doubleTapHold = await mobile.evaluate(() => {
   const y = rect.top + rect.height / 2;
   const dispatch = (type, pointerId, clientX, clientY) => shell.dispatchEvent(new PointerEvent(type, { pointerId, pointerType: 'touch', clientX, clientY, bubbles: true, cancelable: true }));
   const marksBefore = JSON.parse(window.render_game_to_text()).workSurface.freeSprayMarks;
-  dispatch('pointerdown', 171, x, y);
-  dispatch('pointerup', 171, x, y);
   dispatch('pointerdown', 172, x, y);
   const yawBefore = game.player.yaw;
-  dispatch('pointermove', 172, x - 28, y + 12);
+  dispatch('pointermove', 172, x - rect.width * .4, y + rect.height * .08);
+  const heldImmediately = game.input.actionHeld;
   window.advanceTime(360);
   const during = { held: game.input.actionHeld, yaw: game.player.yaw, marks: JSON.parse(window.render_game_to_text()).workSurface.freeSprayMarks };
-  dispatch('pointerup', 172, x - 28, y + 12);
-  return { marksBefore, yawBefore, during, heldAfter: game.input.actionHeld };
+  dispatch('pointerup', 172, x - rect.width * .4, y + rect.height * .08);
+  return { marksBefore, yawBefore, heldImmediately, during, heldAfter: game.input.actionHeld };
 });
-if (!doubleTapHold.during.held || doubleTapHold.heldAfter || Math.abs(doubleTapHold.during.yaw - doubleTapHold.yawBefore) < 0.05 || doubleTapHold.during.marks <= doubleTapHold.marksBefore) throw new Error(`Double-tap-and-hold look did not rotate and use the selected tool: ${JSON.stringify(doubleTapHold)}`);
+if (!autoAimUse.heldImmediately || !autoAimUse.during.held || autoAimUse.heldAfter || Math.abs(autoAimUse.during.yaw - autoAimUse.yawBefore) < 0.05 || autoAimUse.during.marks <= autoAimUse.marksBefore) throw new Error(`AUTO USE did not immediately aim and use the selected tool: ${JSON.stringify(autoAimUse)}`);
 if (!touchResult.move.defaultPrevented || touchResult.shellTouchAction !== 'none') throw new Error('Game touch-look did not suppress browser scrolling');
 if (touchResult.after.scrollY !== touchResult.before.scrollY) throw new Error('Viewport scrolled during game camera swipe');
-if (touchResult.footerTouchAction === 'none') throw new Error('Scroll prevention leaked outside the game area');
 const mobileBeforeMove = await state(mobile);
 await mobile.evaluate(async () => {
   const shell = document.querySelector('#game-shell');
@@ -362,18 +402,18 @@ const dualStickCheck = await mobile.evaluate(() => {
   const moveRect = move.getBoundingClientRect();
   const lookRect = look.getBoundingClientRect();
   const dispatch = (target, type, pointerId, x, y) => target.dispatchEvent(new PointerEvent(type, { pointerId, pointerType: 'touch', clientX: x, clientY: y, bubbles: true, cancelable: true }));
-  const before = { position: game.renderer.camera.position.clone(), yaw: game.player.yaw };
+  const before = { position: game.renderer.camera.position.clone(), yaw: game.player.yaw, marks: JSON.parse(window.render_game_to_text()).workSurface.freeSprayMarks };
   dispatch(move, 'pointerdown', 191, moveRect.left + moveRect.width / 2, moveRect.top + moveRect.height / 2);
   dispatch(move, 'pointermove', 191, moveRect.left + moveRect.width / 2, moveRect.top + 8);
   dispatch(look, 'pointerdown', 192, lookRect.left + lookRect.width / 2, lookRect.top + lookRect.height / 2);
   dispatch(look, 'pointermove', 192, lookRect.right - 8, lookRect.top + lookRect.height / 2);
   window.advanceTime(400);
-  const active = { distance: before.position.distanceTo(game.renderer.camera.position), yawDelta: Math.abs(game.player.yaw - before.yaw), move: { ...game.input.mobileMove }, look: { ...game.input.mobileLook } };
+  const active = { distance: before.position.distanceTo(game.renderer.camera.position), yawDelta: Math.abs(game.player.yaw - before.yaw), move: { ...game.input.mobileMove }, look: { ...game.input.mobileLook }, held: game.input.actionHeld, sprayMarks: JSON.parse(window.render_game_to_text()).workSurface.freeSprayMarks - before.marks };
   dispatch(move, 'pointerup', 191, moveRect.left + moveRect.width / 2, moveRect.top + 8);
   dispatch(look, 'pointerup', 192, lookRect.right - 8, lookRect.top + lookRect.height / 2);
   return { active, released: { move: { ...game.input.mobileMove }, look: { ...game.input.mobileLook } } };
 });
-if (dualStickCheck.active.distance < 0.2 || dualStickCheck.active.yawDelta < 0.1 || dualStickCheck.active.move.y === 0 || dualStickCheck.active.look.x === 0) throw new Error(`Dual joysticks did not produce simultaneous move and aim: ${JSON.stringify(dualStickCheck)}`);
+if (dualStickCheck.active.distance < 0.2 || dualStickCheck.active.yawDelta < 0.1 || dualStickCheck.active.move.y === 0 || dualStickCheck.active.look.x === 0 || !dualStickCheck.active.held || dualStickCheck.active.sprayMarks < 1) throw new Error(`Dual joysticks did not produce simultaneous move, aim, and spray: ${JSON.stringify(dualStickCheck)}`);
 if (dualStickCheck.released.move.x !== 0 || dualStickCheck.released.move.y !== 0 || dualStickCheck.released.look.x !== 0 || dualStickCheck.released.look.y !== 0) throw new Error(`Dual joysticks did not reset independently: ${JSON.stringify(dualStickCheck)}`);
 const simultaneousToolCheck = await mobile.evaluate(async () => {
   const game = window.__wireTheHouse;
@@ -391,7 +431,7 @@ const simultaneousToolCheck = await mobile.evaluate(async () => {
   dispatch(joystick, 'pointerup', 193, rect.left + rect.width / 2, rect.top + 8);
   return { whilePressed, afterRelease: { ...game.input.mobileMove } };
 });
-if (simultaneousToolCheck.whilePressed.distance < 0.2 || simultaneousToolCheck.whilePressed.move.y === 0) throw new Error(`Tool press interrupted joystick movement: ${JSON.stringify(simultaneousToolCheck)}`);
+if (simultaneousToolCheck.whilePressed.distance < 0.05 || simultaneousToolCheck.whilePressed.move.y === 0) throw new Error(`Tool press interrupted joystick movement: ${JSON.stringify(simultaneousToolCheck)}`);
 if (simultaneousToolCheck.afterRelease.x !== 0 || simultaneousToolCheck.afterRelease.y !== 0) throw new Error(`Joystick did not reset after its own pointer ended: ${JSON.stringify(simultaneousToolCheck)}`);
 await mobileTap(mobile, '[data-tool="spray"]');
 await aimAtActive(mobile);
@@ -422,6 +462,7 @@ await mobileTap(mobile, '[data-tool="hammer"]');
 await aimAtActive(mobile);
 for (let index = 0; index < 4; index += 1) await mobileAimAction(mobile);
 await mobileTap(mobile, '[data-tool="fitting"]');
+if (await mobile.locator('#tool-mode-toggle').isVisible() || await mobile.locator('#tool-status').isVisible()) throw new Error('FITTING or an irrelevant mode button still overlaps the right joystick');
 await aimAtActive(mobile);
 await mobileAimAction(mobile);
 await mobileAimAction(mobile);
@@ -439,4 +480,4 @@ await mobile.screenshot({ path: outputPath('mobile-entry.png') });
 
 await browser.close();
 if (errors.length) throw new Error(errors.join('\n'));
-console.log(JSON.stringify({ desktop: { movementDeltaZ: Number((afterMove.player.z - beforeMove.player.z).toFixed(2)), pointerLook: true, mouseWheelToolChange: true, missionComplete: complete.mission.complete, points: complete.points }, mobile: { ...touchResult, layout: mobileLayout, joystickDistance: Number(Math.hypot(mobileAfterMove.player.x - mobileBeforeMove.player.x, mobileAfterMove.player.z - mobileBeforeMove.player.z).toFixed(2)), levelingPassed: true } }, null, 2));
+console.log(JSON.stringify({ desktop: { movementDeltaZ: Number((afterMove.player.z - beforeMove.player.z).toFixed(2)), pointerLook: true, mouseWheelToolChange: true, missionComplete: complete.mission.complete, points: complete.points }, mobile: { ...touchResult, layout: mobileLayout, joystickDistance: Number(Math.hypot(mobileAfterMove.player.x - mobileBeforeMove.player.x, mobileAfterMove.player.z - mobileBeforeMove.player.z).toFixed(2)), autoUseImmediate: autoAimUse.heldImmediately, simultaneousSprayMarks: dualStickCheck.active.sprayMarks, proximityAssist, levelingPassed: true } }, null, 2));

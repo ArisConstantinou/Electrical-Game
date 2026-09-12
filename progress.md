@@ -11,6 +11,9 @@ Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web gam
 
 ## Current
 
+- Physical-iPhone control revision removes the mobile selected-tool badge, adds a contextual mode switch above the tool strip for SPRAY and HAMMER, defaults the right stick to immediate AUTO USE, and adds PRECISE/NORMAL/FAST aim profiles. WALL ASSIST defaults to AUTO: normal handling away from the work wall blends smoothly into a larger dead zone, exponential fine aim, slower vertical rotation and slower walking near the wall.
+- Verified at 390×844: contextual LIVE/DOTS and CHASE/DEMOLISH switching, no mode control for FITTING, immediate spray on aim-stick deflection, simultaneous left-stick movement + right-stick aim + continuous spray, independent release, far/near precision scaling, full mission completion, zero overflow and readable resting/settings layouts.
+
 - Mobile cleanup moves spray method, spray color, and hammer mode into a top-right settings popover; removes the below-game footer; uses the dynamic viewport height; and blocks selection/drag highlighting across the whole document.
 - Verified settings open/change/close with touch at 390×844, 44px+ touch targets, `shellHeight === scrollHeight === innerHeight`, no footer or overflow, full desktop/mobile mission completion, Studio 10/10 and live Studio roundtrip.
 

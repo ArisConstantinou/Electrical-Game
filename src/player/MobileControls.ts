@@ -1,5 +1,8 @@
 import type { Input } from '../core/Input';
-import type { PlayerController } from './PlayerController';
+import type { MobileAimProfile, PlayerController } from './PlayerController';
+import type { RigTool } from './FPSRig';
+
+export type AimControlMode = 'auto-use' | 'double-tap';
 
 export class MobileControls {
   private joystickPointer: number | null = null;
@@ -11,8 +14,10 @@ export class MobileControls {
   private lastLookTapAt = Number.NEGATIVE_INFINITY;
   private lastLookTapX = 0;
   private lastLookTapY = 0;
+  private aimControlMode: AimControlMode = 'auto-use';
+  private aimProfile: MobileAimProfile = 'normal';
 
-  constructor(private readonly surface: HTMLElement, private readonly input: Input, private readonly player: PlayerController) {
+  constructor(private readonly surface: HTMLElement, private readonly input: Input, private readonly player: PlayerController, private readonly selectedTool: () => RigTool) {
     surface.addEventListener('pointerdown', this.onPointerDown, { passive: false });
     surface.addEventListener('pointermove', this.onPointerMove, { passive: false });
     surface.addEventListener('pointerup', this.onPointerUp, { passive: false });
@@ -26,6 +31,20 @@ export class MobileControls {
       event.preventDefault();
       window.dispatchEvent(new CustomEvent('wirehouse:select-tool', { detail: button.dataset.tool }));
     }));
+  }
+
+  setAimControlMode(mode: AimControlMode): void {
+    this.aimControlMode = mode;
+    this.lastLookTapAt = Number.NEGATIVE_INFINITY;
+    if (this.lookActionPointer !== null) {
+      this.lookActionPointer = null;
+      this.input.actionHeld = false;
+    }
+  }
+
+  setAimProfile(profile: MobileAimProfile): void {
+    this.aimProfile = profile;
+    this.player.setMobileAimProfile(profile);
   }
 
   private onPointerDown = (event: PointerEvent): void => {
@@ -42,21 +61,7 @@ export class MobileControls {
       this.lookJoystickActive = true;
       try { lookJoystick.setPointerCapture(event.pointerId); } catch { /* Synthetic QA events do not own an active pointer. */ }
       this.updateLookJoystick(event, lookJoystick);
-      const now = performance.now();
-      const rect = lookJoystick.getBoundingClientRect();
-      const centerDistance = Math.hypot(event.clientX - (rect.left + rect.width / 2), event.clientY - (rect.top + rect.height / 2));
-      const isCenterTap = centerDistance <= rect.width * 0.24;
-      const isNearbyTap = Math.hypot(event.clientX - this.lastLookTapX, event.clientY - this.lastLookTapY) <= 42;
-      if (isCenterTap && now - this.lastLookTapAt <= 340 && isNearbyTap) {
-        this.lookActionPointer = event.pointerId;
-        this.input.actionHeld = true;
-        this.input.actionRequested = true;
-        this.lastLookTapAt = Number.NEGATIVE_INFINITY;
-      } else {
-        this.lastLookTapAt = now;
-        this.lastLookTapX = event.clientX;
-        this.lastLookTapY = event.clientY;
-      }
+      if (this.aimControlMode === 'double-tap' || !this.isRepeatableTool) this.detectDoubleTapAction(event, lookJoystick);
     } else if (this.lookPointer === null) {
       this.lookPointer = event.pointerId;
       try { this.surface.setPointerCapture(event.pointerId); } catch { /* Synthetic QA events do not own an active pointer. */ }
@@ -126,11 +131,24 @@ export class MobileControls {
     const rawX = (event.clientX - (rect.left + radius)) / radius;
     const rawY = (event.clientY - (rect.top + radius)) / radius;
     const length = Math.hypot(rawX, rawY);
-    const deadZone = 0.12;
-    const magnitude = length <= deadZone ? 0 : Math.min(1, (length - deadZone) / (1 - deadZone));
+    const response = {
+      precise: { deadZone: 0.2, exponent: 2.15 },
+      normal: { deadZone: 0.14, exponent: 1.45 },
+      fast: { deadZone: 0.1, exponent: 1.08 },
+    }[this.aimProfile];
+    const proximity = this.player.wallAssistAmount;
+    const deadZone = response.deadZone + (Math.max(response.deadZone, 0.24) - response.deadZone) * proximity;
+    const exponent = response.exponent + (Math.max(response.exponent, 2.3) - response.exponent) * proximity;
+    const normalized = length <= deadZone ? 0 : Math.min(1, (length - deadZone) / (1 - deadZone));
+    const magnitude = normalized ** exponent;
     const x = length > 0 ? rawX / length * magnitude : 0;
     const y = length > 0 ? rawY / length * magnitude : 0;
     this.input.mobileLook = { x, y };
+    if (this.aimControlMode === 'auto-use' && this.isRepeatableTool && magnitude > 0 && this.lookActionPointer === null) {
+      this.lookActionPointer = event.pointerId;
+      this.input.actionHeld = true;
+      this.input.actionRequested = true;
+    }
     const travel = radius * 0.52;
     const thumb = document.querySelector<HTMLElement>('#look-joystick-thumb');
     if (thumb) thumb.style.transform = `translate(calc(-50% + ${x * travel}px), calc(-50% + ${y * travel}px))`;
@@ -147,5 +165,28 @@ export class MobileControls {
       this.lookActionPointer = null;
       this.input.actionHeld = false;
     }
+  }
+
+  private detectDoubleTapAction(event: PointerEvent, lookJoystick: HTMLElement): void {
+    const now = performance.now();
+    const rect = lookJoystick.getBoundingClientRect();
+    const centerDistance = Math.hypot(event.clientX - (rect.left + rect.width / 2), event.clientY - (rect.top + rect.height / 2));
+    const isCenterTap = centerDistance <= rect.width * 0.24;
+    const isNearbyTap = Math.hypot(event.clientX - this.lastLookTapX, event.clientY - this.lastLookTapY) <= 42;
+    if (isCenterTap && now - this.lastLookTapAt <= 340 && isNearbyTap) {
+      this.lookActionPointer = event.pointerId;
+      this.input.actionHeld = true;
+      this.input.actionRequested = true;
+      this.lastLookTapAt = Number.NEGATIVE_INFINITY;
+      return;
+    }
+    this.lastLookTapAt = now;
+    this.lastLookTapX = event.clientX;
+    this.lastLookTapY = event.clientY;
+  }
+
+  private get isRepeatableTool(): boolean {
+    const tool = this.selectedTool();
+    return tool === 'spray' || tool === 'hammer';
   }
 }
