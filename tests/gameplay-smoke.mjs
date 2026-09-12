@@ -52,6 +52,7 @@ const mobileAimAction = async page => {
       dispatch('pointermove', 881, x + rect.width * .2, y);
       window.advanceTime(game.selectedTool === 'hammer' ? 260 : 60);
       dispatch('pointerup', 881, x + rect.width * .2, y);
+      if (game.selectedTool === 'hammer') window.advanceTime(34);
       return;
     }
     dispatch('pointerdown', 881);
@@ -320,10 +321,10 @@ const heldAfterSpray = await paintedChase.evaluate(() => window.__wireTheHouse.i
 const offRouteSurfaceBefore = (await state(paintedChase)).workSurface;
 await paintedChase.keyboard.press('Digit4');
 const heldAfterToolSwitch = await paintedChase.evaluate(() => window.__wireTheHouse.input.actionHeld);
-await paintedChase.evaluate(() => window.advanceTime(300));
+await paintedChase.evaluate(() => window.advanceTime(1100));
 await paintedChase.mouse.up({ button: 'left' });
 const offRouteChase = await state(paintedChase);
-if (!['chasing', 'chased'].includes(offRouteChase.activePoint.stage) || offRouteChase.activePoint.chaseHits < 1 || offRouteChase.workSurface.recessedBricks <= offRouteSurfaceBefore.recessedBricks) {
+if (offRouteChase.activePoint.stage !== 'chasing' || offRouteChase.activePoint.chaseHits !== 1 || offRouteChase.workSurface.recessedBricks <= offRouteSurfaceBefore.recessedBricks) {
   throw new Error(`CHASE did not start while the player kept holding action after switching from spray: ${JSON.stringify({ heldAfterSpray, heldAfterToolSwitch, offRouteChase })}`);
 }
 if (offRouteChase.workSurface.destroyedBricks !== offRouteSurfaceBefore.destroyedBricks) throw new Error('Off-centre CHASE destroyed masonry instead of recessing it');
@@ -334,7 +335,7 @@ const routedChase = await browser.newPage({ viewport: { width: 1366, height: 768
 await routedChase.goto(baseUrl, { waitUntil: 'networkidle' });
 await routedChase.click('#start-button');
 await routedChase.waitForTimeout(250);
-const routedResult = await routedChase.evaluate(() => {
+const initialPaintedPixels = await routedChase.evaluate(() => {
   const game = window.__wireTheHouse;
   const point = game.mission.activePoint;
   const camera = game.renderer.camera;
@@ -352,10 +353,46 @@ const routedResult = await routedChase.evaluate(() => {
   point.setStage('marked');
   camera.lookAt(-1.7, 0.97, -2.41);
   camera.updateMatrixWorld(true);
-  for (let hit = 0; hit < 4; hit += 1) game.chasing.hit(camera, point);
   game.step(1 / 60);
-  return JSON.parse(window.render_game_to_text());
+  const pixels = game.room.brickWall.livePaintContext.getImageData(0, 0, game.room.brickWall.livePaintCanvas.width, game.room.brickWall.livePaintCanvas.height).data;
+  let painted = 0;
+  for (let index = 3; index < pixels.length; index += 4) if (pixels[index] > 0) painted += 1;
+  return painted;
 });
+if (initialPaintedPixels < 100) throw new Error(`CHASE route did not create enough visible paint for cleanup regression: ${initialPaintedPixels}`);
+await routedChase.keyboard.press('Digit4');
+const chasePasses = [];
+for (let pass = 1; pass <= 4; pass += 1) {
+  chasePasses.push(await routedChase.evaluate(() => {
+    const game = window.__wireTheHouse;
+    const point = game.mission.activePoint;
+    const hit = game.chasing.hit(game.renderer.camera, point);
+    game.step(1 / 60);
+    const pixels = game.room.brickWall.livePaintContext.getImageData(0, 0, game.room.brickWall.livePaintCanvas.width, game.room.brickWall.livePaintCanvas.height).data;
+    let paintedPixels = 0;
+    for (let index = 3; index < pixels.length; index += 4) if (pixels[index] > 0) paintedPixels += 1;
+    return { hit, paintedPixels, state: JSON.parse(window.render_game_to_text()) };
+  }));
+  await routedChase.screenshot({ path: outputPath(`desktop-chase-pass-${pass}.png`) });
+}
+const routedResult = chasePasses.at(-1).state;
+for (let index = 0; index < chasePasses.length; index += 1) {
+  const pass = chasePasses[index];
+  const expectedHits = index + 1;
+  const expectedStage = expectedHits === 4 ? 'chased' : 'chasing';
+  if (!pass.hit || pass.state.activePoint.chaseHits !== expectedHits || pass.state.activePoint.stage !== expectedStage) {
+    throw new Error(`CHASE pass ${expectedHits} was not a separate successful stage: ${JSON.stringify(pass)}`);
+  }
+  if (index > 0 && pass.state.activePoint.chaseCoverage <= chasePasses[index - 1].state.activePoint.chaseCoverage) {
+    throw new Error(`CHASE coverage did not advance on pass ${expectedHits}: ${JSON.stringify(chasePasses.map(item => item.state.activePoint.chaseCoverage))}`);
+  }
+  if (index > 0 && pass.paintedPixels > chasePasses[index - 1].paintedPixels) {
+    throw new Error(`CHASE paint residue increased on pass ${expectedHits}: ${JSON.stringify(chasePasses.map(item => item.paintedPixels))}`);
+  }
+}
+if (chasePasses.at(-1).paintedPixels !== 0 || routedResult.workSurface.freeSprayMarks !== 0) {
+  throw new Error(`Completed CHASE left visible spray residue: ${JSON.stringify({ paintedPixels: chasePasses.at(-1).paintedPixels, freeSprayMarks: routedResult.workSurface.freeSprayMarks })}`);
+}
 if (routedResult.activePoint.stage !== 'chased' || routedResult.activePoint.chaseCoverage < 0.98) throw new Error(`CHASE did not consume the complete painted route: ${JSON.stringify(routedResult)}`);
 if (routedResult.workSurface.carvedCells < 20 || routedResult.workSurface.recessedBricks < 5 || routedResult.workSurface.destroyedBricks !== 0 || routedResult.workSurface.chaseDepthMm !== 55 || routedResult.workSurface.chaseBackSurfaces < 20 || routedResult.workSurface.chaseSideWalls < 20) {
   throw new Error(`CHASE did not form a narrow multi-brick groove: ${JSON.stringify(routedResult.workSurface)}`);
@@ -378,7 +415,6 @@ const chaseDepthGeometry = await routedChase.evaluate(() => {
 if (chaseDepthGeometry.backs < 20 || chaseDepthGeometry.sides < 20 || chaseDepthGeometry.measuredDepthMm !== 55 || !chaseDepthGeometry.solidMaterials) {
   throw new Error(`CHASE lacks solid 55 mm back/side geometry: ${JSON.stringify(chaseDepthGeometry)}`);
 }
-await routedChase.keyboard.press('Digit4');
 await routedChase.waitForTimeout(300);
 await routedChase.screenshot({ path: outputPath('desktop-complete-jagged-chase-route.png') });
 await routedChase.evaluate(() => {
@@ -495,7 +531,10 @@ if (liveMarksAfter - liveMarksBefore < 5) throw new Error(`LIVE spray did not re
 await desktop.keyboard.press('Digit4');
 await aimAtActive(desktop);
 await unlockedLeftClickAction(desktop, 800);
-if ((await state(desktop)).activePoint.stage !== 'chased') throw new Error(`Holding desktop left mouse did not repeatedly use the hammer: ${JSON.stringify(await state(desktop))}`);
+const heldHammerState = await state(desktop);
+if (heldHammerState.activePoint.stage !== 'chasing' || heldHammerState.activePoint.chaseHits !== 1) throw new Error(`Holding desktop left mouse repeated the hammer instead of making one chase pass: ${JSON.stringify(heldHammerState)}`);
+for (let pass = 0; pass < 3; pass += 1) await leftClickAction(desktop);
+if ((await state(desktop)).activePoint.stage !== 'chased') throw new Error(`Four separate desktop hammer presses did not complete CHASE: ${JSON.stringify(await state(desktop))}`);
 const destroyedBeforeDesktopDemolish = (await state(desktop)).workSurface.destroyedBricks;
 await desktop.keyboard.press('KeyX');
 await desktop.waitForTimeout(140);
@@ -508,7 +547,20 @@ await desktop.evaluate(() => {
   game.step(1 / 60);
 });
 for (let hit = 0; hit < 4; hit += 1) {
-  await leftClickAction(desktop);
+  await desktop.mouse.down({ button: 'left' });
+  await desktop.evaluate(() => {
+    const game = window.__wireTheHouse;
+    // Pointer Lock can report a synthetic mouse delta when a headless browser
+    // restores capture. Lock the QA ray immediately before consuming the real
+    // left-button request so this test measures demolition, not that browser delta.
+    game.renderer.camera.position.set(0.8, 1.65, -0.35);
+    game.player.yaw = 0;
+    game.player.pitch = 0;
+    game.renderer.camera.rotation.set(0, 0, 0);
+    game.step(1 / 60);
+  });
+  await desktop.mouse.up({ button: 'left' });
+  await desktop.waitForTimeout(100);
   await desktop.evaluate(() => window.advanceTime(260));
 }
 const destroyedAfterDesktopDemolish = (await state(desktop)).workSurface.destroyedBricks;

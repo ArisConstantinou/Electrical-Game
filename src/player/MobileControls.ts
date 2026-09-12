@@ -75,7 +75,7 @@ export class MobileControls {
         this.lookY = event.clientY;
         this.dragDistance = 0;
       }
-      if (this.aimControlMode === 'double-tap' || (this.aimInputMode === 'stick' && !this.isRepeatableTool)) this.detectDoubleTapAction(event, lookJoystick);
+      if (this.aimControlMode === 'double-tap' || (this.aimInputMode === 'stick' && !this.isContinuousTool)) this.detectDoubleTapAction(event, lookJoystick);
     } else if (this.lookPointer === null) {
       this.lookPointer = event.pointerId;
       try { this.surface.setPointerCapture(event.pointerId); } catch { /* Synthetic QA events do not own an active pointer. */ }
@@ -111,7 +111,7 @@ export class MobileControls {
     }
     if (event.pointerId === this.lookPointer) {
       event.preventDefault();
-      if (event.type === 'pointerup' && this.aimInputMode === 'drag' && this.aimControlMode === 'auto-use' && !this.isRepeatableTool) {
+      if (event.type === 'pointerup' && this.aimInputMode === 'drag' && this.aimControlMode === 'auto-use' && !this.isContinuousTool) {
         this.input.actionRequested = true;
       }
       this.releaseLook(event.pointerId);
@@ -162,7 +162,7 @@ export class MobileControls {
     const x = length > 0 ? rawX / length * magnitude : 0;
     const y = length > 0 ? rawY / length * magnitude : 0;
     this.input.mobileLook = { x, y };
-    if (this.aimControlMode === 'auto-use' && this.isRepeatableTool && magnitude > 0 && this.lookActionPointer === null) {
+    if (this.aimControlMode === 'auto-use' && this.isContinuousTool && magnitude > 0 && this.lookActionPointer === null) {
       this.lookActionPointer = event.pointerId;
       this.input.actionHeld = true;
       this.input.actionRequested = true;
@@ -211,15 +211,14 @@ export class MobileControls {
     this.lookY = event.clientY;
     this.dragDistance += Math.hypot(dx, dy);
     this.player.lookMobileDrag(dx, dy);
-    if (this.aimControlMode === 'auto-use' && this.isRepeatableTool && this.dragDistance >= 3 && this.lookActionPointer === null) {
+    if (this.aimControlMode === 'auto-use' && this.isContinuousTool && this.dragDistance >= 3 && this.lookActionPointer === null) {
       this.lookActionPointer = event.pointerId;
       this.input.actionHeld = true;
       this.input.actionRequested = true;
     }
   }
 
-  private get isRepeatableTool(): boolean {
-    const tool = this.selectedTool();
-    return tool === 'spray' || tool === 'hammer';
+  private get isContinuousTool(): boolean {
+    return this.selectedTool() === 'spray';
   }
 }

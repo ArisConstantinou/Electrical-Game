@@ -73,6 +73,7 @@ export class BrickWall extends THREE.Group {
   private readonly raycaster = new THREE.Raycaster();
   private readonly sprayMarks: Array<{ pointId: string; mesh: THREE.Mesh }> = [];
   private readonly spraySamplesByPoint = new Map<string, THREE.Vector3[]>();
+  private readonly liveSpraySamplesByPoint = new Map<string, number>();
   private readonly chasedSamplesByPoint = new Map<string, Set<number>>();
   private readonly chasePassByPoint = new Map<string, number>();
   private readonly fractureSignatures = new Set<string>();
@@ -205,6 +206,7 @@ export class BrickWall extends THREE.Group {
     } else {
       this.paintLiveStroke(this.lastLivePoint ?? hit.point, hit.point, color);
       this.liveStrokeSamples += 1;
+      this.liveSpraySamplesByPoint.set(pointId, (this.liveSpraySamplesByPoint.get(pointId) ?? 0) + 1);
       this.lastLivePoint = hit.point.clone();
     }
     return hit.point;
@@ -336,11 +338,14 @@ export class BrickWall extends THREE.Group {
         if (removable) removable.recessed = true;
       }
       if (carved) impacts.push(point.clone());
-      this.clearPaintAt(point, 0.07);
+      // The visible spray includes a soft line and scattered mist extending
+      // beyond its centreline. Clear the whole worked corridor as it is chased.
+      this.clearPaintAt(point, 0.115);
     }
     selected.forEach(index => processed.add(index));
     this.chasedSamplesByPoint.set(pointId, processed);
     this.chasePassByPoint.set(pointId, pass + 1);
+    if (processed.size >= samples.length) this.clearCompletedChasePaint(pointId, samples);
     if (impacts.length === 0) return null;
     return { points: impacts.slice(0, 10), kind: 'chase-chip', brickSize: new THREE.Vector3(0.055, 0.045, CHASE_DEPTH), seed: hashString(`${pointId}:chase:${pass}`), destroyed: false };
   }
@@ -749,5 +754,14 @@ export class BrickWall extends THREE.Group {
         this.sprayMarks.splice(index, 1);
       }
     }
+  }
+
+  private clearCompletedChasePaint(pointId: string, samples: THREE.Vector3[]): void {
+    // A final corridor pass removes any antialiased edge or randomized mist
+    // left between sample points, while preserving paint belonging to other jobs.
+    for (const sample of samples) this.clearPaintAt(sample, 0.125);
+    const removedLiveSamples = this.liveSpraySamplesByPoint.get(pointId) ?? 0;
+    this.liveStrokeSamples = Math.max(0, this.liveStrokeSamples - removedLiveSamples);
+    this.liveSpraySamplesByPoint.delete(pointId);
   }
 }

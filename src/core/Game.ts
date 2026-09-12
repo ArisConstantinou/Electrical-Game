@@ -101,7 +101,9 @@ export class Game {
     if (this.started && !leveling) this.player.update(Math.min(dt, 0.05));
     this.actionCooldown = Math.max(0, this.actionCooldown - dt);
     const requested = this.input.consumeAction();
-    const repeatable = (this.selectedTool === 'spray' || this.selectedTool === 'hammer') && this.input.actionHeld && this.actionCooldown <= 0;
+    // Spray is a continuous tool. The hammer is intentionally discrete so one
+    // press exposes one chase pass instead of consuming the whole route while held.
+    const repeatable = this.selectedTool === 'spray' && this.input.actionHeld && this.actionCooldown <= 0;
     const spraying = this.selectedTool === 'spray' && this.input.actionHeld;
     if (this.wasSpraying && !spraying) this.interaction.endSprayStroke();
     this.wasSpraying = spraying;
@@ -222,7 +224,11 @@ export class Game {
 
   private selectTool(tool: RigTool): void {
     if (!RIG_TOOLS.includes(tool)) return;
+    const changed = this.selectedTool !== tool;
     this.selectedTool = tool;
+    // Keep the established spray -> hammer gesture useful, but queue exactly
+    // one hammer strike rather than turning a held pointer into auto-repeat.
+    if (changed && tool === 'hammer' && this.input.actionHeld) this.input.actionRequested = true;
     if (tool === 'spring' || tool === 'cutter') this.conduit.selectTool(tool as PvcTool);
     this.hud.notify(TOOL_HINTS[tool], true, 1200);
   }
