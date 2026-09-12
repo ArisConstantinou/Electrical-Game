@@ -168,6 +168,35 @@ await demolition.evaluate(() => {
   game.step(1 / 60);
 });
 await demolition.screenshot({ path: outputPath('desktop-top-bottom-demolition.png') });
+const clusterSupportResult = await demolition.evaluate(() => {
+  const game = window.__wireTheHouse;
+  const wall = game.room.brickWall;
+  const camera = game.renderer.camera;
+  const targets = wall.targets.filter(target => Math.abs(target.center.x) < 0.46 && Math.abs(target.center.y - 1.5) < 0.24);
+  camera.position.set(0, 1.5, -0.55);
+  for (const target of targets) {
+    let attempts = 0;
+    while (!target.destroyed && attempts < 6) {
+      camera.lookAt(target.center);
+      camera.updateMatrixWorld(true);
+      wall.removeAtAim(camera);
+      attempts += 1;
+    }
+  }
+  const interior = targets.find(target => !Object.values(wall.structuralSupport(target)).some(Boolean));
+  game.renderer.render();
+  return {
+    targetCount: targets.length,
+    destroyedCount: targets.filter(target => target.destroyed).length,
+    interiorId: interior?.id ?? null,
+    interiorHasReplacement: Boolean(interior?.replacement),
+    unsupportedAnchoredRemnants: wall.unsupportedAnchoredRemnantCount,
+  };
+});
+if (clusterSupportResult.targetCount < 9 || clusterSupportResult.destroyedCount !== clusterSupportResult.targetCount || !clusterSupportResult.interiorId || clusterSupportResult.interiorHasReplacement || clusterSupportResult.unsupportedAnchoredRemnants !== 0) {
+  throw new Error(`Contiguous demolition left floating static geometry: ${JSON.stringify(clusterSupportResult)}`);
+}
+await demolition.screenshot({ path: outputPath('desktop-demolition-supported-shells.png') });
 const fullWallResult = await demolition.evaluate(() => {
   const game = window.__wireTheHouse;
   const wall = game.room.brickWall;
@@ -187,9 +216,9 @@ const fullWallResult = await demolition.evaluate(() => {
     }
     pass += 1;
   }
-  return { destroyed: wall.destroyedBrickCount, passes: pass };
+  return { destroyed: wall.destroyedBrickCount, passes: pass, unsupportedAnchoredRemnants: wall.unsupportedAnchoredRemnantCount };
 });
-if (fullWallResult.destroyed !== 472) throw new Error(`Not every wall brick can be destroyed: ${JSON.stringify(fullWallResult)}`);
+if (fullWallResult.destroyed !== 472 || fullWallResult.unsupportedAnchoredRemnants !== 0) throw new Error(`Not every wall brick can be cleanly destroyed: ${JSON.stringify(fullWallResult)}`);
 await demolition.screenshot({ path: outputPath('desktop-full-wall-demolished.png') });
 await demolition.close();
 

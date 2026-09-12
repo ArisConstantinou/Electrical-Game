@@ -16,8 +16,11 @@ interface BrickTarget {
   carvedCells: Set<number>;
   replacement: THREE.Group | null;
   cracks: THREE.Group | null;
+  fractureSeed: number;
+  fractureImpact: THREE.Vector3 | null;
 }
 interface AimHit { point: THREE.Vector3; target: BrickTarget }
+interface StructuralSupport { top: boolean; right: boolean; bottom: boolean; left: boolean }
 
 export type SprayMode = 'dots' | 'live';
 export type MasonryImpactKind = 'chase-chip' | 'demolish-chip' | 'demolish-crack' | 'demolish-spall' | 'demolish-break';
@@ -166,8 +169,8 @@ export class BrickWall extends THREE.Group {
     return this.cast(camera, 0, 0, maxDistance);
   }
 
-  private registerTarget(source: Omit<BrickTarget, 'damage' | 'destroyed' | 'originalHidden' | 'carvedCells' | 'replacement' | 'cracks'>): BrickTarget {
-    const target: BrickTarget = { ...source, center: source.center.clone(), size: source.size.clone(), damage: 0, destroyed: false, originalHidden: false, carvedCells: new Set(), replacement: null, cracks: null };
+  private registerTarget(source: Omit<BrickTarget, 'damage' | 'destroyed' | 'originalHidden' | 'carvedCells' | 'replacement' | 'cracks' | 'fractureSeed' | 'fractureImpact'>): BrickTarget {
+    const target: BrickTarget = { ...source, center: source.center.clone(), size: source.size.clone(), damage: 0, destroyed: false, originalHidden: false, carvedCells: new Set(), replacement: null, cracks: null, fractureSeed: 0, fractureImpact: null };
     this.targets.push(target);
     this.targetsById.set(target.id, target);
     return target;
@@ -291,6 +294,7 @@ export class BrickWall extends THREE.Group {
     this.clearPaintAt(hit.point, target.damage === DEMOLISH_HITS ? 0.19 : 0.045);
     let kind: MasonryImpactKind = target.damage === 1 ? 'demolish-chip' : target.damage === 2 ? 'demolish-crack' : 'demolish-spall';
     let destroyed = false;
+    const impactPoints = [hit.point];
     if (target.damage >= DEMOLISH_HITS) {
       kind = 'demolish-break';
       destroyed = true;
@@ -300,9 +304,11 @@ export class BrickWall extends THREE.Group {
       this.hideOriginal(target);
       this.removeReplacement(target);
       this.removeCracks(target);
-      this.addAnchoredFractureShell(target, seed, hit.point);
+      target.fractureSeed = seed;
+      target.fractureImpact = hit.point.clone();
+      impactPoints.push(...this.refreshDestroyedShellsAround(target));
     }
-    return { points: [hit.point], kind, brickSize: target.size.clone(), seed, destroyed };
+    return { points: impactPoints, kind, brickSize: target.size.clone(), seed, destroyed };
   }
 
   recessChaseAtAim(camera: THREE.Camera, pointId: string): MasonryImpact | null {
@@ -349,6 +355,9 @@ export class BrickWall extends THREE.Group {
   get chaseSideWallCount(): number { return this.targets.reduce((count, target) => count + Number(target.replacement?.userData.chaseSideWalls ?? 0), 0); }
   get uniqueFracturePatternCount(): number { return this.fractureSignatures.size; }
   get anchoredRemnantCount(): number { return this.targets.filter(target => target.destroyed && target.replacement !== null).length; }
+  get unsupportedAnchoredRemnantCount(): number {
+    return this.targets.filter(target => target.destroyed && target.replacement !== null && !Object.values(this.structuralSupport(target)).some(Boolean)).length;
+  }
   getChaseCoverage(pointId: string): number {
     const total = this.spraySamplesByPoint.get(pointId)?.length ?? 0;
     return total === 0 ? 0 : THREE.MathUtils.clamp((this.chasedSamplesByPoint.get(pointId)?.size ?? 0) / total, 0, 1);
@@ -551,7 +560,41 @@ export class BrickWall extends THREE.Group {
     target.cracks = null;
   }
 
+  private refreshDestroyedShellsAround(source: BrickTarget): THREE.Vector3[] {
+    const detachedPoints: THREE.Vector3[] = [];
+    const nearby = this.targets.filter(target => target.destroyed
+      && Math.abs(target.center.x - source.center.x) <= source.size.x * 1.2
+      && Math.abs(target.center.y - source.center.y) <= source.size.y * 1.5);
+    for (const target of nearby) {
+      const previousCount = Number(target.replacement?.userData.attachedPieceCount ?? 0);
+      this.removeReplacement(target);
+      if (target.fractureImpact) this.addAnchoredFractureShell(target, target.fractureSeed, target.fractureImpact);
+      const nextCount = Number(target.replacement?.userData.attachedPieceCount ?? 0);
+      if (previousCount > nextCount) detachedPoints.push(target.center.clone().add(new THREE.Vector3(0, 0, target.size.z / 2)));
+    }
+    return detachedPoints;
+  }
+
+  private structuralSupport(target: BrickTarget): StructuralSupport {
+    const support: StructuralSupport = { top: false, right: false, bottom: false, left: false };
+    for (const other of this.targets) {
+      if (other === target || other.destroyed) continue;
+      const dx = other.center.x - target.center.x;
+      const dy = other.center.y - target.center.y;
+      const horizontalOverlap = Math.abs(dx) < (target.size.x + other.size.x) / 2 - 0.008;
+      const verticalOverlap = Math.abs(dy) < (target.size.y + other.size.y) / 2 - 0.008;
+      if (horizontalOverlap && dy > 0 && dy < (target.size.y + other.size.y) * 0.7) support.top = true;
+      if (horizontalOverlap && dy < 0 && -dy < (target.size.y + other.size.y) * 0.7) support.bottom = true;
+      if (verticalOverlap && dx > 0 && dx < (target.size.x + other.size.x) * 0.7) support.right = true;
+      if (verticalOverlap && dx < 0 && -dx < (target.size.x + other.size.x) * 0.7) support.left = true;
+      if (support.top && support.right && support.bottom && support.left) break;
+    }
+    return support;
+  }
+
   private addAnchoredFractureShell(target: BrickTarget, seed: number, impact: THREE.Vector3): void {
+    const support = this.structuralSupport(target);
+    if (!Object.values(support).some(Boolean)) return;
     const random = seeded(seed ^ 0x9e3779b9);
     const group = new THREE.Group();
     group.name = `Anchored irregular fracture shell ${target.id}`;
@@ -587,13 +630,15 @@ export class BrickWall extends THREE.Group {
       }
     }
 
-    // Only retain cells connected to an outer edge: no permanent fragment can float in the opening.
+    // Only retain cells connected to an edge that still touches intact masonry or the room frame.
     const connected = new Set<number>();
     const queue: number[] = [];
     for (const index of candidates) {
       const row = Math.floor(index / cols);
       const col = index % cols;
-      if (row === 0 || row === rows - 1 || col === 0 || col === cols - 1) {
+      const attached = (row === 0 && support.bottom) || (row === rows - 1 && support.top)
+        || (col === 0 && support.left) || (col === cols - 1 && support.right);
+      if (attached) {
         connected.add(index);
         queue.push(index);
       }
@@ -627,7 +672,7 @@ export class BrickWall extends THREE.Group {
     }
 
     const ribMatrices: THREE.Matrix4[] = [];
-    const ribCount = 1 + ((seed >>> 11) % 3);
+    const ribCount = support.top || support.bottom ? 1 + ((seed >>> 11) % 3) : 0;
     for (let rib = 0; rib < ribCount; rib += 1) {
       const x = -target.size.x * 0.3 + (rib + 1) / (ribCount + 1) * target.size.x * 0.6 + (random() - 0.5) * cellW;
       const gapCenter = (random() - 0.5) * target.size.y * 0.18;
@@ -635,8 +680,8 @@ export class BrickWall extends THREE.Group {
       const bottomHeight = Math.max(0.008, gapCenter - gapHeight / 2 + target.size.y / 2);
       const topHeight = Math.max(0.008, target.size.y / 2 - (gapCenter + gapHeight / 2));
       const ribWidth = cellW * (0.18 + random() * 0.22);
-      ribMatrices.push(new THREE.Matrix4().compose(new THREE.Vector3(x, -target.size.y / 2 + bottomHeight / 2, -target.size.z * 0.28), new THREE.Quaternion(), new THREE.Vector3(ribWidth, bottomHeight, target.size.z * 0.42)));
-      ribMatrices.push(new THREE.Matrix4().compose(new THREE.Vector3(x, target.size.y / 2 - topHeight / 2, -target.size.z * 0.28), new THREE.Quaternion(), new THREE.Vector3(ribWidth, topHeight, target.size.z * 0.42)));
+      if (support.bottom) ribMatrices.push(new THREE.Matrix4().compose(new THREE.Vector3(x, -target.size.y / 2 + bottomHeight / 2, -target.size.z * 0.28), new THREE.Quaternion(), new THREE.Vector3(ribWidth, bottomHeight, target.size.z * 0.42)));
+      if (support.top) ribMatrices.push(new THREE.Matrix4().compose(new THREE.Vector3(x, target.size.y / 2 - topHeight / 2, -target.size.z * 0.28), new THREE.Quaternion(), new THREE.Vector3(ribWidth, topHeight, target.size.z * 0.42)));
     }
 
     const addInstances = (matrices: THREE.Matrix4[], material: THREE.Material, name: string): void => {
@@ -653,7 +698,10 @@ export class BrickWall extends THREE.Group {
     addInstances(outerMatrices, chasedBrickMaterial, `Attached face fragments ${target.id}`);
     addInstances(innerMatrices, chaseInteriorMaterial, `Attached inner fragments ${target.id}`);
     addInstances(ribMatrices, chaseInteriorMaterial, `Broken hollow-brick ribs ${target.id}`);
-    const signature = `${pattern}:${[...connected].join(',')}:${ribCount}`;
+    group.userData.attachedPieceCount = outerMatrices.length + innerMatrices.length + ribMatrices.length;
+    if (outerMatrices.length === 0 && innerMatrices.length === 0 && ribMatrices.length === 0) return;
+    const supportKey = `${Number(support.top)}${Number(support.right)}${Number(support.bottom)}${Number(support.left)}`;
+    const signature = `${pattern}:${supportKey}:${[...connected].join(',')}:${ribCount}`;
     group.userData.fractureSignature = signature;
     this.fractureSignatures.add(signature);
     this.add(group);
