@@ -17,6 +17,8 @@ export class MobileControls {
     surface.addEventListener('pointerup', this.onPointerUp, { passive: false });
     surface.addEventListener('pointercancel', this.onPointerUp, { passive: false });
     surface.addEventListener('lostpointercapture', this.onLostCapture);
+    surface.addEventListener('selectstart', event => event.preventDefault());
+    surface.addEventListener('dragstart', event => event.preventDefault());
     addEventListener('pointerup', this.onPointerUp, { passive: false });
     addEventListener('pointercancel', this.onPointerUp, { passive: false });
     const action = document.querySelector<HTMLButtonElement>('#mobile-action');

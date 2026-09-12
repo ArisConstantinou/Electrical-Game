@@ -11,6 +11,8 @@ Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web gam
 
 ## Current
 
+- All game-shell elements now disable standard and WebKit text selection/callouts, while `selectstart` and `dragstart` are cancelled at the game boundary to prevent iOS Safari highlight handles.
+- Selection regression validates standard/WebKit user-select on nested button text and event cancellation; Chromium explicitly reports touch-callout as unsupported while Safari consumes the authored `none` rule.
 - Mobile right-side look now supports double-tap-and-hold: the held second tap continuously uses any selected tool while drag-look remains active.
 - The ACTION button remains available and visibly teaches `2× TAP + HOLD LOOK`; gameplay regression covers simultaneous right-look rotation and held spray use.
 - Verified at 390×844 that double-tap-and-hold produced five held spray marks while changing yaw, released cleanly, retained zero horizontal overflow, and completed the full mobile/desktop gameplay smoke.

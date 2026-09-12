@@ -285,9 +285,13 @@ if (touchResult.after.pitch === touchResult.before.pitch || touchResult.after.ya
 const mobileButtonStyles = await mobile.evaluate(() => {
   const button = document.querySelector('#mobile-action');
   const style = getComputedStyle(button);
-  return { tapHighlight: style.webkitTapHighlightColor, userSelect: style.userSelect, touchAction: style.touchAction };
+  const child = button.querySelector('small');
+  const childStyle = getComputedStyle(child);
+  const selectEvent = new Event('selectstart', { bubbles: true, cancelable: true });
+  child.dispatchEvent(selectEvent);
+  return { tapHighlight: style.webkitTapHighlightColor, userSelect: style.userSelect, webkitUserSelect: style.webkitUserSelect, childUserSelect: childStyle.userSelect, childWebkitUserSelect: childStyle.webkitUserSelect, touchCallout: childStyle.webkitTouchCallout || 'unsupported', touchAction: style.touchAction, selectPrevented: selectEvent.defaultPrevented };
 });
-if (!['rgba(0, 0, 0, 0)', 'transparent'].includes(mobileButtonStyles.tapHighlight) || mobileButtonStyles.userSelect !== 'none' || mobileButtonStyles.touchAction !== 'manipulation') throw new Error(`Mobile buttons allow browser highlight or selection: ${JSON.stringify(mobileButtonStyles)}`);
+if (!['rgba(0, 0, 0, 0)', 'transparent'].includes(mobileButtonStyles.tapHighlight) || mobileButtonStyles.userSelect !== 'none' || mobileButtonStyles.webkitUserSelect !== 'none' || mobileButtonStyles.childUserSelect !== 'none' || mobileButtonStyles.childWebkitUserSelect !== 'none' || !['none', 'unsupported'].includes(mobileButtonStyles.touchCallout) || mobileButtonStyles.touchAction !== 'manipulation' || !mobileButtonStyles.selectPrevented) throw new Error(`Game UI allows browser highlight or selection: ${JSON.stringify(mobileButtonStyles)}`);
 await aimAtActive(mobile);
 const doubleTapHold = await mobile.evaluate(() => {
   const game = window.__wireTheHouse;
