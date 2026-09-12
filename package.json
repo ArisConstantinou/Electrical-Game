@@ -15,7 +15,8 @@
     "test:studio-live": "node tests/studio-live-smoke.mjs",
     "test:masonry": "node tests/masonry-acceptance.mjs",
     "test:masonry-contact": "node tests/masonry-contact.mjs",
-    "test:masonry-benchmark": "node tests/masonry-benchmark.mjs"
+    "test:masonry-benchmark": "node tests/masonry-benchmark.mjs",
+    "test:hammer-stance": "node tests/hammer-stance-smoke.mjs"
   },
   "dependencies": {
     "three": "^0.180.0"

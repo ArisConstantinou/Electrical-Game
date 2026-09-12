@@ -29,6 +29,7 @@ export class FPSRig extends THREE.Group {
   private readonly hammerArmParts: Array<{ upper: THREE.Mesh; forearm: THREE.Mesh; cuff: THREE.Mesh; glove: THREE.Mesh; grip: THREE.Vector3; side: number }> = [];
   readonly chiselTipWorld = new THREE.Vector3();
   chiselInAir = false;
+  workStanceSide = 0;
 
   /** Seat the real visible tip on the first remaining solid, then read it back. */
   contact(camera: THREE.Camera, wall: BrickWall): ChiselContact | null {
@@ -134,10 +135,11 @@ export class FPSRig extends THREE.Group {
       const wristCamera=camera.worldToLocal(this.localToWorld(wrist.clone()));
       // Shoulders enter from below the viewport. Elbows stay on their own side
       // of the picture instead of inheriting the motor's pitched orientation.
-      const shoulder=this.worldToLocal(camera.localToWorld(new THREE.Vector3(arm.side*.38,-.66,-.36)));
+      const stance=THREE.MathUtils.clamp(this.workStanceSide,-1,1), blend=Math.abs(stance);
+      const shoulder=this.worldToLocal(camera.localToWorld(new THREE.Vector3(arm.side*(.38-.07*blend)-stance*.06,-.66, -.36+arm.side*stance*.08)));
       // Route the forearm up underneath its wrist. When the tool leans left,
       // the right upper arm crosses below the work area, never across the tip.
-      const elbow=this.worldToLocal(camera.localToWorld(new THREE.Vector3(wristCamera.x+arm.side*.10,Math.min(-.34,wristCamera.y-.32),Math.min(-.52,wristCamera.z*.80))));
+      const elbow=this.worldToLocal(camera.localToWorld(new THREE.Vector3(THREE.MathUtils.lerp(wristCamera.x+arm.side*.10,wristCamera.x+(Math.sign(wristCamera.x)||arm.side)*.25,blend),Math.min(-.34,wristCamera.y-.32+.07*blend),Math.min(-.52+.07*blend,wristCamera.z*(.80-.08*blend)))));
       segment(arm.upper,shoulder,elbow); segment(arm.forearm,elbow,wrist);
       const axis=wrist.clone().sub(elbow).normalize();
       arm.cuff.position.copy(wrist).addScaledVector(axis,-.05);
