@@ -75,7 +75,7 @@ const reachLeveling = async page => {
   if (chaseComplete.workSurface.destroyedBricks !== surfaceBeforeChase.destroyedBricks) throw new Error('CHASE destroyed bricks instead of recessing them');
   if (chaseComplete.workSurface.recessedBricks <= surfaceBeforeChase.recessedBricks) throw new Error('CHASE did not create a recessed wall channel');
   if (chaseComplete.activePoint.id === 'A') {
-    const destroyedBefore = chaseComplete.workSurface.destroyedBricks;
+    const demolitionBefore = chaseComplete.workSurface;
     await page.keyboard.press('KeyX');
     if ((await state(page)).workSurface.hammerMode !== 'demolish') throw new Error('X did not switch hammer to DEMOLISH');
     await page.evaluate(() => {
@@ -88,8 +88,8 @@ const reachLeveling = async page => {
       await action(page);
       await page.evaluate(() => window.advanceTime(260));
     }
-    const destroyedAfter = (await state(page)).workSurface.destroyedBricks;
-    if (destroyedAfter <= destroyedBefore) throw new Error('Demo hammer stopped after the required four mission hits');
+    const demolitionAfter = (await state(page)).workSurface;
+    if (demolitionAfter.destroyedBricks !== demolitionBefore.destroyedBricks || demolitionAfter.maximumDemolitionDepthMm < 12 || demolitionAfter.maximumDemolitionDepthMm >= 100) throw new Error(`Four demo-hammer hits should make a partial-depth crater, not an easy through-hole: ${JSON.stringify({ demolitionBefore, demolitionAfter })}`);
     await page.keyboard.press('KeyX');
     await aimAtActive(page);
   }
@@ -147,7 +147,7 @@ await demolition.waitForTimeout(450);
 await demolition.keyboard.press('Digit4');
 await demolition.keyboard.press('KeyX');
 if ((await state(demolition)).workSurface.hammerMode !== 'demolish') throw new Error('Standalone demolition mode did not activate');
-const destroyAtHeight = async targetY => {
+const excavateAtHeight = async targetY => {
   await demolition.evaluate(y => {
     const game = window.__wireTheHouse;
     game.renderer.camera.position.set(0, 1.65, -0.35);
@@ -184,13 +184,14 @@ const destroyAtHeight = async targetY => {
     }, targetY);
   }
   const after = (await state(demolition)).workSurface;
-  if (after.destroyedBricks <= before.destroyedBricks || after.activeFragments < 10) throw new Error(`Four DEMOLISH impacts did not fracture the brick at wall height ${targetY}: ${JSON.stringify({ before, after })}`);
+  if (after.destroyedBricks !== before.destroyedBricks || after.breachedWallCells !== before.breachedWallCells || after.maximumDemolitionDepthMm < 12 || after.maximumDemolitionDepthMm >= 100 || after.activeFragments < 10) throw new Error(`Four DEMOLISH impacts did not leave a deep but non-through random crater at wall height ${targetY}: ${JSON.stringify({ before, after })}`);
 };
-await destroyAtHeight(2.93);
-await destroyAtHeight(0.07);
+await excavateAtHeight(2.93);
+await excavateAtHeight(0.07);
 const variedWallDamage = (await state(demolition)).workSurface;
-if (variedWallDamage.floatingStaticPieces !== 0 || variedWallDamage.unsupportedAnchoredRemnants !== 0 || variedWallDamage.fracturePatterns < 2 || variedWallDamage.partialBreachBricks < 4 || variedWallDamage.breachedWallCells < 100 || variedWallDamage.deformedWallCells < 100 || variedWallDamage.maximumFractureSpan < 0.3) {
-  throw new Error(`DEMOLISH did not produce supported wall-scale damage: ${JSON.stringify(variedWallDamage)}`);
+const variedImpactProfiles = await demolition.evaluate(() => window.__wireTheHouse.room.brickWall.demolitionSites.filter(site => site.severity >= 1).map(site => ({ rotation: Number(site.rotation.toFixed(3)), aspect: Number((site.radiusX / site.radiusY).toFixed(3)), lobes: `${site.lobeFrequencyA}:${site.lobeFrequencyB}`, depth: Number((site.excavationDepth * 1000).toFixed(1)) })));
+if (variedWallDamage.floatingStaticPieces !== 0 || variedWallDamage.unsupportedAnchoredRemnants !== 0 || variedWallDamage.fracturePatterns < 2 || variedWallDamage.breachedWallCells !== 0 || variedWallDamage.deformedWallCells < 100 || variedWallDamage.maximumFractureSpan < 0.2 || new Set(variedImpactProfiles.map(profile => JSON.stringify(profile))).size < 2) {
+  throw new Error(`DEMOLISH did not produce distinct random partial-depth wall damage: ${JSON.stringify({ variedWallDamage, variedImpactProfiles })}`);
 }
 await demolition.evaluate(() => {
   const game = window.__wireTheHouse;
@@ -209,7 +210,7 @@ const clusterSupportResult = await demolition.evaluate(() => {
   camera.position.set(0, 1.5, -0.55);
   for (const target of targets) {
     let attempts = 0;
-    while (!target.destroyed && attempts < 6) {
+    while (!target.destroyed && attempts < 24) {
       camera.lookAt(target.center);
       camera.updateMatrixWorld(true);
       game.chasing.freeHit(camera);
@@ -223,6 +224,7 @@ const clusterSupportResult = await demolition.evaluate(() => {
   return {
     targetCount: targets.length,
     destroyedCount: targets.filter(target => target.destroyed).length,
+    maximumDemolitionDepthMm: wall.maximumDemolitionDepthMm,
     retainedStaticTargets,
     floatingStaticPieces: wall.floatingStaticPieceCount,
     unsupportedAnchoredRemnants: wall.unsupportedAnchoredRemnantCount,
@@ -236,7 +238,7 @@ const clusterSupportResult = await demolition.evaluate(() => {
     rubblePileHeight: game.chasing.rubblePileHeight,
   };
 });
-if (clusterSupportResult.targetCount < 9 || clusterSupportResult.destroyedCount !== clusterSupportResult.targetCount || clusterSupportResult.retainedStaticTargets.some(target => target.supportedComponents < 1 || target.unsupportedComponents !== 0) || clusterSupportResult.floatingStaticPieces !== 0 || clusterSupportResult.unsupportedAnchoredRemnants !== 0 || clusterSupportResult.airborneFragments !== 0 || clusterSupportResult.unsupportedSettledFragments !== 0 || clusterSupportResult.rubblePileHeight > 0.161) {
+if (clusterSupportResult.targetCount < 9 || clusterSupportResult.maximumDemolitionDepthMm < 70 || clusterSupportResult.retainedStaticTargets.some(target => target.supportedComponents < 1 || target.unsupportedComponents !== 0) || clusterSupportResult.floatingStaticPieces !== 0 || clusterSupportResult.unsupportedAnchoredRemnants !== 0 || clusterSupportResult.airborneFragments !== 0 || clusterSupportResult.unsupportedSettledFragments !== 0 || clusterSupportResult.rubblePileHeight > 0.161) {
   throw new Error(`Contiguous demolition left floating static geometry: ${JSON.stringify(clusterSupportResult)}`);
 }
 const supportExpiryResult = await demolition.evaluate(() => {
@@ -284,10 +286,11 @@ const fullWallResult = await demolition.evaluate(() => {
     affectedTargets: wall.targets.filter(target => target.originalHidden).length,
     breachedWallCells: wall.breachedWallCellCount,
     deformedWallCells: wall.deformedWallCellCount,
+    maximumDemolitionDepthMm: wall.maximumDemolitionDepthMm,
     unsupportedAnchoredRemnants: wall.unsupportedAnchoredRemnantCount,
   };
 });
-if (fullWallResult.destroyed < 10 || fullWallResult.affectedTargets !== 472 || fullWallResult.breachedWallCells < 2000 || fullWallResult.deformedWallCells < 30000 || fullWallResult.unsupportedRetainedTargets !== 0 || fullWallResult.unsupportedAnchoredRemnants !== 0) throw new Error(`Full-wall hammer scan did not preserve a connected wall-scale damage field: ${JSON.stringify(fullWallResult)}`);
+if (fullWallResult.affectedTargets !== 472 || fullWallResult.maximumDemolitionDepthMm < 20 || fullWallResult.destroyed >= fullWallResult.affectedTargets || fullWallResult.deformedWallCells < 30000 || fullWallResult.unsupportedRetainedTargets !== 0 || fullWallResult.unsupportedAnchoredRemnants !== 0) throw new Error(`Full-wall hammer scan did not preserve a resistant connected wall-scale damage field: ${JSON.stringify(fullWallResult)}`);
 await demolition.screenshot({ path: outputPath('desktop-full-wall-demolished.png') });
 await demolition.close();
 
@@ -334,8 +337,8 @@ await demolitionDetail.evaluate(() => {
   game.renderer.render();
 });
 const fracturedState = await state(demolitionDetail);
-if (fracturedState.workSurface.destroyedBricks !== 1 || fracturedState.workSurface.damagedBricks !== 0 || fracturedState.workSurface.activeFragments < 20 || fracturedState.workSurface.partialBreachBricks < 3 || fracturedState.workSurface.deformedWallCells < 80 || fracturedState.workSurface.floatingStaticPieces !== 0) {
-  throw new Error(`DEMOLISH did not finish with bonded, deformed wall damage: ${JSON.stringify(fracturedState.workSurface)}`);
+if (fracturedState.workSurface.destroyedBricks !== 0 || fracturedState.workSurface.damagedBricks !== 1 || fracturedState.workSurface.breachedWallCells !== 0 || fracturedState.workSurface.maximumDemolitionDepthMm < 12 || fracturedState.workSurface.maximumDemolitionDepthMm >= 100 || fracturedState.workSurface.activeFragments < 14 || fracturedState.workSurface.deformedWallCells < 80 || fracturedState.workSurface.floatingStaticPieces !== 0) {
+  throw new Error(`Four DEMOLISH hits did not finish with bonded partial-depth wall damage: ${JSON.stringify(fracturedState.workSurface)}`);
 }
 await demolitionDetail.screenshot({ path: outputPath('desktop-progressive-demolition-fragments.png') });
 const solidFragmentMaterials = await demolitionDetail.evaluate(() => {
@@ -627,8 +630,8 @@ await desktop.evaluate(() => {
   window.advanceTime(900);
 });
 await desktop.mouse.up({ button: 'left' });
-const destroyedAfterDesktopDemolish = (await state(desktop)).workSurface.destroyedBricks;
-if (destroyedAfterDesktopDemolish <= surfaceBeforeDesktopDemolish.destroyedBricks) throw new Error(`Holding desktop left mouse did not continuously DEMOLISH: ${JSON.stringify(await state(desktop))}`);
+const surfaceAfterDesktopDemolish = (await state(desktop)).workSurface;
+if (surfaceAfterDesktopDemolish.destroyedBricks !== surfaceBeforeDesktopDemolish.destroyedBricks || surfaceAfterDesktopDemolish.maximumDemolitionDepthMm < 12 || surfaceAfterDesktopDemolish.maximumDemolitionDepthMm >= 100) throw new Error(`Desktop hold should accumulate a partial crater without punching through the wall in 900 ms: ${JSON.stringify(await state(desktop))}`);
 await desktop.keyboard.press('Digit5');
 await aimAtActive(desktop);
 const beforeDesktopFitting = await state(desktop);
@@ -718,7 +721,7 @@ const mobileHeldDemolition = await mobileDemolition.evaluate(() => {
   window.advanceTime(34);
   return { during, heldAfterRelease: game.input.actionHeld };
 });
-if (!mobileHeldDemolition.during.held || mobileHeldDemolition.during.surface.destroyedBricks < 1 || mobileHeldDemolition.heldAfterRelease) {
+if (!mobileHeldDemolition.during.held || mobileHeldDemolition.during.surface.destroyedBricks !== 0 || mobileHeldDemolition.during.surface.maximumDemolitionDepthMm < 12 || mobileHeldDemolition.during.surface.maximumDemolitionDepthMm >= 100 || mobileHeldDemolition.heldAfterRelease) {
   throw new Error(`Mobile hold did not continuously DEMOLISH and release cleanly: ${JSON.stringify(mobileHeldDemolition)}`);
 }
 await mobileDemolition.screenshot({ path: outputPath('mobile-held-demolition.png') });
