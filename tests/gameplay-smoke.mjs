@@ -180,6 +180,33 @@ if (fullWallResult.destroyed !== 472) throw new Error(`Not every wall brick can 
 await demolition.screenshot({ path: outputPath('desktop-full-wall-demolished.png') });
 await demolition.close();
 
+const paintedChase = await browser.newPage({ viewport: { width: 1366, height: 768 } });
+await paintedChase.goto(baseUrl, { waitUntil: 'networkidle' });
+await paintedChase.click('#start-button');
+await paintedChase.waitForTimeout(450);
+await paintedChase.evaluate(() => {
+  const game = window.__wireTheHouse;
+  const targetY = 0.72;
+  game.renderer.camera.position.set(-0.8, 1.65, -0.35);
+  game.player.yaw = 0;
+  game.player.pitch = Math.atan2(targetY - 1.65, 2.04);
+  game.renderer.camera.rotation.set(game.player.pitch, 0, 0);
+  game.step(1 / 60);
+});
+await paintedChase.keyboard.press('Digit3');
+await action(paintedChase);
+if ((await state(paintedChase)).activePoint.stage !== 'marked') throw new Error('Off-centre freehand spray did not mark the active point');
+const offRouteSurfaceBefore = (await state(paintedChase)).workSurface;
+await paintedChase.keyboard.press('Digit4');
+await action(paintedChase);
+const offRouteChase = await state(paintedChase);
+if (offRouteChase.activePoint.stage !== 'chasing' || offRouteChase.activePoint.chaseHits !== 1 || offRouteChase.workSurface.recessedBricks <= offRouteSurfaceBefore.recessedBricks) {
+  throw new Error(`CHASE did not follow the player's actual off-centre paint: ${JSON.stringify(offRouteChase)}`);
+}
+if (offRouteChase.workSurface.destroyedBricks !== offRouteSurfaceBefore.destroyedBricks) throw new Error('Off-centre CHASE destroyed masonry instead of recessing it');
+await paintedChase.screenshot({ path: outputPath('desktop-chase-follows-painted-line.png') });
+await paintedChase.close();
+
 const desktop = await browser.newPage({ viewport: { width: 1792, height: 864 } });
 desktop.on('console', message => { if (message.type() === 'error') errors.push(`desktop console: ${message.text()}`); });
 desktop.on('pageerror', error => errors.push(`desktop page: ${error.message}`));
