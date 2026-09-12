@@ -94,3 +94,13 @@ Final integration follow-up: level buttons now use native click so confirm/cance
 
 ## 2026-09-13 Sideways working stance
 User request: left/right hammer selection should reposition the camera and hands together for a natural view. Implemented damped camera orbit around the unchanged wall aim, reversible presentation offset, level horizon and coordinated shoulder/elbow stance. Verified desktop1366x768 and touch390x844, stable aim, no accumulated drift, eased transitions, tool-switch restoration, physical chisel contact, full desktop A/B/C and touch A gameplay, build and10/10 Studio checks.
+
+## 2026-09-13 Tool models, wet chase preparation and mortar casting
+
+User request: replace all tool visuals and improve site materials; proper spray can, pointing trowel, dense internal PVC spring, three-vial spirit level, non-ratchet cutter and water hose. Mortar needs aimed swing, angle/power, retained deposits, spills and prewetting. Clarification: water goes INSIDE excavated chases and box recesses.
+
+Implemented shared procedural tool models from primary manufacturer references, coordinated grips and small actuator/cutter animations, concrete/render/floor materials and peripheral site supplies. Added tools7/8, hold-release ballistic casts with first-contact preview, dampness plus free-water states on actual exposed geometry, local packing, low-work crouch, geometric opening clipping and mass accounting for adhered/resting/floor/airborne material. Removed old one-click rectangular mortar fill. Retained hammer stance and actual-volume contact.
+
+Validation in progress: all8 tools desktop1366x768/mobile390x844 and landscape844x390 visually inspected; overlays/scrolling fixed. Unit mass/contact and opening tests pass. Full mission exposed and fixed ledge contact loops and repeated-leveling triangle multiplication. Final mission/deployment evidence will be recorded after completion. Existing unrelated artifacts remain untouched.
+
+Final local acceptance: full A/B/C desktop and real-touch emulation PASS with actual internal chase wetting, casts/packing, physical coverage revalidation after leveling and all conduit work. Fixed mobile completion-title clipping and softened mortar shading without changing collision triangles. Six geometry checks, mortar input/physics smoke, all16 tool views, Studio10/10 plus live patch/save/reload, hammer stance/contact and bundled client pass. Final build assets index-BppNZKS5.js / index-C06Bk5rc.css. Raw final gameplay evidence: output/qa-tools-mortar-final-validation; report and limitations: docs/TOOLS_MORTAR_ACCEPTANCE.md. Mobile is Chrome emulation; accelerated setting remains a qualitative gameplay approximation. Publication verification follows commit/push.

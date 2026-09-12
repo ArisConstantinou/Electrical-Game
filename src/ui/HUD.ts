@@ -56,9 +56,14 @@ export class HUD {
           <aside id="desktop-key-guide" class="hud-card" aria-label="Keyboard and mouse controls">
             <div><kbd>WASD</kbd><span>MOVE</span><kbd>MOUSE</kbd><span>LOOK</span><kbd>SHIFT</kbd><span>FAST</span></div>
             <div><kbd>LMB</kbd><span>USE / HOLD</span><kbd>E</kbd><span>INTERACT</span><kbd>WHEEL</kbd><span>SWITCH TOOL</span></div>
-            <div><kbd>1–6</kbd><span>SELECT TOOL</span><kbd>[ / ]</kbd><span>HAMMER TILT</span><kbd>C</kbd><span>COLOR</span></div>
+            <div><kbd>1–8</kbd><span>SELECT TOOL</span><kbd>[ / ]</kbd><span>HAMMER TILT</span><kbd>C</kbd><span>COLOR</span></div>
             <div><kbd>T / R</kbd><span>CHISEL / ANGLE</span><kbd>F</kbd><span>FULLSCREEN</span><kbd>ESC</kbd><span>RELEASE MOUSE</span></div>
           </aside>
+          <div id="mortar-panel" class="hud-card" hidden>
+            <strong id="mortar-readout"></strong><div class="progress-track"><span id="swing-power"></span></div>
+            <div class="mortar-buttons"><button type="button" id="mortar-angle-down" aria-label="Lower trowel throw angle">− ANGLE</button><button type="button" id="mortar-swing">HOLD · RELEASE</button><button type="button" id="mortar-angle-up" aria-label="Raise trowel throw angle">+ ANGLE</button></div>
+            <button type="button" id="work-height">CROUCH · LOW WORK</button><button type="button" id="mortar-pack">P · PRESS / PACK NEARBY</button><small id="mortar-hint"></small>
+          </div>
           <div id="reticle" aria-hidden="true"><span></span><span></span></div>
           <div id="interaction-prompt" role="status"></div>
           <div id="level-panel" class="hud-card" aria-label="Leveling controls">
@@ -88,6 +93,8 @@ export class HUD {
               <button type="button" data-tool="level" aria-label="Spirit level"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="9" width="26" height="14" rx="2"/><circle cx="16" cy="16" r="4"/><path d="M6 16h5M21 16h5"/></svg><span>LEVEL</span></button>
               <button type="button" data-tool="spring" aria-label="Bending spring"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 24c2-16 5-16 7 0 2-16 5-16 7 0 2-16 5-16 7 0M3 27h25"/></svg><span>SPRING</span></button>
               <button type="button" data-tool="cutter" aria-label="Pipe cutter"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="11" cy="23" r="5"/><circle cx="23" cy="23" r="5"/><path d="M14 19 25 5M20 19 8 5M8 5h17"/></svg><span>CUTTER</span></button>
+              <button type="button" data-tool="trowel" aria-label="Mortar trowel"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="m3 27 5-17 14 9zM15 15l5-7 8-4"/></svg><span>TROWEL</span></button>
+              <button type="button" data-tool="hose" aria-label="Water hose"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="m5 9 14 4-4 7-8-4zM10 18v8c0 5 14 4 15 0M22 10l6-3M23 15h6M21 20l6 3"/></svg><span>HOSE</span></button>
             </nav>
           </div>
           <section id="start-screen" class="screen-panel">
@@ -96,7 +103,7 @@ export class HUD {
             <p>Mark the clay brick. Chase real masonry. Set every recessed box level and flush. Finish the rigid PVC routes before the builders plaster.</p>
             <div class="brief-grid"><span>3 installation points</span><span>No cable pulling</span><span>Desktop + mobile</span></div>
             <button id="start-button">ENTER THE SITE</button>
-            <small>WASD · MOUSE LOOK · LEFT CLICK / E USE TOOL · WHEEL / 1–6 TOOLS · V SPRAY · C COLOR · X CHASE / DEMOLISH</small>
+            <small>WASD · MOUSE LOOK · LEFT CLICK / E USE TOOL · WHEEL / 1–8 TOOLS · V SPRAY · C COLOR · X CHASE / DEMOLISH</small>
           </section>
           <section id="result-panel" class="screen-panel result-panel">
             <div class="eyebrow">LIVING ROOM · INSPECTION PASSED</div>
@@ -110,6 +117,10 @@ export class HUD {
     root.querySelector('#chisel-side')!.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:side-chisel')));
     root.querySelector('#chisel-tilt')!.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:tilt-chisel')));
     root.querySelector('#chisel-angle')!.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:rotate-chisel')));
+    root.querySelector('#work-height')!.addEventListener('click',()=>dispatchEvent(new CustomEvent('wirehouse:work-height')));
+    root.querySelector('#mortar-pack')!.addEventListener('click',()=>dispatchEvent(new CustomEvent('wirehouse:mortar-pack')));
+    root.querySelector('#mortar-angle-down')!.addEventListener('click',()=>dispatchEvent(new CustomEvent('wirehouse:mortar-angle',{detail:-5})));
+    root.querySelector('#mortar-angle-up')!.addEventListener('click',()=>dispatchEvent(new CustomEvent('wirehouse:mortar-angle',{detail:5})));
     this.shell = root.querySelector('#game-shell')!;
     this.objective = root.querySelector('#objective')!;
     this.prompt = root.querySelector('#interaction-prompt')!;
@@ -159,7 +170,9 @@ export class HUD {
   }
 
   update(point: InstallationPoint | null, targeted: boolean, missionProgress: number, selectedTool: RigTool): void {
+    const toolChanged=this.selectedTool!==selectedTool;
     this.selectedTool = selectedTool;
+    this.shell.classList.toggle('mortar-tool',selectedTool==='trowel'||selectedTool==='hose');
     this.progress.style.width = `${missionProgress}%`;
     this.reticle.classList.toggle('active', targeted);
     if (performance.now() > this.messageUntil) {
@@ -181,11 +194,12 @@ export class HUD {
       if (bubble) bubble.style.transform = `translate(calc(-50% + ${Math.max(-76, Math.min(76, -tilt * 24))}px), -50%)`;
       if (depthMarker) depthMarker.style.left = `${50 + Math.max(-42, Math.min(42, depth * 2.5))}%`;
     }
-    this.tool.innerHTML = `<span>SELECTED TOOL</span><b class="selected">${selectedTool.toUpperCase()}</b><em>LEFT CLICK TO USE</em>`;
+    this.tool.innerHTML = `<span>SELECTED TOOL</span><b class="selected">${selectedTool.toUpperCase()}</b><em>${selectedTool==='trowel'?'HOLD · RELEASE':selectedTool==='hose'?'HOLD TO MIST':'LEFT CLICK TO USE'}</em>`;
     this.shell.querySelectorAll<HTMLButtonElement>('[data-tool]').forEach(button => {
       const selected = button.dataset.tool === selectedTool;
       button.classList.toggle('selected', selected);
       button.setAttribute('aria-pressed', String(selected));
+      if(selected&&toolChanged){const nav=button.parentElement!;nav.scrollLeft=button.offsetLeft-(nav.clientWidth-button.offsetWidth)/2;}
     });
     const modeToggle = this.shell.querySelector<HTMLButtonElement>('#tool-mode-toggle');
     const hasContextMode = selectedTool === 'spray' || selectedTool === 'hammer';
@@ -194,6 +208,15 @@ export class HUD {
     this.shell.dataset.aimed = targeted ? 'true' : 'false';
   }
 
+  updateMortar(tool:RigTool,power:number,angle:number,wet:{pore:number;film:number},coverage:number,recovery:number,outcome:string):void {
+    const panel=this.shell.querySelector<HTMLElement>('#mortar-panel')!;panel.hidden=tool!=='trowel'&&tool!=='hose';
+    this.shell.querySelector<HTMLElement>('#mortar-readout')!.textContent=tool==='hose'?`CHASE SURFACE · ${wet.film>.3?'TOO WET':wet.pore>.3?'DAMP':'DRY'} · ${Math.round(wet.pore*100)}%`:`SWING ${Math.round(power*100)}% · ${angle}° · BED ${Math.round(coverage*100)}%`;
+    this.shell.querySelector<HTMLElement>('#swing-power')!.style.width=`${tool==='hose'?wet.pore*100:power*100}%`;
+    this.shell.querySelector<HTMLElement>('#mortar-hint')!.textContent=tool==='hose'?'Mist the exposed sides and back of the chase. Avoid standing water.':recovery>0?'Recovering / loading next trowelful…':outcome;
+    this.shell.querySelector<HTMLElement>('#mortar-swing')!.textContent=tool==='hose'?'HOLD · MIST':'HOLD · RELEASE';
+    this.shell.querySelector<HTMLElement>('#mortar-pack')!.hidden=tool==='hose';
+    for(const id of ['#mortar-angle-up','#mortar-angle-down'])this.shell.querySelector<HTMLElement>(id)!.hidden=tool==='hose';
+  }
   notify(message: string, good = true, duration = 700): void {
     this.prompt.textContent = message;
     this.prompt.classList.toggle('warning', !good);
@@ -249,7 +272,7 @@ export class HUD {
     look?.setAttribute('aria-label', mode === 'drag' ? 'Drag aim pad; drag to aim and use spray or hammer' : 'Aim joystick; move it to use spray or hammer');
     const hint = this.shell.querySelector<HTMLElement>('#aim-control-label');
     const autoUse = this.shell.querySelector<HTMLElement>('#aim-control-mode b')?.textContent === 'AUTO USE';
-    const dragAction = this.selectedTool === 'spray' ? 'AIM + SPRAY' : this.selectedTool === 'hammer' ? 'AIM + HAMMER' : 'RELEASE TO USE';
+    const dragAction = this.selectedTool === 'spray' ? 'AIM + SPRAY' : this.selectedTool === 'hammer' ? 'AIM + HAMMER' : this.selectedTool === 'hose' ? 'AIM + WATER' : this.selectedTool === 'trowel' ? 'AIM · USE HOLD BUTTON' : 'RELEASE TO USE';
     if (hint) hint.textContent = mode === 'drag' ? (autoUse ? `DRAG · ${dragAction}` : 'DRAG · AIM') : (autoUse ? 'AIM · AUTO TOOL' : 'AIM · 2× HOLD');
   }
 }

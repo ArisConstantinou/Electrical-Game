@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { buildToolModel } from '../player/ToolModels';
 import { INSTALLATION_RULES, type BoxKind } from '../data/installationRules';
 import { ElectricalBox } from './Box';
 
@@ -50,19 +51,9 @@ export class BoxGroup extends THREE.Group {
     bar.name = 'Full-group spirit level';
     bar.userData.studioEntityId = `${stableId}:spirit-level`;
     bar.position.set(0, this.groupHeight / 2 + 0.055, 0.05);
-    const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0xd4a617, roughness: 0.55, metalness: 0.16 });
-    const darkMaterial = new THREE.MeshStandardMaterial({ color: 0x242521, roughness: 0.7 });
-    const liquidMaterial = new THREE.MeshStandardMaterial({ color: 0xc8dc57, emissive: 0x253500, emissiveIntensity: 0.2, roughness: 0.35 });
-    const body = new THREE.Mesh(new THREE.BoxGeometry(this.groupWidth + 0.13, 0.045, 0.025), bodyMaterial);
-    const windowMesh = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.028, 0.029), darkMaterial);
-    const vial = new THREE.Mesh(new THREE.CapsuleGeometry(0.009, 0.065, 4, 10), liquidMaterial);
-    vial.rotation.z = Math.PI / 2;
-    vial.position.z = 0.017;
-    const bubble = new THREE.Mesh(new THREE.SphereGeometry(0.006, 10, 8), new THREE.MeshStandardMaterial({ color: 0xf5f0c7, roughness: 0.25 }));
-    bubble.name = 'Spirit level bubble';
-    bubble.position.set(0, 0, 0.027);
-    bar.userData.bubble = bubble;
-    bar.add(body, windowMesh, vial, bubble);
+    const model=buildToolModel('level');model.position.set(-.005,.02,.075);
+    const bubble=model.getObjectByName('level-bubble');
+    bar.userData.bubble=bubble;bar.add(model);
     return bar;
   }
 

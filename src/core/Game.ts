@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { Renderer } from './Renderer';
 import { Input } from './Input';
 import { AssetManager } from './AssetManager';
@@ -25,7 +26,9 @@ const TOOL_HINTS: Record<RigTool, string> = {
   fitting: 'BACK BOX · fit the recessed socket box',
   level: 'SPIRIT LEVEL · align the box group',
   spring: 'BENDING SPRING · shape the 20 mm PVC',
-  cutter: 'PVC CUTTER · trim the conduit to length',
+  cutter: 'PVC CUTTER · single-action cut to length',
+  trowel: 'TROWEL · hold to charge, release to cast · ↑ / ↓ loft angle',
+  hose: 'WATER HOSE · hold to mist the masonry; avoid saturation',
 };
 
 const SPRAY_COLORS = [
@@ -44,6 +47,7 @@ export class Game {
   readonly room: Room;
   readonly mission: MissionSystem;
   readonly conduit: ConduitSystem;
+  readonly mortar: MortarSystem;
   readonly leveling = new LevelingSystem();
   readonly hud: HUD;
   readonly fpsRig = new FPSRig();
@@ -82,7 +86,8 @@ export class Game {
     this.room.brickWall.contactProvider = camera => this.fpsRig.contact(camera, this.room.brickWall);
     this.chasing = new ChasingSystem(this.renderer.scene, this.room.brickWall);
     this.conduit = new ConduitSystem(this.renderer.scene, this.room.brickWall);
-    this.interaction = new InteractionSystem(new MarkingSystem(this.room.brickWall), this.chasing, new MortarSystem(), this.leveling, this.conduit);
+    this.mortar = new MortarSystem(this.renderer.scene, this.room.brickWall, this.mission.points);
+    this.interaction = new InteractionSystem(new MarkingSystem(this.room.brickWall), this.chasing, this.leveling, this.mortar, this.conduit);
     this.applySpraySettings();
     this.desktopControls = new DesktopControls(this.hud.shell, this.renderer.webgl.domElement, this.player, this.input);
     this.mobileControls = new MobileControls(
@@ -120,10 +125,24 @@ export class Game {
     const spraying = this.selectedTool === 'spray' && this.input.actionHeld;
     if (this.wasSpraying && !spraying) this.interaction.endSprayStroke();
     this.wasSpraying = spraying;
-    if (this.started && (requested || repeatable)) {
+    if (this.started && this.selectedTool !== 'trowel' && this.selectedTool !== 'hose' && (requested || repeatable)) {
       this.performAction(repeatable && !requested);
       this.actionCooldown = this.selectedTool === 'spray' ? 0.045 : this.selectedTool === 'hammer' ? 0.24 : 0.18;
     }
+    const mortarTool = this.started && !leveling && (this.selectedTool === 'trowel' || this.selectedTool === 'hose');
+    const nearbySurface=this.room.brickWall.aim(this.renderer.camera);
+    const reach=nearbySurface ? nearbySurface.point.distanceTo(this.renderer.camera.position) : 2;
+    this.fpsRig.position.z=this.selectedTool==='hammer'?-.88:-Math.min(.88,Math.max(.12,reach-.23));
+    const releaseOrigin = this.fpsRig.toolTipWorld(this.renderer.camera, this.selectedTool);
+    if (mortarTool && this.selectedTool === 'trowel') this.mortar.swing(this.input.actionHeld,dt,this.renderer.camera,releaseOrigin);
+    else this.mortar.cancel();
+    if (mortarTool && this.selectedTool === 'hose' && this.input.actionHeld) this.mortar.wet(this.renderer.camera,releaseOrigin,dt);
+    this.mortar.update(dt);
+    this.mortar.preview(this.renderer.camera,releaseOrigin,mortarTool && this.selectedTool === 'trowel');
+    this.fpsRig.hoseActive=this.selectedTool==='hose'&&this.input.actionHeld;
+    this.fpsRig.levelTiltDegrees=active?.boxGroup.tiltDegrees??0;
+    this.fpsRig.mortarCharge=this.mortar.charge;
+    this.fpsRig.mortarRecovery=this.mortar.recovery;
     this.chasing.update(dt);
     this.fpsRig.update(dt, this.player.velocity.lengthSq() > 0.02, spraying);
     this.fpsRig.show(this.selectedTool);
@@ -139,6 +158,9 @@ export class Game {
     this.hud.updateAimSpeed(this.aimProfile);
     this.hud.updateWallAssist(this.wallAssistEnabled);
     this.hud.updateAimInput(this.aimInputMode);
+    const waterHit=this.room.brickWall.aim(this.renderer.camera);
+    const wet=waterHit ? this.mortar.moistureAt(new THREE.Vector3(waterHit.point.x,waterHit.point.y,waterHit.point.z)) : {pore:0,film:0};
+    this.hud.updateMortar(this.selectedTool,this.mortar.charge,this.mortar.angleDegrees,wet,active ? this.mortar.coverage(active):0,this.mortar.recovery,this.mortar.lastOutcome);
     if (this.shake > 0) {
       this.shake = Math.max(0, this.shake - dt * 3.7);
       this.renderer.camera.rotation.x += (Math.random() - 0.5) * this.shake * 0.025;
@@ -151,9 +173,10 @@ export class Game {
   renderState(): string {
     const point = this.mission.activePoint;
     return JSON.stringify({
+      mortar: this.mortar.telemetry,
       coordinateSystem: 'metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall',
       mode: !this.started ? 'start' : this.mission.complete ? 'mission-complete' : point?.stage === 'leveling' ? 'leveling' : 'playing',
-      player: { x: Number(this.renderer.camera.position.x.toFixed(3)), y: Number(this.renderer.camera.position.y.toFixed(3)), z: Number(this.renderer.camera.position.z.toFixed(3)), yaw: Number(this.player.yaw.toFixed(3)), pitch: Number(this.player.pitch.toFixed(3)) },
+      player: { crouched:this.player.eyeHeight<1.1, x: Number(this.renderer.camera.position.x.toFixed(3)), y: Number(this.renderer.camera.position.y.toFixed(3)), z: Number(this.renderer.camera.position.z.toFixed(3)), yaw: Number(this.player.yaw.toFixed(3)), pitch: Number(this.player.pitch.toFixed(3)) },
       mission: { name: 'Living Room First Fix', progressPercent: this.mission.progress, selectedTool: this.selectedTool, complete: this.mission.complete },
       workSurface: { ...this.room.brickWall.telemetry, stanceSideDegrees:this.hammerWorkStance.sideDegrees, stanceCameraOffset:this.hammerWorkStance.offset.toArray(), freeSprayMarks: this.room.brickWall.freeMarkCount, activeFragments: this.chasing.activeFragmentCount, insideFragments: this.chasing.insideFragmentCount, inwardFragments: this.chasing.inwardFragmentCount, physicsMs:this.chasing.lastUpdateMs, peakPhysicsMs:this.chasing.maximumUpdateMs, fragmentBudget:this.chasing.fragmentBudget, chiselTip:{x:this.fpsRig.chiselTipWorld.x,y:this.fpsRig.chiselTipWorld.y,z:this.fpsRig.chiselTipWorld.z,inAir:this.fpsRig.chiselInAir}, airborneFragments: this.chasing.airborneFragmentCount, settledFragments: this.chasing.settledFragmentCount, sprayMode: this.sprayMode, sprayColor: SPRAY_COLORS[this.sprayColorIndex].name, hammerMode: this.hammerMode, chisel: this.room.brickWall.chiselType, chiselEnergyJ: this.room.brickWall.chiselEnergyJ, chiselTiltDegrees:this.room.brickWall.chiselTiltDegrees, chiselSideDegrees:this.room.brickWall.chiselSideDegrees, chiselEdgeDegrees: this.room.brickWall.chiselEdgeAngle*180/Math.PI, aimControlMode:this.aimControlMode, aimInputMode:this.aimInputMode, aimProfile:this.aimProfile, wallAssist:this.wallAssistEnabled, proximityPrecision:Number(this.player.wallAssistAmount.toFixed(3)) },
       activePoint: point ? { id: point.definition.id, kind: point.definition.kind, bottomHeightM: point.definition.bottom, boxes: point.definition.boxes, stage: point.stage, chaseHits: point.chaseHits, chaseCoverage: Number(this.room.brickWall.getChaseCoverage(point.definition.id).toFixed(3)), pipeStep: point.pipeStep, targeted: this.mission.target(this.renderer.camera) === point, tiltDegrees: Number(point.boxGroup.tiltDegrees.toFixed(2)), depthErrorMm: Number((point.boxGroup.depthError * 1000).toFixed(1)), levelPass: point.boxGroup.isLevel, flushPass: point.boxGroup.isFlush } : null,
@@ -169,11 +192,26 @@ export class Game {
     if (!target) { this.hud.notify('Aim at the work area you chose.', false); return; }
     const hammering = this.selectedTool === 'hammer';
     const result = this.interaction.action(target, this.selectedTool, this.renderer.camera, continuing);
+    if(result.success)this.fpsRig.toolAction=1;
     if (hammering && result.success) { this.fpsRig.strike(); this.shake = 1; }
     if (result.message) this.hud.notify(result.message, result.success);
   }
 
   private bindEvents(): void {
+    addEventListener('wirehouse:work-height',()=>{this.player.crouched=!this.player.crouched;document.querySelector('#work-height')!.textContent=this.player.crouched?'STAND UP':'CROUCH · LOW WORK';});
+    const pack=()=>{if(this.started&&this.selectedTool==='trowel'){this.mortar.cancel();this.input.actionHeld=false;const success=this.mortar.pack(this.renderer.camera);this.mortar.lastOutcome=success?'Pressed into the recess. Keep the box openings clear.':'Move the trowel within reach of the exposed bed around the box.';if(success)this.fpsRig.toolAction=1;}};
+    addEventListener('wirehouse:mortar-pack',pack);
+    addEventListener('keydown',event=>{if(event.code==='KeyP'&&!event.repeat)pack();});
+    const cancelSwing=()=>this.mortar.cancel();
+    addEventListener('pointerdown',event=>{if(event.button===2)cancelSwing();});
+    addEventListener('blur',cancelSwing);addEventListener('pointercancel',cancelSwing);
+    document.addEventListener('pointerlockchange',()=>{if(!document.pointerLockElement)cancelSwing();});
+    addEventListener('wirehouse:mortar-angle',event=>{this.mortar.angleDegrees=THREE.MathUtils.clamp(this.mortar.angleDegrees+(event as CustomEvent<number>).detail,-20,50);});
+    const swingButton=document.querySelector<HTMLElement>('#mortar-swing')!;
+    swingButton.addEventListener('pointerdown',event=>{event.preventDefault();swingButton.setPointerCapture(event.pointerId);this.input.actionHeld=true;});
+    swingButton.addEventListener('pointerup',()=>{this.input.actionHeld=false;});
+    swingButton.addEventListener('pointercancel',()=>{this.input.actionHeld=false;cancelSwing();});
+    addEventListener('keydown',event=>{if(this.selectedTool==='trowel' && (event.code==='ArrowUp'||event.code==='ArrowDown')){event.preventDefault();this.mortar.angleDegrees=THREE.MathUtils.clamp(this.mortar.angleDegrees+(event.code==='ArrowUp'?2:-2),-20,50);}});
     addEventListener('wirehouse:select-tool', event => this.selectTool((event as CustomEvent<RigTool>).detail));
     addEventListener('wirehouse:cycle-tool', event => this.cycleTool((event as CustomEvent<number>).detail || 1));
     addEventListener('wirehouse:cycle-spray-mode', () => {
@@ -262,6 +300,7 @@ export class Game {
   private selectTool(tool: RigTool): void {
     if (!RIG_TOOLS.includes(tool)) return;
     const changed = this.selectedTool !== tool;
+    if(changed)this.mortar.cancel();
     this.selectedTool = tool;
     // Keep the established spray -> hammer gesture useful, but queue exactly
     // one hammer strike rather than turning a held pointer into auto-repeat.
@@ -282,7 +321,7 @@ export class Game {
     this.fpsRig.setSprayColor(color.value);
   }
 
-  private isContinuousAction(): boolean { return this.selectedTool === 'spray' || this.selectedTool === 'hammer'; }
+  private isContinuousAction(): boolean { return this.selectedTool === 'spray' || this.selectedTool === 'hammer' || this.selectedTool === 'hose'; }
 
   private loop = (time: number): void => {
     const dt = Math.min((time - this.lastTime) / 1000, 0.05);

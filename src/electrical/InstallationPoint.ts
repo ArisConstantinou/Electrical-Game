@@ -42,34 +42,4 @@ export class InstallationPoint extends THREE.Group {
     this.hotspot.visible = false;
   }
 
-  createMortar(): THREE.Mesh {
-    const padWidth = this.boxGroup.groupWidth + 0.19;
-    const padHeight = this.boxGroup.groupHeight + 0.18;
-    const shape = new THREE.Shape();
-    shape.moveTo(-padWidth / 2, -padHeight / 2);
-    shape.lineTo(padWidth / 2, -padHeight / 2);
-    shape.lineTo(padWidth / 2, padHeight / 2);
-    shape.lineTo(-padWidth / 2, padHeight / 2);
-    shape.closePath();
-    for (const box of this.boxGroup.boxes) {
-      const clearance = 0.002;
-      const hole = new THREE.Path();
-      hole.moveTo(box.position.x - box.width / 2 + clearance, -box.height / 2 + clearance);
-      hole.lineTo(box.position.x - box.width / 2 + clearance, box.height / 2 - clearance);
-      hole.lineTo(box.position.x + box.width / 2 - clearance, box.height / 2 - clearance);
-      hole.lineTo(box.position.x + box.width / 2 - clearance, -box.height / 2 + clearance);
-      hole.closePath();
-      shape.holes.push(hole);
-    }
-    const geometry = new THREE.ExtrudeGeometry(shape, { depth: 0.012, bevelEnabled: true, bevelSize: 0.004, bevelThickness: 0.003, bevelSegments: 1 });
-    const material = new THREE.MeshStandardMaterial({ color: 0x77736a, roughness: 1, metalness: 0 });
-    const mortar = new THREE.Mesh(geometry, material);
-    mortar.name = 'Continuous flush mortar bed';
-    mortar.userData.studioEntityId = `point-${this.definition.id}:mortar`;
-    mortar.position.z = -0.006;
-    mortar.receiveShadow = true;
-    this.mortar = mortar;
-    this.add(mortar);
-    return mortar;
-  }
 }

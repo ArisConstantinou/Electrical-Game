@@ -157,3 +157,33 @@ button {
 #chisel-settings b { color: #fff; }
 #settings-panel { max-height: calc(100dvh - 100px); overflow-y: auto; }
 #mobile-control-settings small { font-size: 14px; }
+
+/* Mortar casting stays reachable independently of the mobile look pad. */
+#mortar-panel { position:absolute; z-index:12; left:20px; top:150px; width:min(360px,calc(100% - 24px)); padding:12px; pointer-events:auto; }
+#mortar-panel[hidden] { display:none; }
+#mortar-panel strong { display:block; font-size:14px; line-height:1.5; }
+#mortar-panel small { display:block; font-size:14px; line-height:1.35; margin-top:7px; }
+.mortar-buttons { display:flex; gap:7px; margin-top:9px; }
+.mortar-buttons button { flex:1; min-height:42px; font-size:12px; padding:7px; background:#263b39; color:#f4eddd; border:1px solid #75918a; border-radius:6px; touch-action:none; }
+#mortar-swing { flex:1.7; background:#805c2d; }
+#swing-power { background:#e6bf68; }
+@media (max-width:700px) { #mortar-panel { left:14px; top:130px; width:calc(100% - 28px); padding:9px; } }
+@media (max-height:520px) and (pointer:coarse) { #mortar-panel { left:14px; top:110px; width:290px; } #mortar-panel small {font-size:12px;} }
+
+.mortar-tool #interaction-prompt { display:none; }
+
+#mortar-pack, #work-height { margin-top:7px; min-height:36px; font-size:12px; color:#f4eddd; background:#38433e; border:1px solid #75918a; width:100%; }
+#mortar-pack[hidden] {display:none;}
+
+#work-height { width:45%; margin-right:2%; } #mortar-pack {width:53%;}
+/* Landscape leaves both corner pads and the central tool silhouette clear. */
+@media (max-height:520px) and (pointer:coarse) {
+  #mortar-panel { left:132px; top:104px; width:230px; padding:7px; }
+  #mortar-panel strong, #mortar-panel small {font-size:12px;}
+  .mortar-buttons {gap:3px;margin-top:5px;}
+  .mortar-buttons button {padding:4px;min-height:34px;}
+  #mortar-pack, #work-height {min-height:32px;line-height:1.1;padding:3px;}
+}
+
+.result-panel h2 { font-size:clamp(46px,9vw,120px); max-width:100%; line-height:.86; overflow-wrap:anywhere; }
+@media (max-width:480px) { .result-panel {padding:24px;} .result-panel h2 {font-size:clamp(42px,12vw,56px);} }

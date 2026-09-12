@@ -4,8 +4,8 @@ import type { RigTool } from '../player/FPSRig';
 import type { ChasingSystem } from './ChasingSystem';
 import type { ConduitSystem } from './ConduitSystem';
 import type { LevelingSystem } from './LevelingSystem';
-import type { MarkingSystem } from './MarkingSystem';
 import type { MortarSystem } from './MortarSystem';
+import type { MarkingSystem } from './MarkingSystem';
 
 export interface InteractionResult { success: boolean; message: string }
 export type HammerMode = 'chase' | 'demolish';
@@ -15,8 +15,8 @@ export class InteractionSystem {
   constructor(
     private readonly marking: MarkingSystem,
     private readonly chasing: ChasingSystem,
-    private readonly mortar: MortarSystem,
     private readonly leveling: LevelingSystem,
+    private readonly mortar: MortarSystem,
     private readonly conduit: ConduitSystem,
   ) {}
 
@@ -50,14 +50,17 @@ export class InteractionSystem {
       return { success: true, message: 'Box group fitted into the recess with a small alignment error.' };
     }
     if (tool === 'fitting' && point.stage === 'fitted') {
-      this.mortar.apply(point);
-      return { success: true, message: 'Continuous mortar bed applied around the complete group.' };
+      return { success: false, message: 'Mist the masonry with the hose (8), then cast mortar with the trowel (7). Fill all four sides.' };
     }
     if (tool === 'level' && point.stage === 'mortared') {
       this.leveling.begin(point);
       return { success: true, message: 'Leveling mode: correct tilt and flush depth.' };
     }
     if (tool === 'level' && point.stage === 'leveling') {
+      if(point.boxGroup.isLevel&&point.boxGroup.isFlush&&!this.mortar.ready(point)){
+        point.boxGroup.levelBar.visible=false;point.setStage('fitted');
+        return {success:false,message:'Alignment is correct. Pack the remaining mortar gaps, then recheck the level.'};
+      }
       const passed = this.leveling.confirm(point);
       return { success: passed, message: passed ? 'LEVEL and FLUSH passed.' : 'Not yet: bubble and depth must both be inside tolerance.' };
     }
@@ -66,7 +69,7 @@ export class InteractionSystem {
       const result = this.conduit.action(point);
       return { success: result.changed, message: result.message };
     }
-    const required: Record<string, string> = { inspect: 'SPRAY', marked: 'HAMMER', chasing: 'HAMMER', chased: 'FITTING TOOL', fitted: 'FITTING TOOL', mortared: 'SPIRIT LEVEL', leveling: 'SPIRIT LEVEL', leveled: 'SPRING / CUTTER', conduit: 'SPRING / CUTTER', complete: 'NONE' };
+    const required: Record<string, string> = { inspect: 'SPRAY', marked: 'HAMMER', chasing: 'HAMMER', chased: 'FITTING TOOL', fitted: 'HOSE / TROWEL', mortared: 'SPIRIT LEVEL', leveling: 'SPIRIT LEVEL', leveled: 'SPRING / CUTTER', conduit: 'SPRING / CUTTER', complete: 'NONE' };
     return { success: false, message: `Select ${required[point.stage]} for this step.` };
   }
 }

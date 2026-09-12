@@ -1,8 +1,9 @@
 import * as THREE from 'three';
+import { buildToolModel, addHammerDetails } from './ToolModels';
 import type { BrickWall, ChiselContact } from '../world/BrickWall';
 
-export type RigTool = 'spray' | 'hammer' | 'fitting' | 'level' | 'spring' | 'cutter';
-export const RIG_TOOLS: RigTool[] = ['spray', 'hammer', 'fitting', 'level', 'spring', 'cutter'];
+export type RigTool = 'spray' | 'hammer' | 'fitting' | 'level' | 'spring' | 'cutter' | 'trowel' | 'hose';
+export const RIG_TOOLS: RigTool[] = ['spray', 'hammer', 'fitting', 'level', 'spring', 'cutter', 'trowel', 'hose'];
 
 // The viewmodel belongs to the final transparent pass so wall paint can never
 // composite over the hands or tool, regardless of camera distance.
@@ -28,6 +29,11 @@ export class FPSRig extends THREE.Group {
   private readonly hammerArms = new THREE.Group();
   private readonly hammerArmParts: Array<{ upper: THREE.Mesh; forearm: THREE.Mesh; cuff: THREE.Mesh; glove: THREE.Mesh; grip: THREE.Vector3; side: number }> = [];
   readonly chiselTipWorld = new THREE.Vector3();
+  toolAction = 0;
+  hoseActive = false;
+  levelTiltDegrees = 0;
+  mortarCharge = 0;
+  mortarRecovery = 0;
   chiselInAir = false;
   workStanceSide = 0;
 
@@ -86,20 +92,23 @@ export class FPSRig extends THREE.Group {
     this.userData.studioEntityId = 'fps-rig';
     this.position.set(0.08, this.restingY, -0.88);
     this.scale.setScalar(0.74);
-    this.addTool('spray', this.createSpray());
-    this.addTool('hammer', this.createHammer());
+    this.addTool('spray', this.createDetailedTool('spray'));
+    const hammer=this.createHammer();addHammerDetails(hammer);this.addTool('hammer', hammer);
     this.add(this.hammerArms);
-    this.addTool('fitting', this.createFittingTool());
-    this.addTool('level', this.createLevel());
-    this.addTool('spring', this.createPvcTool('spring'));
-    this.addTool('cutter', this.createPvcTool('cutter'));
+    for(const tool of ['fitting','level','spring','cutter','trowel','hose'] as const)this.addTool(tool,this.createDetailedTool(tool));
     this.show('spray');
   }
 
   show(tool: RigTool): void { this.tools.forEach((group, key) => { group.visible = key === tool; }); this.hammerArms.visible=tool==='hammer'; }
   setSprayColor(color: number): void {
     this.sprayCanMaterial?.color.setHex(color);
+    this.tools.get('spray')?.traverse(object=>{if(object instanceof THREE.Mesh && object.userData.sprayColor)(object.material as THREE.MeshStandardMaterial).color.setHex(color);});
     (this.sprayMist?.material as THREE.PointsMaterial | undefined)?.color.setHex(color);
+  }
+  toolTipWorld(camera: THREE.Camera,tool: RigTool): THREE.Vector3 {
+    camera.updateMatrixWorld(true);this.updateWorldMatrix(true,true);
+    const group=this.tools.get(tool),tip=group?.userData.tipPoint as number[] | undefined;
+    return group ? group.localToWorld(tip ? new THREE.Vector3().fromArray(tip) : new THREE.Vector3(.1,.04,-.14)) : camera.localToWorld(new THREE.Vector3(.15,-.18,-.55));
   }
   strike(): void { this.strikeAmount = 1; }
   update(dt: number, moving: boolean, spraying = false): void {
@@ -107,13 +116,24 @@ export class FPSRig extends THREE.Group {
     this.position.y = this.restingY + bob;
     this.strikeAmount = Math.max(0, this.strikeAmount - dt * 5.5);
     this.rotation.x = -Math.sin(this.strikeAmount * Math.PI) * 0.16;
+    this.toolAction=Math.max(0,this.toolAction-dt*2.5);
+    const cutter=this.tools.get('cutter')?.getObjectByName('cutter-moving-handle');
+    if(cutter)cutter.rotation.z=Math.sin(this.toolAction*Math.PI)*.28;
+    const trigger=this.tools.get('hose')?.getObjectByName('hose-trigger');
+    if(trigger)trigger.scale.x=this.hoseActive?.82:1;
+    const bubble=this.tools.get('level')?.getObjectByName('level-bubble');
+    if(bubble){if(bubble.userData.restX===undefined)bubble.userData.restX=bubble.position.x;bubble.position.x=bubble.userData.restX+THREE.MathUtils.clamp(this.levelTiltDegrees*.003,-.014,.014);}
+    const actuator=this.tools.get('spray')?.getObjectByName('spray-actuator');
+    if(actuator)actuator.position.y=spraying?.102:.104;
+    const trowel=this.tools.get('trowel');
+    if(trowel){trowel.rotation.x=-this.mortarCharge*.55+Math.sin(this.mortarRecovery/.65*Math.PI)*.65;trowel.position.y=-this.mortarCharge*.05;const load=trowel.getObjectByName('trowel-load');if(load)load.visible=this.mortarRecovery<.2;}
     if (this.sprayMist) {
       this.sprayMist.visible = spraying;
       if (spraying) {
         const positions = this.sprayMist.geometry.getAttribute('position') as THREE.BufferAttribute;
         for (let index = 0; index < positions.count; index += 1) {
           const travel = (performance.now() * 0.0018 + index / positions.count) % 1;
-          positions.setXYZ(index, 0.17 + (Math.random() - 0.5) * travel * 0.055, 0.065 + (Math.random() - 0.5) * travel * 0.055, -0.05 - travel * 0.34);
+          positions.setXYZ(index, 0.175 + (Math.random() - 0.5) * travel * 0.055, 0.021 + (Math.random() - 0.5) * travel * 0.055, -0.05 - travel * 0.34);
         }
         positions.needsUpdate = true;
       }
@@ -182,26 +202,20 @@ export class FPSRig extends THREE.Group {
     place(hand, x, y, z);
     return hand;
   }
-  private createSpray(): THREE.Group {
-    const group = new THREE.Group();
-    group.add(this.hand(0.27, -0.29, 0.04, 0.62));
-    this.sprayCanMaterial = material(0x087fce, 0.45, 0.15);
-    const can = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.19, 16), this.sprayCanMaterial);
-    can.rotation.z = -0.16; place(can, 0.15, -0.08, -0.03);
-    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.029, 0.027, 12), material(0xd8d6cd, 0.45));
-    place(cap, 0.165, 0.032, -0.03);
-    const nozzle = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.018, 0.026), material(0x252826, 0.5));
-    place(nozzle, 0.17, 0.052, -0.044);
-    const label = new THREE.Mesh(new THREE.CylinderGeometry(0.046, 0.046, 0.064, 16), material(0xe9e5da, 0.62));
-    label.rotation.z = -0.16; place(label, 0.15, -0.075, -0.03);
-    const labelBand = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.018, 0.012), material(0x24333a, 0.65));
-    labelBand.rotation.z = -0.16; place(labelBand, 0.152, -0.074, -0.074);
-    const mistGeometry = new THREE.BufferGeometry();
-    mistGeometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(54), 3));
-    this.sprayMist = new THREE.Points(mistGeometry, new THREE.PointsMaterial({ color: 0xffffff, size: 0.012, transparent: true, opacity: 0.42, depthTest: false, sizeAttenuation: true }));
-    this.sprayMist.visible = false;
-    this.sprayMist.renderOrder = 21;
-    group.add(can, label, labelBand, cap, nozzle, this.sprayMist);
+  private createDetailedTool(kind: Exclude<RigTool,'hammer'>):THREE.Group {
+    const group=buildToolModel(kind),grip=new THREE.Vector3().fromArray(group.userData.gripPoint);
+    group.add(this.hand(grip.x+.06,grip.y-.14,grip.z+.01,.4));
+    const second=group.userData.secondaryGripPoint as number[] | undefined;
+    if(second)group.add(this.hand(second[0]-.055,second[1]-.14,second[2]+.01,-.4));
+    if(kind==='trowel'){
+      const load=new THREE.Mesh(new THREE.IcosahedronGeometry(.044,2),material(0x857a66,.96));load.name='trowel-load';load.position.set(.01,.06,-.077);load.scale.set(.85,1.5,.22);group.add(load);
+    }
+    if(kind==='spray'){
+      const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(54),3));
+      this.sprayMist=new THREE.Points(geometry,new THREE.PointsMaterial({color:0x168cdb,size:.009,transparent:true,opacity:.4,depthTest:false}));this.sprayMist.visible=false;this.sprayMist.renderOrder=21;group.add(this.sprayMist);
+    }
+    // Shared builders also serve world props; only viewmodels use this overlay pass.
+    group.traverse(object=>{if(object instanceof THREE.Mesh){for(const m of Array.isArray(object.material)?object.material:[object.material]){m.transparent=true;m.depthTest=false;m.depthWrite=false;}object.renderOrder=20;object.castShadow=false;}});
     return group;
   }
   private createHammer(): THREE.Group {
@@ -235,63 +249,6 @@ export class FPSRig extends THREE.Group {
     // The wall must occlude parts of the bit inside solid shell/ribs. The other
     // handheld tools retain their established overlay rendering.
     group.traverse(object=>{ if(object instanceof THREE.Mesh) for(const m of Array.isArray(object.material)?object.material:[object.material]) {m.depthTest=true;m.depthWrite=true;m.transparent=false;} });
-    return group;
-  }
-  private createFittingTool(): THREE.Group {
-    const group = new THREE.Group();
-    group.add(this.hand(0.25, -0.3, 0.08, 0.62));
-    const box = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.095, 0.052, 24), material(0x3f4748, 0.74, 0.08));
-    box.rotation.x = Math.PI / 2; place(box, 0.08, -0.035, -0.17);
-    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.096, 0.009, 8, 28), material(0x747d7c, 0.55, 0.2));
-    place(rim, 0.08, -0.035, -0.202);
-    const recess = new THREE.Mesh(new THREE.CylinderGeometry(0.057, 0.057, 0.008, 20), material(0x171a1a, 0.95));
-    recess.rotation.x = Math.PI / 2; place(recess, 0.08, -0.035, -0.205);
-    const lug = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.024, 0.012), material(0xa0a5a1, 0.4, 0.38));
-    place(lug, 0.007, -0.035, -0.21);
-    const secondLug = lug.clone(); place(secondLug, 0.153, -0.035, -0.21);
-    const knockout = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.009, 14), material(0xc84c35, 0.65));
-    knockout.rotation.x = Math.PI / 2; place(knockout, 0.08, 0.03, -0.21);
-    const secondKnockout = knockout.clone(); place(secondKnockout, 0.08, -0.1, -0.21);
-    group.add(box, rim, recess, lug, secondLug, knockout, secondKnockout);
-    return group;
-  }
-  private createLevel(): THREE.Group {
-    const group = new THREE.Group();
-    group.add(this.hand(-0.3, -0.31, 0.08, -0.48), this.hand(0.3, -0.31, 0.08, 0.48));
-    const bar = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.055, 0.035), material(0xd3a218, 0.5, 0.16));
-    place(bar, 0, -0.08, -0.1);
-    const vial = new THREE.Mesh(new THREE.CapsuleGeometry(0.013, 0.12, 4, 10), material(0xcadd55, 0.3));
-    vial.rotation.z = Math.PI / 2; place(vial, 0, -0.079, -0.122);
-    group.add(bar, vial);
-    return group;
-  }
-  private createPvcTool(selected: 'spring' | 'cutter'): THREE.Group {
-    const group = new THREE.Group();
-    group.add(this.hand(selected === 'spring' ? -0.27 : 0.27, -0.3, 0.08, selected === 'spring' ? -0.58 : 0.6));
-    if (selected === 'spring') {
-      const points: THREE.Vector3[] = [];
-      for (let index = 0; index <= 96; index += 1) {
-        const t = index / 96;
-        const angle = t * Math.PI * 13;
-        points.push(new THREE.Vector3((t - 0.5) * 0.43, Math.sin(angle) * 0.029, Math.cos(angle) * 0.029));
-      }
-      const spring = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 128, 0.009, 7, false), material(0xb7a06d, 0.32, 0.74));
-      spring.rotation.z = -0.08; place(spring, -0.02, -0.04, -0.15);
-      group.add(spring);
-    } else {
-      const red = material(0xb53026, 0.48, 0.3);
-      const jaw = new THREE.Mesh(new THREE.TorusGeometry(0.065, 0.02, 9, 22, Math.PI * 1.4), red);
-      jaw.rotation.z = 0.55; place(jaw, 0.08, 0.015, -0.16);
-      const handleA = new THREE.Mesh(new THREE.CapsuleGeometry(0.021, 0.18, 5, 9), red);
-      handleA.rotation.z = -0.45; place(handleA, 0.15, -0.15, -0.14);
-      const handleB = new THREE.Mesh(new THREE.CapsuleGeometry(0.02, 0.17, 5, 9), material(0x272a29, 0.84));
-      handleB.rotation.z = -0.15; place(handleB, 0.21, -0.16, -0.13);
-      const bladeShape = new THREE.Shape();
-      bladeShape.moveTo(-0.065, 0.012); bladeShape.lineTo(0.067, 0.05); bladeShape.lineTo(0.035, -0.008); bladeShape.closePath();
-      const blade = new THREE.Mesh(new THREE.ShapeGeometry(bladeShape), material(0xd0d1cc, 0.24, 0.82));
-      place(blade, 0.08, 0.012, -0.185);
-      group.add(jaw, handleA, handleB, blade);
-    }
     return group;
   }
 }

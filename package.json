@@ -16,7 +16,9 @@
     "test:masonry": "node tests/masonry-acceptance.mjs",
     "test:masonry-contact": "node tests/masonry-contact.mjs",
     "test:masonry-benchmark": "node tests/masonry-benchmark.mjs",
-    "test:hammer-stance": "node tests/hammer-stance-smoke.mjs"
+    "test:hammer-stance": "node tests/hammer-stance-smoke.mjs",
+    "test:mortar": "node tests/mortar-application-smoke.mjs",
+    "test:tools-visual": "node tests/tools-visual-smoke.mjs"
   },
   "dependencies": {
     "three": "^0.180.0"

@@ -5,6 +5,8 @@ import { GAME_CONFIG } from '../data/gameConfig';
 export type MobileAimProfile = 'precise' | 'normal' | 'fast';
 
 export class PlayerController {
+  crouched = false;
+  get eyeHeight(): number { return this.crouched || this.input.pressed('ControlLeft') || this.input.pressed('ControlRight') ? .95 : GAME_CONFIG.player.eyeHeight; }
   yaw = 0;
   pitch = -0.62;
   readonly velocity = new THREE.Vector3();
@@ -49,7 +51,7 @@ export class PlayerController {
     const radius = GAME_CONFIG.player.radius;
     this.camera.position.x = THREE.MathUtils.clamp(this.camera.position.x, -GAME_CONFIG.room.width / 2 + radius, GAME_CONFIG.room.width / 2 - radius);
     this.camera.position.z = THREE.MathUtils.clamp(this.camera.position.z, -GAME_CONFIG.room.depth / 2 + radius + 0.25, GAME_CONFIG.room.depth / 2 - radius);
-    this.camera.position.y = GAME_CONFIG.player.eyeHeight;
+    this.camera.position.y = THREE.MathUtils.damp(this.camera.position.y, this.eyeHeight, 14, dt);
   }
 
   setMobileAimProfile(profile: MobileAimProfile): void {
