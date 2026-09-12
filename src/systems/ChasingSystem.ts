@@ -100,11 +100,13 @@ export class ChasingSystem {
   private spawnDebris(impact: MasonryImpact): void {
     const random = seeded(impact.seed);
     const baseCount = impact.kind === 'demolish-break' ? 11 + Math.floor(random() * 11)
-      : impact.kind === 'demolish-spall' ? 6 + Math.floor(random() * 6)
+      : impact.kind === 'demolish-split' ? 8 + Math.floor(random() * 7)
+        : impact.kind === 'demolish-spall' ? 6 + Math.floor(random() * 6)
         : impact.kind === 'demolish-crack' ? 4 + Math.floor(random() * 4)
           : impact.kind === 'demolish-chip' ? 2 + Math.floor(random() * 4)
             : Math.min(14, Math.max(5, impact.points.length * 2));
     const largeBreak = impact.kind === 'demolish-break';
+    const splitBreak = impact.kind === 'demolish-split';
     for (let index = 0; index < baseCount; index += 1) {
       const source = impact.points[index % impact.points.length];
       const geometry = fragmentGeometries[Math.floor(random() * fragmentGeometries.length)];
@@ -113,13 +115,13 @@ export class ChasingSystem {
         fragmentMaterials[Math.floor(random() * fragmentMaterials.length)],
       );
       fragment.name = 'Loose masonry fragment';
-      const width = largeBreak ? 0.022 + Math.pow(random(), 1.35) * 0.068 : 0.007 + Math.pow(random(), 1.7) * 0.024;
-      const height = largeBreak ? 0.014 + Math.pow(random(), 1.45) * 0.038 : 0.005 + Math.pow(random(), 1.8) * 0.017;
-      const depth = largeBreak ? 0.014 + Math.pow(random(), 1.5) * 0.045 : 0.005 + Math.pow(random(), 1.8) * 0.019;
+      const width = largeBreak ? 0.022 + Math.pow(random(), 1.35) * 0.068 : splitBreak ? 0.014 + Math.pow(random(), 1.45) * 0.043 : 0.007 + Math.pow(random(), 1.7) * 0.024;
+      const height = largeBreak ? 0.014 + Math.pow(random(), 1.45) * 0.038 : splitBreak ? 0.01 + Math.pow(random(), 1.55) * 0.026 : 0.005 + Math.pow(random(), 1.8) * 0.017;
+      const depth = largeBreak ? 0.014 + Math.pow(random(), 1.5) * 0.045 : splitBreak ? 0.009 + Math.pow(random(), 1.6) * 0.029 : 0.005 + Math.pow(random(), 1.8) * 0.019;
       const bounds = geometry.boundingBox!.getSize(new THREE.Vector3());
       fragment.scale.set(width / bounds.x, height / bounds.y, depth / bounds.z);
       const angle = index * GOLDEN_ANGLE + random() * 0.45;
-      const ring = 0.018 + Math.sqrt(index) * (largeBreak ? 0.027 : 0.014);
+      const ring = 0.018 + Math.sqrt(index) * (largeBreak ? 0.027 : splitBreak ? 0.02 : 0.014);
       fragment.position.copy(source).add(new THREE.Vector3(Math.cos(angle) * ring, Math.sin(angle) * ring * 0.55, 0.025 + (index % 4) * 0.018));
       fragment.rotation.set(random() * Math.PI, random() * Math.PI, random() * Math.PI);
       fragment.castShadow = true;
@@ -128,7 +130,7 @@ export class ChasingSystem {
       this.scene.add(fragment);
       this.particles.push({
         mesh: fragment,
-        velocity: new THREE.Vector3(Math.cos(angle) * (0.08 + random() * (largeBreak ? 0.3 : 0.14)), 0.04 + random() * (largeBreak ? 0.3 : 0.16), 0.12 + random() * (largeBreak ? 0.36 : 0.2)),
+        velocity: new THREE.Vector3(Math.cos(angle) * (0.08 + random() * (largeBreak ? 0.3 : splitBreak ? 0.22 : 0.14)), 0.04 + random() * (largeBreak ? 0.3 : splitBreak ? 0.23 : 0.16), 0.12 + random() * (largeBreak ? 0.36 : splitBreak ? 0.28 : 0.2)),
         angularVelocity: new THREE.Vector3((random() - 0.5) * 11, (random() - 0.5) * 11, (random() - 0.5) * 11),
         life: (largeBreak ? 32 : 8) + random() * (largeBreak ? 18 : 5),
         halfWidth: width * 0.5,

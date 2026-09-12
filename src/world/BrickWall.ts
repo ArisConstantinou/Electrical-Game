@@ -11,6 +11,7 @@ interface BrickTarget {
   rotationZ: number;
   size: THREE.Vector3;
   damage: number;
+  impactCount: number;
   destroyed: boolean;
   originalHidden: boolean;
   carvedCells: Set<number>;
@@ -48,7 +49,7 @@ interface DemolitionSite {
 interface BreachSupportAudit { supportedComponents: number; unsupportedComponents: number; prunedComponents: number }
 
 export type SprayMode = 'dots' | 'live';
-export type MasonryImpactKind = 'chase-chip' | 'demolish-chip' | 'demolish-crack' | 'demolish-spall' | 'demolish-break';
+export type MasonryImpactKind = 'chase-chip' | 'demolish-chip' | 'demolish-crack' | 'demolish-spall' | 'demolish-split' | 'demolish-break';
 export interface MasonryImpact {
   points: THREE.Vector3[];
   kind: MasonryImpactKind;
@@ -67,7 +68,8 @@ const chaseBackMaterial = new THREE.MeshStandardMaterial({ color: 0x8f3c25, roug
 const chaseSideMaterial = new THREE.MeshStandardMaterial({ color: 0x74301f, roughness: 1, metalness: 0, side: THREE.DoubleSide });
 const bondedPerimeterMaterial = new THREE.MeshStandardMaterial({ color: 0xa94428, roughness: 1, metalness: 0, side: THREE.DoubleSide });
 const chaseVoidMaterial = new THREE.MeshStandardMaterial({ color: 0x35120d, roughness: 1, metalness: 0 });
-const fractureMaterial = new THREE.MeshStandardMaterial({ color: 0x64291d, roughness: 1, metalness: 0, transparent: true, opacity: 0.2, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+const fractureMaterial = new THREE.MeshStandardMaterial({ color: 0x5d2418, roughness: 1, metalness: 0, transparent: true, opacity: 0.52, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+const splitFractureMaterial = new THREE.MeshStandardMaterial({ color: 0x3b150f, roughness: 1, metalness: 0, transparent: true, opacity: 0.82, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 });
 const CHASE_GRID_X = 20;
 const CHASE_GRID_Y = 10;
 const CHASE_DEPTH = 0.055;
@@ -79,6 +81,7 @@ const DEMOLISH_RADIUS_Y = 0.165;
 const DEMOLISH_SPALL_RADIUS_X = 0.39;
 const DEMOLISH_SPALL_RADIUS_Y = 0.28;
 const DEMOLISH_HITS = 4;
+const DEMOLISH_SPLIT_HIT = 6;
 const DEMOLISH_THROUGH_DEPTH = 0.165;
 const WALL_COLUMNS = 21;
 const WALL_ROWS = 23;
@@ -214,8 +217,8 @@ export class BrickWall extends THREE.Group {
     return this.cast(camera, 0, 0, maxDistance);
   }
 
-  private registerTarget(source: Omit<BrickTarget, 'damage' | 'destroyed' | 'originalHidden' | 'carvedCells' | 'carvedDepths' | 'breachCells' | 'replacement' | 'cracks' | 'demolitionOrigin' | 'demolitionSeed'>): BrickTarget {
-    const target: BrickTarget = { ...source, center: source.center.clone(), size: source.size.clone(), damage: 0, destroyed: false, originalHidden: false, carvedCells: new Set(), carvedDepths: new Map(), breachCells: new Set(), replacement: null, cracks: null, demolitionOrigin: null, demolitionSeed: 0 };
+  private registerTarget(source: Omit<BrickTarget, 'damage' | 'impactCount' | 'destroyed' | 'originalHidden' | 'carvedCells' | 'carvedDepths' | 'breachCells' | 'replacement' | 'cracks' | 'demolitionOrigin' | 'demolitionSeed'>): BrickTarget {
+    const target: BrickTarget = { ...source, center: source.center.clone(), size: source.size.clone(), damage: 0, impactCount: 0, destroyed: false, originalHidden: false, carvedCells: new Set(), carvedDepths: new Map(), breachCells: new Set(), replacement: null, cracks: null, demolitionOrigin: null, demolitionSeed: 0 };
     this.targets.push(target);
     this.targetsById.set(target.id, target);
     return target;
@@ -371,7 +374,8 @@ export class BrickWall extends THREE.Group {
     }
     hit.point.copy(target.demolitionOrigin);
     if (target.damage === 0) this.damagedBricks += 1;
-    target.damage = Math.min(DEMOLISH_HITS, target.damage + 1);
+    target.impactCount += 1;
+    target.damage = Math.min(DEMOLISH_HITS, target.impactCount);
     let debrisSeed = hashString(`${target.demolitionSeed}:stage:${target.damage}`);
     this.clearPaintAt(hit.point, target.damage === DEMOLISH_HITS ? 0.11 : 0.045);
     let kind: MasonryImpactKind = target.damage === 1 ? 'demolish-chip' : target.damage === 2 ? 'demolish-crack' : 'demolish-spall';
@@ -383,12 +387,15 @@ export class BrickWall extends THREE.Group {
       debrisSeed = impactSeed;
       impactPoints = this.applyWallScaleImpact(target, hit.point, impactSeed, !firstDeepStrike);
       destroyed = target.destroyed;
-      kind = destroyed ? 'demolish-break' : 'demolish-spall';
+      kind = destroyed ? 'demolish-break' : target.impactCount >= DEMOLISH_SPLIT_HIT ? 'demolish-split' : 'demolish-spall';
       if (destroyed) {
         this.heldDemolitionTarget = null;
         this.heldDemolitionPoint = null;
       }
-      this.addFractures(target, hit.point, DEMOLISH_HITS, impactSeed);
+      // Rebuild the same fracture family at a larger accumulated state. The
+      // crack therefore propagates instead of being replaced by unrelated
+      // hairlines after every blow.
+      if (!destroyed) this.addFractures(target, hit.point, target.impactCount, target.demolitionSeed);
     } else {
       this.applyWallScaleVibration(target, hit.point, target.demolitionSeed, target.damage / DEMOLISH_HITS);
       this.addFractures(target, hit.point, target.damage, target.demolitionSeed);
@@ -440,6 +447,8 @@ export class BrickWall extends THREE.Group {
   get freeMarkCount(): number { return this.sprayMarks.length + this.liveStrokeSamples; }
   get destroyedBrickCount(): number { return this.destroyedBricks; }
   get damagedBrickCount(): number { return this.damagedBricks; }
+  get splitBrickCount(): number { return this.targets.filter(target => !target.destroyed && target.impactCount >= DEMOLISH_SPLIT_HIT).length; }
+  get maximumDemolitionStrikeCount(): number { return this.targets.reduce((count, target) => Math.max(count, target.impactCount), 0); }
   get recessedBrickCount(): number { return this.chaseRecessedBricks; }
   get carvedCellCount(): number { return this.chaseCarvedCells; }
   get chaseDepthMm(): number { return CHASE_DEPTH * 1000; }
@@ -538,7 +547,7 @@ export class BrickWall extends THREE.Group {
     const target = this.findTargetAtWallPoint(point, null, 0.025) ?? fallback;
     const response = this.demolitionResponse(point, 1, sites);
     const inset = THREE.MathUtils.clamp(response.excavationDepth + response.deformation, -0.012, target.size.z - 0.012);
-    return target.center.z + target.size.z / 2 - inset + 0.006;
+    return target.center.z + target.size.z / 2 - inset + 0.0012;
   }
 
   private findTargetsNearPoint(point: THREE.Vector3, margin: number): BrickTarget[] {
@@ -1227,9 +1236,11 @@ export class BrickWall extends THREE.Group {
     target.replacement = null;
   }
 
-  private addFractures(target: BrickTarget, impact: THREE.Vector3, damage: number, seed: number): void {
+  private addFractures(target: BrickTarget, impact: THREE.Vector3, strikeCount: number, seed: number): void {
     this.removeCracks(target);
     const random = seeded(seed);
+    const progressiveDamage = Math.min(strikeCount, 10);
+    const visiblySplit = strikeCount >= DEMOLISH_SPLIT_HIT;
     const relevantSites = this.demolitionSitesForTarget(target);
     const group = new THREE.Group();
     group.name = `Wall-scale bonded masonry fractures ${target.id}`;
@@ -1246,7 +1257,9 @@ export class BrickWall extends THREE.Group {
       if (direction.lengthSq() < 0.000001) return;
       const midpoint = from.clone().add(to).multiplyScalar(0.5);
       const response = this.demolitionResponse(midpoint, 0.94, relevantSites);
-      if (response.breached || damage >= DEMOLISH_HITS && response.excavationDepth > 0.006) return;
+      // A retained crater still carries cracks. Hiding every ribbon over an
+      // excavated face was the reason repeated blows appeared to do nothing.
+      if (response.breached) return;
       const normal = new THREE.Vector2(-direction.y, direction.x).normalize().multiplyScalar(width / 2);
       const offset = vertices.length / 3;
       const fromZ = this.wallFrontZAt(from, target, relevantSites);
@@ -1284,7 +1297,9 @@ export class BrickWall extends THREE.Group {
             if (Math.abs(jointX - next.x) <= 0.012) next.x = jointX;
           }
         }
-        addRibbonSegment(current, next, initialWidth * (0.95 - 0.52 * travelled / Math.max(length, 0.001)));
+        const taperedWidth = initialWidth * (0.95 - 0.52 * travelled / Math.max(length, 0.001));
+        const segmentWidth = visiblySplit && travelled < length * 0.35 ? Math.max(0.001, taperedWidth) : taperedWidth;
+        addRibbonSegment(current, next, segmentWidth);
         points.push(next);
         current = next;
         travelled += segment;
@@ -1295,31 +1310,36 @@ export class BrickWall extends THREE.Group {
 
     const origin = new THREE.Vector2(impact.x, impact.y);
     const baseHeading = random() * Math.PI * 2;
-    const trunkCount = THREE.MathUtils.clamp(1 + Math.floor(random() * 2) + (damage >= DEMOLISH_HITS ? 1 : 0), 1, 3);
-    const width = 0.00035 + damage * (0.00006 + random() * 0.00005);
+    const trunkCount = THREE.MathUtils.clamp(1 + Math.floor(random() * 2) + (progressiveDamage >= 3 ? 1 : 0) + (visiblySplit ? 1 : 0), 1, 4);
+    const width = THREE.MathUtils.clamp(
+      Math.max(visiblySplit ? 0.001 : 0, 0.00028 + progressiveDamage * (0.00006 + random() * 0.000045)),
+      0.00038,
+      0.0018,
+    );
     const trunks: THREE.Vector2[][] = [];
     for (let trunkIndex = 0; trunkIndex < trunkCount; trunkIndex += 1) {
       const heading = trunkIndex === 0 ? baseHeading : baseHeading + (random() - 0.5) * Math.PI * 1.75;
-      const length = (0.022 + damage * 0.016) * (0.55 + random() * 0.55);
+      const length = (0.022 + progressiveDamage * 0.014) * (0.55 + random() * 0.55);
       const startOffset = random() < 0.35 ? random() * 0.012 : 0;
       const start = origin.clone().add(new THREE.Vector2(Math.cos(heading), Math.sin(heading)).multiplyScalar(startOffset));
-      trunks.push(buildPath(start, heading, length, width * (0.72 + random() * 0.36), random() * 0.38, (random() - 0.5) * 0.045));
+      const trunkWidth = visiblySplit ? Math.max(0.001, width * (0.72 + random() * 0.36)) : width * (0.72 + random() * 0.36);
+      trunks.push(buildPath(start, heading, length, trunkWidth, random() * 0.38, (random() - 0.5) * 0.045));
     }
-    const branchCount = random() < 0.18 + damage * 0.09 ? 1 : 0;
+    const branchCount = visiblySplit ? 1 + Math.floor(random() * 2) : random() < 0.18 + progressiveDamage * 0.09 ? 1 : 0;
     for (let branch = 0; branch < branchCount; branch += 1) {
       const trunk = trunks[Math.floor(random() * trunks.length)];
       if (trunk.length < 2) continue;
       const branchStart = trunk[1 + Math.floor(random() * (trunk.length - 1))];
       const heading = Math.atan2(branchStart.y - origin.y, branchStart.x - origin.x) + (random() < 0.5 ? -1 : 1) * (0.38 + random() * 1.04);
-      buildPath(branchStart, heading, 0.018 + random() * (0.018 + damage * 0.008), width * (0.32 + random() * 0.3), random() * 0.32, (random() - 0.5) * 0.065);
+      buildPath(branchStart, heading, 0.018 + random() * (0.018 + progressiveDamage * 0.008), width * (0.32 + random() * 0.3), random() * 0.32, (random() - 0.5) * 0.065);
     }
     if (vertices.length === 0) return;
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
-    const seam = new THREE.Mesh(geometry, fractureMaterial);
-    seam.name = `Continuous mortar-and-brick crack network ${target.id}`;
+    const seam = new THREE.Mesh(geometry, visiblySplit ? splitFractureMaterial : fractureMaterial);
+    seam.name = `${visiblySplit ? 'Open split' : 'Progressive crack'} in bonded masonry ${target.id}`;
     seam.raycast = () => undefined;
     seam.renderOrder = 3;
     group.add(seam);
@@ -1329,6 +1349,8 @@ export class BrickWall extends THREE.Group {
     group.userData.span = span;
     group.userData.maximumSegmentLength = maximumSegmentLength;
     group.userData.maximumWidthMm = maximumWidth * 1000;
+    group.userData.strikeCount = strikeCount;
+    group.userData.visiblySplit = visiblySplit;
     group.userData.samples = pathPoints.map(point => ({ x: point.x, y: point.y }));
     this.add(group);
     target.cracks = group;

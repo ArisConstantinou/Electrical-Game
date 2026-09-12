@@ -226,7 +226,7 @@ const brittleSurfaceIntegrity = await demolition.evaluate(() => ({
     return maximum;
   }, 0),
 }));
-if (variedWallDamage.floatingStaticPieces !== 0 || variedWallDamage.unsupportedAnchoredRemnants !== 0 || variedWallDamage.demolitionMicroCellBoxes !== 0 || variedWallDamage.demolitionSurfaceTriangles < 2 || brittleSurfaceIntegrity.openSeams !== 0 || brittleSurfaceIntegrity.sealedPerimeterTriangles < 2 || brittleSurfaceIntegrity.surfaceNormalDeviation > 0.0001 || brittleSurfaceIntegrity.maximumSurfaceWarpMm > 6.1 || brittleSurfaceIntegrity.maximumSurfaceTrianglesPerTarget > 400 || brittleSurfaceIntegrity.maximumRelevantSitesPerTarget > 12 || brittleSurfaceIntegrity.maximumFractureSegmentLength > 0.04 || brittleSurfaceIntegrity.maximumFractureWidthMm > 1 || variedWallDamage.fracturePatterns < 2 || variedWallDamage.breachedWallCells !== 0 || variedWallDamage.deformedWallCells < 100 || variedWallDamage.maximumFractureSpan < 0.015 || variedWallDamage.maximumFractureSpan > 0.22 || new Set(variedImpactProfiles.map(profile => JSON.stringify(profile))).size < 2) {
+if (variedWallDamage.floatingStaticPieces !== 0 || variedWallDamage.unsupportedAnchoredRemnants !== 0 || variedWallDamage.demolitionMicroCellBoxes !== 0 || variedWallDamage.demolitionSurfaceTriangles < 2 || brittleSurfaceIntegrity.openSeams !== 0 || brittleSurfaceIntegrity.sealedPerimeterTriangles < 2 || brittleSurfaceIntegrity.surfaceNormalDeviation > 0.0001 || brittleSurfaceIntegrity.maximumSurfaceWarpMm > 6.1 || brittleSurfaceIntegrity.maximumSurfaceTrianglesPerTarget > 400 || brittleSurfaceIntegrity.maximumRelevantSitesPerTarget > 12 || brittleSurfaceIntegrity.maximumFractureSegmentLength > 0.04 || brittleSurfaceIntegrity.maximumFractureWidthMm > 1.8 || variedWallDamage.fracturePatterns < 2 || variedWallDamage.breachedWallCells !== 0 || variedWallDamage.deformedWallCells < 100 || variedWallDamage.maximumFractureSpan < 0.015 || variedWallDamage.maximumFractureSpan > 0.22 || new Set(variedImpactProfiles.map(profile => JSON.stringify(profile))).size < 2) {
   throw new Error(`DEMOLISH did not produce distinct brittle partial-depth wall damage: ${JSON.stringify({ variedWallDamage, variedImpactProfiles, brittleSurfaceIntegrity })}`);
 }
 await demolition.evaluate(() => {
@@ -363,7 +363,7 @@ for (let hit = 0; hit < 3; hit += 1) {
 }
 const crackedState = await state(demolitionDetail);
 const crackStyle = await demolitionDetail.evaluate(() => ({ maximumSegmentLength: window.__wireTheHouse.room.brickWall.maximumFractureSegmentLength, maximumWidthMm: window.__wireTheHouse.room.brickWall.maximumFractureWidthMm }));
-if (crackedState.workSurface.destroyedBricks !== 0 || crackedState.workSurface.damagedBricks !== 1 || crackedState.workSurface.fractureSegments < 3 || crackedState.workSurface.maximumFractureSpan < 0.025 || crackedState.workSurface.maximumFractureSpan > 0.22 || crackStyle.maximumSegmentLength > 0.04 || crackStyle.maximumWidthMm > 1 || crackedState.workSurface.deformedWallCells < 100) throw new Error(`DEMOLISH produced missing or oversized progressive cracking: ${JSON.stringify({ workSurface: crackedState.workSurface, crackStyle })}`);
+if (crackedState.workSurface.destroyedBricks !== 0 || crackedState.workSurface.damagedBricks !== 1 || crackedState.workSurface.fractureSegments < 3 || crackedState.workSurface.maximumFractureSpan < 0.025 || crackedState.workSurface.maximumFractureSpan > 0.22 || crackStyle.maximumSegmentLength > 0.04 || crackStyle.maximumWidthMm > 1.8 || crackedState.workSurface.deformedWallCells < 100) throw new Error(`DEMOLISH produced missing or oversized progressive cracking: ${JSON.stringify({ workSurface: crackedState.workSurface, crackStyle })}`);
 await demolitionDetail.screenshot({ path: outputPath('desktop-progressive-demolition-cracks.png') });
 await demolitionDetail.evaluate(() => {
   const game = window.__wireTheHouse;
@@ -378,6 +378,32 @@ if (fracturedState.workSurface.destroyedBricks !== 0 || fracturedState.workSurfa
   throw new Error(`Four DEMOLISH hits did not finish with bonded partial-depth wall damage: ${JSON.stringify(fracturedState.workSurface)}`);
 }
 await demolitionDetail.screenshot({ path: outputPath('desktop-progressive-demolition-fragments.png') });
+for (let hit = 0; hit < 2; hit += 1) {
+  await demolitionDetail.evaluate(() => {
+    const game = window.__wireTheHouse;
+    game.renderer.camera.lookAt(game.qaDemolitionTarget);
+    game.renderer.camera.updateMatrixWorld(true);
+    game.chasing.freeHit(game.renderer.camera);
+    game.chasing.update(1 / 60);
+    game.renderer.render();
+  });
+}
+const splitState = await state(demolitionDetail);
+const splitGeometry = await demolitionDetail.evaluate(() => {
+  const wall = window.__wireTheHouse.room.brickWall;
+  const target = wall.targets.find(item => item.impactCount >= 6 && !item.destroyed);
+  const seam = target?.cracks?.children.find(child => child.name.startsWith('Open split'));
+  return {
+    impactCount: target?.impactCount ?? 0,
+    hasOpenSplit: Boolean(seam),
+    visiblySplit: Boolean(target?.cracks?.userData.visiblySplit),
+    maximumWidthMm: wall.maximumFractureWidthMm,
+  };
+});
+if (splitState.workSurface.destroyedBricks !== 0 || splitState.workSurface.splitBricks !== 1 || splitState.workSurface.maximumDemolitionStrikes < 6 || !splitGeometry.hasOpenSplit || !splitGeometry.visiblySplit || splitGeometry.impactCount < 6 || splitGeometry.maximumWidthMm < 1 || splitGeometry.maximumWidthMm > 1.8) {
+  throw new Error(`Repeated DEMOLISH impacts did not progress from a crater into a visible bonded split: ${JSON.stringify({ workSurface: splitState.workSurface, splitGeometry })}`);
+}
+await demolitionDetail.screenshot({ path: outputPath('desktop-progressive-demolition-split.png') });
 const solidFragmentMaterials = await demolitionDetail.evaluate(() => {
   const materials = [];
   window.__wireTheHouse.renderer.scene.traverse(object => {

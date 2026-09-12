@@ -44,6 +44,7 @@ export class InteractionSystem {
         const feedback = impact?.kind === 'demolish-chip' ? 'Surface chipped — keep striking.'
           : impact?.kind === 'demolish-crack' ? 'Cracks spreading — two solid hits remain.'
             : impact?.kind === 'demolish-spall' ? 'Brick spalling — one solid hit remains.'
+              : impact?.kind === 'demolish-split' ? 'Cracks opened and the bonded brick face is splitting.'
               : impact?.kind === 'demolish-break' ? 'Brick fractured into uneven rubble.'
                 : 'Aim the demolition hammer at an intact brick.';
         return { success: Boolean(impact), message: feedback };

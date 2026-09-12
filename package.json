@@ -9,6 +9,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 5363 --strictPort",
     "typecheck": "tsc -b --pretty false",
+    "test:demolition-logic": "node tests/demolition-progression-smoke.mjs",
     "test:gameplay": "node tests/gameplay-smoke.mjs",
     "test:studio": "node tests/studio-contract.mjs",
     "test:studio-live": "node tests/studio-live-smoke.mjs"
