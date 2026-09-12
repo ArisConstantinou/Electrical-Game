@@ -124,6 +124,21 @@ if (Math.abs(tallLayout.shellHeight - tallLayout.innerHeight) > 1 || tallLayout.
 await tallDesktop.screenshot({ path: outputPath('desktop-tall-viewport.png') });
 await tallDesktop.close();
 
+const hybridDesktop = await browser.newPage({ viewport: { width: 1366, height: 768 } });
+await hybridDesktop.addInitScript(() => Object.defineProperty(navigator, 'maxTouchPoints', { configurable: true, get: () => 10 }));
+await hybridDesktop.goto(baseUrl, { waitUntil: 'networkidle' });
+await hybridDesktop.click('#start-button');
+await hybridDesktop.waitForTimeout(120);
+const hybridPointerLock = await hybridDesktop.evaluate(() => ({
+  finePointer: matchMedia('(any-pointer: fine)').matches,
+  maxTouchPoints: navigator.maxTouchPoints,
+  lockedCanvas: document.pointerLockElement === document.querySelector('#game-canvas'),
+}));
+if (!hybridPointerLock.finePointer || hybridPointerLock.maxTouchPoints !== 10 || !hybridPointerLock.lockedCanvas) {
+  throw new Error(`Touch-capable desktop did not retain mouse Pointer Lock: ${JSON.stringify(hybridPointerLock)}`);
+}
+await hybridDesktop.close();
+
 const demolition = await browser.newPage({ viewport: { width: 1366, height: 768 } });
 await demolition.goto(baseUrl, { waitUntil: 'networkidle' });
 await demolition.click('#start-button');
@@ -410,6 +425,14 @@ await desktop.mouse.move(680, 380);
 await desktop.mouse.move(740, 330);
 const afterLook = await state(desktop);
 if (afterLook.player.yaw === beforeMove.player.yaw || afterLook.player.pitch === beforeMove.player.pitch) throw new Error('Desktop Pointer Lock mouse look did not update yaw and pitch');
+const beforePointerSpike = await state(desktop);
+await desktop.evaluate(() => {
+  document.dispatchEvent(new MouseEvent('mousemove', { movementX: 2400, movementY: -1800, bubbles: true }));
+});
+const afterPointerSpike = await state(desktop);
+if (afterPointerSpike.player.yaw !== beforePointerSpike.player.yaw || afterPointerSpike.player.pitch !== beforePointerSpike.player.pitch) {
+  throw new Error(`Desktop mouse look accepted an implausible Pointer Lock spike: ${JSON.stringify({ before: beforePointerSpike.player, after: afterPointerSpike.player })}`);
+}
 await desktop.mouse.wheel(0, 120);
 if ((await state(desktop)).mission.selectedTool !== 'hammer') throw new Error('Desktop mouse wheel did not cycle the visible work tool');
 await desktop.keyboard.press('Digit3');
@@ -455,7 +478,7 @@ const afterRightClick = await desktop.evaluate(() => ({
   held: window.__wireTheHouse.input.actionHeld,
   requested: window.__wireTheHouse.input.actionRequested,
   marks: JSON.parse(window.render_game_to_text()).workSurface.freeSprayMarks,
-  locked: document.pointerLockElement === document.querySelector('#game-shell'),
+  locked: document.pointerLockElement === document.querySelector('#game-canvas'),
 }));
 if (!afterRightClick.locked || afterRightClick.held || afterRightClick.requested || afterRightClick.marks !== marksBeforeRightClick) {
   throw new Error(`Right mouse must only restore Pointer Lock, never spray: ${JSON.stringify({ marksBeforeRightClick, afterRightClick })}`);

@@ -63,6 +63,7 @@ export class Game {
   private wasSpraying = false;
   private wasLeveling = false;
   private readonly mobileControls: MobileControls;
+  private readonly desktopControls: DesktopControls;
 
   constructor(root: HTMLElement) {
     this.hud = new HUD(root);
@@ -79,13 +80,13 @@ export class Game {
     this.conduit = new ConduitSystem(this.renderer.scene);
     this.interaction = new InteractionSystem(new MarkingSystem(this.room.brickWall), this.chasing, new MortarSystem(), this.leveling, this.conduit);
     this.applySpraySettings();
-    new DesktopControls(this.hud.shell, this.player, this.input);
+    this.desktopControls = new DesktopControls(this.hud.shell, this.renderer.webgl.domElement, this.player, this.input);
     this.mobileControls = new MobileControls(this.hud.shell, this.input, this.player, () => this.selectedTool);
     new MobileHUD();
     this.bindEvents();
     this.hud.onStart(() => {
       this.started = true;
-      if (!matchMedia('(pointer: coarse)').matches && navigator.maxTouchPoints === 0) void this.hud.shell.requestPointerLock();
+      if (matchMedia('(any-pointer: fine)').matches) this.desktopControls.requestLock();
     });
     addEventListener('resize', this.renderer.resize);
     this.assets.markLoaded('procedural-core');

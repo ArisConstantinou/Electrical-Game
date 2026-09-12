@@ -2,21 +2,23 @@ import type { PlayerController } from './PlayerController';
 import type { Input } from '../core/Input';
 
 export class DesktopControls {
-  constructor(surface: HTMLElement, player: PlayerController, input: Input) {
+  private ignoreNextLockedMove = false;
+
+  constructor(surface: HTMLElement, private readonly lockTarget: HTMLElement, player: PlayerController, input: Input) {
     let primaryDown = false;
     surface.addEventListener('pointerdown', event => {
-      if (this.isTouchDevice || (event.target as Element).closest('button')) return;
+      if ((event.pointerType && event.pointerType !== 'mouse') || (event.target as Element).closest('button')) return;
       if (event.button === 2) {
         event.preventDefault();
         input.actionHeld = false;
         input.actionRequested = false;
         window.dispatchEvent(new CustomEvent('wirehouse:exit-leveling'));
-        if (document.pointerLockElement !== surface) void surface.requestPointerLock();
+        if (document.pointerLockElement !== this.lockTarget) this.requestLock();
         return;
       }
       if (event.button !== 0) return;
       event.preventDefault();
-      const relocking = document.pointerLockElement !== surface;
+      const relocking = document.pointerLockElement !== this.lockTarget;
       if (primaryDown) return;
       primaryDown = true;
       if (relocking) {
@@ -25,7 +27,7 @@ export class DesktopControls {
         // remains a relock/cancel-only input and can never queue an action.
         input.actionHeld = true;
         input.actionRequested = true;
-        void surface.requestPointerLock();
+        this.requestLock();
         return;
       }
       input.actionHeld = true;
@@ -44,13 +46,20 @@ export class DesktopControls {
       input.actionHeld = false;
     });
     document.addEventListener('pointerlockchange', () => {
-      if (document.pointerLockElement !== surface) {
+      this.ignoreNextLockedMove = document.pointerLockElement === this.lockTarget;
+      if (document.pointerLockElement !== this.lockTarget) {
         input.actionHeld = false;
         input.actionRequested = false;
       }
     });
     document.addEventListener('mousemove', event => {
-      if (document.pointerLockElement === surface) player.look(event.movementX, event.movementY);
+      if (document.pointerLockElement !== this.lockTarget) return;
+      if (this.ignoreNextLockedMove) {
+        this.ignoreNextLockedMove = false;
+        return;
+      }
+      if (!this.isPlausibleMovement(event.movementX, event.movementY)) return;
+      player.look(event.movementX, event.movementY);
     });
     surface.addEventListener('wheel', event => {
       event.preventDefault();
@@ -69,5 +78,24 @@ export class DesktopControls {
     });
   }
 
-  get isTouchDevice(): boolean { return matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0; }
+  requestLock(): void {
+    if (document.pointerLockElement === this.lockTarget) return;
+    try {
+      const request = this.lockTarget.requestPointerLock({ unadjustedMovement: true });
+      if (request) void request.catch(error => {
+        if (error instanceof DOMException && error.name === 'NotSupportedError') void this.lockTarget.requestPointerLock();
+      });
+    } catch (error) {
+      if (error instanceof DOMException && error.name !== 'NotSupportedError') return;
+      void this.lockTarget.requestPointerLock();
+    }
+  }
+
+  private isPlausibleMovement(deltaX: number, deltaY: number): boolean {
+    if (!Number.isFinite(deltaX) || !Number.isFinite(deltaY)) return false;
+    const maximumX = Math.max(240, this.lockTarget.clientWidth * 0.25);
+    const maximumY = Math.max(180, this.lockTarget.clientHeight * 0.25);
+    return Math.abs(deltaX) <= maximumX && Math.abs(deltaY) <= maximumY;
+  }
+
 }
