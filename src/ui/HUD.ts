@@ -61,7 +61,7 @@ export class HUD {
           <div id="mobile-controls" aria-label="Mobile controls">
             <div id="joystick" aria-label="Movement joystick"><div class="joystick-ring"></div><div id="joystick-thumb"></div></div>
             <div class="mobile-actions">
-              <button id="mobile-action">ACTION</button>
+              <button id="mobile-action"><strong>ACTION</strong><small>2× TAP + HOLD LOOK</small></button>
               <div><button id="tool-prev" aria-label="Previous tool">◀ TOOL</button><button id="tool-next" aria-label="Next tool">TOOL ▶</button></div>
             </div>
           </div>

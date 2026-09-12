@@ -4,8 +4,12 @@ import type { PlayerController } from './PlayerController';
 export class MobileControls {
   private joystickPointer: number | null = null;
   private lookPointer: number | null = null;
+  private lookActionPointer: number | null = null;
   private lookX = 0;
   private lookY = 0;
+  private lastLookTapAt = Number.NEGATIVE_INFINITY;
+  private lastLookTapX = 0;
+  private lastLookTapY = 0;
 
   constructor(private readonly surface: HTMLElement, private readonly input: Input, private readonly player: PlayerController) {
     surface.addEventListener('pointerdown', this.onPointerDown, { passive: false });
@@ -43,6 +47,18 @@ export class MobileControls {
       try { this.surface.setPointerCapture(event.pointerId); } catch { /* Synthetic QA events do not own an active pointer. */ }
       this.lookX = event.clientX;
       this.lookY = event.clientY;
+      const now = performance.now();
+      const surfaceRect = this.surface.getBoundingClientRect();
+      const isRightLookZone = event.clientX >= surfaceRect.left + surfaceRect.width * 0.48;
+      const isNearbyTap = Math.hypot(event.clientX - this.lastLookTapX, event.clientY - this.lastLookTapY) <= 56;
+      if (isRightLookZone && now - this.lastLookTapAt <= 340 && isNearbyTap) {
+        this.lookActionPointer = event.pointerId;
+        this.input.actionHeld = true;
+        this.input.actionRequested = true;
+      }
+      this.lastLookTapAt = now;
+      this.lastLookTapX = event.clientX;
+      this.lastLookTapY = event.clientY;
     }
   };
 
@@ -66,12 +82,23 @@ export class MobileControls {
       event.preventDefault();
       this.releaseJoystick();
     }
-    if (event.pointerId === this.lookPointer) { event.preventDefault(); this.lookPointer = null; }
+    if (event.pointerId === this.lookPointer) {
+      event.preventDefault();
+      this.lookPointer = null;
+      if (event.pointerId === this.lookActionPointer) {
+        this.lookActionPointer = null;
+        this.input.actionHeld = false;
+      }
+    }
   };
 
   private onLostCapture = (event: PointerEvent): void => {
     if (event.pointerId === this.joystickPointer) this.releaseJoystick();
     if (event.pointerId === this.lookPointer) this.lookPointer = null;
+    if (event.pointerId === this.lookActionPointer) {
+      this.lookActionPointer = null;
+      this.input.actionHeld = false;
+    }
   };
 
   private releaseJoystick(): void {

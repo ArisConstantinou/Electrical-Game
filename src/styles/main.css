@@ -64,7 +64,8 @@ button {
 .joystick-ring { position: absolute; inset: 0; border: 2px solid rgba(255,255,255,.32); border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.08), rgba(20,18,15,.35)); box-shadow: inset 0 0 0 15px rgba(255,255,255,.025); }
 #joystick-thumb { position: absolute; left: 50%; top: 50%; width: 58px; height: 58px; transform: translate(-50%,-50%); border: 2px solid rgba(255,255,255,.72); border-radius: 50%; background: linear-gradient(145deg, rgba(218,116,65,.9), rgba(123,55,29,.92)); box-shadow: 0 6px 18px rgba(0,0,0,.35); }
 .mobile-actions { position: absolute; right: max(18px, env(safe-area-inset-right)); bottom: max(22px, env(safe-area-inset-bottom)); display: grid; gap: 8px; width: 154px; pointer-events: auto; }
-.mobile-actions > button { min-height: 64px; background: #b85930; border-color: #e28c60; font-size: 18px; }
+.mobile-actions > button { display: grid; place-content: center; gap: 5px; min-height: 72px; background: #b85930; border-color: #e28c60; font-size: 18px; }
+.mobile-actions > button small { font: 700 12px/1 'Barlow Condensed', sans-serif; letter-spacing: .045em; }
 .mobile-actions div { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
 .screen-panel { position: absolute; z-index: 10; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: clamp(28px, 7vw, 110px); background: linear-gradient(90deg, rgba(20,18,15,.96) 0%, rgba(20,18,15,.86) 44%, rgba(20,18,15,.2) 100%), linear-gradient(0deg, rgba(146,67,33,.22), transparent); transition: opacity .35s ease, visibility .35s ease; }
 .screen-panel.hidden { opacity: 0; visibility: hidden; pointer-events: none; }

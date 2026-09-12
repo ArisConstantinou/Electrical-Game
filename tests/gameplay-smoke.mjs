@@ -288,6 +288,27 @@ const mobileButtonStyles = await mobile.evaluate(() => {
   return { tapHighlight: style.webkitTapHighlightColor, userSelect: style.userSelect, touchAction: style.touchAction };
 });
 if (!['rgba(0, 0, 0, 0)', 'transparent'].includes(mobileButtonStyles.tapHighlight) || mobileButtonStyles.userSelect !== 'none' || mobileButtonStyles.touchAction !== 'manipulation') throw new Error(`Mobile buttons allow browser highlight or selection: ${JSON.stringify(mobileButtonStyles)}`);
+await aimAtActive(mobile);
+const doubleTapHold = await mobile.evaluate(() => {
+  const game = window.__wireTheHouse;
+  const shell = document.querySelector('#game-shell');
+  window.dispatchEvent(new CustomEvent('wirehouse:select-tool', { detail: 'spray' }));
+  const rect = shell.getBoundingClientRect();
+  const x = rect.left + rect.width * 0.68;
+  const y = rect.top + rect.height * 0.42;
+  const dispatch = (type, pointerId, clientX, clientY) => shell.dispatchEvent(new PointerEvent(type, { pointerId, pointerType: 'touch', clientX, clientY, bubbles: true, cancelable: true }));
+  const marksBefore = JSON.parse(window.render_game_to_text()).workSurface.freeSprayMarks;
+  dispatch('pointerdown', 171, x, y);
+  dispatch('pointerup', 171, x, y);
+  dispatch('pointerdown', 172, x, y);
+  const yawBefore = game.player.yaw;
+  dispatch('pointermove', 172, x - 28, y + 12);
+  window.advanceTime(360);
+  const during = { held: game.input.actionHeld, yaw: game.player.yaw, marks: JSON.parse(window.render_game_to_text()).workSurface.freeSprayMarks };
+  dispatch('pointerup', 172, x - 28, y + 12);
+  return { marksBefore, yawBefore, during, heldAfter: game.input.actionHeld };
+});
+if (!doubleTapHold.during.held || doubleTapHold.heldAfter || Math.abs(doubleTapHold.during.yaw - doubleTapHold.yawBefore) < 0.05 || doubleTapHold.during.marks <= doubleTapHold.marksBefore) throw new Error(`Double-tap-and-hold look did not rotate and use the selected tool: ${JSON.stringify(doubleTapHold)}`);
 if (!touchResult.move.defaultPrevented || touchResult.shellTouchAction !== 'none') throw new Error('Game touch-look did not suppress browser scrolling');
 if (touchResult.after.scrollY !== touchResult.before.scrollY) throw new Error('Viewport scrolled during game camera swipe');
 if (touchResult.footerTouchAction === 'none') throw new Error('Scroll prevention leaked outside the game area');
