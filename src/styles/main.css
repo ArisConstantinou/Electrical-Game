@@ -58,17 +58,26 @@ button {
 #level-readout span { flex: 1; padding: 8px; color: #ffc46f; background: #26231e; border: 1px solid #5d5142; font: 700 15px/1 'Barlow Condensed', sans-serif; text-align: center; }
 #level-readout span.ok { color: #9ee08f; border-color: #4e764a; }
 .level-buttons { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; }
-.level-buttons button, .mobile-actions button { min-height: 48px; border: 1px solid #81715f; color: #fff; background: #34302a; font: 800 14px/1 'Barlow Condensed', sans-serif; letter-spacing: .06em; }
+.level-buttons button { min-height: 48px; border: 1px solid #81715f; color: #fff; background: #34302a; font: 800 14px/1 'Barlow Condensed', sans-serif; letter-spacing: .06em; }
 .level-buttons .confirm { background: #b85930; border-color: #df8658; }
 .level-buttons .cancel { grid-column: 1 / -1; background: #292621; border-color: #756a5c; }
 #mobile-controls { display: none; position: absolute; z-index: 6; inset: 0; pointer-events: none; }
-#joystick { position: absolute; left: max(22px, env(safe-area-inset-left)); bottom: max(25px, env(safe-area-inset-bottom)); width: 142px; height: 142px; pointer-events: auto; touch-action: none; }
-.joystick-ring { position: absolute; inset: 0; border: 2px solid rgba(255,255,255,.32); border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.08), rgba(20,18,15,.35)); box-shadow: inset 0 0 0 15px rgba(255,255,255,.025); }
-#joystick-thumb { position: absolute; left: 50%; top: 50%; width: 58px; height: 58px; transform: translate(-50%,-50%); border: 2px solid rgba(255,255,255,.72); border-radius: 50%; background: linear-gradient(145deg, rgba(218,116,65,.9), rgba(123,55,29,.92)); box-shadow: 0 6px 18px rgba(0,0,0,.35); }
-.mobile-actions { position: absolute; right: max(18px, env(safe-area-inset-right)); bottom: max(22px, env(safe-area-inset-bottom)); display: grid; gap: 8px; width: 154px; pointer-events: auto; }
-.mobile-actions > button { display: grid; place-content: center; gap: 5px; min-height: 72px; background: #b85930; border-color: #e28c60; font-size: 18px; }
-.mobile-actions > button small { font: 700 12px/1 'Barlow Condensed', sans-serif; letter-spacing: .045em; }
-.mobile-actions div { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+#joystick, #look-joystick { position: absolute; bottom: calc(max(12px, env(safe-area-inset-bottom)) + 72px); width: 124px; height: 124px; pointer-events: auto; touch-action: none; }
+#joystick { left: max(16px, env(safe-area-inset-left)); }
+#look-joystick { right: max(16px, env(safe-area-inset-right)); }
+.joystick-ring, .look-joystick-ring { position: absolute; inset: 0; border: 2px solid rgba(255,255,255,.34); border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.08), rgba(20,18,15,.38)); box-shadow: inset 0 0 0 13px rgba(255,255,255,.025), 0 8px 24px rgba(0,0,0,.2); }
+.look-joystick-ring::before, .look-joystick-ring::after { content: ''; position: absolute; left: 50%; top: 50%; width: 1px; height: 72%; background: rgba(255,255,255,.16); transform: translate(-50%,-50%); }
+.look-joystick-ring::after { width: 72%; height: 1px; }
+#joystick-thumb, #look-joystick-thumb { position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; display: grid; place-items: center; transform: translate(-50%,-50%); border: 2px solid rgba(255,255,255,.72); border-radius: 50%; background: linear-gradient(145deg, rgba(218,116,65,.94), rgba(123,55,29,.94)); box-shadow: 0 6px 18px rgba(0,0,0,.35); pointer-events: none; }
+#look-joystick-thumb { border-color: rgba(159,220,244,.9); background: radial-gradient(circle at 35% 30%, #4d9ec0, #20536b); }
+#look-joystick-thumb span { color: #fff; font: 800 13px/1 'Barlow Condensed', sans-serif; }
+#look-joystick > small { position: absolute; left: 50%; bottom: -19px; width: 130px; color: rgba(255,255,255,.82); font: 800 12px/1 'Barlow Condensed', sans-serif; letter-spacing: .06em; text-align: center; transform: translateX(-50%); }
+#mobile-tool-slider { position: absolute; z-index: 8; left: max(8px, env(safe-area-inset-left)); right: max(8px, env(safe-area-inset-right)); bottom: max(7px, env(safe-area-inset-bottom)); display: flex; gap: 5px; height: 60px; padding: 5px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; background: rgba(25,23,20,.9); border: 1px solid rgba(224,169,121,.52); box-shadow: 0 8px 24px rgba(0,0,0,.28); pointer-events: auto; scroll-snap-type: x mandatory; }
+#mobile-tool-slider::-webkit-scrollbar { display: none; }
+#mobile-tool-slider button { flex: 1 0 52px; min-width: 52px; min-height: 48px; display: grid; place-items: center; gap: 1px; padding: 3px 2px; color: #d4d0c8; background: #2d2923; border: 1px solid #655b4f; scroll-snap-align: center; }
+#mobile-tool-slider button.selected { color: #fff; background: #9f4828; border-color: #f0a06f; box-shadow: inset 0 0 0 1px rgba(255,255,255,.18); }
+#mobile-tool-slider svg { width: 25px; height: 25px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+#mobile-tool-slider span { font: 800 12px/1 'Barlow Condensed', sans-serif; letter-spacing: .03em; }
 .screen-panel { position: absolute; z-index: 10; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: clamp(28px, 7vw, 110px); background: linear-gradient(90deg, rgba(20,18,15,.96) 0%, rgba(20,18,15,.86) 44%, rgba(20,18,15,.2) 100%), linear-gradient(0deg, rgba(146,67,33,.22), transparent); transition: opacity .35s ease, visibility .35s ease; }
 .screen-panel.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
 .screen-panel h1, .screen-panel h2 { margin: 10px 0 14px; font: 800 clamp(64px, 11vw, 148px)/.75 'Barlow Condensed', sans-serif; letter-spacing: -.045em; text-shadow: 0 8px 40px rgba(0,0,0,.45); }
@@ -114,9 +123,8 @@ button {
 }
 
 @media (max-height: 650px) and (pointer: coarse) {
-  #joystick { width: 116px; height: 116px; }
-  #joystick-thumb { width: 50px; height: 50px; }
-  .mobile-actions { width: 140px; }
+  #joystick, #look-joystick { width: 106px; height: 106px; }
+  #joystick-thumb, #look-joystick-thumb { width: 46px; height: 46px; }
   #interaction-prompt { top: max(92px, calc(env(safe-area-inset-top) + 82px)); }
   #level-panel { bottom: 148px; }
   .screen-panel p { margin: 6px 0 10px; }

@@ -11,6 +11,9 @@ Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web gam
 
 ## Current
 
+- Mobile controls now use a Trials-style dual-stick contract: independent captured pointers, normalized vectors, dead zone, bounded knob travel, and pointer-specific reset for MOVE and AIM.
+- The right AIM joystick center performs selected-tool action on double-tap-and-hold; the old ACTION and previous/next tool buttons are replaced by a six-icon horizontal tool slider.
+- Verified at 390×844 with distinct simultaneous pointers: movement advanced, aim yaw changed, held spray created marks, both vectors reset on release, all six icons rendered, legacy buttons were absent, and horizontal overflow stayed zero.
 - All game-shell elements now disable standard and WebKit text selection/callouts, while `selectstart` and `dragstart` are cancelled at the game boundary to prevent iOS Safari highlight handles.
 - Selection regression validates standard/WebKit user-select on nested button text and event cancellation; Chromium explicitly reports touch-callout as unsupported while Safari consumes the authored `none` rule.
 - Mobile right-side look now supports double-tap-and-hold: the held second tap continuously uses any selected tool while drag-look remains active.

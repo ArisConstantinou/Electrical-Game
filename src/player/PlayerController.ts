@@ -19,6 +19,9 @@ export class PlayerController {
   }
 
   update(dt: number): void {
+    if (this.input.mobileLook.x !== 0 || this.input.mobileLook.y !== 0) {
+      this.look(this.input.mobileLook.x * dt, this.input.mobileLook.y * dt, 1.9);
+    }
     const keyboardX = Number(this.input.pressed('KeyD')) - Number(this.input.pressed('KeyA'));
     const keyboardY = Number(this.input.pressed('KeyW')) - Number(this.input.pressed('KeyS'));
     let x = keyboardX + this.input.mobileMove.x;

@@ -60,10 +60,15 @@ export class HUD {
           </div>
           <div id="mobile-controls" aria-label="Mobile controls">
             <div id="joystick" aria-label="Movement joystick"><div class="joystick-ring"></div><div id="joystick-thumb"></div></div>
-            <div class="mobile-actions">
-              <button id="mobile-action"><strong>ACTION</strong><small>2× TAP + HOLD LOOK</small></button>
-              <div><button id="tool-prev" aria-label="Previous tool">◀ TOOL</button><button id="tool-next" aria-label="Next tool">TOOL ▶</button></div>
-            </div>
+            <div id="look-joystick" aria-label="Aim joystick; double tap and hold center to use selected tool"><div class="look-joystick-ring"></div><div id="look-joystick-thumb"><span id="mobile-action" aria-hidden="true">2×</span></div><small>AIM · HOLD TOOL</small></div>
+            <nav id="mobile-tool-slider" aria-label="Select tool">
+              <button type="button" data-tool="spray" aria-label="Spray"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M10 9h11l3 5v14H7V14zM12 4h8v5h-8z"/><path d="M24 11h5M26 7l4-2M26 15l4 2"/></svg><span>SPRAY</span></button>
+              <button type="button" data-tool="hammer" aria-label="Demolition hammer"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 8h17l5 5-5 5H5zM16 18v11"/></svg><span>HAMMER</span></button>
+              <button type="button" data-tool="fitting" aria-label="Fitting box"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="5" y="6" width="22" height="21" rx="2"/><circle cx="16" cy="16.5" r="5"/><path d="M8 10h3M21 10h3"/></svg><span>BOX</span></button>
+              <button type="button" data-tool="level" aria-label="Spirit level"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="9" width="26" height="14" rx="2"/><circle cx="16" cy="16" r="4"/><path d="M6 16h5M21 16h5"/></svg><span>LEVEL</span></button>
+              <button type="button" data-tool="spring" aria-label="Bending spring"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 24c2-16 5-16 7 0 2-16 5-16 7 0 2-16 5-16 7 0M3 27h25"/></svg><span>SPRING</span></button>
+              <button type="button" data-tool="cutter" aria-label="Pipe cutter"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="11" cy="23" r="5"/><circle cx="23" cy="23" r="5"/><path d="M14 19 25 5M20 19 8 5M8 5h17"/></svg><span>CUTTER</span></button>
+            </nav>
           </div>
           <section id="start-screen" class="screen-panel">
             <div class="eyebrow">CYPRUS · RESIDENTIAL FIRST FIX</div>
@@ -130,6 +135,11 @@ export class HUD {
       if (depthMarker) depthMarker.style.left = `${50 + Math.max(-42, Math.min(42, depth * 2.5))}%`;
     }
     this.tool.innerHTML = `<span>SELECTED TOOL</span><b class="selected">${selectedTool.toUpperCase()}</b><em>LEFT CLICK TO USE</em>`;
+    this.shell.querySelectorAll<HTMLButtonElement>('[data-tool]').forEach(button => {
+      const selected = button.dataset.tool === selectedTool;
+      button.classList.toggle('selected', selected);
+      button.setAttribute('aria-pressed', String(selected));
+    });
     this.shell.dataset.aimed = targeted ? 'true' : 'false';
   }
 
