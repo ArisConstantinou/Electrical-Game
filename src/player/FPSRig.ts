@@ -3,7 +3,16 @@ import * as THREE from 'three';
 export type RigTool = 'spray' | 'hammer' | 'fitting' | 'level' | 'spring' | 'cutter';
 export const RIG_TOOLS: RigTool[] = ['spray', 'hammer', 'fitting', 'level', 'spring', 'cutter'];
 
-const material = (color: number, roughness = 0.7, metalness = 0.05): THREE.MeshStandardMaterial => new THREE.MeshStandardMaterial({ color, roughness, metalness, depthTest: false });
+// The viewmodel belongs to the final transparent pass so wall paint can never
+// composite over the hands or tool, regardless of camera distance.
+const material = (color: number, roughness = 0.7, metalness = 0.05): THREE.MeshStandardMaterial => new THREE.MeshStandardMaterial({
+  color,
+  roughness,
+  metalness,
+  transparent: true,
+  depthTest: false,
+  depthWrite: false,
+});
 const place = (object: THREE.Object3D, x: number, y: number, z: number): THREE.Object3D => { object.position.set(x, y, z); object.renderOrder = 20; return object; };
 
 export class FPSRig extends THREE.Group {

@@ -88,7 +88,14 @@ export class BrickWall extends THREE.Group {
 
     const paintSurface = new THREE.Mesh(
       new THREE.PlaneGeometry(GAME_CONFIG.room.width, GAME_CONFIG.room.height),
-      new THREE.MeshBasicMaterial({ map: this.livePaintTexture, transparent: true, depthTest: false, depthWrite: false }),
+      new THREE.MeshBasicMaterial({
+        map: this.livePaintTexture,
+        transparent: true,
+        depthTest: true,
+        depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -2,
+      }),
     );
     paintSurface.name = 'Continuous live spray paint surface';
     paintSurface.userData.studioEntityId = 'world:brick-wall:live-paint';

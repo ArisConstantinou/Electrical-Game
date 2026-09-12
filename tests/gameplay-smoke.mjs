@@ -178,6 +178,23 @@ const response = await desktop.goto(baseUrl, { waitUntil: 'networkidle' });
 if (!response?.ok()) throw new Error(`Route did not load: ${response?.status()}`);
 await desktop.click('#start-button');
 await desktop.waitForTimeout(450);
+const paintLayerContract = await desktop.evaluate(() => {
+  const game = window.__wireTheHouse;
+  const paint = game.room.brickWall.getObjectByName('Continuous live spray paint surface');
+  const rigMaterials = [];
+  game.fpsRig.traverse(object => {
+    if (!object.isMesh) return;
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    for (const item of materials) rigMaterials.push({ transparent: item.transparent, depthWrite: item.depthWrite });
+  });
+  return {
+    paintDepthTest: paint?.material?.depthTest,
+    rigMaterials,
+  };
+});
+if (paintLayerContract.paintDepthTest !== true || paintLayerContract.rigMaterials.some(item => !item.transparent || item.depthWrite)) {
+  throw new Error(`Spray/viewmodel render layering is unsafe: ${JSON.stringify(paintLayerContract)}`);
+}
 if (!await desktop.locator('#desktop-key-guide').isVisible()) throw new Error('Desktop key guide is not visible during gameplay');
 const keyGuideText = await desktop.locator('#desktop-key-guide').innerText();
 for (const required of ['WASD', 'LMB', 'E', 'WHEEL', '1–6', 'V', 'C', 'X', 'F', 'ESC']) {
@@ -211,8 +228,41 @@ for (let index = 0; index < 7; index += 1) {
   }, index);
 }
 await desktop.screenshot({ path: outputPath('desktop-live-red-spray.png') });
+await desktop.evaluate(() => document.exitPointerLock());
+await desktop.waitForTimeout(80);
+const afterPointerUnlock = await desktop.evaluate(() => ({
+  held: window.__wireTheHouse.input.actionHeld,
+  requested: window.__wireTheHouse.input.actionRequested,
+  marks: JSON.parse(window.render_game_to_text()).workSurface.freeSprayMarks,
+  locked: Boolean(document.pointerLockElement),
+}));
+await desktop.evaluate(() => window.advanceTime(220));
+const marksAfterUnlockedTime = (await state(desktop)).workSurface.freeSprayMarks;
+if (afterPointerUnlock.locked || afterPointerUnlock.held || afterPointerUnlock.requested || marksAfterUnlockedTime !== afterPointerUnlock.marks) {
+  throw new Error(`Releasing Pointer Lock left spray input active: ${JSON.stringify({ afterPointerUnlock, marksAfterUnlockedTime })}`);
+}
 await desktop.mouse.up({ button: 'left' });
-const liveMarksAfter = (await state(desktop)).workSurface.freeSprayMarks;
+const marksBeforeRightClick = (await state(desktop)).workSurface.freeSprayMarks;
+await desktop.locator('#game-canvas').click({ button: 'right', position: { x: 650, y: 300 } });
+await desktop.waitForTimeout(80);
+await desktop.evaluate(() => window.advanceTime(220));
+const afterRightClick = await desktop.evaluate(() => ({
+  held: window.__wireTheHouse.input.actionHeld,
+  requested: window.__wireTheHouse.input.actionRequested,
+  marks: JSON.parse(window.render_game_to_text()).workSurface.freeSprayMarks,
+  locked: document.pointerLockElement === document.querySelector('#game-shell'),
+}));
+if (!afterRightClick.locked || afterRightClick.held || afterRightClick.requested || afterRightClick.marks !== marksBeforeRightClick) {
+  throw new Error(`Right mouse must only restore Pointer Lock, never spray: ${JSON.stringify({ marksBeforeRightClick, afterRightClick })}`);
+}
+await desktop.evaluate(() => {
+  const game = window.__wireTheHouse;
+  game.player.yaw += 0.24;
+  game.renderer.camera.rotation.set(game.player.pitch, game.player.yaw, 0);
+  game.step(1 / 60);
+});
+await desktop.screenshot({ path: outputPath('desktop-spray-viewmodel-occlusion.png') });
+const liveMarksAfter = afterPointerUnlock.marks;
 if (liveMarksAfter - liveMarksBefore < 5) throw new Error(`LIVE spray did not record a continuous held stroke: ${liveMarksAfter - liveMarksBefore} samples`);
 await desktop.keyboard.press('Digit4');
 await aimAtActive(desktop);

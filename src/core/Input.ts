@@ -23,6 +23,7 @@ export class Input {
   resetTransientInput(): void {
     this.keys.clear();
     this.actionHeld = false;
+    this.actionRequested = false;
     this.resetMobileMove();
     this.resetMobileLook();
   }

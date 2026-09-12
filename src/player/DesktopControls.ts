@@ -3,19 +3,24 @@ import type { Input } from '../core/Input';
 
 export class DesktopControls {
   constructor(surface: HTMLElement, player: PlayerController, input: Input) {
-    surface.addEventListener('click', event => {
-      if ((event.target as Element).closest('button')) return;
-      if (!this.isTouchDevice && document.pointerLockElement !== surface) void surface.requestPointerLock();
-    });
     surface.addEventListener('pointerdown', event => {
       if (this.isTouchDevice || (event.target as Element).closest('button')) return;
       if (event.button === 2) {
         event.preventDefault();
+        input.actionHeld = false;
+        input.actionRequested = false;
         window.dispatchEvent(new CustomEvent('wirehouse:exit-leveling'));
+        if (document.pointerLockElement !== surface) void surface.requestPointerLock();
         return;
       }
       if (event.button !== 0) return;
       event.preventDefault();
+      if (document.pointerLockElement !== surface) {
+        input.actionHeld = false;
+        input.actionRequested = false;
+        void surface.requestPointerLock();
+        return;
+      }
       input.actionHeld = true;
       input.actionRequested = true;
     });
@@ -25,6 +30,12 @@ export class DesktopControls {
     };
     addEventListener('pointerup', releasePrimaryAction);
     addEventListener('pointercancel', () => { input.actionHeld = false; });
+    document.addEventListener('pointerlockchange', () => {
+      if (document.pointerLockElement !== surface) {
+        input.actionHeld = false;
+        input.actionRequested = false;
+      }
+    });
     document.addEventListener('mousemove', event => {
       if (document.pointerLockElement === surface) player.look(event.movementX, event.movementY);
     });
