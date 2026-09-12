@@ -155,6 +155,10 @@ const destroyAtHeight = async targetY => {
 };
 await destroyAtHeight(2.93);
 await destroyAtHeight(0.07);
+const variedWallDamage = (await state(demolition)).workSurface;
+if (variedWallDamage.anchoredRemnants < 2 || variedWallDamage.fracturePatterns < 2) {
+  throw new Error(`Different bricks reused the same empty-hole fracture result: ${JSON.stringify(variedWallDamage)}`);
+}
 await demolition.evaluate(() => {
   const game = window.__wireTheHouse;
   game.renderer.camera.position.set(0, 1.5, 0.2);
@@ -202,12 +206,19 @@ await demolitionDetail.evaluate(() => {
   game.renderer.camera.updateMatrixWorld(true);
   game.player.yaw = 0;
   game.player.pitch = 0;
+  game.input.resetTransientInput();
+  game.started = false;
+  const target = game.room.brickWall.aim(game.renderer.camera)?.target;
+  if (!target) throw new Error('Could not resolve a demolition detail brick');
+  game.renderer.camera.lookAt(target.center);
+  game.renderer.camera.updateMatrixWorld(true);
 });
 for (let hit = 0; hit < 3; hit += 1) {
   await demolitionDetail.evaluate(() => {
     const game = window.__wireTheHouse;
     game.chasing.freeHit(game.renderer.camera);
-    game.step(1 / 60);
+    game.chasing.update(1 / 60);
+    game.renderer.render();
   });
 }
 const crackedState = await state(demolitionDetail);
@@ -216,13 +227,32 @@ await demolitionDetail.screenshot({ path: outputPath('desktop-progressive-demoli
 await demolitionDetail.evaluate(() => {
   const game = window.__wireTheHouse;
   game.chasing.freeHit(game.renderer.camera);
-  game.step(1 / 60);
+  game.chasing.update(1 / 60);
+  game.renderer.render();
 });
 const fracturedState = await state(demolitionDetail);
-if (fracturedState.workSurface.destroyedBricks !== 1 || fracturedState.workSurface.damagedBricks !== 0 || fracturedState.workSurface.activeFragments < 20) {
+if (fracturedState.workSurface.destroyedBricks !== 1 || fracturedState.workSurface.damagedBricks !== 0 || fracturedState.workSurface.activeFragments < 20 || fracturedState.workSurface.anchoredRemnants !== 1) {
   throw new Error(`DEMOLISH did not finish with varied fragment debris: ${JSON.stringify(fracturedState.workSurface)}`);
 }
 await demolitionDetail.screenshot({ path: outputPath('desktop-progressive-demolition-fragments.png') });
+const solidFragmentMaterials = await demolitionDetail.evaluate(() => {
+  const materials = [];
+  window.__wireTheHouse.renderer.scene.traverse(object => {
+    if (!object.isMesh || (!object.name.includes('fragments') && !object.name.includes('ribs'))) return;
+    const list = Array.isArray(object.material) ? object.material : [object.material];
+    for (const material of list) materials.push({ transparent: material.transparent, depthWrite: material.depthWrite, opacity: material.opacity });
+  });
+  return materials;
+});
+if (solidFragmentMaterials.length < 2 || solidFragmentMaterials.some(material => material.transparent || !material.depthWrite || material.opacity !== 1)) {
+  throw new Error(`Fracture remnants are not solid opaque geometry: ${JSON.stringify(solidFragmentMaterials)}`);
+}
+await demolitionDetail.evaluate(() => window.advanceTime(2200));
+const piledState = await state(demolitionDetail);
+if (piledState.workSurface.airborneFragments !== 0 || piledState.workSurface.settledFragments < 20 || piledState.workSurface.rubblePileHeight < 0.04 || piledState.workSurface.overlappingSettledFragments !== 0) {
+  throw new Error(`Rubble did not fall into a non-overlapping floor pile: ${JSON.stringify(piledState.workSurface)}`);
+}
+await demolitionDetail.screenshot({ path: outputPath('desktop-demolition-rubble-pile.png') });
 await demolitionDetail.close();
 
 const paintedChase = await browser.newPage({ viewport: { width: 1366, height: 768 } });

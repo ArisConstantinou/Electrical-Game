@@ -11,7 +11,7 @@
 ## Runtime translation
 
 - CHASE: 55 mm deep, approximately 50–65 mm visually irregular break-out channel, sampled across the complete painted route.
-- DEMOLISH: chip → branching crack → spall → fracture; the fourth hit creates non-uniform tetrahedral, dodecahedral and block fragments with different dimensions, spin, velocity and floor bounce.
+- DEMOLISH: chip → branching crack → spall → fracture; the fourth hit chooses a seeded crater profile, retains only edge-connected shell geometry and exposed hollow-brick ribs, then creates non-uniform tetrahedral, dodecahedral and block fragments with different dimensions, spin and velocity. Loose pieces collide through conservative solid bounds, settle without interpenetration and persist as capped floor piles.
 - The simulation is a readable gameplay abstraction, not a structural-failure solver. It preserves the observed sequence and visual character without claiming engineering prediction.
 
 ## Primary and manufacturer sources

@@ -58,6 +58,7 @@ Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web gam
 - Full 472-position wall scan exposed phantom re-hits on already shrunken InstancedMesh bricks. Destroyed instance IDs are now permanently filtered from raycasts so every hammer hit advances to an actually visible brick.
 - Hammer targeting now uses a dense 5x5 chisel sampling grid around the reticle, and gameplay regression permanently asserts that all 472 wall bricks can be uniquely destroyed.
 - Masonry-realism revision replaces whole-brick CHASE recesses with an actual 55 mm deep micro-fracture grid that consumes the complete painted route over four passes. DEMOLISH now requires four cumulative impacts (chip, branching cracks, spall, fracture), leaves irregular edge remnants, and throws deterministic unequal tetrahedral/dodecahedral/block fragments that spin, bounce and settle. Focused regressions cover complete U-route carving, intermediate cracks, final rubble, and eventual destruction of all 472 bricks.
+- Demolition follow-up removes the static fragments that appeared to float inside rectangular holes. Every destroyed brick now gets one of four seeded crater masks, with only perimeter-connected shell cells and broken hollow-brick ribs retained. Loose opaque geometry falls under stronger gravity, collides with settled rubble through conservative solid bounds, stacks into persistent floor piles, and is capped to a 320-piece budget.
 
 ## Keep in mind
 

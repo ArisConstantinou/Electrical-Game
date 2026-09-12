@@ -31,7 +31,6 @@ export interface MasonryImpact {
 
 const brickGeometry = new THREE.BoxGeometry(0.286, 0.125, 0.18);
 const unitBoxGeometry = new THREE.BoxGeometry(1, 1, 1);
-const remnantGeometries = [unitBoxGeometry, new THREE.TetrahedronGeometry(1, 0), new THREE.DodecahedronGeometry(1, 0)];
 const brickMaterial = new THREE.MeshStandardMaterial({ color: 0xb84b2a, roughness: 0.96, metalness: 0 });
 const removableMaterial = new THREE.MeshStandardMaterial({ color: 0xb94d2b, roughness: 0.97, metalness: 0 });
 const chasedBrickMaterial = new THREE.MeshStandardMaterial({ color: 0xb24a2a, roughness: 0.99, metalness: 0 });
@@ -71,7 +70,7 @@ export class BrickWall extends THREE.Group {
   private readonly spraySamplesByPoint = new Map<string, THREE.Vector3[]>();
   private readonly chasedSamplesByPoint = new Map<string, Set<number>>();
   private readonly chasePassByPoint = new Map<string, number>();
-  private readonly holeRemnants: THREE.Group[] = [];
+  private readonly fractureSignatures = new Set<string>();
   private readonly livePaintCanvas = document.createElement('canvas');
   private readonly livePaintContext: CanvasRenderingContext2D;
   private readonly livePaintTexture: THREE.CanvasTexture;
@@ -299,7 +298,7 @@ export class BrickWall extends THREE.Group {
       this.hideOriginal(target);
       this.removeReplacement(target);
       this.removeCracks(target);
-      this.addJaggedRemnants(target, seed);
+      this.addAnchoredFractureShell(target, seed, hit.point);
     }
     return { points: [hit.point], kind, brickSize: target.size.clone(), seed, destroyed };
   }
@@ -341,6 +340,8 @@ export class BrickWall extends THREE.Group {
   get damagedBrickCount(): number { return this.damagedBricks; }
   get recessedBrickCount(): number { return this.chaseRecessedBricks; }
   get carvedCellCount(): number { return this.chaseCarvedCells; }
+  get uniqueFracturePatternCount(): number { return this.fractureSignatures.size; }
+  get anchoredRemnantCount(): number { return this.targets.filter(target => target.destroyed && target.replacement !== null).length; }
   getChaseCoverage(pointId: string): number {
     const total = this.spraySamplesByPoint.get(pointId)?.length ?? 0;
     return total === 0 ? 0 : THREE.MathUtils.clamp((this.chasedSamplesByPoint.get(pointId)?.size ?? 0) / total, 0, 1);
@@ -511,33 +512,113 @@ export class BrickWall extends THREE.Group {
     target.cracks = null;
   }
 
-  private addJaggedRemnants(target: BrickTarget, seed: number): void {
+  private addAnchoredFractureShell(target: BrickTarget, seed: number, impact: THREE.Vector3): void {
     const random = seeded(seed ^ 0x9e3779b9);
     const group = new THREE.Group();
-    group.name = `Jagged demolition edge ${target.id}`;
-    for (let index = 0; index < 14; index += 1) {
-      const fragment = new THREE.Mesh(remnantGeometries[index % remnantGeometries.length], index % 3 === 0 ? chaseInteriorMaterial : chasedBrickMaterial);
-      const horizontalEdge = index < 8;
-      const side = random() < 0.5 ? -1 : 1;
-      const inset = index < 6 ? 0.31 + random() * 0.12 : 0.43 + random() * 0.06;
-      const localX = horizontalEdge ? (random() - 0.5) * target.size.x * 0.9 : side * target.size.x * inset;
-      const localY = horizontalEdge ? side * target.size.y * inset : (random() - 0.5) * target.size.y * 0.9;
-      const cosine = Math.cos(target.rotationZ);
-      const sine = Math.sin(target.rotationZ);
-      fragment.position.set(target.center.x + localX * cosine - localY * sine, target.center.y + localX * sine + localY * cosine, target.center.z + target.size.z * 0.18);
-      fragment.rotation.set(random() * Math.PI, random() * Math.PI, random() * Math.PI);
-      const major = index < 6 ? 1.55 : 1;
-      fragment.scale.set((0.014 + random() * 0.034) * major, (0.01 + random() * 0.026) * major, (0.012 + random() * 0.032) * major);
-      fragment.castShadow = true;
-      fragment.raycast = () => undefined;
-      group.add(fragment);
+    group.name = `Anchored irregular fracture shell ${target.id}`;
+    group.userData.studioEntityId = `world:brick-wall:fracture-shell-${target.id}`;
+    group.position.copy(target.center);
+    group.rotation.z = target.rotationZ;
+
+    const cols = 9;
+    const rows = 5;
+    const cellW = target.size.x / cols;
+    const cellH = target.size.y / rows;
+    const dx = impact.x - target.center.x;
+    const dy = impact.y - target.center.y;
+    const cosine = Math.cos(-target.rotationZ);
+    const sine = Math.sin(-target.rotationZ);
+    const impactX = THREE.MathUtils.clamp((dx * cosine - dy * sine) / (target.size.x / 2), -0.3, 0.3);
+    const impactY = THREE.MathUtils.clamp((dx * sine + dy * cosine) / (target.size.y / 2), -0.3, 0.3);
+    const pattern = seed % 4;
+    const candidates = new Set<number>();
+
+    for (let row = 0; row < rows; row += 1) {
+      for (let col = 0; col < cols; col += 1) {
+        const nx = (col + 0.5) / cols * 2 - 1 - impactX;
+        const ny = (row + 0.5) / rows * 2 - 1 - impactY;
+        const noise = (random() - 0.5) * 0.32;
+        const radial = Math.hypot(nx * (0.83 + (pattern === 2 ? 0.18 : 0)), ny * (1.06 + (pattern === 0 ? 0.12 : 0)));
+        const bias = pattern === 0 ? (nx + ny) * 0.12
+          : pattern === 1 ? (nx - ny) * 0.16
+            : pattern === 2 ? Math.sin((nx + ny) * Math.PI) * 0.14
+              : -ny * 0.18;
+        const craterRadius = 0.72 + ((seed >>> 5) % 13) / 100;
+        if (radial + noise + bias >= craterRadius) candidates.add(row * cols + col);
+      }
     }
+
+    // Only retain cells connected to an outer edge: no permanent fragment can float in the opening.
+    const connected = new Set<number>();
+    const queue: number[] = [];
+    for (const index of candidates) {
+      const row = Math.floor(index / cols);
+      const col = index % cols;
+      if (row === 0 || row === rows - 1 || col === 0 || col === cols - 1) {
+        connected.add(index);
+        queue.push(index);
+      }
+    }
+    while (queue.length > 0) {
+      const index = queue.shift()!;
+      const row = Math.floor(index / cols);
+      const col = index % cols;
+      for (const [nextRow, nextCol] of [[row - 1, col], [row + 1, col], [row, col - 1], [row, col + 1]]) {
+        if (nextRow < 0 || nextRow >= rows || nextCol < 0 || nextCol >= cols) continue;
+        const next = nextRow * cols + nextCol;
+        if (candidates.has(next) && !connected.has(next)) { connected.add(next); queue.push(next); }
+      }
+    }
+
+    const outerMatrices: THREE.Matrix4[] = [];
+    const innerMatrices: THREE.Matrix4[] = [];
+    for (const index of connected) {
+      const row = Math.floor(index / cols);
+      const col = index % cols;
+      const depthFactor = 0.42 + random() * 0.58;
+      const depth = target.size.z * depthFactor;
+      const frontReached = random() > 0.34;
+      const z = frontReached ? (target.size.z - depth) / 2 : -target.size.z / 2 + depth / 2;
+      const matrix = new THREE.Matrix4().compose(
+        new THREE.Vector3(-target.size.x / 2 + cellW * (col + 0.5) + (random() - 0.5) * cellW * 0.16, -target.size.y / 2 + cellH * (row + 0.5) + (random() - 0.5) * cellH * 0.18, z),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler((random() - 0.5) * 0.12, (random() - 0.5) * 0.12, (random() - 0.5) * 0.2)),
+        new THREE.Vector3(cellW * (0.78 + random() * 0.35), cellH * (0.74 + random() * 0.4), depth),
+      );
+      (frontReached ? outerMatrices : innerMatrices).push(matrix);
+    }
+
+    const ribMatrices: THREE.Matrix4[] = [];
+    const ribCount = 1 + ((seed >>> 11) % 3);
+    for (let rib = 0; rib < ribCount; rib += 1) {
+      const x = -target.size.x * 0.3 + (rib + 1) / (ribCount + 1) * target.size.x * 0.6 + (random() - 0.5) * cellW;
+      const gapCenter = (random() - 0.5) * target.size.y * 0.18;
+      const gapHeight = target.size.y * (0.3 + random() * 0.25);
+      const bottomHeight = Math.max(0.008, gapCenter - gapHeight / 2 + target.size.y / 2);
+      const topHeight = Math.max(0.008, target.size.y / 2 - (gapCenter + gapHeight / 2));
+      const ribWidth = cellW * (0.18 + random() * 0.22);
+      ribMatrices.push(new THREE.Matrix4().compose(new THREE.Vector3(x, -target.size.y / 2 + bottomHeight / 2, -target.size.z * 0.28), new THREE.Quaternion(), new THREE.Vector3(ribWidth, bottomHeight, target.size.z * 0.42)));
+      ribMatrices.push(new THREE.Matrix4().compose(new THREE.Vector3(x, target.size.y / 2 - topHeight / 2, -target.size.z * 0.28), new THREE.Quaternion(), new THREE.Vector3(ribWidth, topHeight, target.size.z * 0.42)));
+    }
+
+    const addInstances = (matrices: THREE.Matrix4[], material: THREE.Material, name: string): void => {
+      if (matrices.length === 0) return;
+      const mesh = new THREE.InstancedMesh(unitBoxGeometry, material, matrices.length);
+      mesh.name = name;
+      mesh.raycast = () => undefined;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      matrices.forEach((matrix, index) => mesh.setMatrixAt(index, matrix));
+      mesh.instanceMatrix.needsUpdate = true;
+      group.add(mesh);
+    };
+    addInstances(outerMatrices, chasedBrickMaterial, `Attached face fragments ${target.id}`);
+    addInstances(innerMatrices, chaseInteriorMaterial, `Attached inner fragments ${target.id}`);
+    addInstances(ribMatrices, chaseInteriorMaterial, `Broken hollow-brick ribs ${target.id}`);
+    const signature = `${pattern}:${[...connected].join(',')}:${ribCount}`;
+    group.userData.fractureSignature = signature;
+    this.fractureSignatures.add(signature);
     this.add(group);
-    this.holeRemnants.push(group);
-    while (this.holeRemnants.length > 64) {
-      const oldest = this.holeRemnants.shift();
-      if (oldest) this.remove(oldest);
-    }
+    target.replacement = group;
   }
 
   private inChaseZone(definition: InstallationDefinition, x: number, y: number, brickW: number, brickH: number): boolean {
