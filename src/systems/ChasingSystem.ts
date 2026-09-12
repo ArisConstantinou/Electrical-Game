@@ -11,6 +11,7 @@ interface Particle {
   halfHeight: number;
   halfDepth: number;
   settled: boolean;
+  support: Particle | null;
 }
 
 const fragmentGeometries = [
@@ -25,6 +26,8 @@ const fragmentMaterials = [
   new THREE.MeshStandardMaterial({ color: 0x6c2b1d, roughness: 1, transparent: false, depthWrite: true }),
 ];
 const MAX_RUBBLE_PIECES = 320;
+const MAX_RUBBLE_HEIGHT = 0.16;
+const MIN_SUPPORT_COVERAGE = 0.55;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
 fragmentGeometries.forEach(geometry => {
@@ -68,6 +71,15 @@ export class ChasingSystem {
   get settledFragmentCount(): number { return this.particles.filter(particle => particle.settled).length; }
   get rubblePileHeight(): number {
     return this.particles.reduce((height, particle) => particle.settled ? Math.max(height, particle.mesh.position.y + particle.halfHeight) : height, 0);
+  }
+  get unsupportedSettledFragmentCount(): number {
+    return this.particles.filter(particle => {
+      if (!particle.settled) return false;
+      if (!particle.support) return Math.abs(particle.mesh.position.y - particle.halfHeight) > 0.004;
+      if (!particle.support.settled || !this.particles.includes(particle.support)) return true;
+      const expectedY = particle.support.mesh.position.y + particle.support.halfHeight + particle.halfHeight + 0.001;
+      return Math.abs(particle.mesh.position.y - expectedY) > 0.004;
+    }).length;
   }
   get settledOverlapCount(): number {
     let overlaps = 0;
@@ -122,6 +134,7 @@ export class ChasingSystem {
         halfHeight: height * 0.5,
         halfDepth: depth * 0.5,
         settled: false,
+        support: null,
       });
     }
     this.trimRubbleBudget();
@@ -132,45 +145,95 @@ export class ChasingSystem {
       const particle = this.particles[index];
       particle.life -= dt;
       if (!particle.settled) {
+        const previousY = particle.mesh.position.y;
         particle.velocity.y -= 9.2 * dt;
         particle.mesh.position.addScaledVector(particle.velocity, dt);
         particle.mesh.rotation.x += particle.angularVelocity.x * dt;
         particle.mesh.rotation.y += particle.angularVelocity.y * dt;
         particle.mesh.rotation.z += particle.angularVelocity.z * dt;
-        let supportY = this.supportHeight(particle);
-        if (particle.mesh.position.y <= supportY) {
+        let contact = this.supportContact(particle, previousY);
+        if (particle.mesh.position.y <= contact.height) {
           // Rubble comes to rest on a broad face. This gives every settled piece a
           // stable solid footprint instead of leaving arbitrarily rotated meshes interpenetrating.
           particle.mesh.rotation.x = 0;
           particle.mesh.rotation.z = 0;
-          supportY = this.supportHeight(particle);
-          particle.mesh.position.y = supportY;
+          contact = this.supportContact(particle, previousY);
+          if (!contact.particle && contact.height === particle.halfHeight) {
+            this.placeOnOpenFloor(particle);
+            contact = this.supportContact(particle, previousY);
+          }
+          particle.mesh.position.y = contact.height;
           particle.settled = true;
+          particle.support = contact.particle;
           particle.velocity.set(0, 0, 0);
           particle.angularVelocity.set(0, 0, 0);
         }
       }
-      if (particle.life < 0.35) particle.mesh.scale.multiplyScalar(Math.max(0.72, 1 - dt * 4));
+      if (!particle.settled && particle.life < 0.35) particle.mesh.scale.multiplyScalar(Math.max(0.72, 1 - dt * 4));
       if (particle.life <= 0) {
+        this.releaseDependents(particle);
         this.scene.remove(particle.mesh);
         this.particles.splice(index, 1);
       }
     }
   }
 
-  private supportHeight(particle: Particle): number {
-    let support = particle.halfHeight;
+  private supportContact(particle: Particle, maximumCenterY: number): { height: number; particle: Particle | null } {
+    let height = particle.halfHeight;
+    let supportingParticle: Particle | null = null;
     const footprint = this.floorFootprint(particle);
     for (const other of this.particles) {
       if (other === particle || !other.settled) continue;
-      const dx = other.mesh.position.x - particle.mesh.position.x;
-      const dz = other.mesh.position.z - particle.mesh.position.z;
       const otherFootprint = this.floorFootprint(other);
-      if (Math.abs(dx) < footprint.x + otherFootprint.x + 0.001 && Math.abs(dz) < footprint.y + otherFootprint.y + 0.001) {
-        support = Math.max(support, other.mesh.position.y + other.halfHeight + particle.halfHeight + 0.001);
+      const overlapX = Math.min(particle.mesh.position.x + footprint.x, other.mesh.position.x + otherFootprint.x)
+        - Math.max(particle.mesh.position.x - footprint.x, other.mesh.position.x - otherFootprint.x);
+      const overlapZ = Math.min(particle.mesh.position.z + footprint.y, other.mesh.position.z + otherFootprint.y)
+        - Math.max(particle.mesh.position.z - footprint.y, other.mesh.position.z - otherFootprint.y);
+      if (overlapX <= 0 || overlapZ <= 0) continue;
+      const coverage = overlapX * overlapZ / Math.max(0.000001, footprint.x * 2 * footprint.y * 2);
+      if (coverage < MIN_SUPPORT_COVERAGE) continue;
+      const candidate = other.mesh.position.y + other.halfHeight + particle.halfHeight + 0.001;
+      if (candidate > maximumCenterY + 0.004 || candidate + particle.halfHeight > MAX_RUBBLE_HEIGHT) continue;
+      if (candidate > height) {
+        height = candidate;
+        supportingParticle = other;
       }
     }
-    return support;
+    return { height, particle: supportingParticle };
+  }
+
+  private releaseDependents(removedSupport: Particle): void {
+    const lostSupports: Particle[] = [removedSupport];
+    while (lostSupports.length > 0) {
+      const lost = lostSupports.pop()!;
+      for (const particle of this.particles) {
+        if (!particle.settled || particle.support !== lost) continue;
+        particle.settled = false;
+        particle.support = null;
+        particle.velocity.set(0, -0.05, 0);
+        lostSupports.push(particle);
+      }
+    }
+  }
+
+  private placeOnOpenFloor(particle: Particle): void {
+    const originX = particle.mesh.position.x;
+    const originZ = particle.mesh.position.z;
+    const phase = this.particles.indexOf(particle) * GOLDEN_ANGLE;
+    const footprint = this.floorFootprint(particle);
+    for (let attempt = 0; attempt < 600; attempt += 1) {
+      const radius = attempt === 0 ? 0 : 0.018 * Math.sqrt(attempt);
+      const angle = phase + attempt * GOLDEN_ANGLE;
+      particle.mesh.position.x = originX + Math.cos(angle) * radius;
+      particle.mesh.position.z = originZ + Math.sin(angle) * radius;
+      const overlaps = this.particles.some(other => {
+        if (other === particle || !other.settled || other.support) return false;
+        const otherFootprint = this.floorFootprint(other);
+        return Math.abs(other.mesh.position.x - particle.mesh.position.x) < otherFootprint.x + footprint.x + 0.001
+          && Math.abs(other.mesh.position.z - particle.mesh.position.z) < otherFootprint.y + footprint.y + 0.001;
+      });
+      if (!overlaps) return;
+    }
   }
 
   private floorFootprint(particle: Particle): THREE.Vector2 {
@@ -187,6 +250,7 @@ export class ChasingSystem {
       const index = this.particles.findIndex(particle => particle.settled);
       const removeIndex = index >= 0 ? index : 0;
       const [particle] = this.particles.splice(removeIndex, 1);
+      this.releaseDependents(particle);
       this.scene.remove(particle.mesh);
     }
   }

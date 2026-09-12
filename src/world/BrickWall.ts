@@ -369,10 +369,15 @@ export class BrickWall extends THREE.Group {
   get uniqueFracturePatternCount(): number { return this.fractureSignatures.size; }
   get anchoredRemnantCount(): number { return this.targets.filter(target => target.destroyed && target.replacement !== null).length; }
   get floatingStaticPieceCount(): number {
-    return this.targets.reduce((count, target) => count + (target.destroyed ? Number(target.replacement?.userData.interiorPieceCount ?? 0) : 0), 0);
+    return this.targets.reduce((count, target) => {
+      if (!target.destroyed || !target.replacement) return count;
+      const interior = Number(target.replacement.userData.interiorPieceCount ?? 0);
+      const attached = Number(target.replacement.userData.attachedPieceCount ?? 0);
+      return count + interior + (this.structuralSupport(target).bottom ? 0 : attached);
+    }, 0);
   }
   get unsupportedAnchoredRemnantCount(): number {
-    return this.targets.filter(target => target.destroyed && target.replacement !== null && !Object.values(this.structuralSupport(target)).some(Boolean)).length;
+    return this.targets.filter(target => target.destroyed && target.replacement !== null && !this.structuralSupport(target).bottom).length;
   }
   getChaseCoverage(pointId: string): number {
     const total = this.spraySamplesByPoint.get(pointId)?.length ?? 0;
@@ -610,7 +615,10 @@ export class BrickWall extends THREE.Group {
 
   private addAnchoredFractureShell(target: BrickTarget, seed: number, impact: THREE.Vector3): void {
     const support = this.structuralSupport(target);
-    if (!Object.values(support).some(Boolean)) return;
+    // Mortar can leave a small grounded chip on the brick below. Fragments
+    // attached only above or at a side read as frozen in the opening, so they
+    // become loose rubble instead of static replacement geometry.
+    if (!support.bottom) return;
     const random = seeded(seed ^ 0x9e3779b9);
     const group = new THREE.Group();
     group.name = `Anchored irregular fracture shell ${target.id}`;
@@ -652,9 +660,7 @@ export class BrickWall extends THREE.Group {
     const connected = new Set<number>();
     for (const index of candidates) {
       const row = Math.floor(index / cols);
-      const col = index % cols;
-      const attached = (row === 0 && support.bottom) || (row === rows - 1 && support.top)
-        || (col === 0 && support.left) || (col === cols - 1 && support.right);
+      const attached = row === 0;
       if (attached) connected.add(index);
     }
 
@@ -664,14 +670,10 @@ export class BrickWall extends THREE.Group {
       const col = index % cols;
       const depthFactor = 0.42 + random() * 0.58;
       const depth = target.size.z * depthFactor;
-      const anchoredLeft = col === 0 && support.left;
-      const anchoredRight = col === cols - 1 && support.right;
-      const anchoredBottom = row === 0 && support.bottom;
-      const anchoredTop = row === rows - 1 && support.top;
-      const width = cellW * (0.9 + random() * 0.22) * (anchoredLeft || anchoredRight ? 1.14 : 1);
-      const height = cellH * (0.88 + random() * 0.24) * (anchoredBottom || anchoredTop ? 1.14 : 1);
-      const x = -target.size.x / 2 + cellW * (col + 0.5) + (anchoredLeft ? -cellW * 0.07 : anchoredRight ? cellW * 0.07 : 0);
-      const y = -target.size.y / 2 + cellH * (row + 0.5) + (anchoredBottom ? -cellH * 0.07 : anchoredTop ? cellH * 0.07 : 0);
+      const width = cellW * (0.9 + random() * 0.22);
+      const height = cellH * (0.88 + random() * 0.24) * 1.14;
+      const x = -target.size.x / 2 + cellW * (col + 0.5);
+      const y = -target.size.y / 2 + cellH * (row + 0.5) - cellH * 0.07;
       const matrix = new THREE.Matrix4().compose(
         new THREE.Vector3(x, y, (target.size.z - depth) / 2),
         new THREE.Quaternion().setFromEuler(new THREE.Euler((random() - 0.5) * 0.06, (random() - 0.5) * 0.06, (random() - 0.5) * 0.12)),
@@ -696,7 +698,7 @@ export class BrickWall extends THREE.Group {
     group.userData.interiorPieceCount = 0;
     group.userData.ribPieceCount = 0;
     if (outerMatrices.length === 0) return;
-    const supportKey = `${Number(support.top)}${Number(support.right)}${Number(support.bottom)}${Number(support.left)}`;
+    const supportKey = `grounded-${Number(support.bottom)}`;
     const signature = `${pattern}:${supportKey}:${[...connected].join(',')}`;
     group.userData.fractureSignature = signature;
     this.fractureSignatures.add(signature);

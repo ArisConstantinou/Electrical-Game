@@ -189,8 +189,8 @@ const destroyAtHeight = async targetY => {
 await destroyAtHeight(2.93);
 await destroyAtHeight(0.07);
 const variedWallDamage = (await state(demolition)).workSurface;
-if (variedWallDamage.anchoredRemnants < 2 || variedWallDamage.fracturePatterns < 2) {
-  throw new Error(`Different bricks reused the same empty-hole fracture result: ${JSON.stringify(variedWallDamage)}`);
+if (variedWallDamage.anchoredRemnants < 1 || variedWallDamage.fracturePatterns < 1) {
+  throw new Error(`Ground-supported demolition edge did not retain a varied chip: ${JSON.stringify(variedWallDamage)}`);
 }
 if (variedWallDamage.floatingStaticPieces !== 0) throw new Error(`Destroyed bricks retained interior static pieces: ${JSON.stringify(variedWallDamage)}`);
 await demolition.evaluate(() => {
@@ -213,12 +213,14 @@ const clusterSupportResult = await demolition.evaluate(() => {
     while (!target.destroyed && attempts < 6) {
       camera.lookAt(target.center);
       camera.updateMatrixWorld(true);
-      wall.removeAtAim(camera);
+      game.chasing.freeHit(camera);
+      game.chasing.update(1 / 60);
       attempts += 1;
     }
   }
+  window.advanceTime(2200);
   const interior = targets.find(target => !Object.values(wall.structuralSupport(target)).some(Boolean));
-  let offEdgeStaticPieces = 0;
+  let hangingStaticPieces = 0;
   const staticPieceNames = [];
   for (const target of targets) {
     if (!target.replacement) continue;
@@ -230,11 +232,8 @@ const clusterSupportResult = await demolition.evaluate(() => {
         const offset = instance * 16;
         const x = child.instanceMatrix.array[offset + 12];
         const y = child.instanceMatrix.array[offset + 13];
-        const touchesSupportedEdge = (support.left && x <= -target.size.x / 2 + target.size.x / 9 * 0.75)
-          || (support.right && x >= target.size.x / 2 - target.size.x / 9 * 0.75)
-          || (support.bottom && y <= -target.size.y / 2 + target.size.y / 5 * 0.75)
-          || (support.top && y >= target.size.y / 2 - target.size.y / 5 * 0.75);
-        if (!touchesSupportedEdge) offEdgeStaticPieces += 1;
+        const restsOnSupportedBottom = support.bottom && y <= -target.size.y / 2 + target.size.y / 5 * 0.75;
+        if (!restsOnSupportedBottom) hangingStaticPieces += 1;
       }
     }
   }
@@ -244,14 +243,39 @@ const clusterSupportResult = await demolition.evaluate(() => {
     destroyedCount: targets.filter(target => target.destroyed).length,
     interiorId: interior?.id ?? null,
     interiorHasReplacement: Boolean(interior?.replacement),
-    offEdgeStaticPieces,
+    hangingStaticPieces,
     staticPieceNames: [...new Set(staticPieceNames)],
     floatingStaticPieces: wall.floatingStaticPieceCount,
     unsupportedAnchoredRemnants: wall.unsupportedAnchoredRemnantCount,
+    airborneFragments: game.chasing.airborneFragmentCount,
+    airborneSample: game.chasing.particles.filter(particle => !particle.settled).slice(0, 8).map(particle => ({
+      y: Number(particle.mesh.position.y.toFixed(3)),
+      vy: Number(particle.velocity.y.toFixed(3)),
+      life: Number(particle.life.toFixed(3)),
+    })),
+    unsupportedSettledFragments: game.chasing.unsupportedSettledFragmentCount,
+    rubblePileHeight: game.chasing.rubblePileHeight,
   };
 });
-if (clusterSupportResult.targetCount < 9 || clusterSupportResult.destroyedCount !== clusterSupportResult.targetCount || !clusterSupportResult.interiorId || clusterSupportResult.interiorHasReplacement || clusterSupportResult.offEdgeStaticPieces !== 0 || clusterSupportResult.floatingStaticPieces !== 0 || clusterSupportResult.unsupportedAnchoredRemnants !== 0) {
+if (clusterSupportResult.targetCount < 9 || clusterSupportResult.destroyedCount !== clusterSupportResult.targetCount || !clusterSupportResult.interiorId || clusterSupportResult.interiorHasReplacement || clusterSupportResult.hangingStaticPieces !== 0 || clusterSupportResult.floatingStaticPieces !== 0 || clusterSupportResult.unsupportedAnchoredRemnants !== 0 || clusterSupportResult.airborneFragments !== 0 || clusterSupportResult.unsupportedSettledFragments !== 0 || clusterSupportResult.rubblePileHeight > 0.161) {
   throw new Error(`Contiguous demolition left floating static geometry: ${JSON.stringify(clusterSupportResult)}`);
+}
+const supportExpiryResult = await demolition.evaluate(() => {
+  const game = window.__wireTheHouse;
+  const particles = game.chasing.particles;
+  for (const particle of particles) {
+    if (particle.settled && particle.mesh.position.y <= particle.halfHeight + 0.004) particle.life = 0;
+  }
+  window.advanceTime(1200);
+  game.renderer.render();
+  return {
+    airborneFragments: game.chasing.airborneFragmentCount,
+    unsupportedSettledFragments: game.chasing.unsupportedSettledFragmentCount,
+    rubblePileHeight: game.chasing.rubblePileHeight,
+  };
+});
+if (supportExpiryResult.airborneFragments !== 0 || supportExpiryResult.unsupportedSettledFragments !== 0 || supportExpiryResult.rubblePileHeight > 0.161) {
+  throw new Error(`Rubble remained suspended after its lower support expired: ${JSON.stringify(supportExpiryResult)}`);
 }
 await demolition.screenshot({ path: outputPath('desktop-demolition-supported-shells.png') });
 const fullWallResult = await demolition.evaluate(() => {
@@ -340,7 +364,7 @@ if (solidFragmentMaterials.length < 1 || solidFragmentMaterials.some(material =>
 }
 await demolitionDetail.evaluate(() => window.advanceTime(2200));
 const piledState = await state(demolitionDetail);
-if (piledState.workSurface.airborneFragments !== 0 || piledState.workSurface.settledFragments < 20 || piledState.workSurface.rubblePileHeight < 0.04 || piledState.workSurface.overlappingSettledFragments !== 0) {
+if (piledState.workSurface.airborneFragments !== 0 || piledState.workSurface.settledFragments < 20 || piledState.workSurface.rubblePileHeight < 0.04 || piledState.workSurface.rubblePileHeight > 0.161 || piledState.workSurface.unsupportedSettledFragments !== 0 || piledState.workSurface.overlappingSettledFragments !== 0) {
   throw new Error(`Rubble did not fall into a non-overlapping floor pile: ${JSON.stringify(piledState.workSurface)}`);
 }
 await demolitionDetail.screenshot({ path: outputPath('desktop-demolition-rubble-pile.png') });
