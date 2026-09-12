@@ -12,7 +12,7 @@ export class ChasingSystem {
   constructor(private readonly scene: THREE.Scene, private readonly wall: BrickWall) {}
 
   hit(camera: THREE.Camera, point: InstallationPoint): boolean {
-    const impact = this.wall.removeAtAim(camera);
+    const impact = this.wall.recessChaseAtAim(camera, point.definition.id, (point.chaseHits + 1) / 4);
     if (!impact) return false;
     point.chaseHits += 1;
     point.setStage(point.chaseHits >= 4 ? 'chased' : 'chasing');

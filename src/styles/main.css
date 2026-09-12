@@ -2,7 +2,13 @@
 * { box-sizing: border-box; }
 html { background: #171512; overscroll-behavior-y: auto; }
 body { margin: 0; min-width: 320px; min-height: 100vh; background: #171512; }
-button { font: inherit; }
+button {
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+  touch-action: manipulation;
+}
 .page-shell { min-height: 100vh; }
 #game-shell { position: relative; width: 100%; height: 100svh; min-height: 540px; overflow: hidden; background: #768589; touch-action: none; overscroll-behavior: contain; user-select: none; }
 #game-stage, #game-canvas { width: 100%; height: 100%; display: block; }
@@ -18,11 +24,13 @@ button { font: inherit; }
 #tool-status b.selected { color: #fff; border-color: #d99860; background: rgba(217,152,96,.15); }
 #tool-status em { color: #f0b37f; font: 800 12px/1 'Barlow Condensed', sans-serif; letter-spacing: .055em; font-style: normal; }
 #tool-status.leveling-hidden { display: none; }
-#spray-controls { display: none; top: 72px; right: 22px; gap: 7px; padding: 7px; pointer-events: auto; }
-#spray-controls.visible { display: flex; }
-#spray-controls button { min-height: 38px; padding: 0 10px; border: 1px solid #716557; color: #c9c3ba; background: #28241f; font: 700 12px/1 'Barlow Condensed', sans-serif; letter-spacing: .06em; cursor: pointer; }
-#spray-controls button:hover { border-color: #d99860; background: #373027; }
-#spray-controls b { margin-left: 5px; color: #fff; }
+#spray-controls, #hammer-controls { display: none; top: 72px; right: 22px; gap: 7px; padding: 7px; pointer-events: auto; }
+#spray-controls.visible, #hammer-controls.visible { display: flex; }
+#spray-controls button, #hammer-controls button { min-height: 38px; padding: 0 10px; border: 1px solid #716557; color: #c9c3ba; background: #28241f; font: 700 12px/1 'Barlow Condensed', sans-serif; letter-spacing: .06em; cursor: pointer; }
+@media (hover: hover) and (pointer: fine) {
+  #spray-controls button:hover, #hammer-controls button:hover { border-color: #d99860; background: #373027; }
+}
+#spray-controls b, #hammer-controls b { margin-left: 5px; color: #fff; }
 #spray-controls i { display: inline-block; width: 13px; height: 13px; margin: 0 0 -2px 6px; border: 1px solid rgba(255,255,255,.7); border-radius: 50%; }
 #desktop-key-guide { left: 22px; bottom: 20px; display: grid; gap: 6px; max-width: calc(100% - 44px); padding: 10px 12px; font: 700 12px/1 'Barlow Condensed', sans-serif; letter-spacing: .045em; }
 #desktop-key-guide div { display: flex; align-items: center; gap: 6px; }
@@ -82,8 +90,8 @@ button { font: inherit; }
   #tool-status { top: auto; right: max(18px, env(safe-area-inset-right)); bottom: 184px; width: 154px; justify-content: center; padding: 9px 8px; }
   #tool-status span { display: none; }
   #tool-status em { display: none; }
-  #spray-controls { top: auto; right: max(18px, env(safe-area-inset-right)); bottom: 232px; width: 154px; padding: 5px; }
-  #spray-controls button { flex: 1; min-width: 0; min-height: 44px; padding: 0 3px; }
+  #spray-controls, #hammer-controls { top: auto; right: max(18px, env(safe-area-inset-right)); bottom: 232px; width: 154px; padding: 5px; }
+  #spray-controls button, #hammer-controls button { flex: 1; min-width: 0; min-height: 44px; padding: 0 3px; }
   #spray-controls button > b { display: block; margin: 3px 0 0; }
   #spray-controls i { margin-left: 3px; }
   #desktop-key-guide { display: none; }

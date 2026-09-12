@@ -5,6 +5,7 @@ import type { InstallationDefinition } from '../data/installationRules';
 interface RemovableBrick {
   mesh: THREE.Mesh;
   marker: THREE.Group;
+  recessed: boolean;
 }
 
 interface AimHit { point: THREE.Vector3; object: THREE.Object3D; instanceId?: number }
@@ -68,7 +69,7 @@ export class BrickWall extends THREE.Group {
         marker.visible = false;
         brick.add(marker);
         const list = this.removableByPoint.get(owner.id) ?? [];
-        list.push({ mesh: brick, marker });
+        list.push({ mesh: brick, marker, recessed: false });
         this.removableByPoint.set(owner.id, list);
         this.breakables.push(brick);
         this.add(brick);
@@ -226,8 +227,37 @@ export class BrickWall extends THREE.Group {
     return hit.point;
   }
 
+  recessChaseAtAim(camera: THREE.Camera, pointId: string, fraction: number): THREE.Vector3 | null {
+    const bricks = this.removableByPoint.get(pointId) ?? [];
+    this.raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+    const impact = this.raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 0, 1), 2.39), new THREE.Vector3());
+    if (!impact || impact.distanceTo(camera.position) > 4.5) return null;
+    const insideMarkedRoute = bricks.some(brick => Math.abs(brick.mesh.getWorldPosition(new THREE.Vector3()).x - impact.x) < 0.24);
+    if (!insideMarkedRoute) return null;
+    const target = Math.ceil(bricks.length * THREE.MathUtils.clamp(fraction, 0, 1));
+    let changed = false;
+    for (let index = 0; index < target; index += 1) {
+      const brick = bricks[index];
+      if (brick.recessed || !brick.mesh.visible) continue;
+      brick.mesh.position.z -= 0.105;
+      const material = brick.mesh.material as THREE.MeshStandardMaterial;
+      material.color.setHex(0x78351f);
+      material.roughness = 1;
+      brick.recessed = true;
+      changed = true;
+    }
+    if (!changed) return null;
+    this.clearPaintAt(impact, 0.23);
+    return impact;
+  }
+
   get freeMarkCount(): number { return this.sprayMarks.length + this.liveStrokeSamples; }
   get destroyedBrickCount(): number { return this.destroyedBricks; }
+  get recessedBrickCount(): number {
+    let count = 0;
+    this.removableByPoint.forEach(bricks => { count += bricks.filter(item => item.recessed).length; });
+    return count;
+  }
 
   showMarks(pointId: string): void {
     this.removableByPoint.get(pointId)?.forEach(item => { item.marker.visible = true; });
@@ -274,5 +304,25 @@ export class BrickWall extends THREE.Group {
     a.position.z = b.position.z = 0.094;
     group.add(a, b);
     return group;
+  }
+
+  private clearPaintAt(point: THREE.Vector3, radius: number): void {
+    const paintPoint = this.toPaintPixel(point);
+    this.livePaintContext.save();
+    this.livePaintContext.globalCompositeOperation = 'destination-out';
+    this.livePaintContext.beginPath();
+    this.livePaintContext.arc(paintPoint.x, paintPoint.y, 78, 0, Math.PI * 2);
+    this.livePaintContext.fill();
+    this.livePaintContext.restore();
+    this.livePaintTexture.needsUpdate = true;
+    for (let index = this.sprayMarks.length - 1; index >= 0; index -= 1) {
+      const mark = this.sprayMarks[index];
+      if (mark.mesh.position.distanceTo(point) < radius) {
+        this.remove(mark.mesh);
+        mark.mesh.geometry.dispose();
+        (mark.mesh.material as THREE.Material).dispose();
+        this.sprayMarks.splice(index, 1);
+      }
+    }
   }
 }

@@ -12,8 +12,10 @@ For every point: inspect, mark, chase real removable masonry, fit recessed boxes
 
 ## Controls
 
-- Desktop: WASD, mouse look after entering, left mouse or E to use/hold the selected tool, V toggles DOTS/LIVE spray, C cycles spray color, A/D tilt and W/S depth while leveling, wheel or 1–6 to select tools, Shift to walk faster, F fullscreen, Esc releases pointer lock.
-- Mobile: left movement joystick, swipe the free game area to look, large ACTION / SPRING / CUTTER controls, and LEFT / RIGHT / IN / OUT / CONFIRM while leveling.
+- Desktop: WASD, mouse look after entering, left mouse or E to use/hold the selected tool, V toggles DOTS/LIVE spray, C cycles spray color, X toggles the hammer between CHASE and DEMOLISH, A/D tilt and W/S depth while leveling, wheel or 1–6 to select tools, Shift to walk faster, F fullscreen, Esc releases pointer lock.
+- Mobile: left movement joystick, swipe the free game area to look, large ACTION / SPRING / CUTTER controls, a touch hammer-method button for CHASE/DEMOLISH, and LEFT / RIGHT / IN / OUT / CONFIRM while leveling.
+
+CHASE recesses only the blue marked masonry by about 105 mm so boxes and conduit can sit inside the wall while the surrounding brickwork remains intact. DEMOLISH preserves the original unrestricted destructive behavior.
 
 ## Architecture and continuation
 

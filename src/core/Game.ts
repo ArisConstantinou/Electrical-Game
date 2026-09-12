@@ -13,6 +13,7 @@ import { MortarSystem } from '../systems/MortarSystem';
 import { LevelingSystem, type LevelDirection } from '../systems/LevelingSystem';
 import { ConduitSystem, type PvcTool } from '../systems/ConduitSystem';
 import { InteractionSystem } from '../systems/InteractionSystem';
+import type { HammerMode } from '../systems/InteractionSystem';
 import { HUD } from '../ui/HUD';
 import { MobileHUD } from '../ui/MobileHUD';
 
@@ -37,6 +38,7 @@ export class Game {
   selectedTool: RigTool = 'spray';
   sprayMode: 'dots' | 'live' = 'live';
   sprayColorIndex = 0;
+  hammerMode: HammerMode = 'chase';
   started = false;
   private readonly chasing: ChasingSystem;
   private readonly interaction: InteractionSystem;
@@ -100,6 +102,7 @@ export class Game {
     this.hud.update(active, aimed, this.mission.progress, this.selectedTool);
     const sprayColor = SPRAY_COLORS[this.sprayColorIndex];
     this.hud.updateSprayControls(this.sprayMode, sprayColor.name, sprayColor.css, this.selectedTool === 'spray');
+    this.hud.updateHammerControls(this.hammerMode, this.selectedTool === 'hammer');
     if (this.shake > 0) {
       this.shake = Math.max(0, this.shake - dt * 3.7);
       this.renderer.camera.rotation.set(this.player.pitch + (Math.random() - 0.5) * this.shake * 0.025, this.player.yaw + (Math.random() - 0.5) * this.shake * 0.02, 0);
@@ -117,7 +120,7 @@ export class Game {
       mode: !this.started ? 'start' : this.mission.complete ? 'mission-complete' : point?.stage === 'leveling' ? 'leveling' : 'playing',
       player: { x: Number(this.renderer.camera.position.x.toFixed(3)), y: Number(this.renderer.camera.position.y.toFixed(3)), z: Number(this.renderer.camera.position.z.toFixed(3)), yaw: Number(this.player.yaw.toFixed(3)), pitch: Number(this.player.pitch.toFixed(3)) },
       mission: { name: 'Living Room First Fix', progressPercent: this.mission.progress, selectedTool: this.selectedTool, complete: this.mission.complete },
-      workSurface: { freeSprayMarks: this.room.brickWall.freeMarkCount, destroyedBricks: this.room.brickWall.destroyedBrickCount, sprayMode: this.sprayMode, sprayColor: SPRAY_COLORS[this.sprayColorIndex].name },
+      workSurface: { freeSprayMarks: this.room.brickWall.freeMarkCount, destroyedBricks: this.room.brickWall.destroyedBrickCount, recessedBricks: this.room.brickWall.recessedBrickCount, sprayMode: this.sprayMode, sprayColor: SPRAY_COLORS[this.sprayColorIndex].name, hammerMode: this.hammerMode },
       activePoint: point ? { id: point.definition.id, kind: point.definition.kind, bottomHeightM: point.definition.bottom, boxes: point.definition.boxes, stage: point.stage, chaseHits: point.chaseHits, pipeStep: point.pipeStep, targeted: this.mission.target(this.renderer.camera) === point, tiltDegrees: Number(point.boxGroup.tiltDegrees.toFixed(2)), depthErrorMm: Number((point.boxGroup.depthError * 1000).toFixed(1)), levelPass: point.boxGroup.isLevel, flushPass: point.boxGroup.isFlush } : null,
       points: this.mission.points.map(item => ({ id: item.definition.id, stage: item.stage, conduitVisible: Boolean(item.conduit) })),
     });
@@ -147,6 +150,11 @@ export class Game {
       this.sprayColorIndex = (this.sprayColorIndex + 1) % SPRAY_COLORS.length;
       this.applySpraySettings();
       this.hud.notify(`Spray color: ${SPRAY_COLORS[this.sprayColorIndex].name}`);
+    });
+    addEventListener('wirehouse:cycle-hammer-mode', () => {
+      this.hammerMode = this.hammerMode === 'chase' ? 'demolish' : 'chase';
+      this.interaction.setHammerMode(this.hammerMode);
+      this.hud.notify(`Hammer method: ${this.hammerMode.toUpperCase()}`);
     });
     addEventListener('wirehouse:level', event => {
       const detail = (event as CustomEvent<LevelDirection | 'confirm' | 'cancel'>).detail;

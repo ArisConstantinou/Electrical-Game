@@ -18,7 +18,6 @@ export class MobileControls {
     const action = document.querySelector<HTMLButtonElement>('#mobile-action');
     action?.addEventListener('pointerdown', event => {
       event.preventDefault();
-      this.releaseJoystick();
       input.actionHeld = true;
       input.actionRequested = true;
       try { action.setPointerCapture(event.pointerId); } catch { /* Browser may reject synthetic capture. */ }
@@ -27,8 +26,8 @@ export class MobileControls {
     action?.addEventListener('pointerup', releaseAction, { passive: false });
     action?.addEventListener('pointercancel', releaseAction, { passive: false });
     action?.addEventListener('lostpointercapture', () => { input.actionHeld = false; });
-    document.querySelector<HTMLButtonElement>('#tool-prev')?.addEventListener('pointerdown', event => { event.preventDefault(); this.releaseJoystick(); window.dispatchEvent(new CustomEvent('wirehouse:cycle-tool', { detail: -1 })); });
-    document.querySelector<HTMLButtonElement>('#tool-next')?.addEventListener('pointerdown', event => { event.preventDefault(); this.releaseJoystick(); window.dispatchEvent(new CustomEvent('wirehouse:cycle-tool', { detail: 1 })); });
+    document.querySelector<HTMLButtonElement>('#tool-prev')?.addEventListener('pointerdown', event => { event.preventDefault(); window.dispatchEvent(new CustomEvent('wirehouse:cycle-tool', { detail: -1 })); });
+    document.querySelector<HTMLButtonElement>('#tool-next')?.addEventListener('pointerdown', event => { event.preventDefault(); window.dispatchEvent(new CustomEvent('wirehouse:cycle-tool', { detail: 1 })); });
   }
 
   private onPointerDown = (event: PointerEvent): void => {

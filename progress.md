@@ -11,6 +11,10 @@ Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web gam
 
 ## Current
 
+- Mobile joystick movement now remains active while ACTION, spray/hammer use, or tool cycling is pressed; look, movement and action use independent pointers.
+- Mobile game buttons explicitly disable iOS tap highlight, text selection/callout, and touch-only sticky hover styling.
+- The mobile regression now asserts that a second-finger TOOL press preserves joystick movement and that movement resets only when the joystick finger ends.
+- Automated mobile style coverage now rejects browser tap highlight, text selection, or non-manipulation button touch behavior.
 - Freeform controls revision implemented after physical iPhone feedback: transient toast, global tool cycling, visible selected tools, held free spray, reticle-based brick removal and stuck-joystick recovery.
 - Desktop left mouse now uses the selected tool; holding it continuously operates spray and hammer. E remains as an accessible alternate input.
 - The live desktop HUD explicitly shows `LEFT CLICK TO USE` beside the selected tool.

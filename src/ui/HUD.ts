@@ -33,11 +33,14 @@ export class HUD {
             <button id="spray-mode" aria-label="Change spray method">METHOD <b>LIVE</b></button>
             <button id="spray-color" aria-label="Change spray color">COLOR <i></i><b>BLUE</b></button>
           </div>
+          <div id="hammer-controls" class="hud-card" aria-label="Demolition hammer settings">
+            <button id="hammer-mode" aria-label="Change hammer method">METHOD <b>CHASE</b></button>
+          </div>
           <aside id="desktop-key-guide" class="hud-card" aria-label="Keyboard and mouse controls">
             <div><kbd>WASD</kbd><span>MOVE</span><kbd>MOUSE</kbd><span>LOOK</span><kbd>SHIFT</kbd><span>FAST</span></div>
             <div><kbd>LMB</kbd><span>USE / HOLD</span><kbd>E</kbd><span>INTERACT</span><kbd>WHEEL</kbd><span>SWITCH TOOL</span></div>
             <div><kbd>1–6</kbd><span>SELECT TOOL</span><kbd>V</kbd><span>SPRAY METHOD</span><kbd>C</kbd><span>COLOR</span></div>
-            <div><kbd>F</kbd><span>FULLSCREEN</span><kbd>ESC</kbd><span>RELEASE MOUSE</span></div>
+            <div><kbd>X</kbd><span>HAMMER MODE</span><kbd>F</kbd><span>FULLSCREEN</span><kbd>ESC</kbd><span>RELEASE MOUSE</span></div>
           </aside>
           <div id="reticle" aria-hidden="true"><span></span><span></span></div>
           <div id="interaction-prompt" role="status"></div>
@@ -68,7 +71,7 @@ export class HUD {
             <p>Mark the clay brick. Chase real masonry. Set every recessed box level and flush. Finish the rigid PVC routes before the builders plaster.</p>
             <div class="brief-grid"><span>3 installation points</span><span>No cable pulling</span><span>Desktop + mobile</span></div>
             <button id="start-button">ENTER THE SITE</button>
-            <small>WASD · MOUSE LOOK · LEFT CLICK / E USE TOOL · WHEEL / 1–6 TOOLS · V SPRAY METHOD · C COLOR</small>
+            <small>WASD · MOUSE LOOK · LEFT CLICK / E USE TOOL · WHEEL / 1–6 TOOLS · V SPRAY · C COLOR · X CHASE / DEMOLISH</small>
           </section>
           <section id="result-panel" class="screen-panel result-panel">
             <div class="eyebrow">LIVING ROOM · INSPECTION PASSED</div>
@@ -94,6 +97,7 @@ export class HUD {
     }));
     root.querySelector('#spray-mode')?.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:cycle-spray-mode')));
     root.querySelector('#spray-color')?.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:cycle-spray-color')));
+    root.querySelector('#hammer-mode')?.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:cycle-hammer-mode')));
   }
 
   onStart(callback: () => void): void {
@@ -148,5 +152,13 @@ export class HUD {
     if (modeText) modeText.textContent = mode.toUpperCase();
     if (colorText) colorText.textContent = colorName;
     if (swatch) swatch.style.background = colorCss;
+  }
+
+  updateHammerControls(mode: string, visible: boolean): void {
+    const panel = this.shell.querySelector<HTMLElement>('#hammer-controls');
+    if (!panel) return;
+    panel.classList.toggle('visible', visible);
+    const modeText = panel.querySelector<HTMLElement>('#hammer-mode b');
+    if (modeText) modeText.textContent = mode.toUpperCase();
   }
 }

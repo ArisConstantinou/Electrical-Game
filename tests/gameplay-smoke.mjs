@@ -32,13 +32,18 @@ const leftClickAction = async page => {
 };
 const mobileTap = async (page, selector) => { await page.locator(selector).tap(); await page.evaluate(() => window.advanceTime(34)); };
 const reachLeveling = async page => {
+  const surfaceBeforeChase = (await state(page)).workSurface;
   await page.keyboard.press('Digit3');
   await action(page);
   await page.keyboard.press('Digit4');
   for (let index = 0; index < 4; index += 1) await action(page);
   const chaseComplete = await state(page);
+  if (chaseComplete.workSurface.destroyedBricks !== surfaceBeforeChase.destroyedBricks) throw new Error('CHASE destroyed bricks instead of recessing them');
+  if (chaseComplete.workSurface.recessedBricks <= surfaceBeforeChase.recessedBricks) throw new Error('CHASE did not create a recessed wall channel');
   if (chaseComplete.activePoint.id === 'A') {
     const destroyedBefore = chaseComplete.workSurface.destroyedBricks;
+    await page.keyboard.press('KeyX');
+    if ((await state(page)).workSurface.hammerMode !== 'demolish') throw new Error('X did not switch hammer to DEMOLISH');
     await page.evaluate(() => {
       const game = window.__wireTheHouse;
       game.player.yaw += 0.1;
@@ -48,6 +53,7 @@ const reachLeveling = async page => {
     await action(page);
     const destroyedAfter = (await state(page)).workSurface.destroyedBricks;
     if (destroyedAfter <= destroyedBefore) throw new Error('Demo hammer stopped after the required four mission hits');
+    await page.keyboard.press('KeyX');
     await aimAtActive(page);
   }
   if ((await state(page)).activePoint.id === 'A') await page.screenshot({ path: outputPath('desktop-real-chase.png') });
@@ -88,6 +94,8 @@ await demolition.goto(baseUrl, { waitUntil: 'networkidle' });
 await demolition.click('#start-button');
 await demolition.waitForTimeout(450);
 await demolition.keyboard.press('Digit4');
+await demolition.keyboard.press('KeyX');
+if ((await state(demolition)).workSurface.hammerMode !== 'demolish') throw new Error('Standalone demolition mode did not activate');
 const destroyAtHeight = async targetY => {
   await demolition.evaluate(y => {
     const game = window.__wireTheHouse;
@@ -149,7 +157,7 @@ await desktop.click('#start-button');
 await desktop.waitForTimeout(450);
 if (!await desktop.locator('#desktop-key-guide').isVisible()) throw new Error('Desktop key guide is not visible during gameplay');
 const keyGuideText = await desktop.locator('#desktop-key-guide').innerText();
-for (const required of ['WASD', 'LMB', 'E', 'WHEEL', '1–6', 'V', 'C', 'F', 'ESC']) {
+for (const required of ['WASD', 'LMB', 'E', 'WHEEL', '1–6', 'V', 'C', 'X', 'F', 'ESC']) {
   if (!keyGuideText.includes(required)) throw new Error(`Desktop key guide is missing ${required}`);
 }
 const beforeMove = await state(desktop);
@@ -184,10 +192,11 @@ await desktop.mouse.up({ button: 'left' });
 const liveMarksAfter = (await state(desktop)).workSurface.freeSprayMarks;
 if (liveMarksAfter - liveMarksBefore < 5) throw new Error(`LIVE spray did not record a continuous held stroke: ${liveMarksAfter - liveMarksBefore} samples`);
 await desktop.keyboard.press('Digit4');
+await aimAtActive(desktop);
 await desktop.mouse.down({ button: 'left' });
 await desktop.evaluate(() => window.advanceTime(800));
 await desktop.mouse.up({ button: 'left' });
-if ((await state(desktop)).activePoint.stage !== 'chased') throw new Error('Holding desktop left mouse did not repeatedly use the hammer');
+if ((await state(desktop)).activePoint.stage !== 'chased') throw new Error(`Holding desktop left mouse did not repeatedly use the hammer: ${JSON.stringify(await state(desktop))}`);
 await desktop.reload({ waitUntil: 'networkidle' });
 await desktop.click('#start-button');
 await desktop.waitForTimeout(450);
@@ -273,6 +282,12 @@ const touchResult = await mobile.evaluate(() => {
   return { before, after: { yaw: game.player.yaw, pitch: game.player.pitch, scrollY }, down, move, shellTouchAction: getComputedStyle(shell).touchAction, footerTouchAction: getComputedStyle(footer).touchAction };
 });
 if (touchResult.after.pitch === touchResult.before.pitch || touchResult.after.yaw === touchResult.before.yaw) throw new Error('Mobile swipe did not update yaw and pitch');
+const mobileButtonStyles = await mobile.evaluate(() => {
+  const button = document.querySelector('#mobile-action');
+  const style = getComputedStyle(button);
+  return { tapHighlight: style.webkitTapHighlightColor, userSelect: style.userSelect, touchAction: style.touchAction };
+});
+if (!['rgba(0, 0, 0, 0)', 'transparent'].includes(mobileButtonStyles.tapHighlight) || mobileButtonStyles.userSelect !== 'none' || mobileButtonStyles.touchAction !== 'manipulation') throw new Error(`Mobile buttons allow browser highlight or selection: ${JSON.stringify(mobileButtonStyles)}`);
 if (!touchResult.move.defaultPrevented || touchResult.shellTouchAction !== 'none') throw new Error('Game touch-look did not suppress browser scrolling');
 if (touchResult.after.scrollY !== touchResult.before.scrollY) throw new Error('Viewport scrolled during game camera swipe');
 if (touchResult.footerTouchAction === 'none') throw new Error('Scroll prevention leaked outside the game area');
@@ -289,7 +304,7 @@ await mobile.evaluate(async () => {
 });
 const mobileAfterMove = await state(mobile);
 if (Math.hypot(mobileAfterMove.player.x - mobileBeforeMove.player.x, mobileAfterMove.player.z - mobileBeforeMove.player.z) < 0.2) throw new Error('Mobile joystick did not move the player');
-const stuckCheck = await mobile.evaluate(async () => {
+const simultaneousToolCheck = await mobile.evaluate(async () => {
   const game = window.__wireTheHouse;
   const joystick = document.querySelector('#joystick');
   const next = document.querySelector('#tool-next');
@@ -300,9 +315,13 @@ const stuckCheck = await mobile.evaluate(async () => {
   dispatch(next, 'pointerdown', 194, 320, 760);
   const before = game.renderer.camera.position.clone();
   window.advanceTime(500);
-  return { distance: before.distanceTo(game.renderer.camera.position), move: { ...game.input.mobileMove }, tool: game.selectedTool };
+  const whilePressed = { distance: before.distanceTo(game.renderer.camera.position), move: { ...game.input.mobileMove }, tool: game.selectedTool };
+  dispatch(next, 'pointerup', 194, 320, 760);
+  dispatch(joystick, 'pointerup', 193, rect.left + rect.width / 2, rect.top + 8);
+  return { whilePressed, afterRelease: { ...game.input.mobileMove } };
 });
-if (stuckCheck.distance > 0.01 || stuckCheck.move.x !== 0 || stuckCheck.move.y !== 0) throw new Error(`Joystick remained stuck after interrupted pointer: ${JSON.stringify(stuckCheck)}`);
+if (simultaneousToolCheck.whilePressed.distance < 0.2 || simultaneousToolCheck.whilePressed.move.y === 0) throw new Error(`Tool press interrupted joystick movement: ${JSON.stringify(simultaneousToolCheck)}`);
+if (simultaneousToolCheck.afterRelease.x !== 0 || simultaneousToolCheck.afterRelease.y !== 0) throw new Error(`Joystick did not reset after its own pointer ended: ${JSON.stringify(simultaneousToolCheck)}`);
 await mobileTap(mobile, '#tool-prev');
 await aimAtActive(mobile);
 await mobileTap(mobile, '#mobile-action');

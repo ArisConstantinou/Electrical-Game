@@ -8,8 +8,10 @@ import type { MarkingSystem } from './MarkingSystem';
 import type { MortarSystem } from './MortarSystem';
 
 export interface InteractionResult { success: boolean; message: string }
+export type HammerMode = 'chase' | 'demolish';
 
 export class InteractionSystem {
+  private hammerMode: HammerMode = 'chase';
   constructor(
     private readonly marking: MarkingSystem,
     private readonly chasing: ChasingSystem,
@@ -23,6 +25,7 @@ export class InteractionSystem {
     this.marking.color = color;
   }
   endSprayStroke(): void { this.marking.endStroke(); }
+  setHammerMode(mode: HammerMode): void { this.hammerMode = mode; }
 
   action(point: InstallationPoint, tool: RigTool, camera: THREE.Camera): InteractionResult {
     if (tool === 'spray') {
@@ -32,8 +35,17 @@ export class InteractionSystem {
     }
     if (tool === 'hammer') {
       const missionChase = point.stage === 'marked' || point.stage === 'chasing';
-      const hit = missionChase ? this.chasing.hit(camera, point) : this.chasing.freeHit(camera);
-      return { success: hit, message: !hit ? 'Aim the demolition hammer at intact brick.' : missionChase && point.chaseHits >= 4 ? 'Required opening complete. Keep demolishing anywhere if needed.' : '' };
+      if (this.hammerMode === 'demolish' && missionChase) {
+        const hit = this.chasing.hit(camera, point);
+        return { success: hit, message: !hit ? 'Aim CHASE at the blue marked route.' : point.chaseHits >= 4 ? 'Recess complete: depth is ready for boxes and conduit.' : '' };
+      }
+      if (this.hammerMode === 'demolish') {
+        const hit = this.chasing.freeHit(camera);
+        return { success: hit, message: hit ? '' : 'Aim the demolition hammer at an intact brick.' };
+      }
+      if (!missionChase) return { success: false, message: 'CHASE works on the marked route. Press X or choose DEMOLISH for free destruction.' };
+      const hit = this.chasing.hit(camera, point);
+      return { success: hit, message: !hit ? 'Aim CHASE at the blue marked route.' : point.chaseHits >= 4 ? 'Recess complete: depth is ready for boxes and conduit.' : '' };
     }
     if (tool === 'fitting' && point.stage === 'chased') {
       point.boxGroup.visible = true;
