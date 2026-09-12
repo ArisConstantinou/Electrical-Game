@@ -70,6 +70,7 @@ export class BrickWall extends THREE.Group {
   private readonly targetsById = new Map<string, BrickTarget>();
   private readonly instancedTargets = new WeakMap<THREE.InstancedMesh, Map<number, BrickTarget>>();
   private readonly raycaster = new THREE.Raycaster();
+  private heldDemolitionTarget: BrickTarget | null = null;
   private readonly sprayMarks: Array<{ pointId: string; mesh: THREE.Mesh }> = [];
   private readonly spraySamplesByPoint = new Map<string, THREE.Vector3[]>();
   private readonly liveSpraySamplesByPoint = new Map<string, number>();
@@ -282,10 +283,17 @@ export class BrickWall extends THREE.Group {
     }
   }
 
-  removeAtAim(camera: THREE.Camera): MasonryImpact | null {
-    const offsets: number[][] = [[0, 0]];
-    for (const y of [-0.12, -0.06, 0, 0.06, 0.12]) for (const x of [-0.16, -0.08, 0, 0.08, 0.16]) if (x !== 0 || y !== 0) offsets.push([x, y]);
-    const hit = offsets.map(([x, y]) => this.cast(camera, x, y, 4.5)).find(Boolean) ?? null;
+  removeAtAim(camera: THREE.Camera, continuing = false): MasonryImpact | null {
+    let hit: AimHit | null = null;
+    if (continuing && this.heldDemolitionTarget && !this.heldDemolitionTarget.destroyed) {
+      const target = this.heldDemolitionTarget;
+      hit = { target, point: target.center.clone().add(new THREE.Vector3(0, 0, target.size.z / 2)) };
+    } else {
+      const offsets: number[][] = [[0, 0]];
+      for (const y of [-0.12, -0.06, 0, 0.06, 0.12]) for (const x of [-0.16, -0.08, 0, 0.08, 0.16]) if (x !== 0 || y !== 0) offsets.push([x, y]);
+      hit = offsets.map(([x, y]) => this.cast(camera, x, y, 4.5)).find(Boolean) ?? null;
+      this.heldDemolitionTarget = hit?.target ?? null;
+    }
     if (!hit) return null;
     const target = hit.target;
     if (target.damage === 0) this.damagedBricks += 1;
@@ -308,6 +316,7 @@ export class BrickWall extends THREE.Group {
       target.fractureSeed = seed;
       target.fractureImpact = hit.point.clone();
       impactPoints.push(...this.refreshDestroyedShellsAround(target));
+      this.heldDemolitionTarget = null;
     }
     return { points: impactPoints, kind, brickSize: target.size.clone(), seed, destroyed };
   }

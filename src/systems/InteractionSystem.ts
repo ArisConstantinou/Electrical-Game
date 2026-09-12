@@ -27,7 +27,7 @@ export class InteractionSystem {
   endSprayStroke(): void { this.marking.endStroke(); }
   setHammerMode(mode: HammerMode): void { this.hammerMode = mode; }
 
-  action(point: InstallationPoint, tool: RigTool, camera: THREE.Camera): InteractionResult {
+  action(point: InstallationPoint, tool: RigTool, camera: THREE.Camera, continuing = false): InteractionResult {
     if (tool === 'spray') {
       const firstMark = point.stage === 'inspect';
       const painted = this.marking.spray(camera, point);
@@ -40,7 +40,7 @@ export class InteractionSystem {
         return { success: hit, message: !hit ? 'Aim CHASE at the blue marked route.' : point.chaseHits >= 4 ? 'Recess complete: depth is ready for boxes and conduit.' : '' };
       }
       if (this.hammerMode === 'demolish') {
-        const impact = this.chasing.freeHit(camera);
+        const impact = this.chasing.freeHit(camera, continuing);
         const feedback = impact?.kind === 'demolish-chip' ? 'Surface chipped — keep striking.'
           : impact?.kind === 'demolish-crack' ? 'Cracks spreading — two solid hits remain.'
             : impact?.kind === 'demolish-spall' ? 'Brick spalling — one solid hit remains.'

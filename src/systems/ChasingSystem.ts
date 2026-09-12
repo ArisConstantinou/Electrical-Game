@@ -56,8 +56,8 @@ export class ChasingSystem {
     return true;
   }
 
-  freeHit(camera: THREE.Camera): MasonryImpact | null {
-    const impact = this.wall.removeAtAim(camera);
+  freeHit(camera: THREE.Camera, continuing = false): MasonryImpact | null {
+    const impact = this.wall.removeAtAim(camera, continuing);
     if (!impact) return null;
     this.spawnDebris(impact);
     return impact;

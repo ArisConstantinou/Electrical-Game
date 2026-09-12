@@ -157,14 +157,31 @@ const destroyAtHeight = async targetY => {
     game.step(1 / 60);
   }, targetY);
   const before = (await state(demolition)).workSurface;
-  await leftClickAction(demolition);
+  await demolition.evaluate(y => {
+    const game = window.__wireTheHouse;
+    game.renderer.camera.position.set(0, 1.65, -0.35);
+    game.player.yaw = 0;
+    game.player.pitch = Math.atan2(y - 1.65, 2.06);
+    game.renderer.camera.rotation.set(game.player.pitch, 0, 0);
+    game.chasing.freeHit(game.renderer.camera);
+    game.chasing.update(1 / 60);
+    game.renderer.render();
+  }, targetY);
   const chipped = (await state(demolition)).workSurface;
   if (chipped.destroyedBricks !== before.destroyedBricks || chipped.damagedBricks <= before.damagedBricks || chipped.activeFragments < 1) {
     throw new Error(`First DEMOLISH impact did not chip/crack the brick before destruction at wall height ${targetY}`);
   }
   for (let hit = 1; hit < 4; hit += 1) {
-    await demolition.evaluate(() => window.advanceTime(260));
-    await leftClickAction(demolition);
+    await demolition.evaluate(y => {
+      const game = window.__wireTheHouse;
+      game.renderer.camera.position.set(0, 1.65, -0.35);
+      game.player.yaw = 0;
+      game.player.pitch = Math.atan2(y - 1.65, 2.06);
+      game.renderer.camera.rotation.set(game.player.pitch, 0, 0);
+      game.chasing.freeHit(game.renderer.camera);
+      game.chasing.update(0.26);
+      game.renderer.render();
+    }, targetY);
   }
   const after = (await state(demolition)).workSurface;
   if (after.destroyedBricks <= before.destroyedBricks || after.activeFragments < 10) throw new Error(`Four DEMOLISH impacts did not fracture the brick at wall height ${targetY}`);
@@ -279,12 +296,15 @@ await demolitionDetail.evaluate(() => {
   game.started = false;
   const target = game.room.brickWall.aim(game.renderer.camera)?.target;
   if (!target) throw new Error('Could not resolve a demolition detail brick');
+  game.qaDemolitionTarget = target.center.clone();
   game.renderer.camera.lookAt(target.center);
   game.renderer.camera.updateMatrixWorld(true);
 });
 for (let hit = 0; hit < 3; hit += 1) {
   await demolitionDetail.evaluate(() => {
     const game = window.__wireTheHouse;
+    game.renderer.camera.lookAt(game.qaDemolitionTarget);
+    game.renderer.camera.updateMatrixWorld(true);
     game.chasing.freeHit(game.renderer.camera);
     game.chasing.update(1 / 60);
     game.renderer.render();
@@ -295,6 +315,8 @@ if (crackedState.workSurface.destroyedBricks !== 0 || crackedState.workSurface.d
 await demolitionDetail.screenshot({ path: outputPath('desktop-progressive-demolition-cracks.png') });
 await demolitionDetail.evaluate(() => {
   const game = window.__wireTheHouse;
+  game.renderer.camera.lookAt(game.qaDemolitionTarget);
+  game.renderer.camera.updateMatrixWorld(true);
   game.chasing.freeHit(game.renderer.camera);
   game.chasing.update(1 / 60);
   game.renderer.render();
@@ -390,6 +412,8 @@ for (let pass = 1; pass <= 4; pass += 1) {
   chasePasses.push(await routedChase.evaluate(() => {
     const game = window.__wireTheHouse;
     const point = game.mission.activePoint;
+    game.renderer.camera.lookAt(-1.7, 0.97, -2.41);
+    game.renderer.camera.updateMatrixWorld(true);
     const hit = game.chasing.hit(game.renderer.camera, point);
     game.step(1 / 60);
     const pixels = game.room.brickWall.livePaintContext.getImageData(0, 0, game.room.brickWall.livePaintCanvas.width, game.room.brickWall.livePaintCanvas.height).data;
@@ -559,36 +583,35 @@ const heldHammerState = await state(desktop);
 if (heldHammerState.activePoint.stage !== 'chasing' || heldHammerState.activePoint.chaseHits !== 1) throw new Error(`Holding desktop left mouse repeated the hammer instead of making one chase pass: ${JSON.stringify(heldHammerState)}`);
 for (let pass = 0; pass < 3; pass += 1) await leftClickAction(desktop);
 if ((await state(desktop)).activePoint.stage !== 'chased') throw new Error(`Four separate desktop hammer presses did not complete CHASE: ${JSON.stringify(await state(desktop))}`);
-const destroyedBeforeDesktopDemolish = (await state(desktop)).workSurface.destroyedBricks;
+const surfaceBeforeDesktopDemolish = (await state(desktop)).workSurface;
 await desktop.keyboard.press('KeyX');
 await desktop.waitForTimeout(140);
 await desktop.evaluate(() => {
   const game = window.__wireTheHouse;
   game.renderer.camera.position.set(0.8, 1.65, -0.35);
-  game.player.yaw = 0;
-  game.player.pitch = 0;
-  game.renderer.camera.rotation.set(0, 0, 0);
+  const target = game.room.brickWall.targets.find(item => !item.destroyed && Math.abs(item.center.x - 0.8) < 0.2 && Math.abs(item.center.y - 1.65) < 0.2);
+  if (!target) throw new Error('Could not select a centred desktop demolition brick');
+  game.renderer.camera.lookAt(target.center);
+  game.player.yaw = game.renderer.camera.rotation.y;
+  game.player.pitch = game.renderer.camera.rotation.x;
   game.step(1 / 60);
 });
-for (let hit = 0; hit < 4; hit += 1) {
-  await desktop.mouse.down({ button: 'left' });
-  await desktop.evaluate(() => {
-    const game = window.__wireTheHouse;
-    // Pointer Lock can report a synthetic mouse delta when a headless browser
-    // restores capture. Lock the QA ray immediately before consuming the real
-    // left-button request so this test measures demolition, not that browser delta.
-    game.renderer.camera.position.set(0.8, 1.65, -0.35);
-    game.player.yaw = 0;
-    game.player.pitch = 0;
-    game.renderer.camera.rotation.set(0, 0, 0);
-    game.step(1 / 60);
-  });
-  await desktop.mouse.up({ button: 'left' });
-  await desktop.waitForTimeout(100);
-  await desktop.evaluate(() => window.advanceTime(260));
-}
+await desktop.mouse.down({ button: 'left' });
+await desktop.evaluate(() => {
+  const game = window.__wireTheHouse;
+  // Pointer Lock can report a synthetic mouse delta when a headless browser
+  // restores capture. Lock the QA ray before advancing the held demolition.
+  game.renderer.camera.position.set(0.8, 1.65, -0.35);
+  const target = game.room.brickWall.targets.find(item => !item.destroyed && Math.abs(item.center.x - 0.8) < 0.2 && Math.abs(item.center.y - 1.65) < 0.2);
+  if (!target) throw new Error('Could not retain the centred desktop demolition brick');
+  game.renderer.camera.lookAt(target.center);
+  game.player.yaw = game.renderer.camera.rotation.y;
+  game.player.pitch = game.renderer.camera.rotation.x;
+  window.advanceTime(900);
+});
+await desktop.mouse.up({ button: 'left' });
 const destroyedAfterDesktopDemolish = (await state(desktop)).workSurface.destroyedBricks;
-if (destroyedAfterDesktopDemolish <= destroyedBeforeDesktopDemolish) throw new Error(`DEMOLISH did not work from desktop left click: ${JSON.stringify(await state(desktop))}`);
+if (destroyedAfterDesktopDemolish <= surfaceBeforeDesktopDemolish.destroyedBricks) throw new Error(`Holding desktop left mouse did not continuously DEMOLISH: ${JSON.stringify(await state(desktop))}`);
 await desktop.keyboard.press('Digit5');
 await aimAtActive(desktop);
 const beforeDesktopFitting = await state(desktop);
@@ -646,6 +669,43 @@ for (const id of ['A', 'B', 'C']) {
 const complete = await state(desktop);
 if (!complete.mission.complete || complete.mode !== 'mission-complete') throw new Error('Mission did not reach FIRST FIX COMPLETE');
 if (!await desktop.locator('#result-panel.visible').isVisible()) throw new Error('Result panel is not visible');
+
+const mobileDemolition = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 3 });
+await mobileDemolition.goto(baseUrl, { waitUntil: 'networkidle' });
+await mobileDemolition.click('#start-button');
+await mobileDemolition.waitForTimeout(250);
+await mobileTap(mobileDemolition, '[data-tool="hammer"]');
+await mobileTap(mobileDemolition, '#tool-mode-toggle');
+const mobileHeldDemolition = await mobileDemolition.evaluate(() => {
+  const game = window.__wireTheHouse;
+  game.renderer.camera.position.set(0.8, 1.65, -0.35);
+  const target = game.room.brickWall.targets.find(item => !item.destroyed && Math.abs(item.center.x - 0.8) < 0.2 && Math.abs(item.center.y - 1.65) < 0.2);
+  if (!target) throw new Error('Could not select a centred mobile demolition brick');
+  game.renderer.camera.lookAt(target.center);
+  game.player.yaw = game.renderer.camera.rotation.y;
+  game.player.pitch = game.renderer.camera.rotation.x;
+  const look = document.querySelector('#look-joystick');
+  const rect = look.getBoundingClientRect();
+  const x = rect.left + rect.width / 2;
+  const y = rect.top + rect.height / 2;
+  const dispatch = (type, clientX) => look.dispatchEvent(new PointerEvent(type, { pointerId: 990, pointerType: 'touch', clientX, clientY: y, bubbles: true, cancelable: true }));
+  dispatch('pointerdown', x);
+  dispatch('pointermove', x + 6);
+  window.advanceTime(900);
+  const during = {
+    held: game.input.actionHeld,
+    surface: JSON.parse(window.render_game_to_text()).workSurface,
+    damagedTargets: game.room.brickWall.targets.filter(item => item.damage > 0 || item.destroyed).map(item => ({ id: item.id, damage: item.damage, destroyed: item.destroyed })),
+  };
+  dispatch('pointerup', x + 6);
+  window.advanceTime(34);
+  return { during, heldAfterRelease: game.input.actionHeld };
+});
+if (!mobileHeldDemolition.during.held || mobileHeldDemolition.during.surface.destroyedBricks < 1 || mobileHeldDemolition.heldAfterRelease) {
+  throw new Error(`Mobile hold did not continuously DEMOLISH and release cleanly: ${JSON.stringify(mobileHeldDemolition)}`);
+}
+await mobileDemolition.screenshot({ path: outputPath('mobile-held-demolition.png') });
+await mobileDemolition.close();
 
 const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 3 });
 mobile.on('console', message => { if (message.type() === 'error') errors.push(`mobile console: ${message.text()}`); });

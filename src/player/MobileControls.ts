@@ -1,6 +1,5 @@
 import type { Input } from '../core/Input';
 import type { MobileAimProfile, PlayerController } from './PlayerController';
-import type { RigTool } from './FPSRig';
 
 export type AimControlMode = 'auto-use' | 'double-tap';
 export type AimInputMode = 'drag' | 'stick';
@@ -20,7 +19,7 @@ export class MobileControls {
   private aimInputMode: AimInputMode = 'drag';
   private dragDistance = 0;
 
-  constructor(private readonly surface: HTMLElement, private readonly input: Input, private readonly player: PlayerController, private readonly selectedTool: () => RigTool) {
+  constructor(private readonly surface: HTMLElement, private readonly input: Input, private readonly player: PlayerController, private readonly selectedToolIsContinuous: () => boolean) {
     surface.addEventListener('pointerdown', this.onPointerDown, { passive: false });
     surface.addEventListener('pointermove', this.onPointerMove, { passive: false });
     surface.addEventListener('pointerup', this.onPointerUp, { passive: false });
@@ -219,6 +218,6 @@ export class MobileControls {
   }
 
   private get isContinuousTool(): boolean {
-    return this.selectedTool() === 'spray';
+    return this.selectedToolIsContinuous();
   }
 }

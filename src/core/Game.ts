@@ -81,7 +81,12 @@ export class Game {
     this.interaction = new InteractionSystem(new MarkingSystem(this.room.brickWall), this.chasing, new MortarSystem(), this.leveling, this.conduit);
     this.applySpraySettings();
     this.desktopControls = new DesktopControls(this.hud.shell, this.renderer.webgl.domElement, this.player, this.input);
-    this.mobileControls = new MobileControls(this.hud.shell, this.input, this.player, () => this.selectedTool);
+    this.mobileControls = new MobileControls(
+      this.hud.shell,
+      this.input,
+      this.player,
+      () => this.isContinuousAction(),
+    );
     new MobileHUD();
     this.bindEvents();
     this.hud.onStart(() => {
@@ -101,14 +106,15 @@ export class Game {
     if (this.started && !leveling) this.player.update(Math.min(dt, 0.05));
     this.actionCooldown = Math.max(0, this.actionCooldown - dt);
     const requested = this.input.consumeAction();
-    // Spray is a continuous tool. The hammer is intentionally discrete so one
-    // press exposes one chase pass instead of consuming the whole route while held.
-    const repeatable = this.selectedTool === 'spray' && this.input.actionHeld && this.actionCooldown <= 0;
+    // Spray and DEMOLISH are continuous tools. CHASE stays discrete so one
+    // press exposes one route pass instead of consuming the whole chase at once.
+    const continuousTool = this.isContinuousAction();
+    const repeatable = continuousTool && this.input.actionHeld && this.actionCooldown <= 0;
     const spraying = this.selectedTool === 'spray' && this.input.actionHeld;
     if (this.wasSpraying && !spraying) this.interaction.endSprayStroke();
     this.wasSpraying = spraying;
     if (this.started && (requested || repeatable)) {
-      this.performAction();
+      this.performAction(repeatable && !requested);
       this.actionCooldown = this.selectedTool === 'spray' ? 0.045 : this.selectedTool === 'hammer' ? 0.24 : 0.18;
     }
     this.chasing.update(dt);
@@ -148,14 +154,14 @@ export class Game {
     });
   }
 
-  private performAction(): void {
+  private performAction(continuing = false): void {
     const active = this.mission.activePoint;
     if (!active) return;
     const spatialTool = this.selectedTool === 'spray' || this.selectedTool === 'hammer';
     const target = active.stage === 'leveling' ? active : spatialTool ? active : this.mission.target(this.renderer.camera);
     if (!target) { this.hud.notify('Aim at the work area you chose.', false); return; }
     const hammering = this.selectedTool === 'hammer';
-    const result = this.interaction.action(target, this.selectedTool, this.renderer.camera);
+    const result = this.interaction.action(target, this.selectedTool, this.renderer.camera, continuing);
     if (hammering && result.success) { this.fpsRig.strike(); this.shake = 1; }
     if (result.message) this.hud.notify(result.message, result.success);
   }
@@ -243,6 +249,13 @@ export class Game {
     const color = SPRAY_COLORS[this.sprayColorIndex];
     this.interaction.setSpray(this.sprayMode, color.value);
     this.fpsRig.setSprayColor(color.value);
+  }
+
+  private isContinuousAction(): boolean {
+    if (this.selectedTool === 'spray') return true;
+    if (this.selectedTool !== 'hammer' || this.hammerMode !== 'demolish') return false;
+    const stage = this.mission.activePoint?.stage;
+    return stage !== 'marked' && stage !== 'chasing';
   }
 
   private loop = (time: number): void => {
