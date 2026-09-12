@@ -2,34 +2,84 @@ import * as THREE from 'three';
 import { GAME_CONFIG } from '../data/gameConfig';
 import type { InstallationDefinition } from '../data/installationRules';
 
-interface RemovableBrick {
-  mesh: THREE.Mesh;
-  marker: THREE.Group;
-  recessed: boolean;
+interface RemovableBrick { mesh: THREE.Mesh; marker: THREE.Group; recessed: boolean }
+interface BrickTarget {
+  id: string;
+  object: THREE.Object3D;
+  instanceId?: number;
+  center: THREE.Vector3;
+  rotationZ: number;
+  size: THREE.Vector3;
+  damage: number;
+  destroyed: boolean;
+  originalHidden: boolean;
+  carvedCells: Set<number>;
+  replacement: THREE.Group | null;
+  cracks: THREE.Group | null;
+}
+interface AimHit { point: THREE.Vector3; target: BrickTarget }
+
+export type SprayMode = 'dots' | 'live';
+export type MasonryImpactKind = 'chase-chip' | 'demolish-chip' | 'demolish-crack' | 'demolish-spall' | 'demolish-break';
+export interface MasonryImpact {
+  points: THREE.Vector3[];
+  kind: MasonryImpactKind;
+  brickSize: THREE.Vector3;
+  seed: number;
+  destroyed: boolean;
 }
 
-interface AimHit { point: THREE.Vector3; object: THREE.Object3D; instanceId?: number }
-export type SprayMode = 'dots' | 'live';
-
 const brickGeometry = new THREE.BoxGeometry(0.286, 0.125, 0.18);
-const brickMaterial = new THREE.MeshStandardMaterial({ color: 0xb84b2a, roughness: 0.96, metalness: 0, vertexColors: false });
+const unitBoxGeometry = new THREE.BoxGeometry(1, 1, 1);
+const remnantGeometries = [unitBoxGeometry, new THREE.TetrahedronGeometry(1, 0), new THREE.DodecahedronGeometry(1, 0)];
+const brickMaterial = new THREE.MeshStandardMaterial({ color: 0xb84b2a, roughness: 0.96, metalness: 0 });
 const removableMaterial = new THREE.MeshStandardMaterial({ color: 0xb94d2b, roughness: 0.97, metalness: 0 });
+const chasedBrickMaterial = new THREE.MeshStandardMaterial({ color: 0xb24a2a, roughness: 0.99, metalness: 0 });
+const chaseInteriorMaterial = new THREE.MeshStandardMaterial({ color: 0x672717, roughness: 1, metalness: 0 });
+const fractureMaterial = new THREE.LineBasicMaterial({ color: 0x4f1c13, transparent: true, opacity: 0.92, depthTest: true });
+const CHASE_GRID_X = 12;
+const CHASE_GRID_Y = 6;
+const CHASE_DEPTH = 0.055;
+const DEMOLISH_HITS = 4;
+
+function hashString(value: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function seeded(seed: number): () => number {
+  let state = seed || 1;
+  return () => {
+    state = Math.imul(state ^ (state >>> 15), 1 | state);
+    state ^= state + Math.imul(state ^ (state >>> 7), 61 | state);
+    return ((state ^ (state >>> 14)) >>> 0) / 4294967296;
+  };
+}
 
 export class BrickWall extends THREE.Group {
   private readonly removableByPoint = new Map<string, RemovableBrick[]>();
   private readonly breakables: THREE.Object3D[] = [];
+  private readonly targets: BrickTarget[] = [];
+  private readonly targetsById = new Map<string, BrickTarget>();
+  private readonly instancedTargets = new WeakMap<THREE.InstancedMesh, Map<number, BrickTarget>>();
   private readonly raycaster = new THREE.Raycaster();
-  private readonly destroyedInstanceIds = new WeakMap<THREE.InstancedMesh, Set<number>>();
-  private readonly recessedInstanceIds = new WeakMap<THREE.InstancedMesh, Set<number>>();
-  private readonly recessedObjects = new WeakSet<THREE.Object3D>();
   private readonly sprayMarks: Array<{ pointId: string; mesh: THREE.Mesh }> = [];
   private readonly spraySamplesByPoint = new Map<string, THREE.Vector3[]>();
+  private readonly chasedSamplesByPoint = new Map<string, Set<number>>();
+  private readonly chasePassByPoint = new Map<string, number>();
+  private readonly holeRemnants: THREE.Group[] = [];
   private readonly livePaintCanvas = document.createElement('canvas');
   private readonly livePaintContext: CanvasRenderingContext2D;
   private readonly livePaintTexture: THREE.CanvasTexture;
   private lastLivePoint: THREE.Vector3 | null = null;
   private liveStrokeSamples = 0;
   private chaseRecessedBricks = 0;
+  private chaseCarvedCells = 0;
+  private damagedBricks = 0;
   private destroyedBricks = 0;
 
   constructor(definitions: InstallationDefinition[]) {
@@ -43,12 +93,12 @@ export class BrickWall extends THREE.Group {
     this.livePaintContext = context;
     this.livePaintTexture = new THREE.CanvasTexture(this.livePaintCanvas);
     this.livePaintTexture.colorSpace = THREE.SRGBColorSpace;
+
     const cols = 21;
     const rows = 23;
     const brickW = GAME_CONFIG.room.width / cols;
     const brickH = GAME_CONFIG.room.height / rows;
-    const fixedTransforms: THREE.Matrix4[] = [];
-
+    const fixedEntries: Array<{ matrix: THREE.Matrix4; center: THREE.Vector3; rotationZ: number; size: THREE.Vector3; id: string }> = [];
     for (let row = 0; row < rows; row += 1) {
       for (let col = 0; col < cols; col += 1) {
         const stagger = row % 2 === 0 ? 0 : brickW / 2;
@@ -56,11 +106,14 @@ export class BrickWall extends THREE.Group {
         if (x > GAME_CONFIG.room.width / 2 - 0.02) continue;
         const y = brickH / 2 + row * brickH;
         const owner = definitions.find(definition => this.inChaseZone(definition, x, y, brickW, brickH));
-        const position = new THREE.Vector3(x + Math.sin(row * 4.7 + col) * 0.004, y, -2.5 + Math.sin(col * 2.1 + row) * 0.006);
-        const scale = new THREE.Vector3(brickW / 0.286 * 0.985, brickH / 0.125 * 0.965, 1);
-        const matrix = new THREE.Matrix4().compose(position, new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, Math.sin(col * 1.9 + row) * 0.007)), scale);
+        const center = new THREE.Vector3(x + Math.sin(row * 4.7 + col) * 0.004, y, -2.5 + Math.sin(col * 2.1 + row) * 0.006);
+        const rotationZ = Math.sin(col * 1.9 + row) * 0.007;
+        const size = new THREE.Vector3(brickW * 0.985, brickH * 0.965, 0.18);
+        const scale = new THREE.Vector3(size.x / 0.286, size.y / 0.125, 1);
+        const matrix = new THREE.Matrix4().compose(center, new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, rotationZ)), scale);
+        const id = `brick-${row}-${col}`;
         if (!owner) {
-          fixedTransforms.push(matrix);
+          fixedEntries.push({ matrix, center, rotationZ, size, id });
           continue;
         }
         const brick = new THREE.Mesh(brickGeometry, removableMaterial.clone());
@@ -77,29 +130,28 @@ export class BrickWall extends THREE.Group {
         this.removableByPoint.set(owner.id, list);
         this.breakables.push(brick);
         this.add(brick);
+        this.registerTarget({ id, object: brick, center, rotationZ, size });
       }
     }
 
-    const fixed = new THREE.InstancedMesh(brickGeometry, brickMaterial, fixedTransforms.length);
+    const fixed = new THREE.InstancedMesh(brickGeometry, brickMaterial, fixedEntries.length);
     fixed.name = 'Optimized permanent brick field';
     fixed.userData.studioEntityId = 'world:brick-wall:permanent-field';
     fixed.castShadow = true;
     fixed.receiveShadow = true;
-    fixedTransforms.forEach((matrix, index) => { fixed.setMatrixAt(index, matrix); });
+    const fixedMap = new Map<number, BrickTarget>();
+    fixedEntries.forEach((entry, index) => {
+      fixed.setMatrixAt(index, entry.matrix);
+      fixedMap.set(index, this.registerTarget({ ...entry, object: fixed, instanceId: index }));
+    });
+    this.instancedTargets.set(fixed, fixedMap);
     fixed.instanceMatrix.needsUpdate = true;
     this.breakables.push(fixed);
     this.add(fixed);
 
     const paintSurface = new THREE.Mesh(
       new THREE.PlaneGeometry(GAME_CONFIG.room.width, GAME_CONFIG.room.height),
-      new THREE.MeshBasicMaterial({
-        map: this.livePaintTexture,
-        transparent: true,
-        depthTest: true,
-        depthWrite: false,
-        polygonOffset: true,
-        polygonOffsetFactor: -2,
-      }),
+      new THREE.MeshBasicMaterial({ map: this.livePaintTexture, transparent: true, depthTest: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }),
     );
     paintSurface.name = 'Continuous live spray paint surface';
     paintSurface.userData.studioEntityId = 'world:brick-wall:live-paint';
@@ -113,18 +165,30 @@ export class BrickWall extends THREE.Group {
     return this.cast(camera, 0, 0, maxDistance);
   }
 
-  private cast(camera: THREE.Camera, screenX: number, screenY: number, maxDistance: number, skipRecessed = false): AimHit | null {
+  private registerTarget(source: Omit<BrickTarget, 'damage' | 'destroyed' | 'originalHidden' | 'carvedCells' | 'replacement' | 'cracks'>): BrickTarget {
+    const target: BrickTarget = { ...source, center: source.center.clone(), size: source.size.clone(), damage: 0, destroyed: false, originalHidden: false, carvedCells: new Set(), replacement: null, cracks: null };
+    this.targets.push(target);
+    this.targetsById.set(target.id, target);
+    return target;
+  }
+
+  private resolveTarget(object: THREE.Object3D, instanceId?: number): BrickTarget | null {
+    const replacementId = object.userData.brickTargetId;
+    if (typeof replacementId === 'string') return this.targetsById.get(replacementId) ?? null;
+    if (object instanceof THREE.InstancedMesh && instanceId !== undefined) return this.instancedTargets.get(object)?.get(instanceId) ?? null;
+    return this.targets.find(target => target.object === object) ?? null;
+  }
+
+  private cast(camera: THREE.Camera, screenX: number, screenY: number, maxDistance: number): AimHit | null {
     this.raycaster.setFromCamera(new THREE.Vector2(screenX, screenY), camera);
     const hit = this.raycaster.intersectObjects(this.breakables, false).find(candidate => {
-      if (candidate.distance > maxDistance) return false;
-      if (!(candidate.object instanceof THREE.InstancedMesh) || candidate.instanceId === undefined) {
-        return candidate.object.visible && (!skipRecessed || !this.recessedObjects.has(candidate.object));
-      }
-      if (this.destroyedInstanceIds.get(candidate.object)?.has(candidate.instanceId)) return false;
-      return !skipRecessed || !this.recessedInstanceIds.get(candidate.object)?.has(candidate.instanceId);
+      if (candidate.distance > maxDistance || !candidate.object.visible) return false;
+      const target = this.resolveTarget(candidate.object, candidate.instanceId);
+      return Boolean(target && !target.destroyed);
     });
     if (!hit) return null;
-    return { point: hit.point.clone(), object: hit.object, instanceId: hit.instanceId };
+    const target = this.resolveTarget(hit.object, hit.instanceId);
+    return target ? { point: hit.point.clone(), target } : null;
   }
 
   spray(camera: THREE.Camera, pointId: string, mode: SprayMode = 'dots', color = 0x087fce): THREE.Vector3 | null {
@@ -135,8 +199,7 @@ export class BrickWall extends THREE.Group {
       this.addSprayDab(hit.point, pointId, color, 0.018 + Math.random() * 0.012, 0.82);
       this.lastLivePoint = null;
     } else {
-      const from = this.lastLivePoint ?? hit.point;
-      this.paintLiveStroke(from, hit.point, color);
+      this.paintLiveStroke(this.lastLivePoint ?? hit.point, hit.point, color);
       this.liveStrokeSamples += 1;
       this.lastLivePoint = hit.point.clone();
     }
@@ -176,10 +239,7 @@ export class BrickWall extends THREE.Group {
   }
 
   private toPaintPixel(point: THREE.Vector3): { x: number; y: number } {
-    return {
-      x: (point.x / GAME_CONFIG.room.width + 0.5) * this.livePaintCanvas.width,
-      y: (1 - point.y / GAME_CONFIG.room.height) * this.livePaintCanvas.height,
-    };
+    return { x: (point.x / GAME_CONFIG.room.width + 0.5) * this.livePaintCanvas.width, y: (1 - point.y / GAME_CONFIG.room.height) * this.livePaintCanvas.height };
   }
 
   private recordSpraySample(pointId: string, point: THREE.Vector3): void {
@@ -217,96 +277,76 @@ export class BrickWall extends THREE.Group {
     }
   }
 
-  removeAtAim(camera: THREE.Camera): THREE.Vector3 | null {
+  removeAtAim(camera: THREE.Camera): MasonryImpact | null {
     const offsets: number[][] = [[0, 0]];
-    for (const y of [-0.12, -0.06, 0, 0.06, 0.12]) {
-      for (const x of [-0.16, -0.08, 0, 0.08, 0.16]) {
-        if (x !== 0 || y !== 0) offsets.push([x, y]);
-      }
-    }
+    for (const y of [-0.12, -0.06, 0, 0.06, 0.12]) for (const x of [-0.16, -0.08, 0, 0.08, 0.16]) if (x !== 0 || y !== 0) offsets.push([x, y]);
     const hit = offsets.map(([x, y]) => this.cast(camera, x, y, 4.5)).find(Boolean) ?? null;
     if (!hit) return null;
-    if (hit.object instanceof THREE.InstancedMesh && hit.instanceId !== undefined) {
-      const destroyed = this.destroyedInstanceIds.get(hit.object) ?? new Set<number>();
-      destroyed.add(hit.instanceId);
-      this.destroyedInstanceIds.set(hit.object, destroyed);
-      const matrix = new THREE.Matrix4();
-      hit.object.getMatrixAt(hit.instanceId, matrix);
-      matrix.scale(new THREE.Vector3(0.0001, 0.0001, 0.0001));
-      hit.object.setMatrixAt(hit.instanceId, matrix);
-      hit.object.instanceMatrix.needsUpdate = true;
-    } else {
-      hit.object.visible = false;
+    const target = hit.target;
+    if (target.damage === 0) this.damagedBricks += 1;
+    target.damage = Math.min(DEMOLISH_HITS, target.damage + 1);
+    const seed = hashString(`${target.id}:${target.damage}`);
+    this.addFractures(target, hit.point, target.damage, seed);
+    this.clearPaintAt(hit.point, target.damage === DEMOLISH_HITS ? 0.19 : 0.045);
+    let kind: MasonryImpactKind = target.damage === 1 ? 'demolish-chip' : target.damage === 2 ? 'demolish-crack' : 'demolish-spall';
+    let destroyed = false;
+    if (target.damage >= DEMOLISH_HITS) {
+      kind = 'demolish-break';
+      destroyed = true;
+      target.destroyed = true;
+      this.damagedBricks = Math.max(0, this.damagedBricks - 1);
+      this.destroyedBricks += 1;
+      this.hideOriginal(target);
+      this.removeReplacement(target);
+      this.removeCracks(target);
+      this.addJaggedRemnants(target, seed);
     }
-    this.destroyedBricks += 1;
-    const paintPoint = this.toPaintPixel(hit.point);
-    this.livePaintContext.save();
-    this.livePaintContext.globalCompositeOperation = 'destination-out';
-    this.livePaintContext.beginPath();
-    this.livePaintContext.arc(paintPoint.x, paintPoint.y, 78, 0, Math.PI * 2);
-    this.livePaintContext.fill();
-    this.livePaintContext.restore();
-    this.livePaintTexture.needsUpdate = true;
-    for (let index = this.sprayMarks.length - 1; index >= 0; index -= 1) {
-      const mark = this.sprayMarks[index];
-      if (mark.mesh.position.distanceTo(hit.point) < 0.23) {
-        this.remove(mark.mesh);
-        mark.mesh.geometry.dispose();
-        (mark.mesh.material as THREE.Material).dispose();
-        this.sprayMarks.splice(index, 1);
-      }
-    }
-    return hit.point;
+    return { points: [hit.point], kind, brickSize: target.size.clone(), seed, destroyed };
   }
 
-  recessChaseAtAim(camera: THREE.Camera, pointId: string): THREE.Vector3 | null {
+  recessChaseAtAim(camera: THREE.Camera, pointId: string): MasonryImpact | null {
     this.raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-    const impact = this.raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 0, 1), 2.39), new THREE.Vector3());
-    if (!impact || impact.distanceTo(camera.position) > 4.5) return null;
-    if (!this.hasSprayNear(pointId, impact)) return null;
-
-    const offsets: number[][] = [[0, 0]];
-    for (const y of [-0.1, -0.05, 0, 0.05, 0.1]) {
-      for (const x of [-0.12, -0.06, 0, 0.06, 0.12]) {
-        if (x !== 0 || y !== 0) offsets.push([x, y]);
-      }
+    const aimPoint = this.raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 0, 1), 2.39), new THREE.Vector3());
+    if (!aimPoint || aimPoint.distanceTo(camera.position) > 4.5 || !this.hasSprayNear(pointId, aimPoint)) return null;
+    const samples = this.spraySamplesByPoint.get(pointId) ?? [];
+    if (samples.length === 0) return null;
+    const processed = this.chasedSamplesByPoint.get(pointId) ?? new Set<number>();
+    const nearestIndex = samples.reduce((best, sample, index) => sample.distanceToSquared(aimPoint) < best.distance ? { index, distance: sample.distanceToSquared(aimPoint) } : best, { index: 0, distance: Number.POSITIVE_INFINITY }).index;
+    const batchSize = Math.max(1, Math.ceil(samples.length / 4));
+    const selected = samples.map((_, index) => ({ index, distance: Math.min(Math.abs(index - nearestIndex), samples.length - Math.abs(index - nearestIndex)) }))
+      .sort((a, b) => a.distance - b.distance).map(item => item.index).filter(index => !processed.has(index)).slice(0, batchSize);
+    const pass = this.chasePassByPoint.get(pointId) ?? 0;
+    const offsets = [new THREE.Vector2(0, 0), new THREE.Vector2(0.055, 0.015), new THREE.Vector2(-0.055, -0.015), new THREE.Vector2(0, -0.065)];
+    const workPoints = selected.length > 0 ? selected.map(index => samples[index]) : [samples[nearestIndex].clone().add(new THREE.Vector3(offsets[pass % 4].x, offsets[pass % 4].y, 0))];
+    const impacts: THREE.Vector3[] = [];
+    for (const point of workPoints) {
+      const target = this.findTargetAtPoint(point);
+      if (!target || target.destroyed) continue;
+      const before = target.carvedCells.size;
+      this.carveTargetAtPoint(target, point, hashString(`${pointId}:${pass}:${impacts.length}`));
+      if (target.carvedCells.size > before) impacts.push(point.clone());
+      this.clearPaintAt(point, 0.065);
+      const removable = (this.removableByPoint.get(pointId) ?? []).find(item => item.mesh === target.object);
+      if (removable) removable.recessed = true;
     }
-    const hit = offsets
-      .map(([x, y]) => this.cast(camera, x, y, 4.5, true))
-      .find(candidate => candidate && this.hasSprayNear(pointId, candidate.point)) ?? null;
-    if (!hit) return null;
-
-    if (hit.object instanceof THREE.InstancedMesh && hit.instanceId !== undefined) {
-      const recessed = this.recessedInstanceIds.get(hit.object) ?? new Set<number>();
-      recessed.add(hit.instanceId);
-      this.recessedInstanceIds.set(hit.object, recessed);
-      const matrix = new THREE.Matrix4();
-      hit.object.getMatrixAt(hit.instanceId, matrix);
-      matrix.elements[14] -= 0.105;
-      hit.object.setMatrixAt(hit.instanceId, matrix);
-      hit.object.instanceMatrix.needsUpdate = true;
-    } else {
-      hit.object.position.z -= 0.105;
-      this.recessedObjects.add(hit.object);
-      const brick = (this.removableByPoint.get(pointId) ?? []).find(item => item.mesh === hit.object);
-      if (brick) brick.recessed = true;
-      if (hit.object instanceof THREE.Mesh && hit.object.material instanceof THREE.MeshStandardMaterial) {
-        hit.object.material.color.setHex(0x78351f);
-        hit.object.material.roughness = 1;
-      }
-    }
-    this.chaseRecessedBricks += 1;
-    this.clearPaintAt(hit.point, 0.23);
-    return hit.point;
+    selected.forEach(index => processed.add(index));
+    this.chasedSamplesByPoint.set(pointId, processed);
+    this.chasePassByPoint.set(pointId, pass + 1);
+    if (impacts.length === 0) return null;
+    return { points: impacts.slice(0, 10), kind: 'chase-chip', brickSize: new THREE.Vector3(0.055, 0.045, CHASE_DEPTH), seed: hashString(`${pointId}:chase:${pass}`), destroyed: false };
   }
 
   get freeMarkCount(): number { return this.sprayMarks.length + this.liveStrokeSamples; }
   get destroyedBrickCount(): number { return this.destroyedBricks; }
+  get damagedBrickCount(): number { return this.damagedBricks; }
   get recessedBrickCount(): number { return this.chaseRecessedBricks; }
-
-  showMarks(pointId: string): void {
-    this.removableByPoint.get(pointId)?.forEach(item => { item.marker.visible = true; });
+  get carvedCellCount(): number { return this.chaseCarvedCells; }
+  getChaseCoverage(pointId: string): number {
+    const total = this.spraySamplesByPoint.get(pointId)?.length ?? 0;
+    return total === 0 ? 0 : THREE.MathUtils.clamp((this.chasedSamplesByPoint.get(pointId)?.size ?? 0) / total, 0, 1);
   }
+
+  showMarks(pointId: string): void { this.removableByPoint.get(pointId)?.forEach(item => { item.marker.visible = true; }); }
 
   removeFraction(pointId: string, fraction: number): THREE.Vector3[] {
     const bricks = this.removableByPoint.get(pointId) ?? [];
@@ -314,7 +354,6 @@ export class BrickWall extends THREE.Group {
     const debris: THREE.Vector3[] = [];
     bricks.forEach((item, index) => {
       if (index < target && item.mesh.visible) {
-        item.mesh.getWorldPosition(new THREE.Vector3());
         const position = new THREE.Vector3();
         item.mesh.getWorldPosition(position);
         debris.push(position);
@@ -324,15 +363,187 @@ export class BrickWall extends THREE.Group {
     return debris;
   }
 
-  remaining(pointId: string): number {
-    return (this.removableByPoint.get(pointId) ?? []).filter(item => item.mesh.visible).length;
+  remaining(pointId: string): number { return (this.removableByPoint.get(pointId) ?? []).filter(item => item.mesh.visible).length; }
+
+  private findTargetAtPoint(point: THREE.Vector3): BrickTarget | null {
+    let nearest: BrickTarget | null = null;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    for (const target of this.targets) {
+      if (target.destroyed) continue;
+      const dx = point.x - target.center.x;
+      const dy = point.y - target.center.y;
+      const cosine = Math.cos(-target.rotationZ);
+      const sine = Math.sin(-target.rotationZ);
+      const localX = dx * cosine - dy * sine;
+      const localY = dx * sine + dy * cosine;
+      if (Math.abs(localX) > target.size.x * 0.54 || Math.abs(localY) > target.size.y * 0.56) continue;
+      const distance = localX * localX + localY * localY;
+      if (distance < nearestDistance) { nearestDistance = distance; nearest = target; }
+    }
+    return nearest;
+  }
+
+  private carveTargetAtPoint(target: BrickTarget, point: THREE.Vector3, seed: number): void {
+    const previousCount = target.carvedCells.size;
+    const dx = point.x - target.center.x;
+    const dy = point.y - target.center.y;
+    const cosine = Math.cos(-target.rotationZ);
+    const sine = Math.sin(-target.rotationZ);
+    const localX = dx * cosine - dy * sine;
+    const localY = dx * sine + dy * cosine;
+    const cellW = target.size.x / CHASE_GRID_X;
+    const cellH = target.size.y / CHASE_GRID_Y;
+    const random = seeded(seed);
+    let closestCell = 0;
+    let closestDistance = Number.POSITIVE_INFINITY;
+    for (let row = 0; row < CHASE_GRID_Y; row += 1) {
+      for (let col = 0; col < CHASE_GRID_X; col += 1) {
+        const cellX = -target.size.x / 2 + cellW * (col + 0.5);
+        const cellY = -target.size.y / 2 + cellH * (row + 0.5);
+        const distance = Math.hypot(cellX - localX, cellY - localY);
+        const index = row * CHASE_GRID_X + col;
+        if (distance < closestDistance) { closestDistance = distance; closestCell = index; }
+        if (distance <= 0.03 * (0.82 + random() * 0.36)) target.carvedCells.add(index);
+      }
+    }
+    target.carvedCells.add(closestCell);
+    if (previousCount === 0) this.chaseRecessedBricks += 1;
+    this.chaseCarvedCells += target.carvedCells.size - previousCount;
+    this.hideOriginal(target);
+    this.rebuildChasedBrick(target);
+  }
+
+  private rebuildChasedBrick(target: BrickTarget): void {
+    this.removeReplacement(target);
+    const group = new THREE.Group();
+    group.name = `Fractured chase section ${target.id}`;
+    group.userData.studioEntityId = `world:brick-wall:chase-${target.id}`;
+    group.position.copy(target.center);
+    group.rotation.z = target.rotationZ;
+    const cellW = target.size.x / CHASE_GRID_X;
+    const cellH = target.size.y / CHASE_GRID_Y;
+    const intactMatrices: THREE.Matrix4[] = [];
+    const recessedMatrices: THREE.Matrix4[] = [];
+    const backDepth = Math.max(0.045, target.size.z - CHASE_DEPTH);
+    for (let row = 0; row < CHASE_GRID_Y; row += 1) for (let col = 0; col < CHASE_GRID_X; col += 1) {
+      const carved = target.carvedCells.has(row * CHASE_GRID_X + col);
+      const matrix = new THREE.Matrix4().compose(
+        new THREE.Vector3(-target.size.x / 2 + cellW * (col + 0.5), -target.size.y / 2 + cellH * (row + 0.5), carved ? -target.size.z / 2 + backDepth / 2 : 0),
+        new THREE.Quaternion(),
+        new THREE.Vector3(cellW * 1.006, cellH * 1.008, carved ? backDepth : target.size.z),
+      );
+      (carved ? recessedMatrices : intactMatrices).push(matrix);
+    }
+    const addCells = (matrices: THREE.Matrix4[], material: THREE.Material, name: string): void => {
+      if (matrices.length === 0) return;
+      const mesh = new THREE.InstancedMesh(unitBoxGeometry, material, matrices.length);
+      mesh.name = name;
+      mesh.userData.brickTargetId = target.id;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      matrices.forEach((matrix, index) => mesh.setMatrixAt(index, matrix));
+      mesh.instanceMatrix.needsUpdate = true;
+      group.add(mesh);
+      this.breakables.push(mesh);
+    };
+    addCells(intactMatrices, chasedBrickMaterial, `Jagged intact cells ${target.id}`);
+    addCells(recessedMatrices, chaseInteriorMaterial, `55 mm recessed cells ${target.id}`);
+    this.add(group);
+    target.replacement = group;
+  }
+
+  private hideOriginal(target: BrickTarget): void {
+    if (target.originalHidden) return;
+    target.originalHidden = true;
+    if (target.object instanceof THREE.InstancedMesh && target.instanceId !== undefined) {
+      const matrix = new THREE.Matrix4();
+      target.object.getMatrixAt(target.instanceId, matrix);
+      matrix.scale(new THREE.Vector3(0.0001, 0.0001, 0.0001));
+      target.object.setMatrixAt(target.instanceId, matrix);
+      target.object.instanceMatrix.needsUpdate = true;
+    } else target.object.visible = false;
+  }
+
+  private removeReplacement(target: BrickTarget): void {
+    if (!target.replacement) return;
+    target.replacement.traverse(object => {
+      const index = this.breakables.indexOf(object);
+      if (index >= 0) this.breakables.splice(index, 1);
+    });
+    this.remove(target.replacement);
+    target.replacement = null;
+  }
+
+  private addFractures(target: BrickTarget, impact: THREE.Vector3, damage: number, seed: number): void {
+    this.removeCracks(target);
+    const random = seeded(seed);
+    const group = new THREE.Group();
+    group.name = `Progressive masonry fractures ${target.id}`;
+    group.position.copy(target.center);
+    group.rotation.z = target.rotationZ;
+    const inverse = new THREE.Vector2(impact.x - target.center.x, impact.y - target.center.y).rotateAround(new THREE.Vector2(), -target.rotationZ);
+    const vertices: number[] = [];
+    const branches = 3 + damage * 2;
+    for (let branch = 0; branch < branches; branch += 1) {
+      const angle = random() * Math.PI * 2;
+      const length = (0.025 + random() * 0.035) * (0.65 + damage * 0.28);
+      const bend = (random() - 0.5) * 0.75;
+      const middleX = inverse.x + Math.cos(angle) * length * 0.48;
+      const middleY = inverse.y + Math.sin(angle) * length * 0.48;
+      const endX = middleX + Math.cos(angle + bend) * length * 0.52;
+      const endY = middleY + Math.sin(angle + bend) * length * 0.52;
+      vertices.push(inverse.x, inverse.y, target.size.z / 2 + 0.002, middleX, middleY, target.size.z / 2 + 0.002, middleX, middleY, target.size.z / 2 + 0.002, endX, endY, target.size.z / 2 + 0.002);
+      if (damage >= 2 && branch % 2 === 0) vertices.push(middleX, middleY, target.size.z / 2 + 0.002, middleX + Math.cos(angle - bend * 1.4) * length * 0.35, middleY + Math.sin(angle - bend * 1.4) * length * 0.35, target.size.z / 2 + 0.002);
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    const lines = new THREE.LineSegments(geometry, fractureMaterial);
+    lines.raycast = () => undefined;
+    group.add(lines);
+    this.add(group);
+    target.cracks = group;
+  }
+
+  private removeCracks(target: BrickTarget): void {
+    if (!target.cracks) return;
+    target.cracks.traverse(object => { if (object instanceof THREE.LineSegments) object.geometry.dispose(); });
+    this.remove(target.cracks);
+    target.cracks = null;
+  }
+
+  private addJaggedRemnants(target: BrickTarget, seed: number): void {
+    const random = seeded(seed ^ 0x9e3779b9);
+    const group = new THREE.Group();
+    group.name = `Jagged demolition edge ${target.id}`;
+    for (let index = 0; index < 14; index += 1) {
+      const fragment = new THREE.Mesh(remnantGeometries[index % remnantGeometries.length], index % 3 === 0 ? chaseInteriorMaterial : chasedBrickMaterial);
+      const horizontalEdge = index < 8;
+      const side = random() < 0.5 ? -1 : 1;
+      const inset = index < 6 ? 0.31 + random() * 0.12 : 0.43 + random() * 0.06;
+      const localX = horizontalEdge ? (random() - 0.5) * target.size.x * 0.9 : side * target.size.x * inset;
+      const localY = horizontalEdge ? side * target.size.y * inset : (random() - 0.5) * target.size.y * 0.9;
+      const cosine = Math.cos(target.rotationZ);
+      const sine = Math.sin(target.rotationZ);
+      fragment.position.set(target.center.x + localX * cosine - localY * sine, target.center.y + localX * sine + localY * cosine, target.center.z + target.size.z * 0.18);
+      fragment.rotation.set(random() * Math.PI, random() * Math.PI, random() * Math.PI);
+      const major = index < 6 ? 1.55 : 1;
+      fragment.scale.set((0.014 + random() * 0.034) * major, (0.01 + random() * 0.026) * major, (0.012 + random() * 0.032) * major);
+      fragment.castShadow = true;
+      fragment.raycast = () => undefined;
+      group.add(fragment);
+    }
+    this.add(group);
+    this.holeRemnants.push(group);
+    while (this.holeRemnants.length > 64) {
+      const oldest = this.holeRemnants.shift();
+      if (oldest) this.remove(oldest);
+    }
   }
 
   private inChaseZone(definition: InstallationDefinition, x: number, y: number, brickW: number, brickH: number): boolean {
     const boxWidth = definition.boxes.reduce((sum, kind) => sum + (kind === '1G' ? 0.074 : 0.134), 0) + (definition.boxes.length - 1) * 0.008;
     const centerY = definition.bottom + 0.037;
-    const opening = Math.abs(x - definition.x) < (boxWidth + 0.18) / 2 + brickW / 2
-      && Math.abs(y - centerY) < 0.13 + brickH / 2;
+    const opening = Math.abs(x - definition.x) < (boxWidth + 0.18) / 2 + brickW / 2 && Math.abs(y - centerY) < 0.13 + brickH / 2;
     const route = Math.abs(x - definition.x) < 0.12 + brickW / 2 && y < definition.bottom + 0.06;
     return opening || route;
   }
@@ -353,10 +564,11 @@ export class BrickWall extends THREE.Group {
 
   private clearPaintAt(point: THREE.Vector3, radius: number): void {
     const paintPoint = this.toPaintPixel(point);
+    const pixelRadius = radius / GAME_CONFIG.room.width * this.livePaintCanvas.width;
     this.livePaintContext.save();
     this.livePaintContext.globalCompositeOperation = 'destination-out';
     this.livePaintContext.beginPath();
-    this.livePaintContext.arc(paintPoint.x, paintPoint.y, 78, 0, Math.PI * 2);
+    this.livePaintContext.arc(paintPoint.x, paintPoint.y, pixelRadius, 0, Math.PI * 2);
     this.livePaintContext.fill();
     this.livePaintContext.restore();
     this.livePaintTexture.needsUpdate = true;

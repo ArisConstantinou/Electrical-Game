@@ -83,7 +83,10 @@ const reachLeveling = async page => {
       game.renderer.camera.rotation.set(game.player.pitch, game.player.yaw, 0);
       game.step(1 / 60);
     });
-    await action(page);
+    for (let hit = 0; hit < 4; hit += 1) {
+      await action(page);
+      await page.evaluate(() => window.advanceTime(260));
+    }
     const destroyedAfter = (await state(page)).workSurface.destroyedBricks;
     if (destroyedAfter <= destroyedBefore) throw new Error('Demo hammer stopped after the required four mission hits');
     await page.keyboard.press('KeyX');
@@ -137,10 +140,18 @@ const destroyAtHeight = async targetY => {
     game.renderer.camera.rotation.set(game.player.pitch, 0, 0);
     game.step(1 / 60);
   }, targetY);
-  const before = (await state(demolition)).workSurface.destroyedBricks;
+  const before = (await state(demolition)).workSurface;
   await leftClickAction(demolition);
-  const after = (await state(demolition)).workSurface.destroyedBricks;
-  if (after <= before) throw new Error(`Demo hammer could not destroy brick at wall height ${targetY}`);
+  const chipped = (await state(demolition)).workSurface;
+  if (chipped.destroyedBricks !== before.destroyedBricks || chipped.damagedBricks <= before.damagedBricks || chipped.activeFragments < 1) {
+    throw new Error(`First DEMOLISH impact did not chip/crack the brick before destruction at wall height ${targetY}`);
+  }
+  for (let hit = 1; hit < 4; hit += 1) {
+    await demolition.evaluate(() => window.advanceTime(260));
+    await leftClickAction(demolition);
+  }
+  const after = (await state(demolition)).workSurface;
+  if (after.destroyedBricks <= before.destroyedBricks || after.activeFragments < 10) throw new Error(`Four DEMOLISH impacts did not fracture the brick at wall height ${targetY}`);
 };
 await destroyAtHeight(2.93);
 await destroyAtHeight(0.07);
@@ -159,9 +170,7 @@ const fullWallResult = await demolition.evaluate(() => {
   const camera = game.renderer.camera;
   camera.position.set(0, 1.5, 0.2);
   let pass = 0;
-  let previous = -1;
-  while (pass < 4 && wall.destroyedBrickCount !== previous) {
-    previous = wall.destroyedBrickCount;
+  while (pass < 8 && wall.destroyedBrickCount < 472) {
     for (let row = 0; row < 23; row += 1) {
       for (let col = 0; col < 21; col += 1) {
         const x = -3 + (6 / 21) / 2 + col * (6 / 21) + (row % 2 ? (6 / 21) / 2 : 0);
@@ -179,6 +188,42 @@ const fullWallResult = await demolition.evaluate(() => {
 if (fullWallResult.destroyed !== 472) throw new Error(`Not every wall brick can be destroyed: ${JSON.stringify(fullWallResult)}`);
 await demolition.screenshot({ path: outputPath('desktop-full-wall-demolished.png') });
 await demolition.close();
+
+const demolitionDetail = await browser.newPage({ viewport: { width: 1366, height: 768 } });
+await demolitionDetail.goto(baseUrl, { waitUntil: 'networkidle' });
+await demolitionDetail.click('#start-button');
+await demolitionDetail.waitForTimeout(300);
+await demolitionDetail.keyboard.press('Digit4');
+await demolitionDetail.keyboard.press('KeyX');
+await demolitionDetail.evaluate(() => {
+  const game = window.__wireTheHouse;
+  game.renderer.camera.position.set(0.286, 1.37, -1.45);
+  game.renderer.camera.lookAt(0.286, 1.37, -2.5);
+  game.renderer.camera.updateMatrixWorld(true);
+  game.player.yaw = 0;
+  game.player.pitch = 0;
+});
+for (let hit = 0; hit < 3; hit += 1) {
+  await demolitionDetail.evaluate(() => {
+    const game = window.__wireTheHouse;
+    game.chasing.freeHit(game.renderer.camera);
+    game.step(1 / 60);
+  });
+}
+const crackedState = await state(demolitionDetail);
+if (crackedState.workSurface.destroyedBricks !== 0 || crackedState.workSurface.damagedBricks !== 1) throw new Error(`DEMOLISH skipped progressive cracking: ${JSON.stringify(crackedState.workSurface)}`);
+await demolitionDetail.screenshot({ path: outputPath('desktop-progressive-demolition-cracks.png') });
+await demolitionDetail.evaluate(() => {
+  const game = window.__wireTheHouse;
+  game.chasing.freeHit(game.renderer.camera);
+  game.step(1 / 60);
+});
+const fracturedState = await state(demolitionDetail);
+if (fracturedState.workSurface.destroyedBricks !== 1 || fracturedState.workSurface.damagedBricks !== 0 || fracturedState.workSurface.activeFragments < 20) {
+  throw new Error(`DEMOLISH did not finish with varied fragment debris: ${JSON.stringify(fracturedState.workSurface)}`);
+}
+await demolitionDetail.screenshot({ path: outputPath('desktop-progressive-demolition-fragments.png') });
+await demolitionDetail.close();
 
 const paintedChase = await browser.newPage({ viewport: { width: 1366, height: 768 } });
 await paintedChase.goto(baseUrl, { waitUntil: 'networkidle' });
@@ -210,6 +255,41 @@ if (!['chasing', 'chased'].includes(offRouteChase.activePoint.stage) || offRoute
 if (offRouteChase.workSurface.destroyedBricks !== offRouteSurfaceBefore.destroyedBricks) throw new Error('Off-centre CHASE destroyed masonry instead of recessing it');
 await paintedChase.screenshot({ path: outputPath('desktop-chase-follows-painted-line.png') });
 await paintedChase.close();
+
+const routedChase = await browser.newPage({ viewport: { width: 1366, height: 768 } });
+await routedChase.goto(baseUrl, { waitUntil: 'networkidle' });
+await routedChase.click('#start-button');
+await routedChase.waitForTimeout(250);
+const routedResult = await routedChase.evaluate(() => {
+  const game = window.__wireTheHouse;
+  const point = game.mission.activePoint;
+  const camera = game.renderer.camera;
+  const route = [];
+  for (let step = 0; step <= 10; step += 1) route.push({ x: -1.95, y: 0.42 + step * 0.055 });
+  for (let step = 1; step <= 10; step += 1) route.push({ x: -1.95 + step * 0.05, y: 0.97 });
+  for (let step = 1; step <= 10; step += 1) route.push({ x: -1.45, y: 0.97 - step * 0.055 });
+  camera.position.set(-1.7, 1.45, -1.45);
+  for (const sample of route) {
+    camera.lookAt(sample.x, sample.y, -2.41);
+    camera.updateMatrixWorld(true);
+    game.room.brickWall.spray(camera, point.definition.id, 'live', 0x087fce);
+  }
+  point.placeAt(route[0].x, route[0].y);
+  point.setStage('marked');
+  camera.lookAt(-1.7, 0.97, -2.41);
+  camera.updateMatrixWorld(true);
+  for (let hit = 0; hit < 4; hit += 1) game.chasing.hit(camera, point);
+  game.step(1 / 60);
+  return JSON.parse(window.render_game_to_text());
+});
+if (routedResult.activePoint.stage !== 'chased' || routedResult.activePoint.chaseCoverage < 0.98) throw new Error(`CHASE did not consume the complete painted route: ${JSON.stringify(routedResult)}`);
+if (routedResult.workSurface.carvedCells < 20 || routedResult.workSurface.recessedBricks < 5 || routedResult.workSurface.destroyedBricks !== 0) {
+  throw new Error(`CHASE did not form a narrow multi-brick groove: ${JSON.stringify(routedResult.workSurface)}`);
+}
+await routedChase.keyboard.press('Digit4');
+await routedChase.waitForTimeout(300);
+await routedChase.screenshot({ path: outputPath('desktop-complete-jagged-chase-route.png') });
+await routedChase.close();
 
 const desktop = await browser.newPage({ viewport: { width: 1792, height: 864 } });
 desktop.on('console', message => { if (message.type() === 'error') errors.push(`desktop console: ${message.text()}`); });
@@ -319,7 +399,10 @@ await desktop.evaluate(() => {
   game.renderer.camera.rotation.set(0, 0, 0);
   game.step(1 / 60);
 });
-await leftClickAction(desktop);
+for (let hit = 0; hit < 4; hit += 1) {
+  await leftClickAction(desktop);
+  await desktop.evaluate(() => window.advanceTime(260));
+}
 const destroyedAfterDesktopDemolish = (await state(desktop)).workSurface.destroyedBricks;
 if (destroyedAfterDesktopDemolish <= destroyedBeforeDesktopDemolish) throw new Error(`DEMOLISH did not work from desktop left click: ${JSON.stringify(await state(desktop))}`);
 await desktop.keyboard.press('Digit5');

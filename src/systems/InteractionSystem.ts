@@ -40,8 +40,13 @@ export class InteractionSystem {
         return { success: hit, message: !hit ? 'Aim CHASE at the blue marked route.' : point.chaseHits >= 4 ? 'Recess complete: depth is ready for boxes and conduit.' : '' };
       }
       if (this.hammerMode === 'demolish') {
-        const hit = this.chasing.freeHit(camera);
-        return { success: hit, message: hit ? '' : 'Aim the demolition hammer at an intact brick.' };
+        const impact = this.chasing.freeHit(camera);
+        const feedback = impact?.kind === 'demolish-chip' ? 'Surface chipped — keep striking.'
+          : impact?.kind === 'demolish-crack' ? 'Cracks spreading — two solid hits remain.'
+            : impact?.kind === 'demolish-spall' ? 'Brick spalling — one solid hit remains.'
+              : impact?.kind === 'demolish-break' ? 'Brick fractured into uneven rubble.'
+                : 'Aim the demolition hammer at an intact brick.';
+        return { success: Boolean(impact), message: feedback };
       }
       if (!missionChase) return { success: false, message: 'CHASE works on the marked route. Press X or choose DEMOLISH for free destruction.' };
       const hit = this.chasing.hit(camera, point);

@@ -57,6 +57,7 @@ Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web gam
 - Physical close-wall follow-up identified a separate held-input discontinuity: selecting HAMMER while the spray action was still held forcibly cleared `actionHeld`, so CHASE waited for a full release and second press. Tool selection now preserves the physical held state; the regression keeps LMB down continuously across SPRAY→HAMMER and proves CHASE starts on the already-painted brick.
 - Full 472-position wall scan exposed phantom re-hits on already shrunken InstancedMesh bricks. Destroyed instance IDs are now permanently filtered from raycasts so every hammer hit advances to an actually visible brick.
 - Hammer targeting now uses a dense 5x5 chisel sampling grid around the reticle, and gameplay regression permanently asserts that all 472 wall bricks can be uniquely destroyed.
+- Masonry-realism revision replaces whole-brick CHASE recesses with an actual 55 mm deep micro-fracture grid that consumes the complete painted route over four passes. DEMOLISH now requires four cumulative impacts (chip, branching cracks, spall, fracture), leaves irregular edge remnants, and throws deterministic unequal tetrahedral/dodecahedral/block fragments that spin, bounce and settle. Focused regressions cover complete U-route carving, intermediate cracks, final rubble, and eventual destruction of all 472 bricks.
 
 ## Keep in mind
 
