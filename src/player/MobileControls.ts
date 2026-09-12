@@ -74,7 +74,7 @@ export class MobileControls {
         this.lookY = event.clientY;
         this.dragDistance = 0;
       }
-      if (this.aimControlMode === 'double-tap' || !this.isRepeatableTool) this.detectDoubleTapAction(event, lookJoystick);
+      if (this.aimControlMode === 'double-tap' || (this.aimInputMode === 'stick' && !this.isRepeatableTool)) this.detectDoubleTapAction(event, lookJoystick);
     } else if (this.lookPointer === null) {
       this.lookPointer = event.pointerId;
       try { this.surface.setPointerCapture(event.pointerId); } catch { /* Synthetic QA events do not own an active pointer. */ }
@@ -108,6 +108,9 @@ export class MobileControls {
     }
     if (event.pointerId === this.lookPointer) {
       event.preventDefault();
+      if (event.type === 'pointerup' && this.aimInputMode === 'drag' && this.aimControlMode === 'auto-use' && !this.isRepeatableTool) {
+        this.input.actionRequested = true;
+      }
       this.releaseLook(event.pointerId);
     }
   };

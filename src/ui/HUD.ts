@@ -17,6 +17,7 @@ export class HUD {
   private readonly levelReadout: HTMLElement;
   private readonly result: HTMLElement;
   private messageUntil = 0;
+  private selectedTool: RigTool = 'spray';
 
   constructor(root: HTMLElement) {
     root.innerHTML = `
@@ -146,6 +147,7 @@ export class HUD {
   }
 
   update(point: InstallationPoint | null, targeted: boolean, missionProgress: number, selectedTool: RigTool): void {
+    this.selectedTool = selectedTool;
     this.progress.style.width = `${missionProgress}%`;
     this.reticle.classList.toggle('active', targeted);
     if (performance.now() > this.messageUntil) {
@@ -235,6 +237,7 @@ export class HUD {
     look?.setAttribute('aria-label', mode === 'drag' ? 'Drag aim pad; drag to aim and use spray or hammer' : 'Aim joystick; move it to use spray or hammer');
     const hint = this.shell.querySelector<HTMLElement>('#aim-control-label');
     const autoUse = this.shell.querySelector<HTMLElement>('#aim-control-mode b')?.textContent === 'AUTO USE';
-    if (hint) hint.textContent = mode === 'drag' ? (autoUse ? 'DRAG · AIM + SPRAY' : 'DRAG · AIM') : (autoUse ? 'AIM · AUTO TOOL' : 'AIM · 2× HOLD');
+    const dragAction = this.selectedTool === 'spray' ? 'AIM + SPRAY' : this.selectedTool === 'hammer' ? 'AIM + HAMMER' : 'RELEASE TO USE';
+    if (hint) hint.textContent = mode === 'drag' ? (autoUse ? `DRAG · ${dragAction}` : 'DRAG · AIM') : (autoUse ? 'AIM · AUTO TOOL' : 'AIM · 2× HOLD');
   }
 }

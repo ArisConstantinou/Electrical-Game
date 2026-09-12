@@ -45,8 +45,10 @@ const mobileAimAction = async page => {
       dispatch('pointerup', 881, x + rect.width * .2, y);
       return;
     }
-    dispatch('pointerdown', 881); dispatch('pointerup', 881);
-    dispatch('pointerdown', 882); window.advanceTime(34); dispatch('pointerup', 882);
+    dispatch('pointerdown', 881);
+    dispatch('pointermove', 881, x + rect.width * .12, y - rect.height * .05);
+    dispatch('pointerup', 881, x + rect.width * .12, y - rect.height * .05);
+    window.advanceTime(34);
   });
 };
 const mobileTap = async (page, selector) => {
@@ -243,7 +245,7 @@ for (const id of ['A', 'B', 'C']) {
     await desktop.locator('[data-level="right"]').click();
     const tiltAfterRight = (await state(desktop)).activePoint.tiltDegrees;
     if (Math.abs(tiltAfterRight - tiltBeforeButtons) > 0.01) throw new Error('RIGHT leveling button is not clickable');
-    await desktop.mouse.click(700, 400, { button: 'right' });
+    await desktop.locator('#game-shell').dispatchEvent('pointerdown', { button: 2, pointerType: 'mouse' });
     await desktop.evaluate(() => window.advanceTime(34));
     if ((await state(desktop)).activePoint.stage !== 'mortared') throw new Error('Right mouse did not exit leveling mode');
     await aimAtActive(desktop);
@@ -317,6 +319,19 @@ for (const tool of ['spray', 'hammer', 'fitting', 'level', 'spring', 'cutter']) 
   if ((await state(mobile)).mission.selectedTool !== tool) throw new Error(`Could not select ${tool} for viewmodel QA`);
   await mobile.screenshot({ path: outputPath(`mobile-tool-${tool}.png`) });
 }
+const cancelledOneShot = await mobile.evaluate(() => {
+  const game = window.__wireTheHouse;
+  window.dispatchEvent(new CustomEvent('wirehouse:select-tool', { detail: 'fitting' }));
+  game.input.actionRequested = false;
+  const look = document.querySelector('#look-joystick');
+  const rect = look.getBoundingClientRect();
+  const x = rect.left + rect.width / 2;
+  const y = rect.top + rect.height / 2;
+  look.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 880, pointerType: 'touch', clientX: x, clientY: y, bubbles: true, cancelable: true }));
+  look.dispatchEvent(new PointerEvent('pointercancel', { pointerId: 880, pointerType: 'touch', clientX: x, clientY: y, bubbles: true, cancelable: true }));
+  return game.input.actionRequested;
+});
+if (cancelledOneShot) throw new Error('Cancelled drag incorrectly used a one-shot tool');
 await mobileTap(mobile, '[data-tool="hammer"]');
 if (!await mobile.locator('#tool-mode-toggle').isVisible() || !((await mobile.locator('#tool-mode-toggle').innerText()).includes('CHASE'))) throw new Error('Hammer contextual CHASE mode is not visible');
 await mobileTap(mobile, '#tool-mode-toggle');
