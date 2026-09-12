@@ -34,10 +34,12 @@ const unitBoxGeometry = new THREE.BoxGeometry(1, 1, 1);
 const brickMaterial = new THREE.MeshStandardMaterial({ color: 0xb84b2a, roughness: 0.96, metalness: 0 });
 const removableMaterial = new THREE.MeshStandardMaterial({ color: 0xb94d2b, roughness: 0.97, metalness: 0 });
 const chasedBrickMaterial = new THREE.MeshStandardMaterial({ color: 0xb24a2a, roughness: 0.99, metalness: 0 });
+const chaseBackMaterial = new THREE.MeshStandardMaterial({ color: 0x914126, roughness: 1, metalness: 0, emissive: 0x210904, emissiveIntensity: 0.22 });
+const chaseSideMaterial = new THREE.MeshStandardMaterial({ color: 0x3e1812, roughness: 1, metalness: 0 });
 const chaseInteriorMaterial = new THREE.MeshStandardMaterial({ color: 0x672717, roughness: 1, metalness: 0 });
 const fractureMaterial = new THREE.LineBasicMaterial({ color: 0x4f1c13, transparent: true, opacity: 0.92, depthTest: true });
-const CHASE_GRID_X = 12;
-const CHASE_GRID_Y = 6;
+const CHASE_GRID_X = 20;
+const CHASE_GRID_Y = 10;
 const CHASE_DEPTH = 0.055;
 const DEMOLISH_HITS = 4;
 
@@ -319,14 +321,16 @@ export class BrickWall extends THREE.Group {
     const workPoints = selected.length > 0 ? selected.map(index => samples[index]) : [samples[nearestIndex].clone().add(new THREE.Vector3(offsets[pass % 4].x, offsets[pass % 4].y, 0))];
     const impacts: THREE.Vector3[] = [];
     for (const point of workPoints) {
-      const target = this.findTargetAtPoint(point);
-      if (!target || target.destroyed) continue;
-      const before = target.carvedCells.size;
-      this.carveTargetAtPoint(target, point, hashString(`${pointId}:${pass}:${impacts.length}`));
-      if (target.carvedCells.size > before) impacts.push(point.clone());
-      this.clearPaintAt(point, 0.065);
-      const removable = (this.removableByPoint.get(pointId) ?? []).find(item => item.mesh === target.object);
-      if (removable) removable.recessed = true;
+      let carved = false;
+      for (const target of this.findTargetsNearPoint(point, 0.045)) {
+        const before = target.carvedCells.size;
+        this.carveTargetAtPoint(target, point, hashString(`${pointId}:${target.id}:${pass}:${impacts.length}`));
+        if (target.carvedCells.size > before) carved = true;
+        const removable = (this.removableByPoint.get(pointId) ?? []).find(item => item.mesh === target.object);
+        if (removable) removable.recessed = true;
+      }
+      if (carved) impacts.push(point.clone());
+      this.clearPaintAt(point, 0.07);
     }
     selected.forEach(index => processed.add(index));
     this.chasedSamplesByPoint.set(pointId, processed);
@@ -340,6 +344,9 @@ export class BrickWall extends THREE.Group {
   get damagedBrickCount(): number { return this.damagedBricks; }
   get recessedBrickCount(): number { return this.chaseRecessedBricks; }
   get carvedCellCount(): number { return this.chaseCarvedCells; }
+  get chaseDepthMm(): number { return CHASE_DEPTH * 1000; }
+  get chaseBackSurfaceCount(): number { return this.targets.reduce((count, target) => count + Number(target.replacement?.userData.chaseBackSurfaces ?? 0), 0); }
+  get chaseSideWallCount(): number { return this.targets.reduce((count, target) => count + Number(target.replacement?.userData.chaseSideWalls ?? 0), 0); }
   get uniqueFracturePatternCount(): number { return this.fractureSignatures.size; }
   get anchoredRemnantCount(): number { return this.targets.filter(target => target.destroyed && target.replacement !== null).length; }
   getChaseCoverage(pointId: string): number {
@@ -366,22 +373,17 @@ export class BrickWall extends THREE.Group {
 
   remaining(pointId: string): number { return (this.removableByPoint.get(pointId) ?? []).filter(item => item.mesh.visible).length; }
 
-  private findTargetAtPoint(point: THREE.Vector3): BrickTarget | null {
-    let nearest: BrickTarget | null = null;
-    let nearestDistance = Number.POSITIVE_INFINITY;
-    for (const target of this.targets) {
-      if (target.destroyed) continue;
+  private findTargetsNearPoint(point: THREE.Vector3, margin: number): BrickTarget[] {
+    return this.targets.filter(target => {
+      if (target.destroyed) return false;
       const dx = point.x - target.center.x;
       const dy = point.y - target.center.y;
       const cosine = Math.cos(-target.rotationZ);
       const sine = Math.sin(-target.rotationZ);
       const localX = dx * cosine - dy * sine;
       const localY = dx * sine + dy * cosine;
-      if (Math.abs(localX) > target.size.x * 0.54 || Math.abs(localY) > target.size.y * 0.56) continue;
-      const distance = localX * localX + localY * localY;
-      if (distance < nearestDistance) { nearestDistance = distance; nearest = target; }
-    }
-    return nearest;
+      return Math.abs(localX) <= target.size.x / 2 + margin && Math.abs(localY) <= target.size.y / 2 + margin;
+    });
   }
 
   private carveTargetAtPoint(target: BrickTarget, point: THREE.Vector3, seed: number): void {
@@ -404,7 +406,7 @@ export class BrickWall extends THREE.Group {
         const distance = Math.hypot(cellX - localX, cellY - localY);
         const index = row * CHASE_GRID_X + col;
         if (distance < closestDistance) { closestDistance = distance; closestCell = index; }
-        if (distance <= 0.03 * (0.82 + random() * 0.36)) target.carvedCells.add(index);
+        if (distance <= 0.048 * (0.84 + random() * 0.34)) target.carvedCells.add(index);
       }
     }
     target.carvedCells.add(closestCell);
@@ -424,16 +426,49 @@ export class BrickWall extends THREE.Group {
     const cellW = target.size.x / CHASE_GRID_X;
     const cellH = target.size.y / CHASE_GRID_Y;
     const intactMatrices: THREE.Matrix4[] = [];
-    const recessedMatrices: THREE.Matrix4[] = [];
-    const backDepth = Math.max(0.045, target.size.z - CHASE_DEPTH);
+    const backMatrices: THREE.Matrix4[] = [];
+    const sideMatrices: THREE.Matrix4[] = [];
+    const backThickness = 0.012;
+    const frontZ = target.size.z / 2;
+    const backSurfaceZ = frontZ - CHASE_DEPTH;
+    const cavityCentreZ = frontZ - CHASE_DEPTH / 2;
+    const edgeThickness = Math.min(0.006, cellW * 0.25, cellH * 0.25);
+    const isCarved = (row: number, col: number): boolean => row >= 0 && row < CHASE_GRID_Y && col >= 0 && col < CHASE_GRID_X && target.carvedCells.has(row * CHASE_GRID_X + col);
     for (let row = 0; row < CHASE_GRID_Y; row += 1) for (let col = 0; col < CHASE_GRID_X; col += 1) {
       const carved = target.carvedCells.has(row * CHASE_GRID_X + col);
-      const matrix = new THREE.Matrix4().compose(
-        new THREE.Vector3(-target.size.x / 2 + cellW * (col + 0.5), -target.size.y / 2 + cellH * (row + 0.5), carved ? -target.size.z / 2 + backDepth / 2 : 0),
+      const cellX = -target.size.x / 2 + cellW * (col + 0.5);
+      const cellY = -target.size.y / 2 + cellH * (row + 0.5);
+      if (!carved) {
+        intactMatrices.push(new THREE.Matrix4().compose(
+          new THREE.Vector3(cellX, cellY, 0),
+          new THREE.Quaternion(),
+          new THREE.Vector3(cellW * 1.006, cellH * 1.008, target.size.z),
+        ));
+        continue;
+      }
+      backMatrices.push(new THREE.Matrix4().compose(
+        new THREE.Vector3(cellX, cellY, backSurfaceZ - backThickness / 2),
         new THREE.Quaternion(),
-        new THREE.Vector3(cellW * 1.006, cellH * 1.008, carved ? backDepth : target.size.z),
-      );
-      (carved ? recessedMatrices : intactMatrices).push(matrix);
+        new THREE.Vector3(cellW * 1.035, cellH * 1.04, backThickness),
+      ));
+      const addVerticalSide = (x: number): void => {
+        sideMatrices.push(new THREE.Matrix4().compose(
+          new THREE.Vector3(x, cellY, cavityCentreZ),
+          new THREE.Quaternion(),
+          new THREE.Vector3(edgeThickness, cellH * 1.04, CHASE_DEPTH),
+        ));
+      };
+      const addHorizontalSide = (y: number): void => {
+        sideMatrices.push(new THREE.Matrix4().compose(
+          new THREE.Vector3(cellX, y, cavityCentreZ),
+          new THREE.Quaternion(),
+          new THREE.Vector3(cellW * 1.04, edgeThickness, CHASE_DEPTH),
+        ));
+      };
+      if (!isCarved(row, col - 1)) addVerticalSide(cellX - cellW / 2);
+      if (!isCarved(row, col + 1)) addVerticalSide(cellX + cellW / 2);
+      if (!isCarved(row - 1, col)) addHorizontalSide(cellY - cellH / 2);
+      if (!isCarved(row + 1, col)) addHorizontalSide(cellY + cellH / 2);
     }
     const addCells = (matrices: THREE.Matrix4[], material: THREE.Material, name: string): void => {
       if (matrices.length === 0) return;
@@ -448,7 +483,11 @@ export class BrickWall extends THREE.Group {
       this.breakables.push(mesh);
     };
     addCells(intactMatrices, chasedBrickMaterial, `Jagged intact cells ${target.id}`);
-    addCells(recessedMatrices, chaseInteriorMaterial, `55 mm recessed cells ${target.id}`);
+    addCells(backMatrices, chaseBackMaterial, `55 mm recessed back surfaces ${target.id}`);
+    addCells(sideMatrices, chaseSideMaterial, `55 mm dark chase side walls ${target.id}`);
+    group.userData.chaseBackSurfaces = backMatrices.length;
+    group.userData.chaseSideWalls = sideMatrices.length;
+    group.userData.chaseDepthMm = CHASE_DEPTH * 1000;
     this.add(group);
     target.replacement = group;
   }

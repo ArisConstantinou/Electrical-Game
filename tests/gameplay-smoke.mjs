@@ -313,12 +313,38 @@ const routedResult = await routedChase.evaluate(() => {
   return JSON.parse(window.render_game_to_text());
 });
 if (routedResult.activePoint.stage !== 'chased' || routedResult.activePoint.chaseCoverage < 0.98) throw new Error(`CHASE did not consume the complete painted route: ${JSON.stringify(routedResult)}`);
-if (routedResult.workSurface.carvedCells < 20 || routedResult.workSurface.recessedBricks < 5 || routedResult.workSurface.destroyedBricks !== 0) {
+if (routedResult.workSurface.carvedCells < 20 || routedResult.workSurface.recessedBricks < 5 || routedResult.workSurface.destroyedBricks !== 0 || routedResult.workSurface.chaseDepthMm !== 55 || routedResult.workSurface.chaseBackSurfaces < 20 || routedResult.workSurface.chaseSideWalls < 20) {
   throw new Error(`CHASE did not form a narrow multi-brick groove: ${JSON.stringify(routedResult.workSurface)}`);
+}
+const chaseDepthGeometry = await routedChase.evaluate(() => {
+  const result = { backs: 0, sides: 0, measuredDepthMm: 0, solidMaterials: true };
+  window.__wireTheHouse.renderer.scene.traverse(object => {
+    if (!object.isInstancedMesh || (!object.name.includes('recessed back surfaces') && !object.name.includes('dark chase side walls'))) return;
+    const material = object.material;
+    result.solidMaterials &&= !material.transparent && material.depthWrite && material.depthTest && material.opacity === 1;
+    if (object.name.includes('dark chase side walls')) result.sides += object.count;
+    if (object.name.includes('recessed back surfaces')) {
+      result.backs += object.count;
+      const matrix = object.instanceMatrix.array;
+      result.measuredDepthMm = Math.max(result.measuredDepthMm, Math.round((0.09 - (matrix[14] + Math.abs(matrix[10]) / 2)) * 1000));
+    }
+  });
+  return result;
+});
+if (chaseDepthGeometry.backs < 20 || chaseDepthGeometry.sides < 20 || chaseDepthGeometry.measuredDepthMm !== 55 || !chaseDepthGeometry.solidMaterials) {
+  throw new Error(`CHASE lacks solid 55 mm back/side geometry: ${JSON.stringify(chaseDepthGeometry)}`);
 }
 await routedChase.keyboard.press('Digit4');
 await routedChase.waitForTimeout(300);
 await routedChase.screenshot({ path: outputPath('desktop-complete-jagged-chase-route.png') });
+await routedChase.evaluate(() => {
+  const game = window.__wireTheHouse;
+  game.renderer.camera.position.set(-0.82, 1.32, -0.92);
+  game.renderer.camera.lookAt(-1.7, 0.82, -2.465);
+  game.renderer.camera.updateMatrixWorld(true);
+  game.renderer.render();
+});
+await routedChase.screenshot({ path: outputPath('desktop-chase-depth-oblique.png') });
 await routedChase.close();
 
 const desktop = await browser.newPage({ viewport: { width: 1792, height: 864 } });
@@ -711,6 +737,7 @@ if (await mobile.locator('#interaction-prompt.visible').isVisible()) throw new E
 await mobileTap(mobile, '[data-tool="hammer"]');
 await aimAtActive(mobile);
 for (let index = 0; index < 4; index += 1) await mobileAimAction(mobile);
+await mobile.screenshot({ path: outputPath('mobile-chase-depth.png') });
 await mobileTap(mobile, '[data-tool="fitting"]');
 if (await mobile.locator('#tool-mode-toggle').isVisible() || await mobile.locator('#tool-status').isVisible()) throw new Error('FITTING or an irrelevant mode button still overlaps the right joystick');
 await aimAtActive(mobile);
