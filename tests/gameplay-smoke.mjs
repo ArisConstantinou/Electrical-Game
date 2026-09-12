@@ -190,7 +190,7 @@ await excavateAtHeight(2.93);
 await excavateAtHeight(0.07);
 const variedWallDamage = (await state(demolition)).workSurface;
 const variedImpactProfiles = await demolition.evaluate(() => window.__wireTheHouse.room.brickWall.demolitionSites.filter(site => site.severity >= 1).map(site => ({ rotation: Number(site.rotation.toFixed(3)), aspect: Number((site.radiusX / site.radiusY).toFixed(3)), lobes: `${site.lobeFrequencyA}:${site.lobeFrequencyB}`, depth: Number((site.excavationDepth * 1000).toFixed(1)) })));
-if (variedWallDamage.floatingStaticPieces !== 0 || variedWallDamage.unsupportedAnchoredRemnants !== 0 || variedWallDamage.fracturePatterns < 2 || variedWallDamage.breachedWallCells !== 0 || variedWallDamage.deformedWallCells < 100 || variedWallDamage.maximumFractureSpan < 0.2 || new Set(variedImpactProfiles.map(profile => JSON.stringify(profile))).size < 2) {
+if (variedWallDamage.floatingStaticPieces !== 0 || variedWallDamage.unsupportedAnchoredRemnants !== 0 || variedWallDamage.demolitionMicroCellBoxes !== 0 || variedWallDamage.demolitionSurfaceTriangles < 2 || variedWallDamage.fracturePatterns < 2 || variedWallDamage.breachedWallCells !== 0 || variedWallDamage.deformedWallCells < 100 || variedWallDamage.maximumFractureSpan < 0.2 || new Set(variedImpactProfiles.map(profile => JSON.stringify(profile))).size < 2) {
   throw new Error(`DEMOLISH did not produce distinct random partial-depth wall damage: ${JSON.stringify({ variedWallDamage, variedImpactProfiles })}`);
 }
 await demolition.evaluate(() => {
