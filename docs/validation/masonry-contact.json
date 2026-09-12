@@ -1,0 +1,5807 @@
+{
+  "url": "http://127.0.0.1:5362/Electrical-Game/",
+  "browser": "152.0.7977.83",
+  "viewport": {
+    "width": 1366,
+    "height": 768
+  },
+  "headless": true,
+  "errors": [],
+  "steps": [
+    {
+      "index": 0,
+      "contact": {
+        "point": {
+          "x": 0.588,
+          "y": 1.430002218770996,
+          "z": -2.4099952418302446
+        },
+        "direction": {
+          "x": 5.4702198129847253e-17,
+          "y": -0.42261826174069955,
+          "z": -0.9063077870366499
+        },
+        "edge": {
+          "x": 1,
+          "y": 5.44016760935239e-18,
+          "z": 5.782040571729698e-17
+        },
+        "actualEdge": {
+          "x": 1,
+          "y": 0,
+          "z": 0
+        },
+        "actualAxis": {
+          "x": 0,
+          "y": -0.422618261740699,
+          "z": -0.9063077870366502
+        },
+        "edgeError": 5.80757672435817e-17,
+        "axisError": 6.0037065897536e-16,
+        "tipError": 0,
+        "depthMm": -0.0047581697555365565,
+        "camera": {
+          "yaw": 0.16514867741462685,
+          "pitch": -0.2223122976873602
+        }
+      },
+      "state": {
+        "coordinateSystem": "metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall",
+        "mode": "playing",
+        "player": {
+          "x": 0.748,
+          "y": 1.65,
+          "z": -1.45,
+          "yaw": 0.165,
+          "pitch": -0.222
+        },
+        "mission": {
+          "name": "Living Room First Fix",
+          "progressPercent": 0,
+          "selectedTool": "hammer",
+          "complete": false
+        },
+        "workSurface": {
+          "model": "sparse-3d-brittle-masonry",
+          "pendingSupportJobs": 0,
+          "volumeBytes": 57600,
+          "pendingMeshes": 0,
+          "workerMeshing": true,
+          "lastWorkerMs": 0,
+          "peakGeometryLatencyMs": 0,
+          "workerError": "",
+          "impactCount": 1,
+          "removedNodes": 0,
+          "removedVolumeCm3": 0,
+          "maximumDepthMm": 0,
+          "damagedChunks": 0,
+          "surfaceTriangles": 0,
+          "geometryBytes": 0,
+          "deformedWallCells": 0,
+          "lastCalculationMs": 3.199999988079071,
+          "peakCalculationMs": 3.199999988079071,
+          "lastMeshMs": 0.5,
+          "peakMeshMs": 0.5,
+          "lastImpact": {
+            "removedNodes": 0,
+            "removedByMaterial": {},
+            "stats": {
+              "milliseconds": 2.899999976158142,
+              "affectedNodes": 543,
+              "weakenedNodes": 543,
+              "connectivityVisited": 0,
+              "detachedNodes": 0,
+              "activeChunks": 2
+            }
+          },
+          "fractureSegments": 7,
+          "freeSprayMarks": 0,
+          "activeFragments": 0,
+          "insideFragments": 0,
+          "inwardFragments": 0,
+          "physicsMs": 0,
+          "peakPhysicsMs": 0.10000002384185791,
+          "fragmentBudget": 144,
+          "chiselTip": {
+            "x": 0.5828707549780406,
+            "y": 1.4343162459901602,
+            "z": -2.409995241830245,
+            "inAir": false
+          },
+          "airborneFragments": 0,
+          "settledFragments": 0,
+          "sprayMode": "live",
+          "sprayColor": "BLUE",
+          "hammerMode": "chase",
+          "chisel": "flat",
+          "chiselEnergyJ": 4,
+          "chiselTiltDegrees": 25,
+          "chiselSideDegrees": 0,
+          "chiselEdgeDegrees": 0,
+          "aimControlMode": "auto-use",
+          "aimInputMode": "drag",
+          "aimProfile": "normal",
+          "wallAssist": true,
+          "proximityPrecision": 0.749
+        },
+        "activePoint": {
+          "id": "A",
+          "kind": "socket",
+          "bottomHeightM": 0.3,
+          "boxes": [
+            "2G",
+            "1G"
+          ],
+          "stage": "inspect",
+          "chaseHits": 0,
+          "chaseCoverage": 0,
+          "pipeStep": "measure",
+          "targeted": false,
+          "tiltDegrees": 0,
+          "depthErrorMm": 0,
+          "levelPass": true,
+          "flushPass": true
+        },
+        "points": [
+          {
+            "id": "A",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "B",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "C",
+            "stage": "inspect",
+            "conduitVisible": false
+          }
+        ]
+      },
+      "removedBounds": null,
+      "negativeVelocity": 0,
+      "insideEmptyCell": 0,
+      "unsupported": 0,
+      "overlap": 0
+    },
+    {
+      "index": 1,
+      "contact": {
+        "point": {
+          "x": 0.588,
+          "y": 1.4300022187709964,
+          "z": -2.409995241830245
+        },
+        "direction": {
+          "x": 9.376883653928688e-18,
+          "y": -0.4226182617406994,
+          "z": -0.90630778703665
+        },
+        "edge": {
+          "x": 1,
+          "y": 2.0788050582998176e-18,
+          "z": 9.376883653928688e-18
+        },
+        "actualEdge": {
+          "x": 1,
+          "y": 0,
+          "z": 0
+        },
+        "actualAxis": {
+          "x": 0,
+          "y": -0.422618261740699,
+          "z": -0.9063077870366502
+        },
+        "edgeError": 9.604549834829738e-18,
+        "axisError": 4.0423605137480865e-16,
+        "tipError": 2.220446049250313e-16,
+        "depthMm": -0.004758169755092467,
+        "camera": {
+          "yaw": 0.16514867741462685,
+          "pitch": -0.2223122976873602
+        }
+      },
+      "state": {
+        "coordinateSystem": "metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall",
+        "mode": "playing",
+        "player": {
+          "x": 0.748,
+          "y": 1.65,
+          "z": -1.45,
+          "yaw": 0.165,
+          "pitch": -0.222
+        },
+        "mission": {
+          "name": "Living Room First Fix",
+          "progressPercent": 0,
+          "selectedTool": "hammer",
+          "complete": false
+        },
+        "workSurface": {
+          "model": "sparse-3d-brittle-masonry",
+          "pendingSupportJobs": 0,
+          "volumeBytes": 57600,
+          "pendingMeshes": 1,
+          "workerMeshing": true,
+          "lastWorkerMs": 0,
+          "peakGeometryLatencyMs": 0,
+          "workerError": "",
+          "impactCount": 2,
+          "removedNodes": 13,
+          "removedVolumeCm3": 6.135652173912979,
+          "maximumDepthMm": 7.9952418302449075,
+          "damagedChunks": 0,
+          "surfaceTriangles": 0,
+          "geometryBytes": 0,
+          "deformedWallCells": 0,
+          "lastCalculationMs": 11.300000011920929,
+          "peakCalculationMs": 11.300000011920929,
+          "lastMeshMs": 4.699999988079071,
+          "peakMeshMs": 4.699999988079071,
+          "lastImpact": {
+            "removedNodes": 13,
+            "removedByMaterial": {
+              "clay": 13
+            },
+            "stats": {
+              "milliseconds": 11.200000017881393,
+              "affectedNodes": 549,
+              "weakenedNodes": 536,
+              "connectivityVisited": 3239,
+              "detachedNodes": 0,
+              "activeChunks": 2
+            }
+          },
+          "fractureSegments": 15,
+          "freeSprayMarks": 0,
+          "activeFragments": 5,
+          "insideFragments": 1,
+          "inwardFragments": 4,
+          "physicsMs": 0,
+          "peakPhysicsMs": 0.4000000059604645,
+          "fragmentBudget": 144,
+          "chiselTip": {
+            "x": 0.5813438161062817,
+            "y": 1.4266764751406678,
+            "z": -2.4178306176171955,
+            "inAir": false
+          },
+          "airborneFragments": 0,
+          "settledFragments": 5,
+          "sprayMode": "live",
+          "sprayColor": "BLUE",
+          "hammerMode": "chase",
+          "chisel": "flat",
+          "chiselEnergyJ": 4,
+          "chiselTiltDegrees": 25,
+          "chiselSideDegrees": 0,
+          "chiselEdgeDegrees": 0,
+          "aimControlMode": "auto-use",
+          "aimInputMode": "drag",
+          "aimProfile": "normal",
+          "wallAssist": true,
+          "proximityPrecision": 0.749
+        },
+        "activePoint": {
+          "id": "A",
+          "kind": "socket",
+          "bottomHeightM": 0.3,
+          "boxes": [
+            "2G",
+            "1G"
+          ],
+          "stage": "inspect",
+          "chaseHits": 0,
+          "chaseCoverage": 0,
+          "pipeStep": "measure",
+          "targeted": false,
+          "tiltDegrees": 0,
+          "depthErrorMm": 0,
+          "levelPass": true,
+          "flushPass": true
+        },
+        "points": [
+          {
+            "id": "A",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "B",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "C",
+            "stage": "inspect",
+            "conduitVisible": false
+          }
+        ]
+      },
+      "removedBounds": {
+        "min": {
+          "x": 0.5640000000000001,
+          "y": 1.42,
+          "z": -2.4217391304347826
+        },
+        "max": {
+          "x": 0.6120000000000001,
+          "y": 1.452,
+          "z": -2.413913043478261
+        }
+      },
+      "negativeVelocity": 0,
+      "insideEmptyCell": 0,
+      "unsupported": 0,
+      "overlap": 0
+    },
+    {
+      "index": 2,
+      "contact": {
+        "point": {
+          "x": 0.588,
+          "y": 1.4300022187709962,
+          "z": -2.409995241830245
+        },
+        "direction": {
+          "x": 1.0416286183078594e-17,
+          "y": -0.4226182617406993,
+          "z": -0.90630778703665
+        },
+        "edge": {
+          "x": 1,
+          "y": 6.767246885264159e-18,
+          "z": 8.337481124778777e-18
+        },
+        "actualEdge": {
+          "x": 1,
+          "y": 0,
+          "z": 0
+        },
+        "actualAxis": {
+          "x": 0,
+          "y": -0.422618261740699,
+          "z": -0.9063077870366502
+        },
+        "edgeError": 1.0738213161981831e-17,
+        "axisError": 2.9911811786887053e-16,
+        "tipError": 2.220446049250313e-16,
+        "depthMm": -0.004758169755092467,
+        "camera": {
+          "yaw": 0.16514867741462685,
+          "pitch": -0.2223122976873602
+        }
+      },
+      "state": {
+        "coordinateSystem": "metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall",
+        "mode": "playing",
+        "player": {
+          "x": 0.748,
+          "y": 1.65,
+          "z": -1.45,
+          "yaw": 0.165,
+          "pitch": -0.222
+        },
+        "mission": {
+          "name": "Living Room First Fix",
+          "progressPercent": 0,
+          "selectedTool": "hammer",
+          "complete": false
+        },
+        "workSurface": {
+          "model": "sparse-3d-brittle-masonry",
+          "pendingSupportJobs": 0,
+          "volumeBytes": 57600,
+          "pendingMeshes": 2,
+          "workerMeshing": true,
+          "lastWorkerMs": 10.199999988079071,
+          "peakGeometryLatencyMs": 15,
+          "workerError": "",
+          "impactCount": 3,
+          "removedNodes": 54,
+          "removedVolumeCm3": 27.46434782608667,
+          "maximumDepthMm": 7.9952418302449075,
+          "damagedChunks": 1,
+          "surfaceTriangles": 2644,
+          "geometryBytes": 285552,
+          "deformedWallCells": 0,
+          "lastCalculationMs": 12.900000005960464,
+          "peakCalculationMs": 12.900000005960464,
+          "lastMeshMs": 5.199999988079071,
+          "peakMeshMs": 5.199999988079071,
+          "lastImpact": {
+            "removedNodes": 41,
+            "removedByMaterial": {
+              "clay": 35,
+              "mortar": 6
+            },
+            "stats": {
+              "milliseconds": 12.800000011920929,
+              "affectedNodes": 533,
+              "weakenedNodes": 492,
+              "connectivityVisited": 3086,
+              "detachedNodes": 0,
+              "activeChunks": 2
+            }
+          },
+          "fractureSegments": 18,
+          "freeSprayMarks": 0,
+          "activeFragments": 14,
+          "insideFragments": 7,
+          "inwardFragments": 8,
+          "physicsMs": 0.20000001788139343,
+          "peakPhysicsMs": 0.4000000059604645,
+          "fragmentBudget": 144,
+          "chiselTip": {
+            "x": 0.5969776532300272,
+            "y": 1.424587144082167,
+            "z": -2.422310745750601,
+            "inAir": false
+          },
+          "airborneFragments": 9,
+          "settledFragments": 5,
+          "sprayMode": "live",
+          "sprayColor": "BLUE",
+          "hammerMode": "chase",
+          "chisel": "flat",
+          "chiselEnergyJ": 4,
+          "chiselTiltDegrees": 25,
+          "chiselSideDegrees": 0,
+          "chiselEdgeDegrees": 0,
+          "aimControlMode": "auto-use",
+          "aimInputMode": "drag",
+          "aimProfile": "normal",
+          "wallAssist": true,
+          "proximityPrecision": 0.749
+        },
+        "activePoint": {
+          "id": "A",
+          "kind": "socket",
+          "bottomHeightM": 0.3,
+          "boxes": [
+            "2G",
+            "1G"
+          ],
+          "stage": "inspect",
+          "chaseHits": 0,
+          "chaseCoverage": 0,
+          "pipeStep": "measure",
+          "targeted": false,
+          "tiltDegrees": 0,
+          "depthErrorMm": 0,
+          "levelPass": true,
+          "flushPass": true
+        },
+        "points": [
+          {
+            "id": "A",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "B",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "C",
+            "stage": "inspect",
+            "conduitVisible": false
+          }
+        ]
+      },
+      "removedBounds": {
+        "min": {
+          "x": 0.548,
+          "y": 1.412,
+          "z": -2.4217391304347826
+        },
+        "max": {
+          "x": 0.6360000000000001,
+          "y": 1.452,
+          "z": -2.413913043478261
+        }
+      },
+      "negativeVelocity": 3,
+      "insideEmptyCell": 0,
+      "unsupported": 0,
+      "overlap": 0
+    },
+    {
+      "index": 3,
+      "contact": {
+        "point": {
+          "x": 0.588,
+          "y": 1.4243634086917458,
+          "z": -2.422087709068635
+        },
+        "direction": {
+          "x": 1.8412153175918516e-18,
+          "y": -0.4226182617406993,
+          "z": -0.90630778703665
+        },
+        "edge": {
+          "x": 1,
+          "y": -3.191239818719168e-17,
+          "z": 1.6912551990265523e-17
+        },
+        "actualEdge": {
+          "x": 1,
+          "y": 0,
+          "z": 0
+        },
+        "actualAxis": {
+          "x": 0,
+          "y": -0.422618261740699,
+          "z": -0.9063077870366502
+        },
+        "edgeError": 3.6116970704660566e-17,
+        "axisError": 2.9894236818058003e-16,
+        "tipError": 2.220446049250313e-16,
+        "depthMm": 12.087709068634656,
+        "camera": {
+          "yaw": 0.16514867741462685,
+          "pitch": -0.2223122976873602
+        }
+      },
+      "state": {
+        "coordinateSystem": "metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall",
+        "mode": "playing",
+        "player": {
+          "x": 0.748,
+          "y": 1.65,
+          "z": -1.45,
+          "yaw": 0.165,
+          "pitch": -0.222
+        },
+        "mission": {
+          "name": "Living Room First Fix",
+          "progressPercent": 0,
+          "selectedTool": "hammer",
+          "complete": false
+        },
+        "workSurface": {
+          "model": "sparse-3d-brittle-masonry",
+          "pendingSupportJobs": 0,
+          "volumeBytes": 57600,
+          "pendingMeshes": 2,
+          "workerMeshing": true,
+          "lastWorkerMs": 7.9000000059604645,
+          "peakGeometryLatencyMs": 34.29999998211861,
+          "workerError": "",
+          "impactCount": 4,
+          "removedNodes": 102,
+          "removedVolumeCm3": 51.547826086956,
+          "maximumDepthMm": 20.087709068634656,
+          "damagedChunks": 2,
+          "surfaceTriangles": 6208,
+          "geometryBytes": 670464,
+          "deformedWallCells": 0,
+          "lastCalculationMs": 11.900000005960464,
+          "peakCalculationMs": 12.900000005960464,
+          "lastMeshMs": 2.0999999940395355,
+          "peakMeshMs": 5.199999988079071,
+          "lastImpact": {
+            "removedNodes": 48,
+            "removedByMaterial": {
+              "clay": 44,
+              "mortar": 4
+            },
+            "stats": {
+              "milliseconds": 11.799999982118607,
+              "affectedNodes": 869,
+              "weakenedNodes": 821,
+              "connectivityVisited": 2551,
+              "detachedNodes": 0,
+              "activeChunks": 2
+            }
+          },
+          "fractureSegments": 19,
+          "freeSprayMarks": 0,
+          "activeFragments": 26,
+          "insideFragments": 18,
+          "inwardFragments": 14,
+          "physicsMs": 0.20000001788139343,
+          "peakPhysicsMs": 0.4000000059604645,
+          "fragmentBudget": 144,
+          "chiselTip": {
+            "x": 0.5941982670314461,
+            "y": 1.4177015229588812,
+            "z": -2.4178306176171955,
+            "inAir": false
+          },
+          "airborneFragments": 19,
+          "settledFragments": 7,
+          "sprayMode": "live",
+          "sprayColor": "BLUE",
+          "hammerMode": "chase",
+          "chisel": "flat",
+          "chiselEnergyJ": 4,
+          "chiselTiltDegrees": 25,
+          "chiselSideDegrees": 0,
+          "chiselEdgeDegrees": 0,
+          "aimControlMode": "auto-use",
+          "aimInputMode": "drag",
+          "aimProfile": "normal",
+          "wallAssist": true,
+          "proximityPrecision": 0.749
+        },
+        "activePoint": {
+          "id": "A",
+          "kind": "socket",
+          "bottomHeightM": 0.3,
+          "boxes": [
+            "2G",
+            "1G"
+          ],
+          "stage": "inspect",
+          "chaseHits": 0,
+          "chaseCoverage": 0,
+          "pipeStep": "measure",
+          "targeted": false,
+          "tiltDegrees": 0,
+          "depthErrorMm": 0,
+          "levelPass": true,
+          "flushPass": true
+        },
+        "points": [
+          {
+            "id": "A",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "B",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "C",
+            "stage": "inspect",
+            "conduitVisible": false
+          }
+        ]
+      },
+      "removedBounds": {
+        "min": {
+          "x": 0.548,
+          "y": 1.412,
+          "z": -2.4295652173913043
+        },
+        "max": {
+          "x": 0.6440000000000001,
+          "y": 1.46,
+          "z": -2.413913043478261
+        }
+      },
+      "negativeVelocity": 7,
+      "insideEmptyCell": 1,
+      "unsupported": 0,
+      "overlap": 0
+    },
+    {
+      "index": 4,
+      "contact": {
+        "point": {
+          "x": 0.5880000000000002,
+          "y": 1.4243634086917458,
+          "z": -2.422087709068635
+        },
+        "direction": {
+          "x": 2.0572721733869716e-17,
+          "y": -0.42261826174069955,
+          "z": -0.9063077870366499
+        },
+        "edge": {
+          "x": 1,
+          "y": 1.2362383313787235e-17,
+          "z": 1.6934812881845038e-17
+        },
+        "actualEdge": {
+          "x": 1,
+          "y": 0,
+          "z": 0
+        },
+        "actualAxis": {
+          "x": 0,
+          "y": -0.4226182617406998,
+          "z": -0.9063077870366499
+        },
+        "edgeError": 2.09670314670463e-17,
+        "axisError": 2.229956130865638e-16,
+        "tipError": 0,
+        "depthMm": 12.087709068634656,
+        "camera": {
+          "yaw": 0.16514867741462685,
+          "pitch": -0.2223122976873602
+        }
+      },
+      "state": {
+        "coordinateSystem": "metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall",
+        "mode": "playing",
+        "player": {
+          "x": 0.748,
+          "y": 1.65,
+          "z": -1.45,
+          "yaw": 0.165,
+          "pitch": -0.222
+        },
+        "mission": {
+          "name": "Living Room First Fix",
+          "progressPercent": 0,
+          "selectedTool": "hammer",
+          "complete": false
+        },
+        "workSurface": {
+          "model": "sparse-3d-brittle-masonry",
+          "pendingSupportJobs": 0,
+          "volumeBytes": 57600,
+          "pendingMeshes": 4,
+          "workerMeshing": true,
+          "lastWorkerMs": 5.5,
+          "peakGeometryLatencyMs": 34.29999998211861,
+          "workerError": "",
+          "impactCount": 5,
+          "removedNodes": 147,
+          "removedVolumeCm3": 74.87999999999923,
+          "maximumDepthMm": 20.087709068634656,
+          "damagedChunks": 3,
+          "surfaceTriangles": 8700,
+          "geometryBytes": 939600,
+          "deformedWallCells": 0,
+          "lastCalculationMs": 11.200000017881393,
+          "peakCalculationMs": 12.900000005960464,
+          "lastMeshMs": 4.199999988079071,
+          "peakMeshMs": 5.199999988079071,
+          "lastImpact": {
+            "removedNodes": 45,
+            "removedByMaterial": {
+              "clay": 35,
+              "mortar": 10
+            },
+            "stats": {
+              "milliseconds": 11.200000017881393,
+              "affectedNodes": 830,
+              "weakenedNodes": 785,
+              "connectivityVisited": 2776,
+              "detachedNodes": 0,
+              "activeChunks": 2
+            }
+          },
+          "fractureSegments": 17,
+          "freeSprayMarks": 0,
+          "activeFragments": 42,
+          "insideFragments": 33,
+          "inwardFragments": 23,
+          "physicsMs": 0.5,
+          "peakPhysicsMs": 0.5,
+          "fragmentBudget": 144,
+          "chiselTip": {
+            "x": 0.5961658656768167,
+            "y": 1.4156231512558985,
+            "z": -2.421370112787527,
+            "inAir": false
+          },
+          "airborneFragments": 33,
+          "settledFragments": 9,
+          "sprayMode": "live",
+          "sprayColor": "BLUE",
+          "hammerMode": "chase",
+          "chisel": "flat",
+          "chiselEnergyJ": 4,
+          "chiselTiltDegrees": 25,
+          "chiselSideDegrees": 0,
+          "chiselEdgeDegrees": 0,
+          "aimControlMode": "auto-use",
+          "aimInputMode": "drag",
+          "aimProfile": "normal",
+          "wallAssist": true,
+          "proximityPrecision": 0.749
+        },
+        "activePoint": {
+          "id": "A",
+          "kind": "socket",
+          "bottomHeightM": 0.3,
+          "boxes": [
+            "2G",
+            "1G"
+          ],
+          "stage": "inspect",
+          "chaseHits": 0,
+          "chaseCoverage": 0,
+          "pipeStep": "measure",
+          "targeted": false,
+          "tiltDegrees": 0,
+          "depthErrorMm": 0,
+          "levelPass": true,
+          "flushPass": true
+        },
+        "points": [
+          {
+            "id": "A",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "B",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "C",
+            "stage": "inspect",
+            "conduitVisible": false
+          }
+        ]
+      },
+      "removedBounds": {
+        "min": {
+          "x": 0.54,
+          "y": 1.412,
+          "z": -2.4295652173913043
+        },
+        "max": {
+          "x": 0.6440000000000001,
+          "y": 1.46,
+          "z": -2.413913043478261
+        }
+      },
+      "negativeVelocity": 11,
+      "insideEmptyCell": 4,
+      "unsupported": 0,
+      "overlap": 0
+    },
+    {
+      "index": 5,
+      "contact": {
+        "point": {
+          "x": 0.5880000000000001,
+          "y": 1.4240016566470493,
+          "z": -2.422863488831995
+        },
+        "direction": {
+          "x": -1.0935987447653548e-17,
+          "y": -0.42261826174069955,
+          "z": -0.9063077870366499
+        },
+        "edge": {
+          "x": 1,
+          "y": -9.111467798746333e-18,
+          "z": -7.817779860203823e-18
+        },
+        "actualEdge": {
+          "x": 1,
+          "y": 0,
+          "z": 0
+        },
+        "actualAxis": {
+          "x": 0,
+          "y": -0.4226182617406998,
+          "z": -0.9063077870366499
+        },
+        "edgeError": 1.200568729353717e-17,
+        "axisError": 2.2231374765805304e-16,
+        "tipError": 0,
+        "depthMm": 12.86348883199473,
+        "camera": {
+          "yaw": 0.16514867741462685,
+          "pitch": -0.2223122976873602
+        }
+      },
+      "state": {
+        "coordinateSystem": "metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall",
+        "mode": "playing",
+        "player": {
+          "x": 0.748,
+          "y": 1.65,
+          "z": -1.45,
+          "yaw": 0.165,
+          "pitch": -0.222
+        },
+        "mission": {
+          "name": "Living Room First Fix",
+          "progressPercent": 0,
+          "selectedTool": "hammer",
+          "complete": false
+        },
+        "workSurface": {
+          "model": "sparse-3d-brittle-masonry",
+          "pendingSupportJobs": 0,
+          "volumeBytes": 57600,
+          "pendingMeshes": 3,
+          "workerMeshing": true,
+          "lastWorkerMs": 5.4000000059604645,
+          "peakGeometryLatencyMs": 42.5,
+          "workerError": "",
+          "impactCount": 6,
+          "removedNodes": 204,
+          "removedVolumeCm3": 104.97391304347715,
+          "maximumDepthMm": 20.86348883199473,
+          "damagedChunks": 4,
+          "surfaceTriangles": 13880,
+          "geometryBytes": 1499040,
+          "deformedWallCells": 0,
+          "lastCalculationMs": 10.400000005960464,
+          "peakCalculationMs": 12.900000005960464,
+          "lastMeshMs": 0.19999998807907104,
+          "peakMeshMs": 5.199999988079071,
+          "lastImpact": {
+            "removedNodes": 57,
+            "removedByMaterial": {
+              "clay": 49,
+              "mortar": 8
+            },
+            "stats": {
+              "milliseconds": 10.400000005960464,
+              "affectedNodes": 701,
+              "weakenedNodes": 644,
+              "connectivityVisited": 3525,
+              "detachedNodes": 0,
+              "activeChunks": 2
+            }
+          },
+          "fractureSegments": 19,
+          "freeSprayMarks": 0,
+          "activeFragments": 60,
+          "insideFragments": 51,
+          "inwardFragments": 32,
+          "physicsMs": 0.5,
+          "peakPhysicsMs": 0.7999999821186066,
+          "fragmentBudget": 144,
+          "chiselTip": {
+            "x": 0.5842497404591763,
+            "y": 1.4017063525444846,
+            "z": -2.4647846877945696,
+            "inAir": false
+          },
+          "airborneFragments": 49,
+          "settledFragments": 11,
+          "sprayMode": "live",
+          "sprayColor": "BLUE",
+          "hammerMode": "chase",
+          "chisel": "flat",
+          "chiselEnergyJ": 4,
+          "chiselTiltDegrees": 25,
+          "chiselSideDegrees": 0,
+          "chiselEdgeDegrees": 0,
+          "aimControlMode": "auto-use",
+          "aimInputMode": "drag",
+          "aimProfile": "normal",
+          "wallAssist": true,
+          "proximityPrecision": 0.749
+        },
+        "activePoint": {
+          "id": "A",
+          "kind": "socket",
+          "bottomHeightM": 0.3,
+          "boxes": [
+            "2G",
+            "1G"
+          ],
+          "stage": "inspect",
+          "chaseHits": 0,
+          "chaseCoverage": 0,
+          "pipeStep": "measure",
+          "targeted": false,
+          "tiltDegrees": 0,
+          "depthErrorMm": 0,
+          "levelPass": true,
+          "flushPass": true
+        },
+        "points": [
+          {
+            "id": "A",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "B",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "C",
+            "stage": "inspect",
+            "conduitVisible": false
+          }
+        ]
+      },
+      "removedBounds": {
+        "min": {
+          "x": 0.532,
+          "y": 1.3960000000000001,
+          "z": -2.4373913043478264
+        },
+        "max": {
+          "x": 0.6440000000000001,
+          "y": 1.46,
+          "z": -2.413913043478261
+        }
+      },
+      "negativeVelocity": 11,
+      "insideEmptyCell": 10,
+      "unsupported": 0,
+      "overlap": 0
+    },
+    {
+      "index": 6,
+      "contact": {
+        "point": {
+          "x": 0.5880000000000001,
+          "y": 1.4190501755352658,
+          "z": -2.433481974342987
+        },
+        "direction": {
+          "x": -3.1182075874497252e-18,
+          "y": -0.4226182617406993,
+          "z": -0.90630778703665
+        },
+        "edge": {
+          "x": 1,
+          "y": -1.4065325480893032e-17,
+          "z": 3.1182075874497252e-18
+        },
+        "actualEdge": {
+          "x": 1,
+          "y": 0,
+          "z": 0
+        },
+        "actualAxis": {
+          "x": 0,
+          "y": -0.422618261740699,
+          "z": -0.9063077870366502
+        },
+        "edgeError": 1.4406824752244604e-17,
+        "axisError": 2.989529605776236e-16,
+        "tipError": 2.220446049250313e-16,
+        "depthMm": 23.481974342987044,
+        "camera": {
+          "yaw": 0.16514867741462685,
+          "pitch": -0.2223122976873602
+        }
+      },
+      "state": {
+        "coordinateSystem": "metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall",
+        "mode": "playing",
+        "player": {
+          "x": 0.748,
+          "y": 1.65,
+          "z": -1.45,
+          "yaw": 0.165,
+          "pitch": -0.222
+        },
+        "mission": {
+          "name": "Living Room First Fix",
+          "progressPercent": 0,
+          "selectedTool": "hammer",
+          "complete": false
+        },
+        "workSurface": {
+          "model": "sparse-3d-brittle-masonry",
+          "pendingSupportJobs": 0,
+          "volumeBytes": 57600,
+          "pendingMeshes": 2,
+          "workerMeshing": true,
+          "lastWorkerMs": 5.0999999940395355,
+          "peakGeometryLatencyMs": 42.5,
+          "workerError": "",
+          "impactCount": 7,
+          "removedNodes": 251,
+          "removedVolumeCm3": 128.97391304347718,
+          "maximumDepthMm": 31.481974342987044,
+          "damagedChunks": 5,
+          "surfaceTriangles": 17092,
+          "geometryBytes": 1845936,
+          "deformedWallCells": 0,
+          "lastCalculationMs": 11.5,
+          "peakCalculationMs": 12.900000005960464,
+          "lastMeshMs": 3.100000023841858,
+          "peakMeshMs": 5.199999988079071,
+          "lastImpact": {
+            "removedNodes": 47,
+            "removedByMaterial": {
+              "clay": 42,
+              "mortar": 5
+            },
+            "stats": {
+              "milliseconds": 11.399999976158142,
+              "affectedNodes": 990,
+              "weakenedNodes": 943,
+              "connectivityVisited": 2655,
+              "detachedNodes": 0,
+              "activeChunks": 2
+            }
+          },
+          "fractureSegments": 18,
+          "freeSprayMarks": 0,
+          "activeFragments": 64,
+          "insideFragments": 57,
+          "inwardFragments": 31,
+          "physicsMs": 0.5999999940395355,
+          "peakPhysicsMs": 0.9000000059604645,
+          "fragmentBudget": 144,
+          "chiselTip": {
+            "x": 0.5953417538943871,
+            "y": 1.4086106160549712,
+            "z": -2.4308055341593944,
+            "inAir": false
+          },
+          "airborneFragments": 55,
+          "settledFragments": 9,
+          "sprayMode": "live",
+          "sprayColor": "BLUE",
+          "hammerMode": "chase",
+          "chisel": "flat",
+          "chiselEnergyJ": 4,
+          "chiselTiltDegrees": 25,
+          "chiselSideDegrees": 0,
+          "chiselEdgeDegrees": 0,
+          "aimControlMode": "auto-use",
+          "aimInputMode": "drag",
+          "aimProfile": "normal",
+          "wallAssist": true,
+          "proximityPrecision": 0.749
+        },
+        "activePoint": {
+          "id": "A",
+          "kind": "socket",
+          "bottomHeightM": 0.3,
+          "boxes": [
+            "2G",
+            "1G"
+          ],
+          "stage": "inspect",
+          "chaseHits": 0,
+          "chaseCoverage": 0,
+          "pipeStep": "measure",
+          "targeted": false,
+          "tiltDegrees": 0,
+          "depthErrorMm": 0,
+          "levelPass": true,
+          "flushPass": true
+        },
+        "points": [
+          {
+            "id": "A",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "B",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "C",
+            "stage": "inspect",
+            "conduitVisible": false
+          }
+        ]
+      },
+      "removedBounds": {
+        "min": {
+          "x": 0.54,
+          "y": 1.3960000000000001,
+          "z": -2.4373913043478264
+        },
+        "max": {
+          "x": 0.6360000000000001,
+          "y": 1.46,
+          "z": -2.413913043478261
+        }
+      },
+      "negativeVelocity": 13,
+      "insideEmptyCell": 18,
+      "unsupported": 0,
+      "overlap": 0
+    },
+    {
+      "index": 7,
+      "contact": {
+        "point": {
+          "x": 0.588,
+          "y": 1.4190501755352662,
+          "z": -2.433481974342987
+        },
+        "direction": {
+          "x": -1.1975389976803456e-17,
+          "y": -0.4226182617406993,
+          "z": -0.90630778703665
+        },
+        "edge": {
+          "x": 1,
+          "y": -1.3799909625710674e-17,
+          "z": -6.778377331053914e-18
+        },
+        "actualEdge": {
+          "x": 1,
+          "y": 0,
+          "z": 0
+        },
+        "actualAxis": {
+          "x": 0,
+          "y": -0.422618261740699,
+          "z": -0.9063077870366502
+        },
+        "edgeError": 1.5374781459257483e-17,
+        "axisError": 2.9917646863459074e-16,
+        "tipError": 2.220446049250313e-16,
+        "depthMm": 23.481974342987044,
+        "camera": {
+          "yaw": 0.16514867741462685,
+          "pitch": -0.2223122976873602
+        }
+      },
+      "state": {
+        "coordinateSystem": "metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall",
+        "mode": "playing",
+        "player": {
+          "x": 0.748,
+          "y": 1.65,
+          "z": -1.45,
+          "yaw": 0.165,
+          "pitch": -0.222
+        },
+        "mission": {
+          "name": "Living Room First Fix",
+          "progressPercent": 0,
+          "selectedTool": "hammer",
+          "complete": false
+        },
+        "workSurface": {
+          "model": "sparse-3d-brittle-masonry",
+          "pendingSupportJobs": 0,
+          "volumeBytes": 57600,
+          "pendingMeshes": 2,
+          "workerMeshing": true,
+          "lastWorkerMs": 6,
+          "peakGeometryLatencyMs": 42.5,
+          "workerError": "",
+          "impactCount": 8,
+          "removedNodes": 307,
+          "removedVolumeCm3": 157.64869565217305,
+          "maximumDepthMm": 31.481974342987044,
+          "damagedChunks": 5,
+          "surfaceTriangles": 18134,
+          "geometryBytes": 1958472,
+          "deformedWallCells": 0,
+          "lastCalculationMs": 10.299999982118607,
+          "peakCalculationMs": 12.900000005960464,
+          "lastMeshMs": 4.4000000059604645,
+          "peakMeshMs": 5.199999988079071,
+          "lastImpact": {
+            "removedNodes": 56,
+            "removedByMaterial": {
+              "clay": 46,
+              "mortar": 10
+            },
+            "stats": {
+              "milliseconds": 10.299999982118607,
+              "affectedNodes": 950,
+              "weakenedNodes": 894,
+              "connectivityVisited": 2838,
+              "detachedNodes": 0,
+              "activeChunks": 2
+            }
+          },
+          "fractureSegments": 16,
+          "freeSprayMarks": 0,
+          "activeFragments": 64,
+          "insideFragments": 59,
+          "inwardFragments": 29,
+          "physicsMs": 0.5,
+          "peakPhysicsMs": 1.0999999940395355,
+          "fragmentBudget": 144,
+          "chiselTip": {
+            "x": 0.5873386517931423,
+            "y": 1.4236767309909888,
+            "z": -2.441307652705883,
+            "inAir": false
+          },
+          "airborneFragments": 56,
+          "settledFragments": 8,
+          "sprayMode": "live",
+          "sprayColor": "BLUE",
+          "hammerMode": "chase",
+          "chisel": "flat",
+          "chiselEnergyJ": 4,
+          "chiselTiltDegrees": 25,
+          "chiselSideDegrees": 0,
+          "chiselEdgeDegrees": 0,
+          "aimControlMode": "auto-use",
+          "aimInputMode": "drag",
+          "aimProfile": "normal",
+          "wallAssist": true,
+          "proximityPrecision": 0.749
+        },
+        "activePoint": {
+          "id": "A",
+          "kind": "socket",
+          "bottomHeightM": 0.3,
+          "boxes": [
+            "2G",
+            "1G"
+          ],
+          "stage": "inspect",
+          "chaseHits": 0,
+          "chaseCoverage": 0,
+          "pipeStep": "measure",
+          "targeted": false,
+          "tiltDegrees": 0,
+          "depthErrorMm": 0,
+          "levelPass": true,
+          "flushPass": true
+        },
+        "points": [
+          {
+            "id": "A",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "B",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "C",
+            "stage": "inspect",
+            "conduitVisible": false
+          }
+        ]
+      },
+      "removedBounds": {
+        "min": {
+          "x": 0.532,
+          "y": 1.3880000000000001,
+          "z": -2.445217391304348
+        },
+        "max": {
+          "x": 0.6440000000000001,
+          "y": 1.46,
+          "z": -2.413913043478261
+        }
+      },
+      "negativeVelocity": 14,
+      "insideEmptyCell": 24,
+      "unsupported": 0,
+      "overlap": 0
+    },
+    {
+      "index": 8,
+      "contact": {
+        "point": {
+          "x": 0.5880000000000001,
+          "y": 1.4044534805317617,
+          "z": -2.46478468779457
+        },
+        "direction": {
+          "x": -7.817779860203823e-18,
+          "y": -0.4226182617406994,
+          "z": -0.90630778703665
+        },
+        "edge": {
+          "x": 1,
+          "y": 4.9538576821466975e-18,
+          "z": -1.0935987447653548e-17
+        },
+        "actualEdge": {
+          "x": 1,
+          "y": 0,
+          "z": 0
+        },
+        "actualAxis": {
+          "x": 0,
+          "y": -0.4226182617406998,
+          "z": -0.9063077870366499
+        },
+        "edgeError": 1.2005687293537168e-17,
+        "axisError": 4.042028908431757e-16,
+        "tipError": 0,
+        "depthMm": 54.784687794569905,
+        "camera": {
+          "yaw": 0.16514867741462685,
+          "pitch": -0.2223122976873602
+        }
+      },
+      "state": {
+        "coordinateSystem": "metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall",
+        "mode": "playing",
+        "player": {
+          "x": 0.748,
+          "y": 1.65,
+          "z": -1.45,
+          "yaw": 0.165,
+          "pitch": -0.222
+        },
+        "mission": {
+          "name": "Living Room First Fix",
+          "progressPercent": 0,
+          "selectedTool": "hammer",
+          "complete": false
+        },
+        "workSurface": {
+          "model": "sparse-3d-brittle-masonry",
+          "pendingSupportJobs": 0,
+          "volumeBytes": 57600,
+          "pendingMeshes": 1,
+          "workerMeshing": true,
+          "lastWorkerMs": 5.4000000059604645,
+          "peakGeometryLatencyMs": 42.5,
+          "workerError": "",
+          "impactCount": 9,
+          "removedNodes": 320,
+          "removedVolumeCm3": 164.15999999999912,
+          "maximumDepthMm": 62.78468779456992,
+          "damagedChunks": 5,
+          "surfaceTriangles": 18110,
+          "geometryBytes": 1955880,
+          "deformedWallCells": 0,
+          "lastCalculationMs": 6.5999999940395355,
+          "peakCalculationMs": 12.900000005960464,
+          "lastMeshMs": 2.300000011920929,
+          "peakMeshMs": 5.199999988079071,
+          "lastImpact": {
+            "removedNodes": 13,
+            "removedByMaterial": {
+              "clay": 13
+            },
+            "stats": {
+              "milliseconds": 6.5,
+              "affectedNodes": 1191,
+              "weakenedNodes": 1178,
+              "connectivityVisited": 2396,
+              "detachedNodes": 0,
+              "activeChunks": 2
+            }
+          },
+          "fractureSegments": 21,
+          "freeSprayMarks": 0,
+          "activeFragments": 64,
+          "insideFragments": 56,
+          "inwardFragments": 27,
+          "physicsMs": 0.7999999821186066,
+          "peakPhysicsMs": 1.0999999940395355,
+          "fragmentBudget": 144,
+          "chiselTip": {
+            "x": 0.5872807419138603,
+            "y": 1.4166699928882291,
+            "z": -2.4413076527058832,
+            "inAir": false
+          },
+          "airborneFragments": 55,
+          "settledFragments": 9,
+          "sprayMode": "live",
+          "sprayColor": "BLUE",
+          "hammerMode": "chase",
+          "chisel": "flat",
+          "chiselEnergyJ": 4,
+          "chiselTiltDegrees": 25,
+          "chiselSideDegrees": 0,
+          "chiselEdgeDegrees": 0,
+          "aimControlMode": "auto-use",
+          "aimInputMode": "drag",
+          "aimProfile": "normal",
+          "wallAssist": true,
+          "proximityPrecision": 0.749
+        },
+        "activePoint": {
+          "id": "A",
+          "kind": "socket",
+          "bottomHeightM": 0.3,
+          "boxes": [
+            "2G",
+            "1G"
+          ],
+          "stage": "inspect",
+          "chaseHits": 0,
+          "chaseCoverage": 0,
+          "pipeStep": "measure",
+          "targeted": false,
+          "tiltDegrees": 0,
+          "depthErrorMm": 0,
+          "levelPass": true,
+          "flushPass": true
+        },
+        "points": [
+          {
+            "id": "A",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "B",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "C",
+            "stage": "inspect",
+            "conduitVisible": false
+          }
+        ]
+      },
+      "removedBounds": {
+        "min": {
+          "x": 0.54,
+          "y": 1.3960000000000001,
+          "z": -2.445217391304348
+        },
+        "max": {
+          "x": 0.6120000000000001,
+          "y": 1.452,
+          "z": -2.4217391304347826
+        }
+      },
+      "negativeVelocity": 9,
+      "insideEmptyCell": 25,
+      "unsupported": 0,
+      "overlap": 0
+    },
+    {
+      "index": 9,
+      "contact": {
+        "point": {
+          "x": 0.588,
+          "y": 1.4044534805317614,
+          "z": -2.4647846877945705
+        },
+        "direction": {
+          "x": 5.4702198129847253e-17,
+          "y": -0.42261826174069955,
+          "z": -0.9063077870366499
+        },
+        "edge": {
+          "x": 1,
+          "y": 5.44016760935239e-18,
+          "z": 5.782040571729698e-17
+        },
+        "actualEdge": {
+          "x": 1,
+          "y": 0,
+          "z": 0
+        },
+        "actualAxis": {
+          "x": 0,
+          "y": -0.422618261740699,
+          "z": -0.9063077870366502
+        },
+        "edgeError": 5.80757672435817e-17,
+        "axisError": 6.0037065897536e-16,
+        "tipError": 0,
+        "depthMm": 54.78468779457035,
+        "camera": {
+          "yaw": 0.16514867741462685,
+          "pitch": -0.2223122976873602
+        }
+      },
+      "state": {
+        "coordinateSystem": "metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall",
+        "mode": "playing",
+        "player": {
+          "x": 0.748,
+          "y": 1.65,
+          "z": -1.45,
+          "yaw": 0.165,
+          "pitch": -0.222
+        },
+        "mission": {
+          "name": "Living Room First Fix",
+          "progressPercent": 0,
+          "selectedTool": "hammer",
+          "complete": false
+        },
+        "workSurface": {
+          "model": "sparse-3d-brittle-masonry",
+          "pendingSupportJobs": 0,
+          "volumeBytes": 57600,
+          "pendingMeshes": 2,
+          "workerMeshing": true,
+          "lastWorkerMs": 8.799999982118607,
+          "peakGeometryLatencyMs": 42.5,
+          "workerError": "",
+          "impactCount": 10,
+          "removedNodes": 358,
+          "removedVolumeCm3": 184.61217391304257,
+          "maximumDepthMm": 62.78468779457036,
+          "damagedChunks": 5,
+          "surfaceTriangles": 18152,
+          "geometryBytes": 1960416,
+          "deformedWallCells": 0,
+          "lastCalculationMs": 10.099999994039536,
+          "peakCalculationMs": 12.900000005960464,
+          "lastMeshMs": 4.799999982118607,
+          "peakMeshMs": 5.199999988079071,
+          "lastImpact": {
+            "removedNodes": 38,
+            "removedByMaterial": {
+              "clay": 36,
+              "mortar": 2
+            },
+            "stats": {
+              "milliseconds": 10,
+              "affectedNodes": 1171,
+              "weakenedNodes": 1133,
+              "connectivityVisited": 3182,
+              "detachedNodes": 0,
+              "activeChunks": 2
+            }
+          },
+          "fractureSegments": 22,
+          "freeSprayMarks": 0,
+          "activeFragments": 64,
+          "insideFragments": 58,
+          "inwardFragments": 26,
+          "physicsMs": 0.4000000059604645,
+          "peakPhysicsMs": 1.0999999940395355,
+          "fragmentBudget": 144,
+          "chiselTip": {
+            "x": 0.5847403176865287,
+            "y": 1.3751696915113925,
+            "z": -2.5273901146977367,
+            "inAir": false
+          },
+          "airborneFragments": 51,
+          "settledFragments": 13,
+          "sprayMode": "live",
+          "sprayColor": "BLUE",
+          "hammerMode": "chase",
+          "chisel": "flat",
+          "chiselEnergyJ": 4,
+          "chiselTiltDegrees": 25,
+          "chiselSideDegrees": 0,
+          "chiselEdgeDegrees": 0,
+          "aimControlMode": "auto-use",
+          "aimInputMode": "drag",
+          "aimProfile": "normal",
+          "wallAssist": true,
+          "proximityPrecision": 0.749
+        },
+        "activePoint": {
+          "id": "A",
+          "kind": "socket",
+          "bottomHeightM": 0.3,
+          "boxes": [
+            "2G",
+            "1G"
+          ],
+          "stage": "inspect",
+          "chaseHits": 0,
+          "chaseCoverage": 0,
+          "pipeStep": "measure",
+          "targeted": false,
+          "tiltDegrees": 0,
+          "depthErrorMm": 0,
+          "levelPass": true,
+          "flushPass": true
+        },
+        "points": [
+          {
+            "id": "A",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "B",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "C",
+            "stage": "inspect",
+            "conduitVisible": false
+          }
+        ]
+      },
+      "removedBounds": {
+        "min": {
+          "x": 0.532,
+          "y": 1.3880000000000001,
+          "z": -2.476521739130435
+        },
+        "max": {
+          "x": 0.6200000000000001,
+          "y": 1.444,
+          "z": -2.413913043478261
+        }
+      },
+      "negativeVelocity": 13,
+      "insideEmptyCell": 31,
+      "unsupported": 0,
+      "overlap": 0
+    },
+    {
+      "index": 10,
+      "contact": {
+        "point": {
+          "x": 0.5880000000000001,
+          "y": 1.3752600905247518,
+          "z": -2.5273901146977362
+        },
+        "direction": {
+          "x": 3.542872955741493e-17,
+          "y": -0.42261826174069955,
+          "z": -0.9063077870366499
+        },
+        "edge": {
+          "x": 1,
+          "y": -1.0616634207294195e-18,
+          "z": 3.9586339674014564e-17
+        },
+        "actualEdge": {
+          "x": 1,
+          "y": 0,
+          "z": 0
+        },
+        "actualAxis": {
+          "x": 0,
+          "y": -0.422618261740699,
+          "z": -0.9063077870366502
+        },
+        "edgeError": 3.9600573455511655e-17,
+        "axisError": 5.98922192405928e-16,
+        "tipError": 2.220446049250313e-16,
+        "depthMm": 117.39011469773608,
+        "camera": {
+          "yaw": 0.16514867741462685,
+          "pitch": -0.2223122976873602
+        }
+      },
+      "state": {
+        "coordinateSystem": "metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall",
+        "mode": "playing",
+        "player": {
+          "x": 0.748,
+          "y": 1.65,
+          "z": -1.45,
+          "yaw": 0.165,
+          "pitch": -0.222
+        },
+        "mission": {
+          "name": "Living Room First Fix",
+          "progressPercent": 0,
+          "selectedTool": "hammer",
+          "complete": false
+        },
+        "workSurface": {
+          "model": "sparse-3d-brittle-masonry",
+          "pendingSupportJobs": 0,
+          "volumeBytes": 115200,
+          "pendingMeshes": 0,
+          "workerMeshing": true,
+          "lastWorkerMs": 5.800000011920929,
+          "peakGeometryLatencyMs": 42.5,
+          "workerError": "",
+          "impactCount": 11,
+          "removedNodes": 358,
+          "removedVolumeCm3": 184.61217391304257,
+          "maximumDepthMm": 62.78468779457036,
+          "damagedChunks": 5,
+          "surfaceTriangles": 20522,
+          "geometryBytes": 2216376,
+          "deformedWallCells": 0,
+          "lastCalculationMs": 2.199999988079071,
+          "peakCalculationMs": 12.900000005960464,
+          "lastMeshMs": 0,
+          "peakMeshMs": 5.199999988079071,
+          "lastImpact": {
+            "removedNodes": 0,
+            "removedByMaterial": {},
+            "stats": {
+              "milliseconds": 2.0999999940395355,
+              "affectedNodes": 898,
+              "weakenedNodes": 898,
+              "connectivityVisited": 0,
+              "detachedNodes": 0,
+              "activeChunks": 4
+            }
+          },
+          "fractureSegments": 29,
+          "freeSprayMarks": 0,
+          "activeFragments": 64,
+          "insideFragments": 57,
+          "inwardFragments": 26,
+          "physicsMs": 0.5,
+          "peakPhysicsMs": 1.0999999940395355,
+          "fragmentBudget": 144,
+          "chiselTip": {
+            "x": 0.5880000000000001,
+            "y": 1.3752600905247525,
+            "z": -2.5273901146977367,
+            "inAir": false
+          },
+          "airborneFragments": 50,
+          "settledFragments": 14,
+          "sprayMode": "live",
+          "sprayColor": "BLUE",
+          "hammerMode": "chase",
+          "chisel": "flat",
+          "chiselEnergyJ": 4,
+          "chiselTiltDegrees": 25,
+          "chiselSideDegrees": 0,
+          "chiselEdgeDegrees": 0,
+          "aimControlMode": "auto-use",
+          "aimInputMode": "drag",
+          "aimProfile": "normal",
+          "wallAssist": true,
+          "proximityPrecision": 0.749
+        },
+        "activePoint": {
+          "id": "A",
+          "kind": "socket",
+          "bottomHeightM": 0.3,
+          "boxes": [
+            "2G",
+            "1G"
+          ],
+          "stage": "inspect",
+          "chaseHits": 0,
+          "chaseCoverage": 0,
+          "pipeStep": "measure",
+          "targeted": false,
+          "tiltDegrees": 0,
+          "depthErrorMm": 0,
+          "levelPass": true,
+          "flushPass": true
+        },
+        "points": [
+          {
+            "id": "A",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "B",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "C",
+            "stage": "inspect",
+            "conduitVisible": false
+          }
+        ]
+      },
+      "removedBounds": null,
+      "negativeVelocity": 13,
+      "insideEmptyCell": 34,
+      "unsupported": 0,
+      "overlap": 0
+    },
+    {
+      "index": 11,
+      "contact": {
+        "point": {
+          "x": 0.588,
+          "y": 1.3752600905247518,
+          "z": -2.5273901146977362
+        },
+        "direction": {
+          "x": 1.2777202765245401e-17,
+          "y": -0.4226182617406993,
+          "z": -0.90630778703665
+        },
+        "edge": {
+          "x": 1,
+          "y": -2.2800930388445344e-17,
+          "z": 2.4730331850469346e-17
+        },
+        "actualEdge": {
+          "x": 1,
+          "y": 0,
+          "z": 0
+        },
+        "actualAxis": {
+          "x": 0,
+          "y": -0.422618261740699,
+          "z": -0.9063077870366502
+        },
+        "edgeError": 3.3637356317241534e-17,
+        "axisError": 2.992096360916071e-16,
+        "tipError": 0,
+        "depthMm": 117.39011469773608,
+        "camera": {
+          "yaw": 0.16514867741462685,
+          "pitch": -0.2223122976873602
+        }
+      },
+      "state": {
+        "coordinateSystem": "metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall",
+        "mode": "playing",
+        "player": {
+          "x": 0.748,
+          "y": 1.65,
+          "z": -1.45,
+          "yaw": 0.165,
+          "pitch": -0.222
+        },
+        "mission": {
+          "name": "Living Room First Fix",
+          "progressPercent": 0,
+          "selectedTool": "hammer",
+          "complete": false
+        },
+        "workSurface": {
+          "model": "sparse-3d-brittle-masonry",
+          "pendingSupportJobs": 0,
+          "volumeBytes": 115200,
+          "pendingMeshes": 2,
+          "workerMeshing": true,
+          "lastWorkerMs": 5.800000011920929,
+          "peakGeometryLatencyMs": 42.5,
+          "workerError": "",
+          "impactCount": 12,
+          "removedNodes": 376,
+          "removedVolumeCm3": 195.88173913043377,
+          "maximumDepthMm": 125.3901146977361,
+          "damagedChunks": 5,
+          "surfaceTriangles": 20522,
+          "geometryBytes": 2216376,
+          "deformedWallCells": 0,
+          "lastCalculationMs": 4.5,
+          "peakCalculationMs": 12.900000005960464,
+          "lastMeshMs": 4.799999982118607,
+          "peakMeshMs": 5.199999988079071,
+          "lastImpact": {
+            "removedNodes": 18,
+            "removedByMaterial": {
+              "clay": 18
+            },
+            "stats": {
+              "milliseconds": 4.5,
+              "affectedNodes": 880,
+              "weakenedNodes": 862,
+              "connectivityVisited": 739,
+              "detachedNodes": 0,
+              "activeChunks": 4
+            }
+          },
+          "fractureSegments": 36,
+          "freeSprayMarks": 0,
+          "activeFragments": 64,
+          "insideFragments": 56,
+          "inwardFragments": 22,
+          "physicsMs": 0.7000000178813934,
+          "peakPhysicsMs": 1.0999999940395355,
+          "fragmentBudget": 144,
+          "chiselTip": {
+            "x": 0.5880000000000002,
+            "y": 1.3533650480194952,
+            "z": -2.574344184875111,
+            "inAir": false
+          },
+          "airborneFragments": 47,
+          "settledFragments": 17,
+          "sprayMode": "live",
+          "sprayColor": "BLUE",
+          "hammerMode": "chase",
+          "chisel": "flat",
+          "chiselEnergyJ": 4,
+          "chiselTiltDegrees": 25,
+          "chiselSideDegrees": 0,
+          "chiselEdgeDegrees": 0,
+          "aimControlMode": "auto-use",
+          "aimInputMode": "drag",
+          "aimProfile": "normal",
+          "wallAssist": true,
+          "proximityPrecision": 0.749
+        },
+        "activePoint": {
+          "id": "A",
+          "kind": "socket",
+          "bottomHeightM": 0.3,
+          "boxes": [
+            "2G",
+            "1G"
+          ],
+          "stage": "inspect",
+          "chaseHits": 0,
+          "chaseCoverage": 0,
+          "pipeStep": "measure",
+          "targeted": false,
+          "tiltDegrees": 0,
+          "depthErrorMm": 0,
+          "levelPass": true,
+          "flushPass": true
+        },
+        "points": [
+          {
+            "id": "A",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "B",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "C",
+            "stage": "inspect",
+            "conduitVisible": false
+          }
+        ]
+      },
+      "removedBounds": {
+        "min": {
+          "x": 0.5640000000000001,
+          "y": 1.364,
+          "z": -2.531304347826087
+        },
+        "max": {
+          "x": 0.6280000000000001,
+          "y": 1.3960000000000001,
+          "z": -2.5156521739130437
+        }
+      },
+      "negativeVelocity": 12,
+      "insideEmptyCell": 37,
+      "unsupported": 0,
+      "overlap": 0
+    },
+    {
+      "index": 12,
+      "contact": {
+        "point": {
+          "x": 0.5880000000000002,
+          "y": 1.3533650480194948,
+          "z": -2.5743441848751107
+        },
+        "direction": {
+          "x": -2.9170053490935975e-17,
+          "y": -0.4226182617406994,
+          "z": -0.90630778703665
+        },
+        "edge": {
+          "x": 1,
+          "y": -1.0924857001863795e-17,
+          "z": -2.7091248432636155e-17
+        },
+        "actualEdge": {
+          "x": 1,
+          "y": 0,
+          "z": 0
+        },
+        "actualAxis": {
+          "x": 0,
+          "y": -0.422618261740699,
+          "z": -0.9063077870366502
+        },
+        "edgeError": 2.9211097927842136e-17,
+        "axisError": 4.051786659051802e-16,
+        "tipError": 2.220446049250313e-16,
+        "depthMm": 164.3441848751106,
+        "camera": {
+          "yaw": 0.16514867741462685,
+          "pitch": -0.2223122976873602
+        }
+      },
+      "state": {
+        "coordinateSystem": "metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall",
+        "mode": "playing",
+        "player": {
+          "x": 0.748,
+          "y": 1.65,
+          "z": -1.45,
+          "yaw": 0.165,
+          "pitch": -0.222
+        },
+        "mission": {
+          "name": "Living Room First Fix",
+          "progressPercent": 0,
+          "selectedTool": "hammer",
+          "complete": false
+        },
+        "workSurface": {
+          "model": "sparse-3d-brittle-masonry",
+          "pendingSupportJobs": 0,
+          "volumeBytes": 115200,
+          "pendingMeshes": 0,
+          "workerMeshing": true,
+          "lastWorkerMs": 6.199999988079071,
+          "peakGeometryLatencyMs": 42.5,
+          "workerError": "",
+          "impactCount": 13,
+          "removedNodes": 376,
+          "removedVolumeCm3": 195.88173913043377,
+          "maximumDepthMm": 125.3901146977361,
+          "damagedChunks": 5,
+          "surfaceTriangles": 22622,
+          "geometryBytes": 2443176,
+          "deformedWallCells": 0,
+          "lastCalculationMs": 1.800000011920929,
+          "peakCalculationMs": 12.900000005960464,
+          "lastMeshMs": 0.19999998807907104,
+          "peakMeshMs": 5.199999988079071,
+          "lastImpact": {
+            "removedNodes": 0,
+            "removedByMaterial": {},
+            "stats": {
+              "milliseconds": 1.800000011920929,
+              "affectedNodes": 1046,
+              "weakenedNodes": 1046,
+              "connectivityVisited": 0,
+              "detachedNodes": 0,
+              "activeChunks": 4
+            }
+          },
+          "fractureSegments": 44,
+          "freeSprayMarks": 0,
+          "activeFragments": 64,
+          "insideFragments": 56,
+          "inwardFragments": 22,
+          "physicsMs": 0.4000000059604645,
+          "peakPhysicsMs": 1.0999999940395355,
+          "fragmentBudget": 144,
+          "chiselTip": {
+            "x": 0.5880000000000002,
+            "y": 1.3533650480194952,
+            "z": -2.574344184875111,
+            "inAir": false
+          },
+          "airborneFragments": 45,
+          "settledFragments": 19,
+          "sprayMode": "live",
+          "sprayColor": "BLUE",
+          "hammerMode": "chase",
+          "chisel": "flat",
+          "chiselEnergyJ": 4,
+          "chiselTiltDegrees": 25,
+          "chiselSideDegrees": 0,
+          "chiselEdgeDegrees": 0,
+          "aimControlMode": "auto-use",
+          "aimInputMode": "drag",
+          "aimProfile": "normal",
+          "wallAssist": true,
+          "proximityPrecision": 0.749
+        },
+        "activePoint": {
+          "id": "A",
+          "kind": "socket",
+          "bottomHeightM": 0.3,
+          "boxes": [
+            "2G",
+            "1G"
+          ],
+          "stage": "inspect",
+          "chaseHits": 0,
+          "chaseCoverage": 0,
+          "pipeStep": "measure",
+          "targeted": false,
+          "tiltDegrees": 0,
+          "depthErrorMm": 0,
+          "levelPass": true,
+          "flushPass": true
+        },
+        "points": [
+          {
+            "id": "A",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "B",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "C",
+            "stage": "inspect",
+            "conduitVisible": false
+          }
+        ]
+      },
+      "removedBounds": null,
+      "negativeVelocity": 9,
+      "insideEmptyCell": 37,
+      "unsupported": 0,
+      "overlap": 0
+    },
+    {
+      "index": 13,
+      "contact": {
+        "point": {
+          "x": 0.588,
+          "y": 1.3533650480194954,
+          "z": -2.574344184875111
+        },
+        "direction": {
+          "x": 3.046930665237335e-17,
+          "y": -0.4226182617406996,
+          "z": -0.9063077870366499
+        },
+        "edge": {
+          "x": 1,
+          "y": 1.6785409285569223e-17,
+          "z": 2.5791995271198762e-17
+        },
+        "actualEdge": {
+          "x": 1,
+          "y": 0,
+          "z": 0
+        },
+        "actualAxis": {
+          "x": 0,
+          "y": -0.422618261740699,
+          "z": -0.9063077870366502
+        },
+        "edgeError": 3.07729911603278e-17,
+        "axisError": 6.504553962091163e-16,
+        "tipError": 0,
+        "depthMm": 164.34418487511104,
+        "camera": {
+          "yaw": 0.16514867741462685,
+          "pitch": -0.2223122976873602
+        }
+      },
+      "state": {
+        "coordinateSystem": "metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall",
+        "mode": "playing",
+        "player": {
+          "x": 0.748,
+          "y": 1.65,
+          "z": -1.45,
+          "yaw": 0.165,
+          "pitch": -0.222
+        },
+        "mission": {
+          "name": "Living Room First Fix",
+          "progressPercent": 0,
+          "selectedTool": "hammer",
+          "complete": false
+        },
+        "workSurface": {
+          "model": "sparse-3d-brittle-masonry",
+          "pendingSupportJobs": 0,
+          "volumeBytes": 115200,
+          "pendingMeshes": 2,
+          "workerMeshing": true,
+          "lastWorkerMs": 6.199999988079071,
+          "peakGeometryLatencyMs": 42.5,
+          "workerError": "",
+          "impactCount": 14,
+          "removedNodes": 397,
+          "removedVolumeCm3": 206.90086956521625,
+          "maximumDepthMm": 172.34418487511104,
+          "damagedChunks": 5,
+          "surfaceTriangles": 22622,
+          "geometryBytes": 2443176,
+          "deformedWallCells": 0,
+          "lastCalculationMs": 4.0999999940395355,
+          "peakCalculationMs": 12.900000005960464,
+          "lastMeshMs": 4.5,
+          "peakMeshMs": 5.199999988079071,
+          "lastImpact": {
+            "removedNodes": 21,
+            "removedByMaterial": {
+              "clay": 21
+            },
+            "stats": {
+              "milliseconds": 4,
+              "affectedNodes": 1050,
+              "weakenedNodes": 1029,
+              "connectivityVisited": 51,
+              "detachedNodes": 0,
+              "activeChunks": 4
+            }
+          },
+          "fractureSegments": 51,
+          "freeSprayMarks": 0,
+          "activeFragments": 64,
+          "insideFragments": 57,
+          "inwardFragments": 21,
+          "physicsMs": 0.3999999761581421,
+          "peakPhysicsMs": 1.0999999940395355,
+          "fragmentBudget": 144,
+          "chiselTip": {
+            "x": 0.593347261681392,
+            "y": 1.41873074048303,
+            "z": -2.449133331068779,
+            "inAir": false
+          },
+          "airborneFragments": 45,
+          "settledFragments": 19,
+          "sprayMode": "live",
+          "sprayColor": "BLUE",
+          "hammerMode": "chase",
+          "chisel": "flat",
+          "chiselEnergyJ": 4,
+          "chiselTiltDegrees": 25,
+          "chiselSideDegrees": 0,
+          "chiselEdgeDegrees": 0,
+          "aimControlMode": "auto-use",
+          "aimInputMode": "drag",
+          "aimProfile": "normal",
+          "wallAssist": true,
+          "proximityPrecision": 0.749
+        },
+        "activePoint": {
+          "id": "A",
+          "kind": "socket",
+          "bottomHeightM": 0.3,
+          "boxes": [
+            "2G",
+            "1G"
+          ],
+          "stage": "inspect",
+          "chaseHits": 0,
+          "chaseCoverage": 0,
+          "pipeStep": "measure",
+          "targeted": false,
+          "tiltDegrees": 0,
+          "depthErrorMm": 0,
+          "levelPass": true,
+          "flushPass": true
+        },
+        "points": [
+          {
+            "id": "A",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "B",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "C",
+            "stage": "inspect",
+            "conduitVisible": false
+          }
+        ]
+      },
+      "removedBounds": {
+        "min": {
+          "x": 0.556,
+          "y": 1.34,
+          "z": -2.5782608695652174
+        },
+        "max": {
+          "x": 0.6120000000000001,
+          "y": 1.372,
+          "z": -2.531304347826087
+        }
+      },
+      "negativeVelocity": 11,
+      "insideEmptyCell": 40,
+      "unsupported": 0,
+      "overlap": 0
+    },
+    {
+      "index": 14,
+      "contact": {
+        "point": {
+          "x": 0.5880000000000001,
+          "y": 1.349715874268619,
+          "z": -2.582169863238007
+        },
+        "direction": {
+          "x": 3.464917766055249e-17,
+          "y": -0.4226182617406995,
+          "z": -0.9063077870366499
+        },
+        "edge": {
+          "x": 1,
+          "y": -4.577994790952674e-18,
+          "z": 4.036589157087699e-17
+        },
+        "actualEdge": {
+          "x": 1,
+          "y": 0,
+          "z": 0
+        },
+        "actualAxis": {
+          "x": 0,
+          "y": -0.4226182617406998,
+          "z": -0.9063077870366499
+        },
+        "edgeError": 4.0624662935436003e-17,
+        "axisError": 2.797101415537913e-16,
+        "tipError": 0,
+        "depthMm": 172.16986323800666,
+        "camera": {
+          "yaw": 0.16514867741462685,
+          "pitch": -0.2223122976873602
+        }
+      },
+      "state": {
+        "coordinateSystem": "metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall",
+        "mode": "playing",
+        "player": {
+          "x": 0.748,
+          "y": 1.65,
+          "z": -1.45,
+          "yaw": 0.165,
+          "pitch": -0.222
+        },
+        "mission": {
+          "name": "Living Room First Fix",
+          "progressPercent": 0,
+          "selectedTool": "hammer",
+          "complete": false
+        },
+        "workSurface": {
+          "model": "sparse-3d-brittle-masonry",
+          "pendingSupportJobs": 0,
+          "volumeBytes": 115200,
+          "pendingMeshes": 2,
+          "workerMeshing": true,
+          "lastWorkerMs": 5.200000017881393,
+          "peakGeometryLatencyMs": 42.5,
+          "workerError": "",
+          "impactCount": 15,
+          "removedNodes": 461,
+          "removedVolumeCm3": 241.1686956521724,
+          "maximumDepthMm": 180,
+          "damagedChunks": 5,
+          "surfaceTriangles": 22970,
+          "geometryBytes": 2480760,
+          "deformedWallCells": 0,
+          "lastCalculationMs": 7.0999999940395355,
+          "peakCalculationMs": 12.900000005960464,
+          "lastMeshMs": 5,
+          "peakMeshMs": 5.199999988079071,
+          "lastImpact": {
+            "removedNodes": 64,
+            "removedByMaterial": {
+              "clay": 64
+            },
+            "stats": {
+              "milliseconds": 6.9000000059604645,
+              "affectedNodes": 971,
+              "weakenedNodes": 907,
+              "connectivityVisited": 94,
+              "detachedNodes": 0,
+              "activeChunks": 4
+            }
+          },
+          "fractureSegments": 45,
+          "freeSprayMarks": 0,
+          "activeFragments": 64,
+          "insideFragments": 60,
+          "inwardFragments": 20,
+          "physicsMs": 0.5,
+          "peakPhysicsMs": 1.0999999940395355,
+          "fragmentBudget": 144,
+          "chiselTip": {
+            "x": 0.5872463878348221,
+            "y": 1.4225651232038377,
+            "z": -2.449133331068779,
+            "inAir": false
+          },
+          "airborneFragments": 45,
+          "settledFragments": 19,
+          "sprayMode": "live",
+          "sprayColor": "BLUE",
+          "hammerMode": "chase",
+          "chisel": "flat",
+          "chiselEnergyJ": 4,
+          "chiselTiltDegrees": 25,
+          "chiselSideDegrees": 0,
+          "chiselEdgeDegrees": 0,
+          "aimControlMode": "auto-use",
+          "aimInputMode": "drag",
+          "aimProfile": "normal",
+          "wallAssist": true,
+          "proximityPrecision": 0.749
+        },
+        "activePoint": {
+          "id": "A",
+          "kind": "socket",
+          "bottomHeightM": 0.3,
+          "boxes": [
+            "2G",
+            "1G"
+          ],
+          "stage": "inspect",
+          "chaseHits": 0,
+          "chaseCoverage": 0,
+          "pipeStep": "measure",
+          "targeted": false,
+          "tiltDegrees": 0,
+          "depthErrorMm": 0,
+          "levelPass": true,
+          "flushPass": true
+        },
+        "points": [
+          {
+            "id": "A",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "B",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "C",
+            "stage": "inspect",
+            "conduitVisible": false
+          }
+        ]
+      },
+      "removedBounds": {
+        "min": {
+          "x": 0.548,
+          "y": 1.332,
+          "z": -2.586086956521739
+        },
+        "max": {
+          "x": 0.6280000000000001,
+          "y": 1.3800000000000001,
+          "z": -2.562608695652174
+        }
+      },
+      "negativeVelocity": 7,
+      "insideEmptyCell": 45,
+      "unsupported": 0,
+      "overlap": 0
+    },
+    {
+      "index": 15,
+      "contact": null,
+      "state": {
+        "coordinateSystem": "metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall",
+        "mode": "playing",
+        "player": {
+          "x": 0.748,
+          "y": 1.65,
+          "z": -1.45,
+          "yaw": 0.165,
+          "pitch": -0.222
+        },
+        "mission": {
+          "name": "Living Room First Fix",
+          "progressPercent": 0,
+          "selectedTool": "hammer",
+          "complete": false
+        },
+        "workSurface": {
+          "model": "sparse-3d-brittle-masonry",
+          "pendingSupportJobs": 0,
+          "volumeBytes": 115200,
+          "pendingMeshes": 0,
+          "workerMeshing": true,
+          "lastWorkerMs": 6,
+          "peakGeometryLatencyMs": 42.5,
+          "workerError": "",
+          "impactCount": 15,
+          "removedNodes": 461,
+          "removedVolumeCm3": 241.1686956521724,
+          "maximumDepthMm": 180,
+          "damagedChunks": 5,
+          "surfaceTriangles": 24074,
+          "geometryBytes": 2599992,
+          "deformedWallCells": 0,
+          "lastCalculationMs": 7.0999999940395355,
+          "peakCalculationMs": 12.900000005960464,
+          "lastMeshMs": 5,
+          "peakMeshMs": 5.199999988079071,
+          "lastImpact": {
+            "removedNodes": 64,
+            "removedByMaterial": {
+              "clay": 64
+            },
+            "stats": {
+              "milliseconds": 6.9000000059604645,
+              "affectedNodes": 971,
+              "weakenedNodes": 907,
+              "connectivityVisited": 94,
+              "detachedNodes": 0,
+              "activeChunks": 4
+            }
+          },
+          "fractureSegments": 45,
+          "freeSprayMarks": 0,
+          "activeFragments": 64,
+          "insideFragments": 60,
+          "inwardFragments": 20,
+          "physicsMs": 0.4000000059604645,
+          "peakPhysicsMs": 1.0999999940395355,
+          "fragmentBudget": 144,
+          "chiselTip": {
+            "x": 0.5880000000000002,
+            "y": 1.3414015449505503,
+            "z": -2.5999999999999996,
+            "inAir": true
+          },
+          "airborneFragments": 45,
+          "settledFragments": 19,
+          "sprayMode": "live",
+          "sprayColor": "BLUE",
+          "hammerMode": "chase",
+          "chisel": "flat",
+          "chiselEnergyJ": 4,
+          "chiselTiltDegrees": 25,
+          "chiselSideDegrees": 0,
+          "chiselEdgeDegrees": 0,
+          "aimControlMode": "auto-use",
+          "aimInputMode": "drag",
+          "aimProfile": "normal",
+          "wallAssist": true,
+          "proximityPrecision": 0.749
+        },
+        "activePoint": {
+          "id": "A",
+          "kind": "socket",
+          "bottomHeightM": 0.3,
+          "boxes": [
+            "2G",
+            "1G"
+          ],
+          "stage": "inspect",
+          "chaseHits": 0,
+          "chaseCoverage": 0,
+          "pipeStep": "measure",
+          "targeted": false,
+          "tiltDegrees": 0,
+          "depthErrorMm": 0,
+          "levelPass": true,
+          "flushPass": true
+        },
+        "points": [
+          {
+            "id": "A",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "B",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "C",
+            "stage": "inspect",
+            "conduitVisible": false
+          }
+        ]
+      },
+      "removedBounds": {
+        "min": {
+          "x": 0.548,
+          "y": 1.332,
+          "z": -2.586086956521739
+        },
+        "max": {
+          "x": 0.6280000000000001,
+          "y": 1.3800000000000001,
+          "z": -2.562608695652174
+        }
+      },
+      "negativeVelocity": 7,
+      "insideEmptyCell": 45,
+      "unsupported": 0,
+      "overlap": 0
+    }
+  ],
+  "limitations": [
+    "The side-oblique diagnostic uses an inspection camera and temporarily hides only the camera-relative arms. Actual hammer, chisel and wall geometry stay unchanged. Normal screenshots retain the arms.",
+    "Input is ordinary keyboard events through the existing gameplay Input, with camera positioning as a QA fixture."
+  ],
+  "candidate": {
+    "x": 0.5880000000000001,
+    "y": 1.43,
+    "initial": {
+      "point": {
+        "x": 0.588,
+        "y": 1.430002218770996,
+        "z": -2.4099952418302446
+      },
+      "direction": {
+        "x": 5.4702198129847253e-17,
+        "y": -0.42261826174069955,
+        "z": -0.9063077870366499
+      }
+    },
+    "samples": [
+      {
+        "t": 0.005,
+        "point": {
+          "x": 0.588,
+          "y": 1.4278891274622925,
+          "z": -2.414526780765428
+        },
+        "material": 1
+      },
+      {
+        "t": 0.007,
+        "point": {
+          "x": 0.588,
+          "y": 1.427043890938811,
+          "z": -2.416339396339501
+        },
+        "material": 1
+      },
+      {
+        "t": 0.009000000000000001,
+        "point": {
+          "x": 0.588,
+          "y": 1.4261986544153298,
+          "z": -2.4181520119135747
+        },
+        "material": 1
+      },
+      {
+        "t": 0.011000000000000001,
+        "point": {
+          "x": 0.588,
+          "y": 1.4253534178918483,
+          "z": -2.419964627487648
+        },
+        "material": 1
+      },
+      {
+        "t": 0.013000000000000001,
+        "point": {
+          "x": 0.588,
+          "y": 1.4245081813683669,
+          "z": -2.421777243061721
+        },
+        "material": 1
+      },
+      {
+        "t": 0.015000000000000001,
+        "point": {
+          "x": 0.588,
+          "y": 1.4236629448448854,
+          "z": -2.4235898586357942
+        },
+        "material": 1
+      },
+      {
+        "t": 0.017,
+        "point": {
+          "x": 0.588,
+          "y": 1.4228177083214042,
+          "z": -2.425402474209868
+        },
+        "material": 1
+      },
+      {
+        "t": 0.019000000000000003,
+        "point": {
+          "x": 0.588,
+          "y": 1.4219724717979227,
+          "z": -2.427215089783941
+        },
+        "material": 1
+      },
+      {
+        "t": 0.021000000000000005,
+        "point": {
+          "x": 0.588,
+          "y": 1.4211272352744413,
+          "z": -2.4290277053580143
+        },
+        "material": 1
+      },
+      {
+        "t": 0.023000000000000007,
+        "point": {
+          "x": 0.588,
+          "y": 1.4202819987509598,
+          "z": -2.4308403209320875
+        },
+        "material": 1
+      },
+      {
+        "t": 0.02500000000000001,
+        "point": {
+          "x": 0.588,
+          "y": 1.4194367622274784,
+          "z": -2.4326529365061607
+        },
+        "material": 1
+      },
+      {
+        "t": 0.02700000000000001,
+        "point": {
+          "x": 0.588,
+          "y": 1.4185915257039972,
+          "z": -2.4344655520802343
+        },
+        "material": 1
+      },
+      {
+        "t": 0.029000000000000012,
+        "point": {
+          "x": 0.588,
+          "y": 1.4177462891805157,
+          "z": -2.4362781676543075
+        },
+        "material": 1
+      },
+      {
+        "t": 0.031000000000000014,
+        "point": {
+          "x": 0.588,
+          "y": 1.4169010526570343,
+          "z": -2.4380907832283807
+        },
+        "material": 1
+      },
+      {
+        "t": 0.033000000000000015,
+        "point": {
+          "x": 0.588,
+          "y": 1.4160558161335528,
+          "z": -2.439903398802454
+        },
+        "material": 1
+      },
+      {
+        "t": 0.03500000000000002,
+        "point": {
+          "x": 0.588,
+          "y": 1.4152105796100716,
+          "z": -2.4417160143765275
+        },
+        "material": 0
+      },
+      {
+        "t": 0.03700000000000002,
+        "point": {
+          "x": 0.588,
+          "y": 1.4143653430865901,
+          "z": -2.4435286299506007
+        },
+        "material": 0
+      },
+      {
+        "t": 0.03900000000000002,
+        "point": {
+          "x": 0.588,
+          "y": 1.4135201065631087,
+          "z": -2.445341245524674
+        },
+        "material": 0
+      },
+      {
+        "t": 0.04100000000000002,
+        "point": {
+          "x": 0.588,
+          "y": 1.4126748700396272,
+          "z": -2.447153861098747
+        },
+        "material": 0
+      },
+      {
+        "t": 0.043000000000000024,
+        "point": {
+          "x": 0.588,
+          "y": 1.411829633516146,
+          "z": -2.4489664766728207
+        },
+        "material": 0
+      },
+      {
+        "t": 0.045000000000000026,
+        "point": {
+          "x": 0.588,
+          "y": 1.4109843969926645,
+          "z": -2.450779092246894
+        },
+        "material": 0
+      },
+      {
+        "t": 0.04700000000000003,
+        "point": {
+          "x": 0.588,
+          "y": 1.410139160469183,
+          "z": -2.452591707820967
+        },
+        "material": 0
+      },
+      {
+        "t": 0.04900000000000003,
+        "point": {
+          "x": 0.588,
+          "y": 1.4092939239457016,
+          "z": -2.4544043233950403
+        },
+        "material": 0
+      },
+      {
+        "t": 0.05100000000000003,
+        "point": {
+          "x": 0.588,
+          "y": 1.4084486874222204,
+          "z": -2.456216938969114
+        },
+        "material": 0
+      },
+      {
+        "t": 0.05300000000000003,
+        "point": {
+          "x": 0.588,
+          "y": 1.407603450898739,
+          "z": -2.458029554543187
+        },
+        "material": 0
+      },
+      {
+        "t": 0.055000000000000035,
+        "point": {
+          "x": 0.588,
+          "y": 1.4067582143752575,
+          "z": -2.4598421701172604
+        },
+        "material": 0
+      },
+      {
+        "t": 0.05700000000000004,
+        "point": {
+          "x": 0.588,
+          "y": 1.405912977851776,
+          "z": -2.4616547856913336
+        },
+        "material": 0
+      },
+      {
+        "t": 0.05900000000000004,
+        "point": {
+          "x": 0.588,
+          "y": 1.4050677413282946,
+          "z": -2.463467401265407
+        },
+        "material": 0
+      },
+      {
+        "t": 0.06100000000000004,
+        "point": {
+          "x": 0.588,
+          "y": 1.4042225048048134,
+          "z": -2.4652800168394804
+        },
+        "material": 1
+      },
+      {
+        "t": 0.06300000000000004,
+        "point": {
+          "x": 0.588,
+          "y": 1.403377268281332,
+          "z": -2.4670926324135536
+        },
+        "material": 1
+      },
+      {
+        "t": 0.06500000000000004,
+        "point": {
+          "x": 0.588,
+          "y": 1.4025320317578505,
+          "z": -2.468905247987627
+        },
+        "material": 1
+      },
+      {
+        "t": 0.06700000000000005,
+        "point": {
+          "x": 0.588,
+          "y": 1.401686795234369,
+          "z": -2.4707178635617
+        },
+        "material": 1
+      },
+      {
+        "t": 0.06900000000000005,
+        "point": {
+          "x": 0.588,
+          "y": 1.4008415587108878,
+          "z": -2.4725304791357736
+        },
+        "material": 1
+      },
+      {
+        "t": 0.07100000000000005,
+        "point": {
+          "x": 0.588,
+          "y": 1.3999963221874063,
+          "z": -2.474343094709847
+        },
+        "material": 0
+      },
+      {
+        "t": 0.07300000000000005,
+        "point": {
+          "x": 0.588,
+          "y": 1.3991510856639249,
+          "z": -2.47615571028392
+        },
+        "material": 0
+      },
+      {
+        "t": 0.07500000000000005,
+        "point": {
+          "x": 0.588,
+          "y": 1.3983058491404434,
+          "z": -2.477968325857993
+        },
+        "material": 0
+      },
+      {
+        "t": 0.07700000000000005,
+        "point": {
+          "x": 0.588,
+          "y": 1.3974606126169622,
+          "z": -2.479780941432067
+        },
+        "material": 0
+      },
+      {
+        "t": 0.07900000000000006,
+        "point": {
+          "x": 0.588,
+          "y": 1.3966153760934807,
+          "z": -2.48159355700614
+        },
+        "material": 0
+      },
+      {
+        "t": 0.08100000000000006,
+        "point": {
+          "x": 0.588,
+          "y": 1.3957701395699993,
+          "z": -2.4834061725802132
+        },
+        "material": 0
+      },
+      {
+        "t": 0.08300000000000006,
+        "point": {
+          "x": 0.588,
+          "y": 1.3949249030465178,
+          "z": -2.4852187881542864
+        },
+        "material": 0
+      },
+      {
+        "t": 0.08500000000000006,
+        "point": {
+          "x": 0.588,
+          "y": 1.3940796665230364,
+          "z": -2.48703140372836
+        },
+        "material": 0
+      },
+      {
+        "t": 0.08700000000000006,
+        "point": {
+          "x": 0.588,
+          "y": 1.3932344299995552,
+          "z": -2.4888440193024333
+        },
+        "material": 0
+      },
+      {
+        "t": 0.08900000000000007,
+        "point": {
+          "x": 0.588,
+          "y": 1.3923891934760737,
+          "z": -2.4906566348765065
+        },
+        "material": 0
+      },
+      {
+        "t": 0.09100000000000007,
+        "point": {
+          "x": 0.588,
+          "y": 1.3915439569525923,
+          "z": -2.4924692504505797
+        },
+        "material": 0
+      },
+      {
+        "t": 0.09300000000000007,
+        "point": {
+          "x": 0.588,
+          "y": 1.3906987204291108,
+          "z": -2.4942818660246533
+        },
+        "material": 0
+      },
+      {
+        "t": 0.09500000000000007,
+        "point": {
+          "x": 0.588,
+          "y": 1.3898534839056296,
+          "z": -2.4960944815987265
+        },
+        "material": 0
+      },
+      {
+        "t": 0.09700000000000007,
+        "point": {
+          "x": 0.588,
+          "y": 1.3890082473821481,
+          "z": -2.4979070971727997
+        },
+        "material": 0
+      },
+      {
+        "t": 0.09900000000000007,
+        "point": {
+          "x": 0.588,
+          "y": 1.3881630108586667,
+          "z": -2.499719712746873
+        },
+        "material": 0
+      },
+      {
+        "t": 0.10100000000000008,
+        "point": {
+          "x": 0.588,
+          "y": 1.3873177743351852,
+          "z": -2.5015323283209465
+        },
+        "material": 0
+      },
+      {
+        "t": 0.10300000000000008,
+        "point": {
+          "x": 0.588,
+          "y": 1.386472537811704,
+          "z": -2.5033449438950197
+        },
+        "material": 0
+      },
+      {
+        "t": 0.10500000000000008,
+        "point": {
+          "x": 0.588,
+          "y": 1.3856273012882225,
+          "z": -2.505157559469093
+        },
+        "material": 0
+      },
+      {
+        "t": 0.10700000000000008,
+        "point": {
+          "x": 0.588,
+          "y": 1.384782064764741,
+          "z": -2.506970175043166
+        },
+        "material": 0
+      },
+      {
+        "t": 0.10900000000000008,
+        "point": {
+          "x": 0.588,
+          "y": 1.3839368282412596,
+          "z": -2.5087827906172393
+        },
+        "material": 0
+      },
+      {
+        "t": 0.11100000000000008,
+        "point": {
+          "x": 0.588,
+          "y": 1.3830915917177784,
+          "z": -2.510595406191313
+        },
+        "material": 0
+      },
+      {
+        "t": 0.11300000000000009,
+        "point": {
+          "x": 0.588,
+          "y": 1.382246355194297,
+          "z": -2.512408021765386
+        },
+        "material": 0
+      },
+      {
+        "t": 0.11500000000000009,
+        "point": {
+          "x": 0.588,
+          "y": 1.3814011186708155,
+          "z": -2.5142206373394593
+        },
+        "material": 0
+      },
+      {
+        "t": 0.11700000000000009,
+        "point": {
+          "x": 0.588,
+          "y": 1.380555882147334,
+          "z": -2.5160332529135325
+        },
+        "material": 0
+      },
+      {
+        "t": 0.11900000000000009,
+        "point": {
+          "x": 0.588,
+          "y": 1.3797106456238526,
+          "z": -2.517845868487606
+        },
+        "material": 0
+      },
+      {
+        "t": 0.1210000000000001,
+        "point": {
+          "x": 0.588,
+          "y": 1.3788654091003714,
+          "z": -2.5196584840616794
+        },
+        "material": 0
+      },
+      {
+        "t": 0.1230000000000001,
+        "point": {
+          "x": 0.588,
+          "y": 1.37802017257689,
+          "z": -2.5214710996357526
+        },
+        "material": 0
+      },
+      {
+        "t": 0.12500000000000008,
+        "point": {
+          "x": 0.588,
+          "y": 1.3771749360534085,
+          "z": -2.5232837152098258
+        },
+        "material": 0
+      },
+      {
+        "t": 0.12700000000000009,
+        "point": {
+          "x": 0.588,
+          "y": 1.376329699529927,
+          "z": -2.5250963307838994
+        },
+        "material": 0
+      },
+      {
+        "t": 0.1290000000000001,
+        "point": {
+          "x": 0.588,
+          "y": 1.3754844630064458,
+          "z": -2.5269089463579726
+        },
+        "material": 0
+      },
+      {
+        "t": 0.1310000000000001,
+        "point": {
+          "x": 0.588,
+          "y": 1.3746392264829643,
+          "z": -2.528721561932046
+        },
+        "material": 1
+      },
+      {
+        "t": 0.1330000000000001,
+        "point": {
+          "x": 0.588,
+          "y": 1.3737939899594829,
+          "z": -2.530534177506119
+        },
+        "material": 1
+      },
+      {
+        "t": 0.1350000000000001,
+        "point": {
+          "x": 0.588,
+          "y": 1.3729487534360014,
+          "z": -2.5323467930801926
+        },
+        "material": 1
+      },
+      {
+        "t": 0.1370000000000001,
+        "point": {
+          "x": 0.588,
+          "y": 1.3721035169125202,
+          "z": -2.534159408654266
+        },
+        "material": 1
+      },
+      {
+        "t": 0.1390000000000001,
+        "point": {
+          "x": 0.588,
+          "y": 1.3712582803890387,
+          "z": -2.535972024228339
+        },
+        "material": 0
+      },
+      {
+        "t": 0.1410000000000001,
+        "point": {
+          "x": 0.588,
+          "y": 1.3704130438655573,
+          "z": -2.537784639802412
+        },
+        "material": 0
+      },
+      {
+        "t": 0.1430000000000001,
+        "point": {
+          "x": 0.588,
+          "y": 1.3695678073420758,
+          "z": -2.539597255376486
+        },
+        "material": 0
+      },
+      {
+        "t": 0.1450000000000001,
+        "point": {
+          "x": 0.588,
+          "y": 1.3687225708185946,
+          "z": -2.541409870950559
+        },
+        "material": 0
+      },
+      {
+        "t": 0.1470000000000001,
+        "point": {
+          "x": 0.588,
+          "y": 1.3678773342951132,
+          "z": -2.5432224865246322
+        },
+        "material": 0
+      },
+      {
+        "t": 0.1490000000000001,
+        "point": {
+          "x": 0.588,
+          "y": 1.3670320977716317,
+          "z": -2.5450351020987054
+        },
+        "material": 0
+      },
+      {
+        "t": 0.1510000000000001,
+        "point": {
+          "x": 0.588,
+          "y": 1.3661868612481503,
+          "z": -2.5468477176727786
+        },
+        "material": 0
+      },
+      {
+        "t": 0.1530000000000001,
+        "point": {
+          "x": 0.588,
+          "y": 1.3653416247246688,
+          "z": -2.5486603332468523
+        },
+        "material": 0
+      }
+    ],
+    "maxAir": 0.06000000000000004
+  },
+  "cavity": {
+    "shellOpened": true,
+    "passedThrough": true,
+    "peakInward": 14,
+    "peakInside": 45,
+    "maximumTipError": 2.220446049250313e-16
+  },
+  "air": {
+    "before": {
+      "model": "sparse-3d-brittle-masonry",
+      "pendingSupportJobs": 0,
+      "volumeBytes": 115200,
+      "pendingMeshes": 0,
+      "workerMeshing": true,
+      "lastWorkerMs": 6,
+      "peakGeometryLatencyMs": 42.5,
+      "workerError": "",
+      "impactCount": 15,
+      "removedNodes": 461,
+      "removedVolumeCm3": 241.1686956521724,
+      "maximumDepthMm": 180,
+      "damagedChunks": 5,
+      "surfaceTriangles": 24074,
+      "geometryBytes": 2599992,
+      "deformedWallCells": 0,
+      "lastCalculationMs": 7.0999999940395355,
+      "peakCalculationMs": 12.900000005960464,
+      "lastMeshMs": 5,
+      "peakMeshMs": 5.199999988079071,
+      "lastImpact": {
+        "removedNodes": 64,
+        "removedByMaterial": {
+          "clay": 64
+        },
+        "stats": {
+          "milliseconds": 6.9000000059604645,
+          "affectedNodes": 971,
+          "weakenedNodes": 907,
+          "connectivityVisited": 94,
+          "detachedNodes": 0,
+          "activeChunks": 4
+        }
+      },
+      "fractureSegments": 45,
+      "freeSprayMarks": 0,
+      "activeFragments": 64,
+      "insideFragments": 60,
+      "inwardFragments": 20,
+      "physicsMs": 0.4000000059604645,
+      "peakPhysicsMs": 1.0999999940395355,
+      "fragmentBudget": 144,
+      "chiselTip": {
+        "x": 0.5880000000000002,
+        "y": 1.3414015449505503,
+        "z": -2.5999999999999996,
+        "inAir": true
+      },
+      "airborneFragments": 45,
+      "settledFragments": 19,
+      "sprayMode": "live",
+      "sprayColor": "BLUE",
+      "hammerMode": "chase",
+      "chisel": "flat",
+      "chiselEnergyJ": 4,
+      "chiselTiltDegrees": 25,
+      "chiselSideDegrees": 0,
+      "chiselEdgeDegrees": 0,
+      "aimControlMode": "auto-use",
+      "aimInputMode": "drag",
+      "aimProfile": "normal",
+      "wallAssist": true,
+      "proximityPrecision": 0.749
+    },
+    "after": {
+      "model": "sparse-3d-brittle-masonry",
+      "pendingSupportJobs": 0,
+      "volumeBytes": 115200,
+      "pendingMeshes": 0,
+      "workerMeshing": true,
+      "lastWorkerMs": 6,
+      "peakGeometryLatencyMs": 42.5,
+      "workerError": "",
+      "impactCount": 15,
+      "removedNodes": 461,
+      "removedVolumeCm3": 241.1686956521724,
+      "maximumDepthMm": 180,
+      "damagedChunks": 5,
+      "surfaceTriangles": 24074,
+      "geometryBytes": 2599992,
+      "deformedWallCells": 0,
+      "lastCalculationMs": 7.0999999940395355,
+      "peakCalculationMs": 12.900000005960464,
+      "lastMeshMs": 5,
+      "peakMeshMs": 5.199999988079071,
+      "lastImpact": {
+        "removedNodes": 64,
+        "removedByMaterial": {
+          "clay": 64
+        },
+        "stats": {
+          "milliseconds": 6.9000000059604645,
+          "affectedNodes": 971,
+          "weakenedNodes": 907,
+          "connectivityVisited": 94,
+          "detachedNodes": 0,
+          "activeChunks": 4
+        }
+      },
+      "fractureSegments": 45,
+      "freeSprayMarks": 0,
+      "activeFragments": 64,
+      "insideFragments": 60,
+      "inwardFragments": 20,
+      "physicsMs": 0.4000000059604645,
+      "peakPhysicsMs": 1.0999999940395355,
+      "fragmentBudget": 144,
+      "chiselTip": {
+        "x": 0.5853445438170647,
+        "y": 1.3410383362112246,
+        "z": -2.6,
+        "inAir": true
+      },
+      "airborneFragments": 45,
+      "settledFragments": 19,
+      "sprayMode": "live",
+      "sprayColor": "BLUE",
+      "hammerMode": "chase",
+      "chisel": "flat",
+      "chiselEnergyJ": 4,
+      "chiselTiltDegrees": 25,
+      "chiselSideDegrees": 0,
+      "chiselEdgeDegrees": 0,
+      "aimControlMode": "auto-use",
+      "aimInputMode": "drag",
+      "aimProfile": "normal",
+      "wallAssist": true,
+      "proximityPrecision": 0.749
+    }
+  },
+  "support": {
+    "contact": null,
+    "state": {
+      "coordinateSystem": "metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall",
+      "mode": "playing",
+      "player": {
+        "x": 0.748,
+        "y": 1.65,
+        "z": -1.45,
+        "yaw": 0.165,
+        "pitch": -0.222
+      },
+      "mission": {
+        "name": "Living Room First Fix",
+        "progressPercent": 0,
+        "selectedTool": "hammer",
+        "complete": false
+      },
+      "workSurface": {
+        "model": "sparse-3d-brittle-masonry",
+        "pendingSupportJobs": 0,
+        "volumeBytes": 115200,
+        "pendingMeshes": 0,
+        "workerMeshing": true,
+        "lastWorkerMs": 6,
+        "peakGeometryLatencyMs": 42.5,
+        "workerError": "",
+        "impactCount": 15,
+        "removedNodes": 461,
+        "removedVolumeCm3": 241.1686956521724,
+        "maximumDepthMm": 180,
+        "damagedChunks": 5,
+        "surfaceTriangles": 24074,
+        "geometryBytes": 2599992,
+        "deformedWallCells": 0,
+        "lastCalculationMs": 7.0999999940395355,
+        "peakCalculationMs": 12.900000005960464,
+        "lastMeshMs": 5,
+        "peakMeshMs": 5.199999988079071,
+        "lastImpact": {
+          "removedNodes": 64,
+          "removedByMaterial": {
+            "clay": 64
+          },
+          "stats": {
+            "milliseconds": 6.9000000059604645,
+            "affectedNodes": 971,
+            "weakenedNodes": 907,
+            "connectivityVisited": 94,
+            "detachedNodes": 0,
+            "activeChunks": 4
+          }
+        },
+        "fractureSegments": 45,
+        "freeSprayMarks": 0,
+        "activeFragments": 31,
+        "insideFragments": 30,
+        "inwardFragments": 9,
+        "physicsMs": 0,
+        "peakPhysicsMs": 1.0999999940395355,
+        "fragmentBudget": 144,
+        "chiselTip": {
+          "x": 0.5880000000000001,
+          "y": 1.3414015449505499,
+          "z": -2.6,
+          "inAir": true
+        },
+        "airborneFragments": 16,
+        "settledFragments": 15,
+        "sprayMode": "live",
+        "sprayColor": "BLUE",
+        "hammerMode": "chase",
+        "chisel": "flat",
+        "chiselEnergyJ": 4,
+        "chiselTiltDegrees": 25,
+        "chiselSideDegrees": 0,
+        "chiselEdgeDegrees": 0,
+        "aimControlMode": "auto-use",
+        "aimInputMode": "drag",
+        "aimProfile": "normal",
+        "wallAssist": true,
+        "proximityPrecision": 0.749
+      },
+      "activePoint": {
+        "id": "A",
+        "kind": "socket",
+        "bottomHeightM": 0.3,
+        "boxes": [
+          "2G",
+          "1G"
+        ],
+        "stage": "inspect",
+        "chaseHits": 0,
+        "chaseCoverage": 0,
+        "pipeStep": "measure",
+        "targeted": false,
+        "tiltDegrees": 0,
+        "depthErrorMm": 0,
+        "levelPass": true,
+        "flushPass": true
+      },
+      "points": [
+        {
+          "id": "A",
+          "stage": "inspect",
+          "conduitVisible": false
+        },
+        {
+          "id": "B",
+          "stage": "inspect",
+          "conduitVisible": false
+        },
+        {
+          "id": "C",
+          "stage": "inspect",
+          "conduitVisible": false
+        }
+      ]
+    },
+    "removedBounds": {
+      "min": {
+        "x": 0.548,
+        "y": 1.332,
+        "z": -2.586086956521739
+      },
+      "max": {
+        "x": 0.6280000000000001,
+        "y": 1.3800000000000001,
+        "z": -2.562608695652174
+      }
+    },
+    "negativeVelocity": 4,
+    "insideEmptyCell": 25,
+    "unsupported": 0,
+    "overlap": 0
+  },
+  "peel": [
+    {
+      "step": 0,
+      "contact": {
+        "point": {
+          "x": -0.6500000000000001,
+          "y": 1.8600049334421171,
+          "z": -2.4099982043739177
+        },
+        "direction": {
+          "x": 1.453708875605875e-17,
+          "y": -0.9396926207859083,
+          "z": -0.3420201433256689
+        },
+        "edge": {
+          "x": 1,
+          "y": 1.734820779059116e-17,
+          "z": -5.160205102130063e-18
+        },
+        "actualEdge": {
+          "x": 1,
+          "y": 0,
+          "z": 0
+        },
+        "actualAxis": {
+          "x": 0,
+          "y": -0.9396926207859082,
+          "z": -0.3420201433256692
+        },
+        "edgeError": 1.809939309042093e-17,
+        "axisError": 3.5138418204336494e-16,
+        "tipError": 0,
+        "depthMm": -0.001795626082490287,
+        "camera": {
+          "yaw": 0.16514867741462683,
+          "pitch": 0.21251553033806256
+        }
+      },
+      "removed": 241.1686956521724
+    },
+    {
+      "step": 1,
+      "contact": {
+        "point": {
+          "x": -0.6499999999999999,
+          "y": 1.8450049334421172,
+          "z": -2.4099982043739168
+        },
+        "direction": {
+          "x": 5.1577725250723256e-17,
+          "y": -0.9396926207859085,
+          "z": -0.3420201433256683
+        },
+        "edge": {
+          "x": 1,
+          "y": 4.806382645755775e-17,
+          "z": 1.8748902153741872e-17
+        },
+        "actualEdge": {
+          "x": 1,
+          "y": 0,
+          "z": 0
+        },
+        "actualAxis": {
+          "x": 0,
+          "y": -0.9396926207859088,
+          "z": -0.34202014332566805
+        },
+        "edgeError": 5.1591208027267735e-17,
+        "axisError": 3.591674624654101e-16,
+        "tipError": 4.440892098500626e-16,
+        "depthMm": -0.0017956260833784654,
+        "camera": {
+          "yaw": 0.16514867741462683,
+          "pitch": 0.1977429066450476
+        }
+      },
+      "removed": 241.627826086955
+    },
+    {
+      "step": 2,
+      "contact": {
+        "point": {
+          "x": -0.65,
+          "y": 1.8300049334421173,
+          "z": -2.409998204373917
+        },
+        "direction": {
+          "x": -3.6809620011197124e-17,
+          "y": -0.9396926207859083,
+          "z": -0.3420201433256689
+        },
+        "edge": {
+          "x": 1,
+          "y": -3.891795928709644e-17,
+          "z": -6.979146045176202e-19
+        },
+        "actualEdge": {
+          "x": 1,
+          "y": 0,
+          "z": 0
+        },
+        "actualAxis": {
+          "x": 0,
+          "y": -0.9396926207859082,
+          "z": -0.3420201433256692
+        },
+        "edgeError": 3.8924216624966196e-17,
+        "axisError": 3.530077400938283e-16,
+        "tipError": 0,
+        "depthMm": -0.0017956260829343762,
+        "camera": {
+          "yaw": 0.16514867741462683,
+          "pitch": 0.1828823188232738
+        }
+      },
+      "removed": 245.67652173912884
+    },
+    {
+      "step": 3,
+      "contact": {
+        "point": {
+          "x": -0.65,
+          "y": 1.8150049334421168,
+          "z": -2.4099982043739168
+        },
+        "direction": {
+          "x": -2.5791295202419376e-17,
+          "y": -0.9396926207859085,
+          "z": -0.34202014332566855
+        },
+        "edge": {
+          "x": 1,
+          "y": -3.000797375421799e-17,
+          "z": 7.037527894562004e-18
+        },
+        "actualEdge": {
+          "x": 1,
+          "y": 0,
+          "z": 0
+        },
+        "actualAxis": {
+          "x": 0,
+          "y": -0.9396926207859082,
+          "z": -0.3420201433256692
+        },
+        "edgeError": 3.0822155792555684e-17,
+        "axisError": 7.452066927314477e-16,
+        "tipError": 0,
+        "depthMm": -0.0017956260833784654,
+        "camera": {
+          "yaw": 0.16514867741462688,
+          "pitch": 0.16793959847793155
+        }
+      },
+      "removed": 250.14260869565055
+    },
+    {
+      "step": 4,
+      "contact": {
+        "point": {
+          "x": -0.6499999999999998,
+          "y": 1.8000049334421169,
+          "z": -2.409998204373917
+        },
+        "direction": {
+          "x": 9.355733691676358e-18,
+          "y": -0.9396926207859085,
+          "z": -0.3420201433256683
+        },
+        "edge": {
+          "x": 1,
+          "y": 1.336137242337763e-17,
+          "z": -9.355733691676358e-18
+        },
+        "actualEdge": {
+          "x": 1,
+          "y": 0,
+          "z": 0
+        },
+        "actualAxis": {
+          "x": 0,
+          "y": -0.9396926207859083,
+          "z": -0.34202014332566893
+        },
+        "edgeError": 1.6311223925437487e-17,
+        "axisError": 6.49808720749877e-16,
+        "tipError": 0,
+        "depthMm": -0.0017956260829343762,
+        "camera": {
+          "yaw": 0.16514867741462683,
+          "pitch": 0.15292078844529078
+        }
+      },
+      "removed": 258.2817391304331
+    },
+    {
+      "step": 5,
+      "contact": {
+        "point": {
+          "x": -0.65,
+          "y": 1.7850049334421167,
+          "z": -2.409998204373917
+        },
+        "direction": {
+          "x": 1.3131529238792554e-17,
+          "y": -0.9396926207859085,
+          "z": -0.3420201433256683
+        },
+        "edge": {
+          "x": 1,
+          "y": 1.875376730785737e-17,
+          "z": -1.3131529238792551e-17
+        },
+        "actualEdge": {
+          "x": 1,
+          "y": 0,
+          "z": 0
+        },
+        "actualAxis": {
+          "x": 0,
+          "y": -0.9396926207859083,
+          "z": -0.34202014332566893
+        },
+        "edgeError": 2.2894122572977625e-17,
+        "axisError": 6.498740500049463e-16,
+        "tipError": 0,
+        "depthMm": -0.0017956260829343762,
+        "camera": {
+          "yaw": 0.1651486774146268,
+          "pitch": 0.13783213045000178
+        }
+      },
+      "removed": 267.1304347826069
+    },
+    {
+      "step": 6,
+      "contact": {
+        "point": {
+          "x": -0.6500000000000001,
+          "y": 1.770004933442117,
+          "z": -2.4099982043739177
+        },
+        "direction": {
+          "x": 2.939243332114959e-17,
+          "y": -0.9396926207859085,
+          "z": -0.3420201433256683
+        },
+        "edge": {
+          "x": 1,
+          "y": 2.491221235986356e-17,
+          "z": 1.7491984948493837e-17
+        },
+        "actualEdge": {
+          "x": 1,
+          "y": 0,
+          "z": 0
+        },
+        "actualAxis": {
+          "x": 0,
+          "y": -0.9396926207859089,
+          "z": -0.34202014332566744
+        },
+        "edgeError": 3.043990575053204e-17,
+        "axisError": 9.490302340569845e-16,
+        "tipError": 4.440892098500626e-16,
+        "depthMm": -0.001795626082490287,
+        "camera": {
+          "yaw": 0.1651486774146268,
+          "pitch": 0.1226800515166681
+        }
+      },
+      "removed": 273.8921739130416
+    },
+    {
+      "step": 7,
+      "contact": {
+        "point": {
+          "x": -0.6500000000000001,
+          "y": 1.7550049334421174,
+          "z": -2.409998204373918
+        },
+        "direction": {
+          "x": 3.5722316302963006e-17,
+          "y": -0.9396926207859085,
+          "z": -0.3420201433256683
+        },
+        "edge": {
+          "x": 1,
+          "y": 3.053931558304387e-17,
+          "z": 2.0538985620609118e-17
+        },
+        "actualEdge": {
+          "x": 1,
+          "y": 0,
+          "z": 0
+        },
+        "actualAxis": {
+          "x": 0,
+          "y": -0.9396926207859089,
+          "z": -0.34202014332566744
+        },
+        "edgeError": 3.6803528724897214e-17,
+        "axisError": 9.49247361808167e-16,
+        "tipError": 4.440892098500626e-16,
+        "depthMm": -0.0017956260820461978,
+        "camera": {
+          "yaw": 0.1651486774146268,
+          "pitch": 0.1074711491944524
+        }
+      },
+      "removed": 280.98782608695456
+    },
+    {
+      "step": 8,
+      "contact": {
+        "point": {
+          "x": -0.6499999999999999,
+          "y": 1.7400049334421168,
+          "z": -2.4099982043739168
+        },
+        "direction": {
+          "x": -2.402704807466339e-17,
+          "y": -0.9396926207859085,
+          "z": -0.3420201433256683
+        },
+        "edge": {
+          "x": 1,
+          "y": -1.38367415744834e-17,
+          "z": -3.2234253848908736e-17
+        },
+        "actualEdge": {
+          "x": 1,
+          "y": 0,
+          "z": 0
+        },
+        "actualAxis": {
+          "x": 0,
+          "y": -0.9396926207859083,
+          "z": -0.34202014332566893
+        },
+        "edgeError": 3.507851961806434e-17,
+        "axisError": 6.501854680388237e-16,
+        "tipError": 0,
+        "depthMm": -0.0017956260833784654,
+        "camera": {
+          "yaw": 0.16514867741462685,
+          "pitch": 0.09221217566712092
+        }
+      },
+      "removed": 286.4973913043458
+    },
+    {
+      "step": 9,
+      "contact": {
+        "point": {
+          "x": -0.6500000000000001,
+          "y": 1.7250049334421171,
+          "z": -2.409998204373917
+        },
+        "direction": {
+          "x": -1.7028441413025326e-18,
+          "y": -0.9396926207859085,
+          "z": -0.3420201433256683
+        },
+        "edge": {
+          "x": 1,
+          "y": -9.257726546608383e-18,
+          "z": 2.04566114491599e-17
+        },
+        "actualEdge": {
+          "x": 1,
+          "y": 0,
+          "z": 0
+        },
+        "actualAxis": {
+          "x": 0,
+          "y": -0.9396926207859083,
+          "z": -0.34202014332566893
+        },
+        "edgeError": 2.245391842849879e-17,
+        "axisError": 6.497435982661558e-16,
+        "tipError": 0,
+        "depthMm": -0.0017956260829343762,
+        "camera": {
+          "yaw": 0.1651486774146269,
+          "pitch": 0.07691002083412823
+        }
+      },
+      "removed": 294.71999999999787
+    }
+  ],
+  "sideways": [
+    {
+      "side": 70,
+      "probes": [
+        {
+          "point": {
+            "x": -1.2500049334421168,
+            "y": 1.18,
+            "z": -2.4099982043739168
+          },
+          "direction": {
+            "x": 0.9396926207859085,
+            "y": -3.188529654664994e-17,
+            "z": -0.34202014332566855
+          },
+          "edge": {
+            "x": 0.34202014332566855,
+            "y": -5.622238069064841e-18,
+            "z": 0.9396926207859085
+          },
+          "actualEdge": {
+            "x": 0.3420201433256677,
+            "y": 0,
+            "z": 0.9396926207859086
+          },
+          "actualAxis": {
+            "x": 0.9396926207859088,
+            "y": 0,
+            "z": -0.34202014332566805
+          },
+          "edgeError": 8.400549631925214e-16,
+          "axisError": 5.476504355013029e-16,
+          "tipError": 2.220446049250313e-16,
+          "depthMm": -0.0017956260833784654,
+          "camera": {
+            "yaw": 0.41606450572382264,
+            "pitch": -0.46355709692784675
+          }
+        },
+        {
+          "point": {
+            "x": -1.2500049334421173,
+            "y": 1.1799999999999997,
+            "z": -2.4099982043739177
+          },
+          "direction": {
+            "x": 0.9396926207859083,
+            "y": -9.848646929094412e-18,
+            "z": -0.3420201433256689
+          },
+          "edge": {
+            "x": 0.34202014332566893,
+            "y": -1.4065325480893035e-17,
+            "z": 0.9396926207859085
+          },
+          "actualEdge": {
+            "x": 0.3420201433256677,
+            "y": 0,
+            "z": 0.9396926207859086
+          },
+          "actualAxis": {
+            "x": 0.9396926207859088,
+            "y": 0,
+            "z": -0.34202014332566805
+          },
+          "edgeError": 1.2263620729451955e-15,
+          "axisError": 9.437409613506197e-16,
+          "tipError": 4.965068306494546e-16,
+          "depthMm": -0.001795626082490287,
+          "camera": {
+            "yaw": -0.24653629426590082,
+            "pitch": -0.2931503635323141
+          }
+        }
+      ],
+      "hits": [
+        {
+          "contact": {
+            "point": {
+              "x": -1.2480040965760435,
+              "y": 1.1800000000000002,
+              "z": -2.4107264494367895
+            },
+            "direction": {
+              "x": 0.9396926207859085,
+              "y": 4.717632751657297e-19,
+              "z": -0.34202014332566855
+            },
+            "edge": {
+              "x": 0.34202014332566855,
+              "y": 2.0631090100289304e-17,
+              "z": 0.9396926207859085
+            },
+            "actualEdge": {
+              "x": 0.3420201433256677,
+              "y": 0,
+              "z": 0.9396926207859086
+            },
+            "actualAxis": {
+              "x": 0.9396926207859089,
+              "y": 0,
+              "z": -0.34202014332566777
+            },
+            "edgeError": 8.402894581643932e-16,
+            "axisError": 8.455207968566649e-16,
+            "tipError": 2.220446049250313e-16,
+            "depthMm": 0.7264494367893448,
+            "camera": {
+              "yaw": 0.16514867741462672,
+              "pitch": -0.4498921245541844
+            }
+          },
+          "removed": 313.1686956521718,
+          "bounds": {
+            "min": {
+              "x": -1.268,
+              "y": 1.156,
+              "z": -2.4530434782608697
+            },
+            "max": {
+              "x": -1.244,
+              "y": 1.204,
+              "z": -2.413913043478261
+            }
+          }
+        },
+        {
+          "contact": {
+            "point": {
+              "x": -1.235004933442117,
+              "y": 1.1800000000000002,
+              "z": -2.4099982043739177
+            },
+            "direction": {
+              "x": 0.9396926207859085,
+              "y": 2.1989473290038933e-16,
+              "z": -0.3420201433256683
+            },
+            "edge": {
+              "x": 0.3420201433256683,
+              "y": -1.0506196421857143e-16,
+              "z": 0.9396926207859085
+            },
+            "actualEdge": {
+              "x": 0.3420201433256677,
+              "y": 0,
+              "z": 0.9396926207859086
+            },
+            "actualAxis": {
+              "x": 0.9396926207859089,
+              "y": 0,
+              "z": -0.34202014332566744
+            },
+            "edgeError": 6.294632675565045e-16,
+            "axisError": 9.737289990418536e-16,
+            "tipError": 4.440892098500626e-16,
+            "depthMm": -0.001795626082490287,
+            "camera": {
+              "yaw": 0.16514867741462672,
+              "pitch": -0.4498921245541844
+            }
+          },
+          "removed": 329.82260869564993,
+          "bounds": {
+            "min": {
+              "x": -1.268,
+              "y": 1.1480000000000001,
+              "z": -2.4608695652173913
+            },
+            "max": {
+              "x": -1.244,
+              "y": 1.204,
+              "z": -2.413913043478261
+            }
+          }
+        },
+        {
+          "contact": {
+            "point": {
+              "x": -1.220004933442117,
+              "y": 1.18,
+              "z": -2.409998204373917
+            },
+            "direction": {
+              "x": 0.9396926207859083,
+              "y": 1.921580027479213e-17,
+              "z": -0.3420201433256689
+            },
+            "edge": {
+              "x": 0.34202014332566893,
+              "y": -6.236503357603365e-17,
+              "z": 0.9396926207859085
+            },
+            "actualEdge": {
+              "x": 0.3420201433256677,
+              "y": 0,
+              "z": 0.9396926207859086
+            },
+            "actualAxis": {
+              "x": 0.9396926207859088,
+              "y": 0,
+              "z": -0.34202014332566805
+            },
+            "edgeError": 1.2278662378249895e-15,
+            "axisError": 9.438851907222926e-16,
+            "tipError": 2.220446049250313e-16,
+            "depthMm": -0.0017956260829343762,
+            "camera": {
+              "yaw": 0.16514867741462672,
+              "pitch": -0.4498921245541844
+            }
+          },
+          "removed": 338.3791304347803,
+          "bounds": {
+            "min": {
+              "x": -1.268,
+              "y": 1.156,
+              "z": -2.445217391304348
+            },
+            "max": {
+              "x": -1.228,
+              "y": 1.204,
+              "z": -2.413913043478261
+            }
+          }
+        },
+        {
+          "contact": {
+            "point": {
+              "x": -1.2050049334421171,
+              "y": 1.1800000000000002,
+              "z": -2.4099982043739168
+            },
+            "direction": {
+              "x": 0.9396926207859085,
+              "y": 1.453319663276637e-16,
+              "z": -0.3420201433256683
+            },
+            "edge": {
+              "x": 0.3420201433256683,
+              "y": -1.7163394603817272e-16,
+              "z": 0.9396926207859085
+            },
+            "actualEdge": {
+              "x": 0.3420201433256677,
+              "y": 0,
+              "z": 0.9396926207859086
+            },
+            "actualAxis": {
+              "x": 0.9396926207859089,
+              "y": 0,
+              "z": -0.34202014332566777
+            },
+            "edgeError": 6.439287230044033e-16,
+            "axisError": 6.634785123388155e-16,
+            "tipError": 2.220446049250313e-16,
+            "depthMm": -0.0017956260833784654,
+            "camera": {
+              "yaw": 0.16514867741462672,
+              "pitch": -0.4498921245541844
+            }
+          },
+          "removed": 345.55826086956284,
+          "bounds": {
+            "min": {
+              "x": -1.26,
+              "y": 1.164,
+              "z": -2.4530434782608697
+            },
+            "max": {
+              "x": -1.212,
+              "y": 1.196,
+              "z": -2.413913043478261
+            }
+          }
+        },
+        {
+          "contact": {
+            "point": {
+              "x": -1.1900049334421168,
+              "y": 1.1800000000000004,
+              "z": -2.409998204373917
+            },
+            "direction": {
+              "x": 0.9396926207859083,
+              "y": -9.892904164141694e-17,
+              "z": -0.3420201433256689
+            },
+            "edge": {
+              "x": 0.34202014332566893,
+              "y": 4.830943840337158e-17,
+              "z": 0.9396926207859085
+            },
+            "actualEdge": {
+              "x": 0.3420201433256677,
+              "y": 0,
+              "z": 0.9396926207859086
+            },
+            "actualAxis": {
+              "x": 0.9396926207859081,
+              "y": 0,
+              "z": -0.3420201433256695
+            },
+            "edgeError": 1.2272326195210111e-15,
+            "axisError": 6.572296395399186e-16,
+            "tipError": 2.220446049250313e-16,
+            "depthMm": -0.0017956260829343762,
+            "camera": {
+              "yaw": 0.16514867741462672,
+              "pitch": -0.4498921245541844
+            }
+          },
+          "removed": 352.0278260869541,
+          "bounds": {
+            "min": {
+              "x": -1.244,
+              "y": 1.156,
+              "z": -2.445217391304348
+            },
+            "max": {
+              "x": -1.204,
+              "y": 1.196,
+              "z": -2.413913043478261
+            }
+          }
+        },
+        {
+          "contact": {
+            "point": {
+              "x": -1.1750049334421173,
+              "y": 1.1799999999999997,
+              "z": -2.4099982043739177
+            },
+            "direction": {
+              "x": 0.9396926207859081,
+              "y": -1.6972743232104786e-16,
+              "z": -0.3420201433256691
+            },
+            "edge": {
+              "x": 0.34202014332566916,
+              "y": 7.692158294855433e-17,
+              "z": 0.9396926207859083
+            },
+            "actualEdge": {
+              "x": 0.3420201433256677,
+              "y": 0,
+              "z": 0.9396926207859086
+            },
+            "actualAxis": {
+              "x": 0.9396926207859089,
+              "y": -8.573150769306236e-16,
+              "z": -0.34202014332566777
+            },
+            "edgeError": 1.4832182316062766e-15,
+            "axisError": 1.6886934109917222e-15,
+            "tipError": 4.440892098500626e-16,
+            "depthMm": -0.001795626082490287,
+            "camera": {
+              "yaw": 0.16514867741462672,
+              "pitch": -0.4498921245541844
+            }
+          },
+          "removed": 356.7026086956498,
+          "bounds": {
+            "min": {
+              "x": -1.228,
+              "y": 1.164,
+              "z": -2.4373913043478264
+            },
+            "max": {
+              "x": -1.196,
+              "y": 1.196,
+              "z": -2.413913043478261
+            }
+          }
+        },
+        {
+          "contact": {
+            "point": {
+              "x": -1.1600049334421174,
+              "y": 1.1799999999999995,
+              "z": -2.409998204373917
+            },
+            "direction": {
+              "x": 0.9396926207859081,
+              "y": -1.256541330859368e-16,
+              "z": -0.3420201433256691
+            },
+            "edge": {
+              "x": 0.34202014332566916,
+              "y": 6.00354081248979e-17,
+              "z": 0.9396926207859083
+            },
+            "actualEdge": {
+              "x": 0.3420201433256677,
+              "y": 0,
+              "z": 0.9396926207859086
+            },
+            "actualAxis": {
+              "x": 0.9396926207859081,
+              "y": -8.573150769306237e-16,
+              "z": -0.3420201433256695
+            },
+            "edgeError": 1.4824384111573278e-15,
+            "axisError": 8.284447141406947e-16,
+            "tipError": 2.220446049250313e-16,
+            "depthMm": -0.0017956260829343762,
+            "camera": {
+              "yaw": 0.16514867741462688,
+              "pitch": -0.4498921245541844
+            }
+          },
+          "removed": 361.91999999999763,
+          "bounds": {
+            "min": {
+              "x": -1.212,
+              "y": 1.18,
+              "z": -2.4373913043478264
+            },
+            "max": {
+              "x": -1.18,
+              "y": 1.196,
+              "z": -2.413913043478261
+            }
+          }
+        },
+        {
+          "contact": {
+            "point": {
+              "x": -1.1450049334421166,
+              "y": 1.1800000000000002,
+              "z": -2.4099982043739168
+            },
+            "direction": {
+              "x": 0.9396926207859085,
+              "y": 9.329707326412115e-17,
+              "z": -0.3420201433256683
+            },
+            "edge": {
+              "x": 0.3420201433256683,
+              "y": -8.628873629425206e-17,
+              "z": 0.9396926207859085
+            },
+            "actualEdge": {
+              "x": 0.3420201433256677,
+              "y": 0,
+              "z": 0.9396926207859086
+            },
+            "actualAxis": {
+              "x": 0.9396926207859089,
+              "y": 0,
+              "z": -0.34202014332566777
+            },
+            "edgeError": 6.266033313737697e-16,
+            "axisError": 6.540540495848285e-16,
+            "tipError": 0,
+            "depthMm": -0.0017956260833784654,
+            "camera": {
+              "yaw": 0.16514867741462688,
+              "pitch": -0.4498921245541844
+            }
+          },
+          "removed": 369.516521739128,
+          "bounds": {
+            "min": {
+              "x": -1.196,
+              "y": 1.164,
+              "z": -2.4373913043478264
+            },
+            "max": {
+              "x": -1.156,
+              "y": 1.196,
+              "z": -2.413913043478261
+            }
+          }
+        },
+        {
+          "contact": {
+            "point": {
+              "x": -1.130004933442117,
+              "y": 1.1799999999999997,
+              "z": -2.409998204373917
+            },
+            "direction": {
+              "x": 0.9396926207859083,
+              "y": -1.9131177927989959e-16,
+              "z": -0.3420201433256689
+            },
+            "edge": {
+              "x": 0.34202014332566893,
+              "y": -3.3733428414389014e-17,
+              "z": 0.9396926207859085
+            },
+            "actualEdge": {
+              "x": 0.3420201433256677,
+              "y": 0,
+              "z": 0.9396926207859086
+            },
+            "actualAxis": {
+              "x": 0.9396926207859089,
+              "y": -8.573150769306236e-16,
+              "z": -0.34202014332566777
+            },
+            "edgeError": 1.2267453055830874e-15,
+            "axisError": 1.4086533810669775e-15,
+            "tipError": 4.440892098500626e-16,
+            "depthMm": -0.0017956260829343762,
+            "camera": {
+              "yaw": 0.16514867741462688,
+              "pitch": -0.4498921245541844
+            }
+          },
+          "removed": 371.4782608695628,
+          "bounds": {
+            "min": {
+              "x": -1.172,
+              "y": 1.164,
+              "z": -2.4373913043478264
+            },
+            "max": {
+              "x": -1.148,
+              "y": 1.188,
+              "z": -2.413913043478261
+            }
+          }
+        },
+        {
+          "contact": {
+            "point": {
+              "x": -1.1150049334421168,
+              "y": 1.1800000000000004,
+              "z": -2.4099982043739168
+            },
+            "direction": {
+              "x": 0.9396926207859085,
+              "y": 2.9545940787283243e-17,
+              "z": -0.3420201433256683
+            },
+            "edge": {
+              "x": 0.3420201433256683,
+              "y": 4.21959764426791e-17,
+              "z": 0.9396926207859085
+            },
+            "actualEdge": {
+              "x": 0.3420201433256677,
+              "y": 0,
+              "z": 0.9396926207859086
+            },
+            "actualAxis": {
+              "x": 0.9396926207859089,
+              "y": 0,
+              "z": -0.34202014332566777
+            },
+            "edgeError": 6.220663061968542e-16,
+            "axisError": 6.480395964103337e-16,
+            "tipError": 2.220446049250313e-16,
+            "depthMm": -0.0017956260833784654,
+            "camera": {
+              "yaw": 0.16514867741462688,
+              "pitch": -0.4498921245541844
+            }
+          },
+          "removed": 376.612173913041,
+          "bounds": {
+            "min": {
+              "x": -1.164,
+              "y": 1.156,
+              "z": -2.4295652173913043
+            },
+            "max": {
+              "x": -1.1239999999999999,
+              "y": 1.196,
+              "z": -2.413913043478261
+            }
+          }
+        },
+        {
+          "contact": {
+            "point": {
+              "x": -1.1000049334421171,
+              "y": 1.1800000000000004,
+              "z": -2.409998204373917
+            },
+            "direction": {
+              "x": 0.9396926207859083,
+              "y": -1.9131177927989959e-16,
+              "z": -0.3420201433256689
+            },
+            "edge": {
+              "x": 0.34202014332566893,
+              "y": -3.3733428414389014e-17,
+              "z": 0.9396926207859085
+            },
+            "actualEdge": {
+              "x": 0.3420201433256677,
+              "y": 0,
+              "z": 0.9396926207859086
+            },
+            "actualAxis": {
+              "x": 0.9396926207859089,
+              "y": -8.573150769306236e-16,
+              "z": -0.34202014332566777
+            },
+            "edgeError": 1.2267453055830874e-15,
+            "axisError": 1.4086533810669775e-15,
+            "tipError": 4.440892098500626e-16,
+            "depthMm": -0.0017956260829343762,
+            "camera": {
+              "yaw": 0.16514867741462688,
+              "pitch": -0.4498921245541844
+            }
+          },
+          "removed": 379.492173913041,
+          "bounds": {
+            "min": {
+              "x": -1.14,
+              "y": 1.164,
+              "z": -2.4373913043478264
+            },
+            "max": {
+              "x": -1.1079999999999999,
+              "y": 1.188,
+              "z": -2.413913043478261
+            }
+          }
+        },
+        {
+          "contact": {
+            "point": {
+              "x": -1.0850049334421166,
+              "y": 1.18,
+              "z": -2.4099982043739168
+            },
+            "direction": {
+              "x": 0.9396926207859085,
+              "y": 2.9545940787283243e-17,
+              "z": -0.3420201433256683
+            },
+            "edge": {
+              "x": 0.3420201433256683,
+              "y": 4.21959764426791e-17,
+              "z": 0.9396926207859085
+            },
+            "actualEdge": {
+              "x": 0.3420201433256677,
+              "y": 0,
+              "z": 0.9396926207859086
+            },
+            "actualAxis": {
+              "x": 0.9396926207859089,
+              "y": 0,
+              "z": -0.34202014332566777
+            },
+            "edgeError": 6.220663061968542e-16,
+            "axisError": 6.480395964103337e-16,
+            "tipError": 2.220446049250313e-16,
+            "depthMm": -0.0017956260833784654,
+            "camera": {
+              "yaw": 0.16514867741462688,
+              "pitch": -0.4498921245541844
+            }
+          },
+          "removed": 385.0852173913018,
+          "bounds": {
+            "min": {
+              "x": -1.132,
+              "y": 1.164,
+              "z": -2.4295652173913043
+            },
+            "max": {
+              "x": -1.0919999999999999,
+              "y": 1.196,
+              "z": -2.413913043478261
+            }
+          }
+        },
+        {
+          "contact": {
+            "point": {
+              "x": -1.070004933442117,
+              "y": 1.18,
+              "z": -2.4099982043739168
+            },
+            "direction": {
+              "x": 0.9396926207859085,
+              "y": 2.320827355888504e-16,
+              "z": -0.3420201433256683
+            },
+            "edge": {
+              "x": 0.3420201433256683,
+              "y": -1.275703771112926e-16,
+              "z": 0.9396926207859085
+            },
+            "actualEdge": {
+              "x": 0.3420201433256677,
+              "y": 0,
+              "z": 0.9396926207859086
+            },
+            "actualAxis": {
+              "x": 0.9396926207859089,
+              "y": 0,
+              "z": -0.34202014332566777
+            },
+            "edgeError": 6.336088619911851e-16,
+            "axisError": 6.877097876699639e-16,
+            "tipError": 2.220446049250313e-16,
+            "depthMm": -0.0017956260833784654,
+            "camera": {
+              "yaw": 0.16514867741462688,
+              "pitch": -0.4498921245541844
+            }
+          },
+          "removed": 392.0973913043452,
+          "bounds": {
+            "min": {
+              "x": -1.1159999999999999,
+              "y": 1.156,
+              "z": -2.4295652173913043
+            },
+            "max": {
+              "x": -1.0839999999999999,
+              "y": 1.204,
+              "z": -2.413913043478261
+            }
+          }
+        },
+        {
+          "contact": {
+            "point": {
+              "x": -1.055004933442117,
+              "y": 1.1800000000000004,
+              "z": -2.409998204373917
+            },
+            "direction": {
+              "x": 0.9396926207859083,
+              "y": 2.2036649617555505e-17,
+              "z": -0.3420201433256689
+            },
+            "edge": {
+              "x": 0.34202014332566893,
+              "y": -8.4430874118282e-18,
+              "z": 0.9396926207859085
+            },
+            "actualEdge": {
+              "x": 0.3420201433256677,
+              "y": 0,
+              "z": 0.9396926207859086
+            },
+            "actualAxis": {
+              "x": 0.9396926207859088,
+              "y": 0,
+              "z": -0.34202014332566805
+            },
+            "edgeError": 1.2263104771233904e-15,
+            "axisError": 9.439468312415825e-16,
+            "tipError": 4.965068306494546e-16,
+            "depthMm": -0.0017956260829343762,
+            "camera": {
+              "yaw": 0.16514867741462688,
+              "pitch": -0.4498921245541844
+            }
+          },
+          "removed": 398.5252173913016,
+          "bounds": {
+            "min": {
+              "x": -1.0999999999999999,
+              "y": 1.156,
+              "z": -2.4373913043478264
+            },
+            "max": {
+              "x": -1.076,
+              "y": 1.196,
+              "z": -2.413913043478261
+            }
+          }
+        },
+        {
+          "contact": {
+            "point": {
+              "x": -1.0400049334421166,
+              "y": 1.1800000000000004,
+              "z": -2.409998204373917
+            },
+            "direction": {
+              "x": 0.9396926207859085,
+              "y": -4.643211561093965e-17,
+              "z": -0.34202014332566855
+            },
+            "edge": {
+              "x": 0.34202014332566855,
+              "y": -8.62692756777901e-17,
+              "z": 0.9396926207859085
+            },
+            "actualEdge": {
+              "x": 0.3420201433256677,
+              "y": 0,
+              "z": 0.9396926207859086
+            },
+            "actualAxis": {
+              "x": 0.9396926207859089,
+              "y": 0,
+              "z": -0.34202014332566777
+            },
+            "edgeError": 8.444543324238758e-16,
+            "axisError": 8.467946248746797e-16,
+            "tipError": 2.220446049250313e-16,
+            "depthMm": -0.0017956260829343762,
+            "camera": {
+              "yaw": 0.16514867741462688,
+              "pitch": -0.4498921245541844
+            }
+          },
+          "removed": 404.8278260869536,
+          "bounds": {
+            "min": {
+              "x": -1.0839999999999999,
+              "y": 1.156,
+              "z": -2.4295652173913043
+            },
+            "max": {
+              "x": -1.052,
+              "y": 1.188,
+              "z": -2.413913043478261
+            }
+          }
+        },
+        {
+          "contact": {
+            "point": {
+              "x": -1.025004933442117,
+              "y": 1.1800000000000004,
+              "z": -2.409998204373917
+            },
+            "direction": {
+              "x": 0.9396926207859085,
+              "y": 2.320827355888504e-16,
+              "z": -0.3420201433256683
+            },
+            "edge": {
+              "x": 0.3420201433256683,
+              "y": -1.275703771112926e-16,
+              "z": 0.9396926207859085
+            },
+            "actualEdge": {
+              "x": 0.3420201433256677,
+              "y": 0,
+              "z": 0.9396926207859086
+            },
+            "actualAxis": {
+              "x": 0.9396926207859089,
+              "y": 0,
+              "z": -0.34202014332566744
+            },
+            "edgeError": 6.336088619911851e-16,
+            "axisError": 9.765535654413028e-16,
+            "tipError": 0,
+            "depthMm": -0.0017956260829343762,
+            "camera": {
+              "yaw": 0.16514867741462688,
+              "pitch": -0.4498921245541844
+            }
+          },
+          "removed": 408.4591304347797,
+          "bounds": {
+            "min": {
+              "x": -1.076,
+              "y": 1.156,
+              "z": -2.4295652173913043
+            },
+            "max": {
+              "x": -1.044,
+              "y": 1.196,
+              "z": -2.413913043478261
+            }
+          }
+        }
+      ],
+      "removedSpanX": 0.22399999999999998,
+      "removedVolumeCm3": 111.15130434782532
+    },
+    {
+      "side": -70,
+      "probes": [
+        {
+          "point": {
+            "x": 1.4000049334421163,
+            "y": 1.8400000000000003,
+            "z": -2.4099982043739177
+          },
+          "direction": {
+            "x": -0.9396926207859085,
+            "y": -4.5016825785442476e-17,
+            "z": -0.3420201433256683
+          },
+          "edge": {
+            "x": 0.3420201433256683,
+            "y": 2.437600537692219e-17,
+            "z": -0.9396926207859085
+          },
+          "actualEdge": {
+            "x": 0.3420201433256677,
+            "y": 0,
+            "z": -0.9396926207859086
+          },
+          "actualAxis": {
+            "x": -0.9396926207859089,
+            "y": 0,
+            "z": -0.34202014332566777
+          },
+          "edgeError": 6.211120498876051e-16,
+          "axisError": 6.489290180770617e-16,
+          "tipError": 4.440892098500626e-16,
+          "depthMm": -0.001795626082490287,
+          "camera": {
+            "yaw": 0.41606450572382264,
+            "pitch": 0.1993966061732736
+          }
+        },
+        {
+          "point": {
+            "x": 1.400004933442117,
+            "y": 1.84,
+            "z": -2.409998204373917
+          },
+          "direction": {
+            "x": -0.9396926207859083,
+            "y": -4.102386598593801e-18,
+            "z": -0.34202014332566855
+          },
+          "edge": {
+            "x": 0.3420201433256686,
+            "y": -2.8725220209858713e-18,
+            "z": -0.9396926207859085
+          },
+          "actualEdge": {
+            "x": 0.3420201433256677,
+            "y": 0,
+            "z": -0.9396926207859086
+          },
+          "actualAxis": {
+            "x": -0.9396926207859082,
+            "y": 0,
+            "z": -0.3420201433256692
+          },
+          "edgeError": 8.950950274958806e-16,
+          "axisError": 6.753347617342838e-16,
+          "tipError": 0,
+          "depthMm": -0.0017956260829343762,
+          "camera": {
+            "yaw": -0.24653629426590085,
+            "pitch": 0.12142295241798308
+          }
+        }
+      ],
+      "hits": [
+        {
+          "contact": {
+            "point": {
+              "x": 1.3912575568072794,
+              "y": 1.8400000000000005,
+              "z": -2.413181989096913
+            },
+            "direction": {
+              "x": -0.9396926207859083,
+              "y": -4.452560189381481e-18,
+              "z": -0.3420201433256689
+            },
+            "edge": {
+              "x": 0.34202014332566893,
+              "y": -1.3598427359842793e-17,
+              "z": -0.9396926207859085
+            },
+            "actualEdge": {
+              "x": 0.3420201433256677,
+              "y": 0,
+              "z": -0.9396926207859086
+            },
+            "actualAxis": {
+              "x": -0.9396926207859082,
+              "y": 0,
+              "z": -0.3420201433256692
+            },
+            "edgeError": 1.2263568068895018e-15,
+            "axisError": 3.5111158017505367e-16,
+            "tipError": 0,
+            "depthMm": 3.1819890969129183,
+            "camera": {
+              "yaw": 0.16514867741462677,
+              "pitch": 0.19279886765589754
+            }
+          },
+          "removed": 424.69565217391005,
+          "bounds": {
+            "min": {
+              "x": 1.388,
+              "y": 1.82,
+              "z": -2.4530434782608697
+            },
+            "max": {
+              "x": 1.42,
+              "y": 1.86,
+              "z": -2.413913043478261
+            }
+          }
+        },
+        {
+          "contact": {
+            "point": {
+              "x": 1.3813551658426944,
+              "y": 1.8399999999999992,
+              "z": -2.411326611142096
+            },
+            "direction": {
+              "x": -0.9396926207859083,
+              "y": 1.1956986204993718e-17,
+              "z": -0.3420201433256689
+            },
+            "edge": {
+              "x": 0.34202014332566893,
+              "y": -2.1083392758993072e-18,
+              "z": -0.9396926207859085
+            },
+            "actualEdge": {
+              "x": 0.3420201433256677,
+              "y": 0,
+              "z": -0.9396926207859086
+            },
+            "actualAxis": {
+              "x": -0.9396926207859082,
+              "y": 0,
+              "z": -0.3420201433256692
+            },
+            "edgeError": 1.2262832240848995e-15,
+            "axisError": 3.5128689978405046e-16,
+            "tipError": 0,
+            "depthMm": 1.3266111420957571,
+            "camera": {
+              "yaw": 0.16514867741462677,
+              "pitch": 0.19279886765589754
+            }
+          },
+          "removed": 437.4678260869535,
+          "bounds": {
+            "min": {
+              "x": 1.38,
+              "y": 1.812,
+              "z": -2.445217391304348
+            },
+            "max": {
+              "x": 1.412,
+              "y": 1.868,
+              "z": -2.413913043478261
+            }
+          }
+        },
+        {
+          "contact": {
+            "point": {
+              "x": 1.3700049334421172,
+              "y": 1.84,
+              "z": -2.409998204373917
+            },
+            "direction": {
+              "x": -0.9396926207859085,
+              "y": 1.7758568079303436e-17,
+              "z": -0.34202014332566855
+            },
+            "edge": {
+              "x": 0.34202014332566855,
+              "y": 4.574149873759527e-18,
+              "z": -0.9396926207859085
+            },
+            "actualEdge": {
+              "x": 0.3420201433256677,
+              "y": 0,
+              "z": -0.9396926207859086
+            },
+            "actualAxis": {
+              "x": -0.9396926207859082,
+              "y": 0,
+              "z": -0.3420201433256692
+            },
+            "edgeError": 8.400486024454483e-16,
+            "axisError": 7.449719395546058e-16,
+            "tipError": 0,
+            "depthMm": -0.0017956260829343762,
+            "camera": {
+              "yaw": 0.16514867741462677,
+              "pitch": 0.19279886765589754
+            }
+          },
+          "removed": 450.6991304347795,
+          "bounds": {
+            "min": {
+              "x": 1.3719999999999999,
+              "y": 1.812,
+              "z": -2.4530434782608697
+            },
+            "max": {
+              "x": 1.404,
+              "y": 1.868,
+              "z": -2.413913043478261
+            }
+          }
+        },
+        {
+          "contact": {
+            "point": {
+              "x": 1.355004933442117,
+              "y": 1.8400000000000005,
+              "z": -2.409998204373917
+            },
+            "direction": {
+              "x": -0.9396926207859083,
+              "y": 9.317913244532971e-18,
+              "z": -0.3420201433256689
+            },
+            "edge": {
+              "x": 0.34202014332566893,
+              "y": 9.144650881932437e-18,
+              "z": -0.9396926207859085
+            },
+            "actualEdge": {
+              "x": 0.3420201433256677,
+              "y": 0,
+              "z": -0.9396926207859086
+            },
+            "actualAxis": {
+              "x": -0.9396926207859082,
+              "y": 0,
+              "z": -0.3420201433256692
+            },
+            "edgeError": 1.226315508022836e-15,
+            "axisError": 3.51206975938713e-16,
+            "tipError": 0,
+            "depthMm": -0.0017956260829343762,
+            "camera": {
+              "yaw": 0.16514867741462677,
+              "pitch": 0.19279886765589754
+            }
+          },
+          "removed": 463.5547826086925,
+          "bounds": {
+            "min": {
+              "x": 1.3639999999999999,
+              "y": 1.804,
+              "z": -2.445217391304348
+            },
+            "max": {
+              "x": 1.412,
+              "y": 1.868,
+              "z": -2.413913043478261
+            }
+          }
+        },
+        {
+          "contact": {
+            "point": {
+              "x": 1.3400049334421167,
+              "y": 1.84,
+              "z": -2.409998204373917
+            },
+            "direction": {
+              "x": -0.9396926207859081,
+              "y": 8.499625244166176e-18,
+              "z": -0.3420201433256691
+            },
+            "edge": {
+              "x": 0.34202014332566916,
+              "y": -7.149387270709078e-18,
+              "z": -0.9396926207859083
+            },
+            "actualEdge": {
+              "x": 0.3420201433256677,
+              "y": 0,
+              "z": -0.9396926207859086
+            },
+            "actualAxis": {
+              "x": -0.9396926207859089,
+              "y": 0,
+              "z": -0.34202014332566777
+            },
+            "edgeError": 1.4812395168858699e-15,
+            "axisError": 1.542394538027286e-15,
+            "tipError": 0,
+            "depthMm": -0.0017956260829343762,
+            "camera": {
+              "yaw": 0.16514867741462677,
+              "pitch": 0.19279886765589754
+            }
+          },
+          "removed": 468.47999999999683,
+          "bounds": {
+            "min": {
+              "x": 1.3479999999999999,
+              "y": 1.812,
+              "z": -2.4373913043478264
+            },
+            "max": {
+              "x": 1.388,
+              "y": 1.868,
+              "z": -2.413913043478261
+            }
+          }
+        },
+        {
+          "contact": {
+            "point": {
+              "x": 1.3250049334421172,
+              "y": 1.84,
+              "z": -2.4099982043739177
+            },
+            "direction": {
+              "x": -0.9396926207859085,
+              "y": -8.325146593036778e-18,
+              "z": -0.3420201433256683
+            },
+            "edge": {
+              "x": 0.3420201433256683,
+              "y": 1.6878877092483184e-17,
+              "z": -0.9396926207859085
+            },
+            "actualEdge": {
+              "x": 0.3420201433256677,
+              "y": 0,
+              "z": -0.9396926207859086
+            },
+            "actualAxis": {
+              "x": -0.9396926207859082,
+              "y": 0,
+              "z": -0.3420201433256692
+            },
+            "edgeError": 6.208630165900932e-16,
+            "axisError": 9.486115000797282e-16,
+            "tipError": 0,
+            "depthMm": -0.001795626082490287,
+            "camera": {
+              "yaw": 0.16514867741462677,
+              "pitch": 0.19279886765589754
+            }
+          },
+          "removed": 472.6956521739098,
+          "bounds": {
+            "min": {
+              "x": 1.3399999999999999,
+              "y": 1.836,
+              "z": -2.4295652173913043
+            },
+            "max": {
+              "x": 1.3639999999999999,
+              "y": 1.86,
+              "z": -2.413913043478261
+            }
+          }
+        },
+        {
+          "contact": {
+            "point": {
+              "x": 1.3100049334421167,
+              "y": 1.8399999999999999,
+              "z": -2.409998204373917
+            },
+            "direction": {
+              "x": -0.9396926207859083,
+              "y": 1.072590533885692e-17,
+              "z": -0.3420201433256689
+            },
+            "edge": {
+              "x": 0.34202014332566893,
+              "y": -3.5017359078768104e-19,
+              "z": -0.9396926207859085
+            },
+            "actualEdge": {
+              "x": 0.3420201433256677,
+              "y": 0,
+              "z": -0.9396926207859086
+            },
+            "actualAxis": {
+              "x": -0.9396926207859082,
+              "y": 0,
+              "z": -0.3420201433256692
+            },
+            "edgeError": 1.2262814616551525e-15,
+            "axisError": 3.512471515701177e-16,
+            "tipError": 0,
+            "depthMm": -0.0017956260829343762,
+            "camera": {
+              "yaw": 0.16514867741462677,
+              "pitch": 0.19279886765589754
+            }
+          },
+          "removed": 477.57913043477936,
+          "bounds": {
+            "min": {
+              "x": 1.3319999999999999,
+              "y": 1.836,
+              "z": -2.4295652173913043
+            },
+            "max": {
+              "x": 1.3559999999999999,
+              "y": 1.852,
+              "z": -2.413913043478261
+            }
+          }
+        },
+        {
+          "contact": {
+            "point": {
+              "x": 1.295004933442117,
+              "y": 1.84,
+              "z": -2.4099982043739168
+            },
+            "direction": {
+              "x": -0.9396926207859083,
+              "y": 1.1546625916281455e-17,
+              "z": -0.3420201433256689
+            },
+            "edge": {
+              "x": 0.34202014332566893,
+              "y": -1.5222840475287676e-18,
+              "z": -0.9396926207859085
+            },
+            "actualEdge": {
+              "x": 0.3420201433256677,
+              "y": 0,
+              "z": -0.9396926207859086
+            },
+            "actualAxis": {
+              "x": -0.9396926207859082,
+              "y": 0,
+              "z": -0.3420201433256692
+            },
+            "edgeError": 1.2262823565257207e-15,
+            "axisError": 3.512731714931182e-16,
+            "tipError": 0,
+            "depthMm": -0.0017956260833784654,
+            "camera": {
+              "yaw": 0.16514867741462677,
+              "pitch": 0.19279886765589754
+            }
+          },
+          "removed": 482.29565217390973,
+          "bounds": {
+            "min": {
+              "x": 1.3159999999999998,
+              "y": 1.836,
+              "z": -2.4373913043478264
+            },
+            "max": {
+              "x": 1.3479999999999999,
+              "y": 1.86,
+              "z": -2.413913043478261
+            }
+          }
+        },
+        {
+          "contact": {
+            "point": {
+              "x": 1.2800049334421164,
+              "y": 1.84,
+              "z": -2.409998204373917
+            },
+            "direction": {
+              "x": -0.9396926207859083,
+              "y": 1.7447865112940505e-19,
+              "z": -0.3420201433256689
+            },
+            "edge": {
+              "x": 0.34202014332566893,
+              "y": 9.72948982177411e-18,
+              "z": -0.9396926207859085
+            },
+            "actualEdge": {
+              "x": 0.3420201433256677,
+              "y": 0,
+              "z": -0.9396926207859086
+            },
+            "actualAxis": {
+              "x": -0.9396926207859083,
+              "y": 0,
+              "z": -0.34202014332566893
+            },
+            "edgeError": 1.2263200086232572e-15,
+            "axisError": 5.551142543494337e-17,
+            "tipError": 0,
+            "depthMm": -0.0017956260829343762,
+            "camera": {
+              "yaw": 0.16514867741462677,
+              "pitch": 0.19279886765589754
+            }
+          },
+          "removed": 486.8869565217358,
+          "bounds": {
+            "min": {
+              "x": 1.2999999999999998,
+              "y": 1.836,
+              "z": -2.4217391304347826
+            },
+            "max": {
+              "x": 1.3319999999999999,
+              "y": 1.852,
+              "z": -2.413913043478261
+            }
+          }
+        },
+        {
+          "contact": {
+            "point": {
+              "x": 1.2650049334421172,
+              "y": 1.8399999999999999,
+              "z": -2.4099982043739168
+            },
+            "direction": {
+              "x": -0.9396926207859083,
+              "y": 1.072590533885692e-17,
+              "z": -0.3420201433256689
+            },
+            "edge": {
+              "x": 0.34202014332566893,
+              "y": -3.5017359078768104e-19,
+              "z": -0.9396926207859085
+            },
+            "actualEdge": {
+              "x": 0.3420201433256677,
+              "y": 0,
+              "z": -0.9396926207859086
+            },
+            "actualAxis": {
+              "x": -0.9396926207859082,
+              "y": 0,
+              "z": -0.3420201433256692
+            },
+            "edgeError": 1.2262814616551525e-15,
+            "axisError": 3.512471515701177e-16,
+            "tipError": 0,
+            "depthMm": -0.0017956260833784654,
+            "camera": {
+              "yaw": 0.16514867741462677,
+              "pitch": 0.19279886765589754
+            }
+          },
+          "removed": 491.35304347825746,
+          "bounds": {
+            "min": {
+              "x": 1.2919999999999998,
+              "y": 1.836,
+              "z": -2.445217391304348
+            },
+            "max": {
+              "x": 1.3159999999999998,
+              "y": 1.86,
+              "z": -2.413913043478261
+            }
+          }
+        },
+        {
+          "contact": {
+            "point": {
+              "x": 1.250004933442117,
+              "y": 1.8400000000000007,
+              "z": -2.409998204373917
+            },
+            "direction": {
+              "x": -0.9396926207859085,
+              "y": -3.1649414909067073e-18,
+              "z": -0.3420201433256683
+            },
+            "edge": {
+              "x": 0.3420201433256683,
+              "y": -4.693306981079834e-19,
+              "z": -0.9396926207859085
+            },
+            "actualEdge": {
+              "x": 0.3420201433256677,
+              "y": 0,
+              "z": -0.9396926207859086
+            },
+            "actualAxis": {
+              "x": -0.9396926207859082,
+              "y": 0,
+              "z": -0.3420201433256692
+            },
+            "edgeError": 6.206337157686097e-16,
+            "axisError": 9.48580247987674e-16,
+            "tipError": 0,
+            "depthMm": -0.0017956260829343762,
+            "camera": {
+              "yaw": 0.16514867741462677,
+              "pitch": 0.19279886765589754
+            }
+          },
+          "removed": 498.1147826086923,
+          "bounds": {
+            "min": {
+              "x": 1.2599999999999998,
+              "y": 1.812,
+              "z": -2.4373913043478264
+            },
+            "max": {
+              "x": 1.2999999999999998,
+              "y": 1.852,
+              "z": -2.413913043478261
+            }
+          }
+        },
+        {
+          "contact": {
+            "point": {
+              "x": 1.2350049334421165,
+              "y": 1.8399999999999996,
+              "z": -2.409998204373917
+            },
+            "direction": {
+              "x": -0.9396926207859083,
+              "y": 1.7447865112940505e-19,
+              "z": -0.3420201433256689
+            },
+            "edge": {
+              "x": 0.34202014332566893,
+              "y": 9.72948982177411e-18,
+              "z": -0.9396926207859085
+            },
+            "actualEdge": {
+              "x": 0.3420201433256677,
+              "y": 0,
+              "z": -0.9396926207859086
+            },
+            "actualAxis": {
+              "x": -0.9396926207859083,
+              "y": 0,
+              "z": -0.34202014332566893
+            },
+            "edgeError": 1.2263200086232572e-15,
+            "axisError": 5.551142543494337e-17,
+            "tipError": 0,
+            "depthMm": -0.0017956260829343762,
+            "camera": {
+              "yaw": 0.16514867741462677,
+              "pitch": 0.19279886765589754
+            }
+          },
+          "removed": 502.24695652173574,
+          "bounds": {
+            "min": {
+              "x": 1.2599999999999998,
+              "y": 1.82,
+              "z": -2.4373913043478264
+            },
+            "max": {
+              "x": 1.2919999999999998,
+              "y": 1.852,
+              "z": -2.413913043478261
+            }
+          }
+        },
+        {
+          "contact": {
+            "point": {
+              "x": 1.2200049334421164,
+              "y": 1.84,
+              "z": -2.409998204373917
+            },
+            "direction": {
+              "x": -0.9396926207859083,
+              "y": 1.3598427359842791e-17,
+              "z": -0.34202014332566855
+            },
+            "edge": {
+              "x": 0.3420201433256686,
+              "y": -4.452560189381479e-18,
+              "z": -0.9396926207859085
+            },
+            "actualEdge": {
+              "x": 0.3420201433256677,
+              "y": 0,
+              "z": -0.9396926207859086
+            },
+            "actualAxis": {
+              "x": -0.9396926207859083,
+              "y": 0,
+              "z": -0.34202014332566893
+            },
+            "edgeError": 8.95101492657302e-16,
+            "axisError": 3.8881592671419753e-16,
+            "tipError": 0,
+            "depthMm": -0.0017956260829343762,
+            "camera": {
+              "yaw": 0.16514867741462677,
+              "pitch": 0.19279886765589754
+            }
+          },
+          "removed": 507.9234782608662,
+          "bounds": {
+            "min": {
+              "x": 1.2439999999999998,
+              "y": 1.836,
+              "z": -2.4373913043478264
+            },
+            "max": {
+              "x": 1.2679999999999998,
+              "y": 1.86,
+              "z": -2.413913043478261
+            }
+          }
+        },
+        {
+          "contact": {
+            "point": {
+              "x": 1.2050049334421167,
+              "y": 1.8399999999999999,
+              "z": -2.4099982043739177
+            },
+            "direction": {
+              "x": -0.9396926207859085,
+              "y": -8.325146593036778e-18,
+              "z": -0.3420201433256683
+            },
+            "edge": {
+              "x": 0.3420201433256683,
+              "y": 1.6878877092483184e-17,
+              "z": -0.9396926207859085
+            },
+            "actualEdge": {
+              "x": 0.3420201433256677,
+              "y": 0,
+              "z": -0.9396926207859086
+            },
+            "actualAxis": {
+              "x": -0.9396926207859082,
+              "y": 0,
+              "z": -0.3420201433256692
+            },
+            "edgeError": 6.208630165900932e-16,
+            "axisError": 9.486115000797282e-16,
+            "tipError": 0,
+            "depthMm": -0.001795626082490287,
+            "camera": {
+              "yaw": 0.16514867741462677,
+              "pitch": 0.19279886765589754
+            }
+          },
+          "removed": 515.1860869565184,
+          "bounds": {
+            "min": {
+              "x": 1.2119999999999997,
+              "y": 1.82,
+              "z": -2.4217391304347826
+            },
+            "max": {
+              "x": 1.2519999999999998,
+              "y": 1.86,
+              "z": -2.413913043478261
+            }
+          }
+        },
+        {
+          "contact": {
+            "point": {
+              "x": 1.190004933442117,
+              "y": 1.84,
+              "z": -2.409998204373917
+            },
+            "direction": {
+              "x": -0.9396926207859083,
+              "y": 1.7447865112940505e-19,
+              "z": -0.3420201433256689
+            },
+            "edge": {
+              "x": 0.34202014332566893,
+              "y": 9.72948982177411e-18,
+              "z": -0.9396926207859085
+            },
+            "actualEdge": {
+              "x": 0.3420201433256677,
+              "y": 0,
+              "z": -0.9396926207859086
+            },
+            "actualAxis": {
+              "x": -0.9396926207859083,
+              "y": 0,
+              "z": -0.34202014332566893
+            },
+            "edgeError": 1.2263200086232572e-15,
+            "axisError": 5.551142543494337e-17,
+            "tipError": 0,
+            "depthMm": -0.0017956260829343762,
+            "camera": {
+              "yaw": 0.16514867741462677,
+              "pitch": 0.19279886765589754
+            }
+          },
+          "removed": 521.6973913043444,
+          "bounds": {
+            "min": {
+              "x": 1.2119999999999997,
+              "y": 1.812,
+              "z": -2.4295652173913043
+            },
+            "max": {
+              "x": 1.2359999999999998,
+              "y": 1.86,
+              "z": -2.413913043478261
+            }
+          }
+        },
+        {
+          "contact": {
+            "point": {
+              "x": 1.1750049334421164,
+              "y": 1.8400000000000005,
+              "z": -2.409998204373917
+            },
+            "direction": {
+              "x": -0.9396926207859083,
+              "y": 1.7447865112940505e-19,
+              "z": -0.3420201433256689
+            },
+            "edge": {
+              "x": 0.34202014332566893,
+              "y": 9.72948982177411e-18,
+              "z": -0.9396926207859085
+            },
+            "actualEdge": {
+              "x": 0.3420201433256677,
+              "y": 0,
+              "z": -0.9396926207859086
+            },
+            "actualAxis": {
+              "x": -0.9396926207859083,
+              "y": 0,
+              "z": -0.34202014332566893
+            },
+            "edgeError": 1.2263200086232572e-15,
+            "axisError": 5.551142543494337e-17,
+            "tipError": 0,
+            "depthMm": -0.0017956260829343762,
+            "camera": {
+              "yaw": 0.16514867741462677,
+              "pitch": 0.19279886765589754
+            }
+          },
+          "removed": 528.0834782608661,
+          "bounds": {
+            "min": {
+              "x": 1.1879999999999997,
+              "y": 1.82,
+              "z": -2.4373913043478264
+            },
+            "max": {
+              "x": 1.2199999999999998,
+              "y": 1.852,
+              "z": -2.413913043478261
+            }
+          }
+        }
+      ],
+      "removedSpanX": 0.2320000000000002,
+      "removedVolumeCm3": 117.57913043478203
+    }
+  ]
+}

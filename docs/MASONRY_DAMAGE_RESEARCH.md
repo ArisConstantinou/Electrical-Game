@@ -1,5 +1,7 @@
 # Masonry chasing and impact-damage reference
 
+> **Historical implementation, superseded 2026-09-13.** The deformation, heightfield and automatic route behavior described below has been removed. See [current research and architecture](MASONRY_RESEARCH.md) and [validated rebuild report](MASONRY_REBUILD_REPORT.md). Retained only as a record of the previous approach.
+
 ## Findings used by the game
 
 - A wall chaser makes a controlled groove rather than removing complete masonry units. Bosch publishes common groove widths of 23–40 mm and depths of 20–65 mm, and explicitly includes a break-out tool to remove the cut centre material.

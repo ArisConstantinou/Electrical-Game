@@ -11,7 +11,7 @@ export interface InteractionResult { success: boolean; message: string }
 export type HammerMode = 'chase' | 'demolish';
 
 export class InteractionSystem {
-  private hammerMode: HammerMode = 'chase';
+  hammerMode: HammerMode = 'chase';
   constructor(
     private readonly marking: MarkingSystem,
     private readonly chasing: ChasingSystem,
@@ -34,26 +34,15 @@ export class InteractionSystem {
       return { success: painted, message: !painted ? 'Aim the spray at brick.' : firstMark ? `Point ${point.definition.id}: free mark started.` : '' };
     }
     if (tool === 'hammer') {
-      const missionChase = point.stage === 'marked' || point.stage === 'chasing';
-      if (this.hammerMode === 'demolish' && missionChase) {
-        const hit = this.chasing.hit(camera, point);
-        return { success: hit, message: !hit ? 'Aim CHASE at the blue marked route.' : point.chaseHits >= 4 ? 'Recess complete: depth is ready for boxes and conduit.' : '' };
+      const impact = this.chasing.freeHit(camera, continuing);
+      if (impact && point.stage !== 'inspect') {
+        point.chaseHits++;
+        this.chasing.refreshProgress(point);
       }
-      if (this.hammerMode === 'demolish') {
-        const impact = this.chasing.freeHit(camera, continuing);
-        const feedback = impact?.kind === 'demolish-chip' ? 'Surface chipped — keep striking.'
-          : impact?.kind === 'demolish-crack' ? 'Cracks spreading — two solid hits remain.'
-            : impact?.kind === 'demolish-spall' ? 'Brick spalling — one solid hit remains.'
-              : impact?.kind === 'demolish-split' ? 'Cracks opened and the bonded brick face is splitting.'
-              : impact?.kind === 'demolish-break' ? 'Brick fractured into uneven rubble.'
-                : 'Aim the demolition hammer at an intact brick.';
-        return { success: Boolean(impact), message: feedback };
-      }
-      if (!missionChase) return { success: false, message: 'CHASE works on the marked route. Press X or choose DEMOLISH for free destruction.' };
-      const hit = this.chasing.hit(camera, point);
-      return { success: hit, message: !hit ? 'Aim CHASE at the blue marked route.' : point.chaseHits >= 4 ? 'Recess complete: depth is ready for boxes and conduit.' : '' };
+      return {success:Boolean(impact), message: !impact ? 'Place the chisel against the masonry.' : point.stage === 'chased' ? 'Cavity clear. The back boxes fit.' : ''};
     }
     if (tool === 'fitting' && point.stage === 'chased') {
+      if (!this.chasing.canFitBoxes(point)) return {success:false,message:'The box touches remaining masonry. Widen or deepen the cavity.'};
       point.boxGroup.visible = true;
       const direction = point.definition.id === 'B' ? -1 : 1;
       point.boxGroup.setInitialError(direction * (2.25 + point.definition.id.charCodeAt(0) % 2), direction * 0.006);

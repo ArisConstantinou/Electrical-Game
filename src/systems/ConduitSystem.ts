@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { BrickWall } from '../world/BrickWall';
 import { Conduit } from '../electrical/Conduit';
 import type { InstallationPoint } from '../electrical/InstallationPoint';
 
@@ -8,7 +9,7 @@ export interface ConduitActionResult { changed: boolean; message: string }
 
 export class ConduitSystem {
   selectedTool: PvcTool = 'spring';
-  constructor(private readonly scene: THREE.Scene) {}
+  constructor(private readonly scene: THREE.Scene, private readonly wall: BrickWall) {}
 
   selectTool(tool: PvcTool): void { this.selectedTool = tool; }
   cycle(): void { this.selectedTool = this.selectedTool === 'spring' ? 'cutter' : 'spring'; }
@@ -30,6 +31,7 @@ export class ConduitSystem {
       return { changed: true, message: 'Bend formed. ACTION to install into the box.' };
     }
     if (point.pipeStep === 'install') {
+      if (!this.wall.canFitConduit(point)) return {changed:false,message:'PVC touches masonry. Use the hammer to finish the actual channel down to the floor.'};
       const conduit = new Conduit(point);
       this.scene.add(conduit);
       point.conduit = conduit;

@@ -1,0 +1,1291 @@
+{
+  "url": "http://127.0.0.1:5362/Electrical-Game/",
+  "capturedAt": "2026-09-12T22:27:19.317Z",
+  "commit": "1fbfaecf5f2baf09d77a5acb716f09209653fa1a",
+  "dirty": "M docs/MASONRY_DAMAGE_RESEARCH.md\n M package.json\n M progress.md\n M src/core/Game.ts\n M src/electrical/Conduit.ts\n M src/player/DesktopControls.ts\n M src/player/FPSRig.ts\n M src/styles/main.css\n M src/systems/ChasingSystem.ts\n M src/systems/ConduitSystem.ts\n M src/systems/InteractionSystem.ts\n M src/ui/HUD.ts\n M src/world/BrickWall.ts\n M tests/demolition-progression-smoke.mjs\n M tests/gameplay-smoke.mjs\n?? artifacts/\n?? docs/MASONRY_REBUILD_REPORT.md\n?? docs/MASONRY_RESEARCH.md\n?? src/world/MasonryVolume.ts\n?? src/world/masonry.worker.ts\n?? src/world/masonryMesher.ts\n?? tests/masonry-acceptance.mjs\n?? tests/masonry-benchmark.mjs\n?? tests/masonry-contact.mjs\n?? tests/masonry-volume.mjs",
+  "browserVersion": "152.0.7977.83",
+  "headless": true,
+  "viewport": {
+    "width": 1366,
+    "height": 768,
+    "deviceScaleFactor": 1
+  },
+  "limitations": [
+    "Headless desktop browser; not physical mobile evidence.",
+    "requestAnimationFrame intervals include scheduling/GPU work; they are not GPU timer queries.",
+    "JS heap is Chromium performance.memory when exposed; GPU memory is not exposed.",
+    "Impact timing instruments ChasingSystem.freeHit including debris generation; update/render timings are separate.",
+    "50 stationary + 100 moving impacts use the gameplay freeHit method, separate from the real mouse hold probe."
+  ],
+  "stages": [
+    {
+      "name": "01-undamaged",
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+        "hardwareConcurrency": 24,
+        "gpuVendor": "Google Inc. (NVIDIA)",
+        "gpuRenderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "webglVersion": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "frameIntervals": {
+        "samples": 722,
+        "averageMs": 4.1682825485094765,
+        "p95Ms": 4.300000000000182,
+        "worstMs": 8.299999999999727,
+        "averageFps": 239.9069612873501
+      },
+      "impactProcessing": {
+        "samples": 0,
+        "averageMs": null,
+        "p95Ms": null,
+        "worstMs": null,
+        "successful": 0
+      },
+      "cpuRenderSubmission": {
+        "samples": 722,
+        "averageMs": 0.19986149540733433,
+        "p95Ms": 0.30000001192092896,
+        "worstMs": 0.800000011920929
+      },
+      "render": {
+        "frame": 838,
+        "calls": 23,
+        "triangles": 19458,
+        "points": 0,
+        "lines": 0
+      },
+      "memory": {
+        "geometries": 50,
+        "textures": 2,
+        "jsHeapUsedBytes": 16761400,
+        "jsHeapTotalBytes": 31245248
+      },
+      "state": {
+        "coordinateSystem": "metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall",
+        "mode": "playing",
+        "player": {
+          "x": 0.8,
+          "y": 1.65,
+          "z": -1.15,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "mission": {
+          "name": "Living Room First Fix",
+          "progressPercent": 0,
+          "selectedTool": "hammer",
+          "complete": false
+        },
+        "workSurface": {
+          "model": "sparse-3d-brittle-masonry",
+          "pendingSupportJobs": 0,
+          "volumeBytes": 0,
+          "pendingMeshes": 0,
+          "workerMeshing": true,
+          "lastWorkerMs": 0,
+          "peakGeometryLatencyMs": 0,
+          "workerError": "",
+          "impactCount": 0,
+          "removedNodes": 0,
+          "removedVolumeCm3": 0,
+          "maximumDepthMm": 0,
+          "damagedChunks": 0,
+          "surfaceTriangles": 0,
+          "geometryBytes": 0,
+          "deformedWallCells": 0,
+          "lastCalculationMs": 0,
+          "peakCalculationMs": 0,
+          "lastMeshMs": 0,
+          "peakMeshMs": 0,
+          "lastImpact": null,
+          "fractureSegments": 0,
+          "freeSprayMarks": 0,
+          "activeFragments": 0,
+          "insideFragments": 0,
+          "inwardFragments": 0,
+          "physicsMs": 0,
+          "peakPhysicsMs": 0.10000002384185791,
+          "fragmentBudget": 144,
+          "chiselTip": {
+            "x": 0.8000000000000002,
+            "y": 1.6500022187709962,
+            "z": -2.409995241830245,
+            "inAir": false
+          },
+          "airborneFragments": 0,
+          "settledFragments": 0,
+          "sprayMode": "live",
+          "sprayColor": "BLUE",
+          "hammerMode": "demolish",
+          "chisel": "flat",
+          "chiselEnergyJ": 4,
+          "chiselTiltDegrees": 25,
+          "chiselSideDegrees": 0,
+          "chiselEdgeDegrees": 0,
+          "aimControlMode": "auto-use",
+          "aimInputMode": "drag",
+          "aimProfile": "normal",
+          "wallAssist": true,
+          "proximityPrecision": 0.352
+        },
+        "activePoint": {
+          "id": "A",
+          "kind": "socket",
+          "bottomHeightM": 0.3,
+          "boxes": [
+            "2G",
+            "1G"
+          ],
+          "stage": "inspect",
+          "chaseHits": 0,
+          "chaseCoverage": 0,
+          "pipeStep": "measure",
+          "targeted": false,
+          "tiltDegrees": 0,
+          "depthErrorMm": 0,
+          "levelPass": true,
+          "flushPass": true
+        },
+        "points": [
+          {
+            "id": "A",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "B",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "C",
+            "stage": "inspect",
+            "conduitVisible": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "02-real-mouse-hold",
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+        "hardwareConcurrency": 24,
+        "gpuVendor": "Google Inc. (NVIDIA)",
+        "gpuRenderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "webglVersion": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "frameIntervals": {
+        "samples": 391,
+        "averageMs": 4.6248081841432205,
+        "p95Ms": 4.300000000000182,
+        "worstMs": 29.100000000000364,
+        "averageFps": 216.2251838743572
+      },
+      "impactProcessing": {
+        "samples": 8,
+        "averageMs": 12.662499997764826,
+        "p95Ms": 21.299999982118607,
+        "worstMs": 22.400000005960464,
+        "successful": 8
+      },
+      "cpuRenderSubmission": {
+        "samples": 391,
+        "averageMs": 0.36905370892771067,
+        "p95Ms": 0.5999999940395355,
+        "worstMs": 27.899999976158142
+      },
+      "render": {
+        "frame": 1272,
+        "calls": 62,
+        "triangles": 51190,
+        "points": 0,
+        "lines": 0
+      },
+      "memory": {
+        "geometries": 91,
+        "textures": 2,
+        "jsHeapUsedBytes": 25398606,
+        "jsHeapTotalBytes": 54387466
+      },
+      "state": {
+        "coordinateSystem": "metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall",
+        "mode": "playing",
+        "player": {
+          "x": 0.8,
+          "y": 1.65,
+          "z": -1.15,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "mission": {
+          "name": "Living Room First Fix",
+          "progressPercent": 0,
+          "selectedTool": "hammer",
+          "complete": false
+        },
+        "workSurface": {
+          "model": "sparse-3d-brittle-masonry",
+          "pendingSupportJobs": 0,
+          "volumeBytes": 57600,
+          "pendingMeshes": 0,
+          "workerMeshing": true,
+          "lastWorkerMs": 6.5,
+          "peakGeometryLatencyMs": 23.69999998807907,
+          "workerError": "",
+          "impactCount": 8,
+          "removedNodes": 173,
+          "removedVolumeCm3": 91.533913043477,
+          "maximumDepthMm": 125.3901146977361,
+          "damagedChunks": 2,
+          "surfaceTriangles": 13188,
+          "geometryBytes": 1424304,
+          "deformedWallCells": 0,
+          "lastCalculationMs": 8.099999994039536,
+          "peakCalculationMs": 14.599999994039536,
+          "lastMeshMs": 4.800000011920929,
+          "peakMeshMs": 6.4000000059604645,
+          "lastImpact": {
+            "removedNodes": 30,
+            "removedByMaterial": {
+              "clay": 30
+            },
+            "stats": {
+              "milliseconds": 8,
+              "affectedNodes": 1191,
+              "weakenedNodes": 1161,
+              "connectivityVisited": 1559,
+              "detachedNodes": 0,
+              "activeChunks": 2
+            }
+          },
+          "fractureSegments": 29,
+          "freeSprayMarks": 0,
+          "activeFragments": 38,
+          "insideFragments": 30,
+          "inwardFragments": 22,
+          "physicsMs": 0,
+          "peakPhysicsMs": 0.5,
+          "fragmentBudget": 144,
+          "chiselTip": {
+            "x": 0.8058842467325279,
+            "y": 1.64000156919995,
+            "z": -2.423377442925221,
+            "inAir": false
+          },
+          "airborneFragments": 24,
+          "settledFragments": 14,
+          "sprayMode": "live",
+          "sprayColor": "BLUE",
+          "hammerMode": "demolish",
+          "chisel": "flat",
+          "chiselEnergyJ": 4,
+          "chiselTiltDegrees": 25,
+          "chiselSideDegrees": 0,
+          "chiselEdgeDegrees": 0,
+          "aimControlMode": "auto-use",
+          "aimInputMode": "drag",
+          "aimProfile": "normal",
+          "wallAssist": true,
+          "proximityPrecision": 0.352
+        },
+        "activePoint": {
+          "id": "A",
+          "kind": "socket",
+          "bottomHeightM": 0.3,
+          "boxes": [
+            "2G",
+            "1G"
+          ],
+          "stage": "inspect",
+          "chaseHits": 0,
+          "chaseCoverage": 0,
+          "pipeStep": "measure",
+          "targeted": false,
+          "tiltDegrees": 0,
+          "depthErrorMm": 0,
+          "levelPass": true,
+          "flushPass": true
+        },
+        "points": [
+          {
+            "id": "A",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "B",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "C",
+            "stage": "inspect",
+            "conduitVisible": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "03-fifty-local-impacts",
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+        "hardwareConcurrency": 24,
+        "gpuVendor": "Google Inc. (NVIDIA)",
+        "gpuRenderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "webglVersion": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "frameIntervals": {
+        "samples": 553,
+        "averageMs": 4.4831826401446655,
+        "p95Ms": 4.300000000000182,
+        "worstMs": 16.700000000000728,
+        "averageFps": 223.05582445950307
+      },
+      "impactProcessing": {
+        "samples": 50,
+        "averageMs": 2.028000000119209,
+        "p95Ms": 11.800000011920929,
+        "worstMs": 14.700000017881393,
+        "successful": 12
+      },
+      "cpuRenderSubmission": {
+        "samples": 553,
+        "averageMs": 0.40452079499177435,
+        "p95Ms": 0.699999988079071,
+        "worstMs": 1.2999999821186066
+      },
+      "render": {
+        "frame": 1866,
+        "calls": 79,
+        "triangles": 69690,
+        "points": 0,
+        "lines": 0
+      },
+      "memory": {
+        "geometries": 112,
+        "textures": 2,
+        "jsHeapUsedBytes": 25514905,
+        "jsHeapTotalBytes": 54996301
+      },
+      "state": {
+        "coordinateSystem": "metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall",
+        "mode": "playing",
+        "player": {
+          "x": 0.8,
+          "y": 1.65,
+          "z": -1.15,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "mission": {
+          "name": "Living Room First Fix",
+          "progressPercent": 0,
+          "selectedTool": "hammer",
+          "complete": false
+        },
+        "workSurface": {
+          "model": "sparse-3d-brittle-masonry",
+          "pendingSupportJobs": 0,
+          "volumeBytes": 115200,
+          "pendingMeshes": 0,
+          "workerMeshing": true,
+          "lastWorkerMs": 3.9000000059604645,
+          "peakGeometryLatencyMs": 29.099999994039536,
+          "workerError": "",
+          "impactCount": 20,
+          "removedNodes": 465,
+          "removedVolumeCm3": 246.42782608695384,
+          "maximumDepthMm": 180,
+          "damagedChunks": 4,
+          "surfaceTriangles": 25896,
+          "geometryBytes": 2796768,
+          "deformedWallCells": 0,
+          "lastCalculationMs": 7.0999999940395355,
+          "peakCalculationMs": 14.599999994039536,
+          "lastMeshMs": 4.4000000059604645,
+          "peakMeshMs": 6.4000000059604645,
+          "lastImpact": {
+            "removedNodes": 64,
+            "removedByMaterial": {
+              "clay": 64
+            },
+            "stats": {
+              "milliseconds": 6.9000000059604645,
+              "affectedNodes": 1133,
+              "weakenedNodes": 1069,
+              "connectivityVisited": 116,
+              "detachedNodes": 0,
+              "activeChunks": 4
+            }
+          },
+          "fractureSegments": 68,
+          "freeSprayMarks": 0,
+          "activeFragments": 57,
+          "insideFragments": 49,
+          "inwardFragments": 23,
+          "physicsMs": 0.19999998807907104,
+          "peakPhysicsMs": 1,
+          "fragmentBudget": 144,
+          "chiselTip": {
+            "x": 0.8000000000000002,
+            "y": 1.584000558133573,
+            "z": -2.5515362598323224,
+            "inAir": false
+          },
+          "airborneFragments": 36,
+          "settledFragments": 21,
+          "sprayMode": "live",
+          "sprayColor": "BLUE",
+          "hammerMode": "demolish",
+          "chisel": "flat",
+          "chiselEnergyJ": 4,
+          "chiselTiltDegrees": 25,
+          "chiselSideDegrees": 0,
+          "chiselEdgeDegrees": 0,
+          "aimControlMode": "auto-use",
+          "aimInputMode": "drag",
+          "aimProfile": "normal",
+          "wallAssist": true,
+          "proximityPrecision": 0.352
+        },
+        "activePoint": {
+          "id": "A",
+          "kind": "socket",
+          "bottomHeightM": 0.3,
+          "boxes": [
+            "2G",
+            "1G"
+          ],
+          "stage": "inspect",
+          "chaseHits": 0,
+          "chaseCoverage": 0,
+          "pipeStep": "measure",
+          "targeted": false,
+          "tiltDegrees": 0,
+          "depthErrorMm": 0,
+          "levelPass": true,
+          "flushPass": true
+        },
+        "points": [
+          {
+            "id": "A",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "B",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "C",
+            "stage": "inspect",
+            "conduitVisible": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "04-long-moving-chase",
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+        "hardwareConcurrency": 24,
+        "gpuVendor": "Google Inc. (NVIDIA)",
+        "gpuRenderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "webglVersion": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "frameIntervals": {
+        "samples": 1081,
+        "averageMs": 5.388436632747456,
+        "p95Ms": 16.400000000001455,
+        "worstMs": 16.80000000000109,
+        "averageFps": 185.58258510875723
+      },
+      "impactProcessing": {
+        "samples": 100,
+        "averageMs": 7.436000001430512,
+        "p95Ms": 11.700000017881393,
+        "worstMs": 14.599999994039536,
+        "successful": 100
+      },
+      "cpuRenderSubmission": {
+        "samples": 1081,
+        "averageMs": 0.43857539287328057,
+        "p95Ms": 0.7000000178813934,
+        "worstMs": 1.199999988079071
+      },
+      "render": {
+        "frame": 2990,
+        "calls": 94,
+        "triangles": 100800,
+        "points": 0,
+        "lines": 0
+      },
+      "memory": {
+        "geometries": 134,
+        "textures": 2,
+        "jsHeapUsedBytes": 62492665,
+        "jsHeapTotalBytes": 105628237
+      },
+      "state": {
+        "coordinateSystem": "metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall",
+        "mode": "playing",
+        "player": {
+          "x": -0.8,
+          "y": 1.65,
+          "z": -1.15,
+          "yaw": 0,
+          "pitch": 0.462
+        },
+        "mission": {
+          "name": "Living Room First Fix",
+          "progressPercent": 0,
+          "selectedTool": "hammer",
+          "complete": false
+        },
+        "workSurface": {
+          "model": "sparse-3d-brittle-masonry",
+          "pendingSupportJobs": 0,
+          "volumeBytes": 864000,
+          "pendingMeshes": 0,
+          "workerMeshing": true,
+          "lastWorkerMs": 4.0999999940395355,
+          "peakGeometryLatencyMs": 29.099999994039536,
+          "workerError": "",
+          "impactCount": 120,
+          "removedNodes": 3260,
+          "removedVolumeCm3": 1695.7356521738943,
+          "maximumDepthMm": 180,
+          "damagedChunks": 14,
+          "surfaceTriangles": 93540,
+          "geometryBytes": 10102320,
+          "deformedWallCells": 0,
+          "lastCalculationMs": 5.5999999940395355,
+          "peakCalculationMs": 14.599999994039536,
+          "lastMeshMs": 2.600000023841858,
+          "peakMeshMs": 6.4000000059604645,
+          "lastImpact": {
+            "removedNodes": 49,
+            "removedByMaterial": {
+              "clay": 49
+            },
+            "stats": {
+              "milliseconds": 5.5999999940395355,
+              "affectedNodes": 771,
+              "weakenedNodes": 722,
+              "connectivityVisited": 3011,
+              "detachedNodes": 0,
+              "activeChunks": 30
+            }
+          },
+          "fractureSegments": 394,
+          "freeSprayMarks": 0,
+          "activeFragments": 67,
+          "insideFragments": 53,
+          "inwardFragments": 27,
+          "physicsMs": 0.29999998211860657,
+          "peakPhysicsMs": 1.100000023841858,
+          "fragmentBudget": 144,
+          "chiselTip": {
+            "x": -0.8000000000000002,
+            "y": 2.278002218770995,
+            "z": -2.409995241830244,
+            "inAir": false
+          },
+          "airborneFragments": 56,
+          "settledFragments": 11,
+          "sprayMode": "live",
+          "sprayColor": "BLUE",
+          "hammerMode": "demolish",
+          "chisel": "flat",
+          "chiselEnergyJ": 4,
+          "chiselTiltDegrees": 25,
+          "chiselSideDegrees": 0,
+          "chiselEdgeDegrees": 0,
+          "aimControlMode": "auto-use",
+          "aimInputMode": "drag",
+          "aimProfile": "normal",
+          "wallAssist": true,
+          "proximityPrecision": 0.352
+        },
+        "activePoint": {
+          "id": "A",
+          "kind": "socket",
+          "bottomHeightM": 0.3,
+          "boxes": [
+            "2G",
+            "1G"
+          ],
+          "stage": "inspect",
+          "chaseHits": 0,
+          "chaseCoverage": 0,
+          "pipeStep": "measure",
+          "targeted": false,
+          "tiltDegrees": 0,
+          "depthErrorMm": 0,
+          "levelPass": true,
+          "flushPass": true
+        },
+        "points": [
+          {
+            "id": "A",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "B",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "C",
+            "stage": "inspect",
+            "conduitVisible": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "05-damaged-idle",
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+        "hardwareConcurrency": 24,
+        "gpuVendor": "Google Inc. (NVIDIA)",
+        "gpuRenderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "webglVersion": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "frameIntervals": {
+        "samples": 721,
+        "averageMs": 4.166712898751732,
+        "p95Ms": 4.299999999999272,
+        "worstMs": 4.400000000001455,
+        "averageFps": 239.9973370614474
+      },
+      "impactProcessing": {
+        "samples": 0,
+        "averageMs": null,
+        "p95Ms": null,
+        "worstMs": null,
+        "successful": 0
+      },
+      "cpuRenderSubmission": {
+        "samples": 721,
+        "averageMs": 0.42371706050741853,
+        "p95Ms": 0.699999988079071,
+        "worstMs": 1.100000023841858
+      },
+      "render": {
+        "frame": 3746,
+        "calls": 64,
+        "triangles": 123684,
+        "points": 0,
+        "lines": 0
+      },
+      "memory": {
+        "geometries": 97,
+        "textures": 2,
+        "jsHeapUsedBytes": 28193681,
+        "jsHeapTotalBytes": 96807973
+      },
+      "state": {
+        "coordinateSystem": "metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall",
+        "mode": "playing",
+        "player": {
+          "x": -0.8,
+          "y": 1.65,
+          "z": -1.15,
+          "yaw": 0,
+          "pitch": -0.118
+        },
+        "mission": {
+          "name": "Living Room First Fix",
+          "progressPercent": 0,
+          "selectedTool": "hammer",
+          "complete": false
+        },
+        "workSurface": {
+          "model": "sparse-3d-brittle-masonry",
+          "pendingSupportJobs": 0,
+          "volumeBytes": 864000,
+          "pendingMeshes": 0,
+          "workerMeshing": true,
+          "lastWorkerMs": 4.0999999940395355,
+          "peakGeometryLatencyMs": 29.099999994039536,
+          "workerError": "",
+          "impactCount": 120,
+          "removedNodes": 3260,
+          "removedVolumeCm3": 1695.7356521738943,
+          "maximumDepthMm": 180,
+          "damagedChunks": 14,
+          "surfaceTriangles": 93540,
+          "geometryBytes": 10102320,
+          "deformedWallCells": 0,
+          "lastCalculationMs": 5.5999999940395355,
+          "peakCalculationMs": 14.599999994039536,
+          "lastMeshMs": 2.600000023841858,
+          "peakMeshMs": 6.4000000059604645,
+          "lastImpact": {
+            "removedNodes": 49,
+            "removedByMaterial": {
+              "clay": 49
+            },
+            "stats": {
+              "milliseconds": 5.5999999940395355,
+              "affectedNodes": 771,
+              "weakenedNodes": 722,
+              "connectivityVisited": 3011,
+              "detachedNodes": 0,
+              "activeChunks": 30
+            }
+          },
+          "fractureSegments": 394,
+          "freeSprayMarks": 0,
+          "activeFragments": 30,
+          "insideFragments": 24,
+          "inwardFragments": 13,
+          "physicsMs": 0.19999998807907104,
+          "peakPhysicsMs": 1.100000023841858,
+          "fragmentBudget": 144,
+          "chiselTip": {
+            "x": -0.7999999999999998,
+            "y": 1.5000022187709958,
+            "z": -2.409995241830244,
+            "inAir": false
+          },
+          "airborneFragments": 18,
+          "settledFragments": 12,
+          "sprayMode": "live",
+          "sprayColor": "BLUE",
+          "hammerMode": "demolish",
+          "chisel": "flat",
+          "chiselEnergyJ": 4,
+          "chiselTiltDegrees": 25,
+          "chiselSideDegrees": 0,
+          "chiselEdgeDegrees": 0,
+          "aimControlMode": "auto-use",
+          "aimInputMode": "drag",
+          "aimProfile": "normal",
+          "wallAssist": true,
+          "proximityPrecision": 0.352
+        },
+        "activePoint": {
+          "id": "A",
+          "kind": "socket",
+          "bottomHeightM": 0.3,
+          "boxes": [
+            "2G",
+            "1G"
+          ],
+          "stage": "inspect",
+          "chaseHits": 0,
+          "chaseCoverage": 0,
+          "pipeStep": "measure",
+          "targeted": false,
+          "tiltDegrees": 0,
+          "depthErrorMm": 0,
+          "levelPass": true,
+          "flushPass": true
+        },
+        "points": [
+          {
+            "id": "A",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "B",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "C",
+            "stage": "inspect",
+            "conduitVisible": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "06-five-hundred-rapid-multiple-areas",
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+        "hardwareConcurrency": 24,
+        "gpuVendor": "Google Inc. (NVIDIA)",
+        "gpuRenderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "webglVersion": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "frameIntervals": {
+        "samples": 2873,
+        "averageMs": 6.7945353289244705,
+        "p95Ms": 16.69999999999709,
+        "worstMs": 20.89999999999418,
+        "averageFps": 147.17709918189405
+      },
+      "impactProcessing": {
+        "samples": 500,
+        "averageMs": 8.555999999761582,
+        "p95Ms": 11.400000005960464,
+        "worstMs": 15,
+        "successful": 500
+      },
+      "cpuRenderSubmission": {
+        "samples": 2873,
+        "averageMs": 0.6924121131101968,
+        "p95Ms": 1.199999988079071,
+        "worstMs": 2.699999988079071
+      },
+      "render": {
+        "frame": 6661,
+        "calls": 123,
+        "triangles": 269184,
+        "points": 0,
+        "lines": 0
+      },
+      "memory": {
+        "geometries": 221,
+        "textures": 2,
+        "jsHeapUsedBytes": 69982429,
+        "jsHeapTotalBytes": 139854893
+      },
+      "state": {
+        "coordinateSystem": "metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall",
+        "mode": "playing",
+        "player": {
+          "x": 0.997,
+          "y": 1.65,
+          "z": -1.15,
+          "yaw": 0,
+          "pitch": 0.271
+        },
+        "mission": {
+          "name": "Living Room First Fix",
+          "progressPercent": 0,
+          "selectedTool": "hammer",
+          "complete": false
+        },
+        "workSurface": {
+          "model": "sparse-3d-brittle-masonry",
+          "pendingSupportJobs": 0,
+          "volumeBytes": 2102400,
+          "pendingMeshes": 0,
+          "workerMeshing": true,
+          "lastWorkerMs": 6,
+          "peakGeometryLatencyMs": 34.39999997615814,
+          "workerError": "",
+          "impactCount": 620,
+          "removedNodes": 14228,
+          "removedVolumeCm3": 7347.046956521669,
+          "maximumDepthMm": 180,
+          "damagedChunks": 70,
+          "surfaceTriangles": 404170,
+          "geometryBytes": 43650360,
+          "deformedWallCells": 0,
+          "lastCalculationMs": 3.5999999940395355,
+          "peakCalculationMs": 14.599999994039536,
+          "lastMeshMs": 3.5999999940395355,
+          "peakMeshMs": 6.9000000059604645,
+          "lastImpact": {
+            "removedNodes": 16,
+            "removedByMaterial": {
+              "clay": 16
+            },
+            "stats": {
+              "milliseconds": 3.5,
+              "affectedNodes": 474,
+              "weakenedNodes": 458,
+              "connectivityVisited": 2950,
+              "detachedNodes": 0,
+              "activeChunks": 73
+            }
+          },
+          "fractureSegments": 1251,
+          "freeSprayMarks": 0,
+          "activeFragments": 98,
+          "insideFragments": 58,
+          "inwardFragments": 36,
+          "physicsMs": 0.699999988079071,
+          "peakPhysicsMs": 2,
+          "fragmentBudget": 144,
+          "chiselTip": {
+            "x": 0.9969959782211378,
+            "y": 2,
+            "z": -2.4099966253268406,
+            "inAir": false
+          },
+          "airborneFragments": 62,
+          "settledFragments": 36,
+          "sprayMode": "live",
+          "sprayColor": "BLUE",
+          "hammerMode": "demolish",
+          "chisel": "flat",
+          "chiselEnergyJ": 4,
+          "chiselTiltDegrees": 0,
+          "chiselSideDegrees": 50,
+          "chiselEdgeDegrees": 0,
+          "aimControlMode": "auto-use",
+          "aimInputMode": "drag",
+          "aimProfile": "normal",
+          "wallAssist": true,
+          "proximityPrecision": 0.352
+        },
+        "activePoint": {
+          "id": "A",
+          "kind": "socket",
+          "bottomHeightM": 0.3,
+          "boxes": [
+            "2G",
+            "1G"
+          ],
+          "stage": "inspect",
+          "chaseHits": 0,
+          "chaseCoverage": 0,
+          "pipeStep": "measure",
+          "targeted": false,
+          "tiltDegrees": 0,
+          "depthErrorMm": 0,
+          "levelPass": true,
+          "flushPass": true
+        },
+        "points": [
+          {
+            "id": "A",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "B",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "C",
+            "stage": "inspect",
+            "conduitVisible": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "07-damaged-idle-ten-seconds",
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+        "hardwareConcurrency": 24,
+        "gpuVendor": "Google Inc. (NVIDIA)",
+        "gpuRenderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "webglVersion": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "frameIntervals": {
+        "samples": 2403,
+        "averageMs": 4.166625052018311,
+        "p95Ms": 4.299999999995634,
+        "worstMs": 5,
+        "averageFps": 240.00239702768562
+      },
+      "impactProcessing": {
+        "samples": 0,
+        "averageMs": null,
+        "p95Ms": null,
+        "worstMs": null,
+        "successful": 0
+      },
+      "cpuRenderSubmission": {
+        "samples": 2403,
+        "averageMs": 0.4953391589921958,
+        "p95Ms": 0.800000011920929,
+        "worstMs": 1.5
+      },
+      "render": {
+        "frame": 9104,
+        "calls": 62,
+        "triangles": 244302,
+        "points": 0,
+        "lines": 0
+      },
+      "memory": {
+        "geometries": 157,
+        "textures": 2,
+        "jsHeapUsedBytes": 76896569,
+        "jsHeapTotalBytes": 132423405
+      },
+      "state": {
+        "coordinateSystem": "metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall",
+        "mode": "playing",
+        "player": {
+          "x": 0.997,
+          "y": 1.65,
+          "z": -1.15,
+          "yaw": 0,
+          "pitch": 0.271
+        },
+        "mission": {
+          "name": "Living Room First Fix",
+          "progressPercent": 0,
+          "selectedTool": "hammer",
+          "complete": false
+        },
+        "workSurface": {
+          "model": "sparse-3d-brittle-masonry",
+          "pendingSupportJobs": 0,
+          "volumeBytes": 2102400,
+          "pendingMeshes": 0,
+          "workerMeshing": true,
+          "lastWorkerMs": 6,
+          "peakGeometryLatencyMs": 34.39999997615814,
+          "workerError": "",
+          "impactCount": 620,
+          "removedNodes": 14228,
+          "removedVolumeCm3": 7347.046956521669,
+          "maximumDepthMm": 180,
+          "damagedChunks": 70,
+          "surfaceTriangles": 404170,
+          "geometryBytes": 43650360,
+          "deformedWallCells": 0,
+          "lastCalculationMs": 3.5999999940395355,
+          "peakCalculationMs": 14.599999994039536,
+          "lastMeshMs": 3.5999999940395355,
+          "peakMeshMs": 6.9000000059604645,
+          "lastImpact": {
+            "removedNodes": 16,
+            "removedByMaterial": {
+              "clay": 16
+            },
+            "stats": {
+              "milliseconds": 3.5,
+              "affectedNodes": 474,
+              "weakenedNodes": 458,
+              "connectivityVisited": 2950,
+              "detachedNodes": 0,
+              "activeChunks": 73
+            }
+          },
+          "fractureSegments": 1251,
+          "freeSprayMarks": 0,
+          "activeFragments": 34,
+          "insideFragments": 18,
+          "inwardFragments": 16,
+          "physicsMs": 0,
+          "peakPhysicsMs": 2,
+          "fragmentBudget": 144,
+          "chiselTip": {
+            "x": 0.9969959782211378,
+            "y": 2,
+            "z": -2.4099966253268406,
+            "inAir": false
+          },
+          "airborneFragments": 1,
+          "settledFragments": 33,
+          "sprayMode": "live",
+          "sprayColor": "BLUE",
+          "hammerMode": "demolish",
+          "chisel": "flat",
+          "chiselEnergyJ": 4,
+          "chiselTiltDegrees": 0,
+          "chiselSideDegrees": 50,
+          "chiselEdgeDegrees": 0,
+          "aimControlMode": "auto-use",
+          "aimInputMode": "drag",
+          "aimProfile": "normal",
+          "wallAssist": true,
+          "proximityPrecision": 0.352
+        },
+        "activePoint": {
+          "id": "A",
+          "kind": "socket",
+          "bottomHeightM": 0.3,
+          "boxes": [
+            "2G",
+            "1G"
+          ],
+          "stage": "inspect",
+          "chaseHits": 0,
+          "chaseCoverage": 0,
+          "pipeStep": "measure",
+          "targeted": false,
+          "tiltDegrees": 0,
+          "depthErrorMm": 0,
+          "levelPass": true,
+          "flushPass": true
+        },
+        "points": [
+          {
+            "id": "A",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "B",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "C",
+            "stage": "inspect",
+            "conduitVisible": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "08-damaged-idle-thirty-seconds",
+      "environment": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+        "hardwareConcurrency": 24,
+        "gpuVendor": "Google Inc. (NVIDIA)",
+        "gpuRenderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "webglVersion": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "frameIntervals": {
+        "samples": 4802,
+        "averageMs": 4.1666597251145365,
+        "p95Ms": 4.30000000000291,
+        "worstMs": 4.600000000005821,
+        "averageFps": 240.00039983406882
+      },
+      "impactProcessing": {
+        "samples": 0,
+        "averageMs": null,
+        "p95Ms": null,
+        "worstMs": null,
+        "successful": 0
+      },
+      "cpuRenderSubmission": {
+        "samples": 4802,
+        "averageMs": 0.4404206579052275,
+        "p95Ms": 0.7000000178813934,
+        "worstMs": 1.2999999821186066
+      },
+      "render": {
+        "frame": 13947,
+        "calls": 62,
+        "triangles": 244302,
+        "points": 0,
+        "lines": 0
+      },
+      "memory": {
+        "geometries": 157,
+        "textures": 2,
+        "jsHeapUsedBytes": 82491997,
+        "jsHeapTotalBytes": 132161261
+      },
+      "state": {
+        "coordinateSystem": "metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall",
+        "mode": "playing",
+        "player": {
+          "x": 0.997,
+          "y": 1.65,
+          "z": -1.15,
+          "yaw": 0,
+          "pitch": 0.271
+        },
+        "mission": {
+          "name": "Living Room First Fix",
+          "progressPercent": 0,
+          "selectedTool": "hammer",
+          "complete": false
+        },
+        "workSurface": {
+          "model": "sparse-3d-brittle-masonry",
+          "pendingSupportJobs": 0,
+          "volumeBytes": 2102400,
+          "pendingMeshes": 0,
+          "workerMeshing": true,
+          "lastWorkerMs": 6,
+          "peakGeometryLatencyMs": 34.39999997615814,
+          "workerError": "",
+          "impactCount": 620,
+          "removedNodes": 14228,
+          "removedVolumeCm3": 7347.046956521669,
+          "maximumDepthMm": 180,
+          "damagedChunks": 70,
+          "surfaceTriangles": 404170,
+          "geometryBytes": 43650360,
+          "deformedWallCells": 0,
+          "lastCalculationMs": 3.5999999940395355,
+          "peakCalculationMs": 14.599999994039536,
+          "lastMeshMs": 3.5999999940395355,
+          "peakMeshMs": 6.9000000059604645,
+          "lastImpact": {
+            "removedNodes": 16,
+            "removedByMaterial": {
+              "clay": 16
+            },
+            "stats": {
+              "milliseconds": 3.5,
+              "affectedNodes": 474,
+              "weakenedNodes": 458,
+              "connectivityVisited": 2950,
+              "detachedNodes": 0,
+              "activeChunks": 73
+            }
+          },
+          "fractureSegments": 1251,
+          "freeSprayMarks": 0,
+          "activeFragments": 34,
+          "insideFragments": 18,
+          "inwardFragments": 16,
+          "physicsMs": 0.09999999403953552,
+          "peakPhysicsMs": 2,
+          "fragmentBudget": 144,
+          "chiselTip": {
+            "x": 0.9969959782211378,
+            "y": 2,
+            "z": -2.4099966253268406,
+            "inAir": false
+          },
+          "airborneFragments": 1,
+          "settledFragments": 33,
+          "sprayMode": "live",
+          "sprayColor": "BLUE",
+          "hammerMode": "demolish",
+          "chisel": "flat",
+          "chiselEnergyJ": 4,
+          "chiselTiltDegrees": 0,
+          "chiselSideDegrees": 50,
+          "chiselEdgeDegrees": 0,
+          "aimControlMode": "auto-use",
+          "aimInputMode": "drag",
+          "aimProfile": "normal",
+          "wallAssist": true,
+          "proximityPrecision": 0.352
+        },
+        "activePoint": {
+          "id": "A",
+          "kind": "socket",
+          "bottomHeightM": 0.3,
+          "boxes": [
+            "2G",
+            "1G"
+          ],
+          "stage": "inspect",
+          "chaseHits": 0,
+          "chaseCoverage": 0,
+          "pipeStep": "measure",
+          "targeted": false,
+          "tiltDegrees": 0,
+          "depthErrorMm": 0,
+          "levelPass": true,
+          "flushPass": true
+        },
+        "points": [
+          {
+            "id": "A",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "B",
+            "stage": "inspect",
+            "conduitVisible": false
+          },
+          {
+            "id": "C",
+            "stage": "inspect",
+            "conduitVisible": false
+          }
+        ]
+      }
+    }
+  ],
+  "errors": [],
+  "httpStatus": 200
+}

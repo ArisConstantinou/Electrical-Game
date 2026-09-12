@@ -12,7 +12,10 @@
     "test:demolition-logic": "node tests/demolition-progression-smoke.mjs",
     "test:gameplay": "node tests/gameplay-smoke.mjs",
     "test:studio": "node tests/studio-contract.mjs",
-    "test:studio-live": "node tests/studio-live-smoke.mjs"
+    "test:studio-live": "node tests/studio-live-smoke.mjs",
+    "test:masonry": "node tests/masonry-acceptance.mjs",
+    "test:masonry-contact": "node tests/masonry-contact.mjs",
+    "test:masonry-benchmark": "node tests/masonry-benchmark.mjs"
   },
   "dependencies": {
     "three": "^0.180.0"

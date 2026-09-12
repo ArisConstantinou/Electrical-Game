@@ -1,0 +1,47 @@
+{
+  "url": "http://127.0.0.1:5362/Electrical-Game/",
+  "browser": "152.0.7977.83",
+  "mobileIsEmulation": true,
+  "scenarios": [
+    {
+      "platform": "desktop",
+      "point": "A",
+      "boxStrokes": 145,
+      "complete": true
+    },
+    {
+      "platform": "desktop",
+      "point": "B",
+      "boxStrokes": 104,
+      "complete": true
+    },
+    {
+      "platform": "desktop",
+      "point": "C",
+      "boxStrokes": 58,
+      "complete": true
+    },
+    {
+      "platform": "mobile-emulated",
+      "point": "A",
+      "boxStrokes": 141,
+      "complete": true,
+      "realTouchHold": true
+    }
+  ],
+  "errors": [],
+  "desktopLayout": {
+    "width": 1366,
+    "height": 768,
+    "scrollWidth": 1366,
+    "scrollHeight": 768,
+    "badFonts": []
+  },
+  "mobileLayout": {
+    "width": 390,
+    "height": 844,
+    "scrollWidth": 390,
+    "scrollHeight": 844,
+    "badFonts": []
+  }
+}

@@ -70,6 +70,12 @@ export class DesktopControls {
       if (directTools[event.code]) window.dispatchEvent(new CustomEvent('wirehouse:select-tool', { detail: directTools[event.code] }));
       if (event.code === 'KeyV' && !event.repeat) window.dispatchEvent(new CustomEvent('wirehouse:cycle-spray-mode'));
       if (event.code === 'KeyC' && !event.repeat) window.dispatchEvent(new CustomEvent('wirehouse:cycle-spray-color'));
+      if (event.code === 'BracketLeft') window.dispatchEvent(new CustomEvent('wirehouse:tilt-chisel',{detail:-5}));
+      if (event.code === 'BracketRight') window.dispatchEvent(new CustomEvent('wirehouse:tilt-chisel',{detail:5}));
+      if (event.code === 'KeyJ') window.dispatchEvent(new CustomEvent('wirehouse:side-chisel',{detail:-5}));
+      if (event.code === 'KeyK') window.dispatchEvent(new CustomEvent('wirehouse:side-chisel',{detail:5}));
+      if (event.code === 'KeyT' && !event.repeat) window.dispatchEvent(new CustomEvent('wirehouse:cycle-chisel'));
+      if (event.code === 'KeyR' && !event.repeat) window.dispatchEvent(new CustomEvent('wirehouse:rotate-chisel'));
       if (event.code === 'KeyX' && !event.repeat) window.dispatchEvent(new CustomEvent('wirehouse:cycle-hammer-mode'));
       if (event.code === 'KeyF' && !event.repeat) {
         if (document.fullscreenElement) void document.exitFullscreen();

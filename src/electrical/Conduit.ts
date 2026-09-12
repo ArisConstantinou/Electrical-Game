@@ -8,9 +8,9 @@ export class Conduit extends THREE.Group {
     this.name = `20 mm rigid PVC conduit · Point ${point.definition.id}`;
     this.userData.studioEntityId = `point-${point.definition.id}:rigid-pvc`;
     const radius = INSTALLATION_RULES.conduit.firstMissionDiameter / 2;
-    const startY = point.definition.bottom - 0.012;
-    const worldX = point.definition.x;
-    const wallZ = -2.37;
+    const startY = point.position.y - point.boxGroup.groupHeight / 2 - 0.012;
+    const worldX = point.position.x;
+    const wallZ = -2.433;
     const floorZ = -2.18;
     const path = new THREE.CatmullRomCurve3([
       new THREE.Vector3(worldX, startY, wallZ),

@@ -1,0 +1,391 @@
+{
+  "failures": [],
+  "progress": [
+    {
+      "nodes": 0,
+      "total": 0,
+      "depth": -0.005250059442740707,
+      "materials": {},
+      "detached": 0
+    },
+    {
+      "nodes": 10,
+      "total": 10,
+      "depth": -0.005250059442740707,
+      "materials": {
+        "clay": 10
+      },
+      "detached": 0
+    },
+    {
+      "nodes": 64,
+      "total": 74,
+      "depth": 7.826951222825951,
+      "materials": {
+        "clay": 63,
+        "mortar": 1
+      },
+      "detached": 0
+    },
+    {
+      "nodes": 7,
+      "total": 81,
+      "depth": 54.78790380434839,
+      "materials": {
+        "clay": 7
+      },
+      "detached": 0
+    },
+    {
+      "nodes": 27,
+      "total": 108,
+      "depth": 54.78790380434839,
+      "materials": {
+        "clay": 27
+      },
+      "detached": 0
+    },
+    {
+      "nodes": 0,
+      "total": 108,
+      "depth": 117.39201385869613,
+      "materials": {},
+      "detached": 0
+    },
+    {
+      "nodes": 28,
+      "total": 136,
+      "depth": 117.39201385869613,
+      "materials": {
+        "clay": 28
+      },
+      "detached": 0
+    },
+    {
+      "nodes": 4,
+      "total": 140,
+      "depth": 164.35312119565236,
+      "materials": {
+        "clay": 4
+      },
+      "detached": 0
+    },
+    {
+      "nodes": 35,
+      "total": 175,
+      "depth": 164.35312119565236,
+      "materials": {
+        "clay": 35
+      },
+      "detached": 0
+    },
+    {
+      "nodes": 61,
+      "total": 236,
+      "depth": 168.25852201086943,
+      "materials": {
+        "clay": 56,
+        "mortar": 5
+      },
+      "detached": 0
+    },
+    {
+      "nodes": 61,
+      "total": 297,
+      "depth": 176.09072309782593,
+      "materials": {
+        "clay": 55,
+        "mortar": 6
+      },
+      "detached": 0
+    },
+    {
+      "nodes": 0,
+      "total": 297,
+      "depth": null,
+      "materials": {},
+      "detached": 0
+    },
+    {
+      "nodes": 0,
+      "total": 297,
+      "depth": null,
+      "materials": {},
+      "detached": 0
+    },
+    {
+      "nodes": 0,
+      "total": 297,
+      "depth": null,
+      "materials": {},
+      "detached": 0
+    },
+    {
+      "nodes": 0,
+      "total": 297,
+      "depth": null,
+      "materials": {},
+      "detached": 0
+    },
+    {
+      "nodes": 0,
+      "total": 297,
+      "depth": null,
+      "materials": {},
+      "detached": 0
+    }
+  ],
+  "boundaryRemoved": 556,
+  "materialResponse": {
+    "concrete": 0,
+    "render": 223,
+    "clay": 81
+  },
+  "partialRibs": [
+    {
+      "x": 0.7,
+      "front": 1,
+      "rib": 1,
+      "rear": 1
+    },
+    {
+      "x": 0.704,
+      "front": 1,
+      "rib": 1,
+      "rear": 1
+    },
+    {
+      "x": 0.708,
+      "front": 1,
+      "rib": 1,
+      "rear": 1
+    },
+    {
+      "x": 0.712,
+      "front": 1,
+      "rib": 1,
+      "rear": 1
+    },
+    {
+      "x": 0.716,
+      "front": 1,
+      "rib": 1,
+      "rear": 1
+    },
+    {
+      "x": 0.72,
+      "front": 1,
+      "rib": 1,
+      "rear": 1
+    },
+    {
+      "x": 0.724,
+      "front": 1,
+      "rib": 1,
+      "rear": 1
+    },
+    {
+      "x": 0.728,
+      "front": 1,
+      "rib": 1,
+      "rear": 1
+    },
+    {
+      "x": 0.732,
+      "front": 1,
+      "rib": 1,
+      "rear": 1
+    },
+    {
+      "x": 0.736,
+      "front": 1,
+      "rib": 1,
+      "rear": 1
+    },
+    {
+      "x": 0.74,
+      "front": 1,
+      "rib": 1,
+      "rear": 1
+    },
+    {
+      "x": 0.744,
+      "front": 1,
+      "rib": 1,
+      "rear": 1
+    },
+    {
+      "x": 0.748,
+      "front": 1,
+      "rib": 1,
+      "rear": 1
+    },
+    {
+      "x": 0.752,
+      "front": 1,
+      "rib": 1,
+      "rear": 1
+    },
+    {
+      "x": 0.756,
+      "front": 0,
+      "rib": 1,
+      "rear": 0
+    },
+    {
+      "x": 0.76,
+      "front": 0,
+      "rib": 1,
+      "rear": 0
+    },
+    {
+      "x": 0.764,
+      "front": 0,
+      "rib": 1,
+      "rear": 0
+    },
+    {
+      "x": 0.768,
+      "front": 0,
+      "rib": 1,
+      "rear": 0
+    },
+    {
+      "x": 0.772,
+      "front": 0,
+      "rib": 1,
+      "rear": 0
+    },
+    {
+      "x": 0.7759999999999999,
+      "front": 0,
+      "rib": 1,
+      "rear": 0
+    },
+    {
+      "x": 0.7799999999999999,
+      "front": 0,
+      "rib": 0,
+      "rear": 0
+    },
+    {
+      "x": 0.7839999999999999,
+      "front": 0,
+      "rib": 0,
+      "rear": 0
+    },
+    {
+      "x": 0.7879999999999999,
+      "front": 0,
+      "rib": 0,
+      "rear": 0
+    },
+    {
+      "x": 0.7919999999999999,
+      "front": 0,
+      "rib": 0,
+      "rear": 0
+    },
+    {
+      "x": 0.7959999999999999,
+      "front": 0,
+      "rib": 0,
+      "rear": 0
+    },
+    {
+      "x": 0.7999999999999999,
+      "front": 0,
+      "rib": 0,
+      "rear": 0
+    },
+    {
+      "x": 0.8039999999999999,
+      "front": 0,
+      "rib": 0,
+      "rear": 0
+    },
+    {
+      "x": 0.8079999999999999,
+      "front": 0,
+      "rib": 0,
+      "rear": 0
+    },
+    {
+      "x": 0.8119999999999999,
+      "front": 0,
+      "rib": 0,
+      "rear": 0
+    },
+    {
+      "x": 0.816,
+      "front": 0,
+      "rib": 0,
+      "rear": 0
+    },
+    {
+      "x": 0.82,
+      "front": 0,
+      "rib": 1,
+      "rear": 0
+    },
+    {
+      "x": 0.824,
+      "front": 0,
+      "rib": 1,
+      "rear": 0
+    },
+    {
+      "x": 0.828,
+      "front": 0,
+      "rib": 1,
+      "rear": 0
+    },
+    {
+      "x": 0.832,
+      "front": 0,
+      "rib": 1,
+      "rear": 0
+    },
+    {
+      "x": 0.836,
+      "front": 0,
+      "rib": 1,
+      "rear": 0
+    },
+    {
+      "x": 0.84,
+      "front": 0,
+      "rib": 1,
+      "rear": 0
+    },
+    {
+      "x": 0.844,
+      "front": 0,
+      "rib": 1,
+      "rear": 0
+    },
+    {
+      "x": 0.848,
+      "front": 2,
+      "rib": 1,
+      "rear": 2
+    },
+    {
+      "x": 0.852,
+      "front": 2,
+      "rib": 2,
+      "rear": 2
+    },
+    {
+      "x": 0.856,
+      "front": 2,
+      "rib": 2,
+      "rear": 2
+    }
+  ],
+  "randomSeeds": [
+    3048719587,
+    1161883966
+  ],
+  "memoryBytes": 115200
+}

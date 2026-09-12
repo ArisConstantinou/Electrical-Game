@@ -76,8 +76,10 @@ export class Game {
     this.room = new Room(this.renderer.scene);
     this.renderer.scene.add(this.room);
     this.mission = new MissionSystem(this.renderer.scene);
+    this.room.brickWall.registerInstallations(this.mission.points);
+    this.room.brickWall.contactProvider = camera => this.fpsRig.contact(camera, this.room.brickWall);
     this.chasing = new ChasingSystem(this.renderer.scene, this.room.brickWall);
-    this.conduit = new ConduitSystem(this.renderer.scene);
+    this.conduit = new ConduitSystem(this.renderer.scene, this.room.brickWall);
     this.interaction = new InteractionSystem(new MarkingSystem(this.room.brickWall), this.chasing, new MortarSystem(), this.leveling, this.conduit);
     this.applySpraySettings();
     this.desktopControls = new DesktopControls(this.hud.shell, this.renderer.webgl.domElement, this.player, this.input);
@@ -106,8 +108,7 @@ export class Game {
     if (this.started && !leveling) this.player.update(Math.min(dt, 0.05));
     this.actionCooldown = Math.max(0, this.actionCooldown - dt);
     const requested = this.input.consumeAction();
-    // Spray and DEMOLISH are continuous tools. CHASE stays discrete so one
-    // press exposes one route pass instead of consuming the whole chase at once.
+    // Both hammer modes deliver local repeated percussive strikes while held.
     const continuousTool = this.isContinuousAction();
     const repeatable = continuousTool && this.input.actionHeld && this.actionCooldown <= 0;
     const spraying = this.selectedTool === 'spray' && this.input.actionHeld;
@@ -120,6 +121,7 @@ export class Game {
     this.chasing.update(dt);
     this.fpsRig.update(dt, this.player.velocity.lengthSq() > 0.02, spraying);
     this.fpsRig.show(this.selectedTool);
+    if (this.selectedTool === 'hammer') this.fpsRig.contact(this.renderer.camera, this.room.brickWall);
     const wallAim = Boolean(this.room.brickWall.aim(this.renderer.camera));
     const pointAim = Boolean(this.mission.target(this.renderer.camera));
     const aimed = this.selectedTool === 'spray' || this.selectedTool === 'hammer' ? wallAim : pointAim;
@@ -148,7 +150,7 @@ export class Game {
       mode: !this.started ? 'start' : this.mission.complete ? 'mission-complete' : point?.stage === 'leveling' ? 'leveling' : 'playing',
       player: { x: Number(this.renderer.camera.position.x.toFixed(3)), y: Number(this.renderer.camera.position.y.toFixed(3)), z: Number(this.renderer.camera.position.z.toFixed(3)), yaw: Number(this.player.yaw.toFixed(3)), pitch: Number(this.player.pitch.toFixed(3)) },
       mission: { name: 'Living Room First Fix', progressPercent: this.mission.progress, selectedTool: this.selectedTool, complete: this.mission.complete },
-      workSurface: { freeSprayMarks: this.room.brickWall.freeMarkCount, damagedBricks: this.room.brickWall.damagedBrickCount, splitBricks: this.room.brickWall.splitBrickCount, maximumDemolitionStrikes: this.room.brickWall.maximumDemolitionStrikeCount, destroyedBricks: this.room.brickWall.destroyedBrickCount, recessedBricks: this.room.brickWall.recessedBrickCount, carvedCells: this.room.brickWall.carvedCellCount, chaseDepthMm: this.room.brickWall.chaseDepthMm, chaseMinimumDepthMm: Number(this.room.brickWall.chaseMinimumDepthMm.toFixed(1)), chaseMaximumDepthMm: Number(this.room.brickWall.chaseMaximumDepthMm.toFixed(1)), chaseBackSurfaces: this.room.brickWall.chaseBackSurfaceCount, chaseSideWalls: this.room.brickWall.chaseSideWallCount, openCrossBrickChaseConnections: this.room.brickWall.openCrossBrickChaseConnectionCount, activeFragments: this.chasing.activeFragmentCount, airborneFragments: this.chasing.airborneFragmentCount, settledFragments: this.chasing.settledFragmentCount, rubblePileHeight: Number(this.chasing.rubblePileHeight.toFixed(3)), unsupportedSettledFragments: this.chasing.unsupportedSettledFragmentCount, overlappingSettledFragments: this.chasing.settledOverlapCount, anchoredRemnants: this.room.brickWall.anchoredRemnantCount, floatingStaticPieces: this.room.brickWall.floatingStaticPieceCount, unsupportedAnchoredRemnants: this.room.brickWall.unsupportedAnchoredRemnantCount, prunedUnsupportedComponents: this.room.brickWall.prunedUnsupportedComponentCount, demolitionSites: this.room.brickWall.demolitionSiteCount, maximumDemolitionDepthMm: Number(this.room.brickWall.maximumDemolitionDepthMm.toFixed(1)), demolitionMicroCellBoxes: this.room.brickWall.demolitionMicroCellBoxCount, demolitionSurfaceTriangles: this.room.brickWall.demolitionSurfaceTriangleCount, fracturePatterns: this.room.brickWall.uniqueFracturePatternCount, fractureSegments: this.room.brickWall.fractureSegmentCount, maximumFractureSpan: Number(this.room.brickWall.maximumFractureSpan.toFixed(3)), partialBreachBricks: this.room.brickWall.partialBreachBrickCount, breachedWallCells: this.room.brickWall.breachedWallCellCount, deformedWallCells: this.room.brickWall.deformedWallCellCount, sprayMode: this.sprayMode, sprayColor: SPRAY_COLORS[this.sprayColorIndex].name, hammerMode: this.hammerMode, aimControlMode: this.aimControlMode, aimInputMode: this.aimInputMode, aimProfile: this.aimProfile, wallAssist: this.wallAssistEnabled, proximityPrecision: Number(this.player.wallAssistAmount.toFixed(3)) },
+      workSurface: { ...this.room.brickWall.telemetry, freeSprayMarks: this.room.brickWall.freeMarkCount, activeFragments: this.chasing.activeFragmentCount, insideFragments: this.chasing.insideFragmentCount, inwardFragments: this.chasing.inwardFragmentCount, physicsMs:this.chasing.lastUpdateMs, peakPhysicsMs:this.chasing.maximumUpdateMs, fragmentBudget:this.chasing.fragmentBudget, chiselTip:{x:this.fpsRig.chiselTipWorld.x,y:this.fpsRig.chiselTipWorld.y,z:this.fpsRig.chiselTipWorld.z,inAir:this.fpsRig.chiselInAir}, airborneFragments: this.chasing.airborneFragmentCount, settledFragments: this.chasing.settledFragmentCount, sprayMode: this.sprayMode, sprayColor: SPRAY_COLORS[this.sprayColorIndex].name, hammerMode: this.hammerMode, chisel: this.room.brickWall.chiselType, chiselEnergyJ: this.room.brickWall.chiselEnergyJ, chiselTiltDegrees:this.room.brickWall.chiselTiltDegrees, chiselSideDegrees:this.room.brickWall.chiselSideDegrees, chiselEdgeDegrees: this.room.brickWall.chiselEdgeAngle*180/Math.PI, aimControlMode:this.aimControlMode, aimInputMode:this.aimInputMode, aimProfile:this.aimProfile, wallAssist:this.wallAssistEnabled, proximityPrecision:Number(this.player.wallAssistAmount.toFixed(3)) },
       activePoint: point ? { id: point.definition.id, kind: point.definition.kind, bottomHeightM: point.definition.bottom, boxes: point.definition.boxes, stage: point.stage, chaseHits: point.chaseHits, chaseCoverage: Number(this.room.brickWall.getChaseCoverage(point.definition.id).toFixed(3)), pipeStep: point.pipeStep, targeted: this.mission.target(this.renderer.camera) === point, tiltDegrees: Number(point.boxGroup.tiltDegrees.toFixed(2)), depthErrorMm: Number((point.boxGroup.depthError * 1000).toFixed(1)), levelPass: point.boxGroup.isLevel, flushPass: point.boxGroup.isFlush } : null,
       points: this.mission.points.map(item => ({ id: item.definition.id, stage: item.stage, conduitVisible: Boolean(item.conduit) })),
     });
@@ -178,6 +180,30 @@ export class Game {
       this.sprayColorIndex = (this.sprayColorIndex + 1) % SPRAY_COLORS.length;
       this.applySpraySettings();
       this.hud.notify(`Spray color: ${SPRAY_COLORS[this.sprayColorIndex].name}`);
+    });
+    addEventListener('wirehouse:cycle-chisel', () => {
+      const wall = this.room.brickWall;
+      wall.chiselType = wall.chiselType === 'flat' ? 'pointed' : 'flat';
+      document.querySelector('#chisel-type b')!.textContent = wall.chiselType.toUpperCase();
+      this.hud.notify(`Chisel: ${wall.chiselType.toUpperCase()}`);
+    });
+    addEventListener('wirehouse:side-chisel', event => {
+      const wall=this.room.brickWall, delta=(event as CustomEvent<number>).detail;
+      const angles=[0,35,65,-35,-65];
+      wall.chiselSideDegrees=delta ? Math.max(-75,Math.min(75,wall.chiselSideDegrees+delta)) : angles[(angles.indexOf(wall.chiselSideDegrees)+1)%angles.length];
+      document.querySelector('#chisel-side b')!.textContent=`${Math.abs(wall.chiselSideDegrees)} deg ${wall.chiselSideDegrees<0 ? 'LEFT' : wall.chiselSideDegrees>0 ? 'RIGHT' : 'STRAIGHT'}`;
+    });
+    addEventListener('wirehouse:tilt-chisel', event => {
+      const wall=this.room.brickWall;
+      const delta=(event as CustomEvent<number>).detail;
+      const angles=[25,50,70,85,0,-25,-50,-70,-85];
+      wall.chiselTiltDegrees=delta ? Math.max(-85,Math.min(85,wall.chiselTiltDegrees+delta)) : angles[(angles.indexOf(wall.chiselTiltDegrees)+1)%angles.length];
+      document.querySelector('#chisel-tilt b')!.textContent=`${Math.abs(wall.chiselTiltDegrees)} deg ${wall.chiselTiltDegrees<0 ? "UP" : "DOWN"}`;
+      this.hud.notify(`Hammer tilt: ${Math.abs(wall.chiselTiltDegrees)} deg ${wall.chiselTiltDegrees<0 ? "upward" : "downward"}`);
+    });
+    addEventListener('wirehouse:rotate-chisel', () => {
+      this.room.brickWall.chiselEdgeAngle = (this.room.brickWall.chiselEdgeAngle + Math.PI/4) % Math.PI;
+      document.querySelector('#chisel-angle b')!.textContent = `${Math.round(this.room.brickWall.chiselEdgeAngle*180/Math.PI)}°`;
     });
     addEventListener('wirehouse:cycle-hammer-mode', () => {
       this.hammerMode = this.hammerMode === 'chase' ? 'demolish' : 'chase';
@@ -251,12 +277,7 @@ export class Game {
     this.fpsRig.setSprayColor(color.value);
   }
 
-  private isContinuousAction(): boolean {
-    if (this.selectedTool === 'spray') return true;
-    if (this.selectedTool !== 'hammer' || this.hammerMode !== 'demolish') return false;
-    const stage = this.mission.activePoint?.stage;
-    return stage !== 'marked' && stage !== 'chasing';
-  }
+  private isContinuousAction(): boolean { return this.selectedTool === 'spray' || this.selectedTool === 'hammer'; }
 
   private loop = (time: number): void => {
     const dt = Math.min((time - this.lastTime) / 1000, 0.05);

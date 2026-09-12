@@ -1,0 +1,24 @@
+{
+  "build": "npm run build PASS",
+  "studioContract": "10/10 PASS",
+  "studioLive": "handshake, patch, save and reload PASS",
+  "typecheck": "PASS",
+  "gameplay": "desktop A/B/C and emulated touch A PASS after native click fix",
+  "assets": [
+    {
+      "file": "dist/assets/index-BkJFtu52.js",
+      "bytes": 643231,
+      "sha256": "944e5a87b73c4dc55a1a31b569c60b1899baa55ef4fabfbcb813e21a79b40f7a"
+    },
+    {
+      "file": "dist/assets/index-DJZNVrxk.css",
+      "bytes": 16014,
+      "sha256": "418e4dea71428d8043daa4915bc89a9dabe8e732718035fefe22bb4d7f1df013"
+    },
+    {
+      "file": "dist/assets/masonry.worker-sS2ngMFY.js",
+      "bytes": 3415,
+      "sha256": "4123d9ea5378906d131afb0f79ac99e2f4cb36d554572add97428b40183b5832"
+    }
+  ]
+}

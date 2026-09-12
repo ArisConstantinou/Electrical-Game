@@ -84,3 +84,10 @@ Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web gam
 - Masonry removal must be geometry removal, not a dark overlay.
 - Mortar must be one continuous shape with holes for box interiors and a front plane flush with box rims.
 - Mobile touch-look must prevent page scrolling only inside the game interaction surface.
+
+## 2026-09-13 Complete brittle masonry rebuild
+User request: all three parts received; research, replace all dent/route-batch geometry with real local hollow shell/rib material removal, actual chisel contact, cavity fitting, validation and before/after profiling. Baseline captured at HEAD 1fbfaec. Sparse 3D material volume selected after primary-source research. Old depthfield and deformation code removed from BrickWall; integration in progress. Existing untracked artifacts preserved. Current request explicitly authorizes browser QA; run headless to avoid disturbing desktop pointer lock.
+
+Final 2026-09-13: Complete sparse brittle volume integration, real shell/cell/rib material loss and fragment geometry, worker mesh coalescing, exact cavity fitting, independent physical blade/downward/lateral controls. Actual input contact, desktop A/B/C and emulated mobile A mission flows pass. Final isolated stress: 500 extra impacts at147.18FPS,8.56ms mean impact,240FPS after30s,zero pending jobs. Research,24-point report and raw before/after/contact/gameplay evidence are in docs. Model remains8mm qualitative, custom bounded fragment physics, single active masonry wall; no physical iPhone/GPU timer proof. Existing unrelated untracked artifacts preserved.
+
+Final integration follow-up: level buttons now use native click so confirm/cancel cannot hide their panel mid-pointerdown; full gameplay regression repeated after this fix.

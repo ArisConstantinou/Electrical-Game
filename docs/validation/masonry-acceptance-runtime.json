@@ -1,0 +1,126 @@
+{
+  "runtime": {
+    "state": {
+      "coordinateSystem": "metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall",
+      "mode": "playing",
+      "player": {
+        "x": -0.3,
+        "y": 1.65,
+        "z": -1.15,
+        "yaw": 0,
+        "pitch": -0.412
+      },
+      "mission": {
+        "name": "Living Room First Fix",
+        "progressPercent": 0,
+        "selectedTool": "hammer",
+        "complete": false
+      },
+      "workSurface": {
+        "model": "sparse-3d-brittle-masonry",
+        "pendingSupportJobs": 0,
+        "volumeBytes": 576000,
+        "pendingMeshes": 0,
+        "workerMeshing": true,
+        "lastWorkerMs": 3.9000000059604645,
+        "peakGeometryLatencyMs": 50,
+        "workerError": "",
+        "impactCount": 212,
+        "removedNodes": 7434,
+        "removedVolumeCm3": 3846.3026086956256,
+        "maximumDepthMm": 172.3441848751106,
+        "damagedChunks": 18,
+        "surfaceTriangles": 132206,
+        "geometryBytes": 14278248,
+        "deformedWallCells": 0,
+        "lastCalculationMs": 6.800000011920929,
+        "peakCalculationMs": 13,
+        "lastMeshMs": 5.299999982118607,
+        "peakMeshMs": 6,
+        "lastImpact": {
+          "removedNodes": 50,
+          "removedByMaterial": {
+            "clay": 33,
+            "mortar": 17
+          },
+          "stats": {
+            "milliseconds": 6.5999999940395355,
+            "affectedNodes": 801,
+            "weakenedNodes": 751,
+            "connectivityVisited": 3310,
+            "detachedNodes": 0,
+            "activeChunks": 20
+          }
+        },
+        "fractureSegments": 347,
+        "freeSprayMarks": 0,
+        "activeFragments": 36,
+        "insideFragments": 22,
+        "inwardFragments": 18,
+        "physicsMs": 0,
+        "peakPhysicsMs": 1.5,
+        "fragmentBudget": 144,
+        "chiselTip": {
+          "x": -0.30000000000000004,
+          "y": 1.100002218770996,
+          "z": -2.4099952418302446,
+          "inAir": false
+        },
+        "airborneFragments": 2,
+        "settledFragments": 34,
+        "sprayMode": "live",
+        "sprayColor": "BLUE",
+        "hammerMode": "chase",
+        "chisel": "flat",
+        "chiselEnergyJ": 4,
+        "chiselTiltDegrees": 25,
+        "chiselSideDegrees": 0,
+        "chiselEdgeDegrees": 0,
+        "aimControlMode": "auto-use",
+        "aimInputMode": "drag",
+        "aimProfile": "normal",
+        "wallAssist": true,
+        "proximityPrecision": 0.352
+      },
+      "activePoint": {
+        "id": "A",
+        "kind": "socket",
+        "bottomHeightM": 0.3,
+        "boxes": [
+          "2G",
+          "1G"
+        ],
+        "stage": "inspect",
+        "chaseHits": 0,
+        "chaseCoverage": 0,
+        "pipeStep": "measure",
+        "targeted": true,
+        "tiltDegrees": 0,
+        "depthErrorMm": 0,
+        "levelPass": true,
+        "flushPass": true
+      },
+      "points": [
+        {
+          "id": "A",
+          "stage": "inspect",
+          "conduitVisible": false
+        },
+        {
+          "id": "B",
+          "stage": "inspect",
+          "conduitVisible": false
+        },
+        {
+          "id": "C",
+          "stage": "inspect",
+          "conduitVisible": false
+        }
+      ]
+    },
+    "triangles": 155574,
+    "geometries": 107,
+    "overflow": false
+  },
+  "errors": []
+}

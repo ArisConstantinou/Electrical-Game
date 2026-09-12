@@ -39,6 +39,12 @@ export class HUD {
             <div id="spray-controls" aria-label="Spray settings">
               <button id="spray-color" type="button" aria-label="Change spray color"><span>SPRAY COLOR</span><span class="setting-value"><i></i><b>BLUE</b></span></button>
             </div>
+            <div id="chisel-settings" aria-label="Demolition chisel settings">
+              <button id="chisel-type" type="button"><span>CHISEL · T</span><b>FLAT</b></button>
+              <button id="chisel-tilt" type="button"><span>HAMMER TILT · [ / ]</span><b>25 deg DOWN</b></button>
+              <button id="chisel-side" type="button"><span>SIDE LEAN / J K</span><b>0 deg STRAIGHT</b></button>
+              <button id="chisel-angle" type="button"><span>EDGE ANGLE · R</span><b>0°</b></button>
+            </div>
             <div id="mobile-control-settings" aria-label="Mobile aim settings">
               <button id="aim-input-mode" type="button" aria-label="Change aim input style"><span>AIM INPUT</span><b>DRAG</b></button>
               <button id="aim-control-mode" type="button" aria-label="Change aim action mode"><span>AIM ACTION</span><b>AUTO USE</b></button>
@@ -50,8 +56,8 @@ export class HUD {
           <aside id="desktop-key-guide" class="hud-card" aria-label="Keyboard and mouse controls">
             <div><kbd>WASD</kbd><span>MOVE</span><kbd>MOUSE</kbd><span>LOOK</span><kbd>SHIFT</kbd><span>FAST</span></div>
             <div><kbd>LMB</kbd><span>USE / HOLD</span><kbd>E</kbd><span>INTERACT</span><kbd>WHEEL</kbd><span>SWITCH TOOL</span></div>
-            <div><kbd>1–6</kbd><span>SELECT TOOL</span><kbd>V</kbd><span>SPRAY METHOD</span><kbd>C</kbd><span>COLOR</span></div>
-            <div><kbd>X</kbd><span>HAMMER MODE</span><kbd>F</kbd><span>FULLSCREEN</span><kbd>ESC</kbd><span>RELEASE MOUSE</span></div>
+            <div><kbd>1–6</kbd><span>SELECT TOOL</span><kbd>[ / ]</kbd><span>HAMMER TILT</span><kbd>C</kbd><span>COLOR</span></div>
+            <div><kbd>T / R</kbd><span>CHISEL / ANGLE</span><kbd>F</kbd><span>FULLSCREEN</span><kbd>ESC</kbd><span>RELEASE MOUSE</span></div>
           </aside>
           <div id="reticle" aria-hidden="true"><span></span><span></span></div>
           <div id="interaction-prompt" role="status"></div>
@@ -100,6 +106,10 @@ export class HUD {
           </section>
         </section>
       </main>`;
+    root.querySelector('#chisel-type')!.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:cycle-chisel')));
+    root.querySelector('#chisel-side')!.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:side-chisel')));
+    root.querySelector('#chisel-tilt')!.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:tilt-chisel')));
+    root.querySelector('#chisel-angle')!.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:rotate-chisel')));
     this.shell = root.querySelector('#game-shell')!;
     this.objective = root.querySelector('#objective')!;
     this.prompt = root.querySelector('#interaction-prompt')!;
@@ -109,7 +119,9 @@ export class HUD {
     this.levelPanel = root.querySelector('#level-panel')!;
     this.levelReadout = root.querySelector('#level-readout')!;
     this.result = root.querySelector('#result-panel')!;
-    root.querySelectorAll<HTMLButtonElement>('[data-level]').forEach(button => button.addEventListener('pointerdown', event => {
+    // Native click completes before confirm/cancel hides the panel, and also
+    // supports keyboard activation without a pointer-down UI race.
+    root.querySelectorAll<HTMLButtonElement>('[data-level]').forEach(button => button.addEventListener('click', event => {
       event.preventDefault();
       window.dispatchEvent(new CustomEvent('wirehouse:level', { detail: button.dataset.level }));
     }));

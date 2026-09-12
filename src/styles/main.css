@@ -152,3 +152,8 @@ button {
   .screen-panel p { margin: 6px 0 10px; }
   .brief-grid { margin-bottom: 12px; }
 }
+#chisel-settings { display: grid; gap: 7px; margin-top: 7px; }
+#chisel-settings button { min-height: 48px; display: flex; align-items: center; justify-content: space-between; padding: 0 13px; border: 1px solid #716557; color: #c9c3ba; background: #28241f; font: 700 14px/1 'Barlow Condensed', sans-serif; letter-spacing: .04em; cursor: pointer; }
+#chisel-settings b { color: #fff; }
+#settings-panel { max-height: calc(100dvh - 100px); overflow-y: auto; }
+#mobile-control-settings small { font-size: 14px; }
