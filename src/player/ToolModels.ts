@@ -179,19 +179,26 @@ function cutter(): THREE.Group {
 function hose(): THREE.Group {
   const group = new THREE.Group(), orange = mat(0xdf6f1d, .48), dark = rubber(), metal = steel();
   rod(group, [.14, -.033, -.033], [.10, .008, -.158], .025, dark, 'Angled cleaning nozzle barrel', .020);
-  rod(group, [.098, .010, -.162], [.084, .024, -.204], .0235, orange, 'Adjustable orange nozzle collar', .020);
-  for (let i = 0; i < 12; i++) {
-    const a = i * Math.PI / 6, ridge = part(group, new THREE.BoxGeometry(.003, .006, .031), mat(0xb85716, .61), [.091 + Math.cos(a) * .021, .017 + Math.sin(a) * .021, -.184], 'Nozzle collar grip rib'); ridge.rotation.z = a;
+  // Broad perforated shower rose, twist collar and metal face match a
+  // single-hand garden water gun; the same head switches to a central jet.
+  rod(group, [.098, .010, -.162], [.084, .024, -.204], .027, orange, 'Adjustable shower selector collar', .039);
+  for (let i = 0; i < 16; i++) {
+    const a = i * Math.PI / 8, ridge = part(group, new THREE.BoxGeometry(.004, .006, .025), dark, [.086 + Math.cos(a) * .037, .023 + Math.sin(a) * .037, -.201], 'Nozzle collar grip rib'); ridge.rotation.z = a;
   }
-  const mouth = part(group, new THREE.CylinderGeometry(.016, .016, .005, 24), mat(0x222926), [.082, .026, -.209], 'Nozzle outlet'); mouth.rotation.x = Math.PI / 2;
-  torus(group, .007, .002, metal, [.082, .026, -.213], 'Water jet orifice');
+  const mouth = part(group, new THREE.CylinderGeometry(.037, .037, .005, 40), metal, [.082, .026, -.214], 'Perforated stainless shower face'); mouth.rotation.x = Math.PI / 2;
+  torus(group, .037, .003, dark, [.082, .026, -.218], 'Protective shower rim');
+  for(let ring=1;ring<=3;ring++)for(let i=0;i<ring*10;i++){
+    const a=i*Math.PI*2/(ring*10),r=ring*.009;
+    const hole=part(group,new THREE.CircleGeometry(.00125,6),dark,[.082+Math.cos(a)*r,.026+Math.sin(a)*r,-.217],'Shower outlet');hole.rotation.y=Math.PI;
+  }
+  torus(group, .0045, .0015, dark, [.082, .026, -.218], 'Central high-flow jet outlet');
   rod(group, [.145, -.025, -.015], [.193, -.143, .018], .022, dark, 'Ergonomic rubber pistol grip', .019);
   rod(group, [.161, -.020, -.009], [.197, -.107, .013], .008, orange, 'hose-trigger', .008);
   part(group, extrude(roundedRectangle(.025, .013, .004), .025), orange, [.154, -.017, .009], 'Trigger lock rocker');
   rod(group, [.195, -.149, .020], [.206, -.181, .026], .018, orange, 'Quick connector coupling', .016);
   torus(group, .016, .002, metal, [.205, -.176, .025], 'Connector locking collar', 'y');
   tube(group, [[.207, -.181, .026], [.216, -.237, .046], [.190, -.305, .063], [.245, -.435, .091]], .009, mat(0x3b6170, .83), 'Flexible water supply hose');
-  return gripFrame(metadata(group, [.177, -.101, .010], [.082, .026, -.215]),[-.048,.118,-.033]);
+  return gripFrame(metadata(group, [.177, -.101, .010], [.082, .026, -.2185]),[-.048,.118,-.033]);
 }
 
 function fitting(): THREE.Group {

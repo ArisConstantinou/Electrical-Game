@@ -311,3 +311,8 @@ button {
 @media (max-height:520px) and (pointer:coarse) {
   #mortar-panel {top:max(68px,calc(env(safe-area-inset-top) + 62px));left:10px;width:min(280px,calc(100% - 20px));}
 }
+
+/* Water flow stays in the existing compact tool card, with full controls in settings. */
+#water-gun-readout { font-size: 14px; line-height: 1.4; color: #d9eee9; font-variant-numeric: tabular-nums; margin-top: 4px; }
+#water-gun-mode { grid-column: 1 / -1; width: 100%; min-height: 42px; font: inherit; font-size: 16px; color: #f3f0e7; background: #263c3a; border: 1px solid #718784; border-radius: 5px; padding: 6px; }
+@media (max-width: 600px) { #water-gun-readout { font-size: 12px; } }

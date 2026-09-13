@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { InstallationPoint } from '../electrical/InstallationPoint';
 import type { BrickWall } from '../world/BrickWall';
 import { MortarField } from './MortarField';
+import { WATER_GUN_MODES, type WaterGunSetting } from './WaterGun';
 
 type WaterCell = { pore: number; film: number; mesh: THREE.Mesh; position: THREE.Vector3; normal: THREE.Vector3 };
 type Clod = { mesh: THREE.Mesh; velocity: THREE.Vector3; mass: number; age: number; contacts: number; slurry: boolean; bond: number };
@@ -22,6 +23,8 @@ export class MortarSystem {
   onRunoff?: (event: { point: THREE.Vector3; normal: THREE.Vector3; litres: number; mortarKg: number }) => void;
   onWaterEmission?: (event: { origin: THREE.Vector3; velocity: THREE.Vector3; litres: number }) => void;
   washedMass = 0;
+  waterGunLitres = 0;
+  readonly waterGunDirection = new THREE.Vector3(0, 0, -1);
   private pendingWashMass = 0;
   private readonly pendingWashPoint = new THREE.Vector3();
   private readonly pendingWashNormal = new THREE.Vector3(0,0,1);
@@ -32,7 +35,6 @@ export class MortarSystem {
   readonly deposits: Deposit[] = [];
   readonly projectiles: Clod[] = [];
   readonly target = new THREE.Mesh(new THREE.RingGeometry(.023, .028, 24), new THREE.MeshBasicMaterial({ color: 0xe6cc76, side: THREE.DoubleSide, depthTest: false, transparent: true, opacity: .85 }));
-  readonly jet = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xbce8ed, transparent: true, opacity: .65 }));
   angleDegrees = 12;
   charge = 0;
   recovery = 0;
@@ -53,7 +55,6 @@ export class MortarSystem {
   private recoveringThrow = false;
   private releaseCount = 0;
   private faceSplash = 0;
-  private jetTime = 0;
   private maintenanceTime = 0;
   private simulationTime = 0;
   private geometryRevision = 0;
@@ -64,8 +65,8 @@ export class MortarSystem {
   constructor(scene: THREE.Scene, private readonly wall: BrickWall, private readonly points: InstallationPoint[]) {
     this.group.name = 'Wet mortar, water and construction spills';
     this.group.userData.studioEntityId = 'mortar-application';
-    scene.add(this.group); this.group.add(this.target, this.jet);
-    this.target.visible = false; this.target.renderOrder = 8; this.jet.visible = false;
+    scene.add(this.group); this.group.add(this.target);
+    this.target.visible = false; this.target.renderOrder = 8;
     // Soft, irregular alpha footprint; individual water samples never draw square tiles.
     const size = 64, data = new Uint8Array(size * size * 4);
     for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
@@ -150,21 +151,32 @@ export class MortarSystem {
   }
 
   private waterKey(p: THREE.Vector3): string { return `${Math.round(p.x / .08)}:${Math.round(p.y / .08)}:${Math.round(p.z / .04)}`; }
-  wet(camera: THREE.Camera, origin: THREE.Vector3, dt: number): void {
-    const totalLitres=Math.max(0,dt)*.12;if(!totalLitres)return;
+  wet(camera: THREE.Camera, origin: THREE.Vector3, dt: number, setting: WaterGunSetting = WATER_GUN_MODES[0], surfaceAt: (x:number,z:number)=>number = ()=>0, nozzleDirection?:THREE.Vector3): void {
+    const totalLitres=Math.max(0,dt)*setting.flowLitresPerSecond;if(!totalLitres)return;
+    this.waterGunLitres+=totalLitres;
     const direction=camera.getWorldDirection(new THREE.Vector3()),cameraOrigin=camera.getWorldPosition(new THREE.Vector3());
-    const aim=this.contact(cameraOrigin,direction,3);
-    if(!aim){this.onWaterEmission?.({origin:origin.clone(),velocity:direction.multiplyScalar(5),litres:totalLitres});return;}
-    const nozzleDirection=aim.point.clone().sub(origin),hit=this.contact(origin,nozzleDirection.clone().normalize(),nozzleDirection.length()+.01);
-    if(!hit){this.onWaterEmission?.({origin:origin.clone(),velocity:nozzleDirection.normalize().multiplyScalar(5),litres:totalLitres});return;}
-    this.jet.geometry.dispose();this.jet.geometry=new THREE.BufferGeometry().setFromPoints([origin,hit.point]);this.jetTime=.08;this.jet.visible=true;
-    const tangent=new THREE.Vector3(1,0,0).applyQuaternion(new THREE.Quaternion().setFromUnitVectors(Z,hit.normal)),up=new THREE.Vector3().crossVectors(hit.normal,tangent).normalize();
-    const totalWeight=1+4*.5+4/3;
-    for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++){
-      const litres=totalLitres/(1+dx*dx+dy*dy)/totalWeight;
-      const target=hit.point.clone().addScaledVector(tangent,dx*.045).addScaledVector(up,dy*.045),delta=target.sub(origin);
-      const local=this.contact(origin,delta.clone().normalize(),delta.length()+.07);
-      if(!local){this.onWaterEmission?.({origin:origin.clone(),velocity:delta.normalize().multiplyScalar(5),litres});continue;}
+    const aim=this.contact(cameraOrigin,direction,8);
+    this.waterGunDirection.copy(nozzleDirection??(aim?aim.point.clone().sub(origin).normalize():direction));
+    // Multiple physical rays share exactly one delivered volume. The dedicated
+    // room-water renderer draws the continuous jet; no straight blue overlay.
+    const rotation=new THREE.Quaternion().setFromUnitVectors(Z,this.waterGunDirection);
+    const count=13;
+    for(let i=0;i<count;i++){
+      const angle=i*2.399963229728653,radius=i===0?0:Math.sqrt(i/(count-1));
+      const ray=new THREE.Vector3(Math.cos(angle)*radius*setting.spreadRadians,Math.sin(angle)*radius*setting.spreadRadians,1).normalize().applyQuaternion(rotation);
+      const litres=totalLitres/count,velocity=ray.clone().multiplyScalar(setting.speedMps);
+      let previous=origin.clone(),local:Contact|null=null;
+      const flight=8/setting.speedMps;
+      for(let step=1;step<=24;step++){
+        const time=flight*step/24,next=origin.clone().addScaledVector(velocity,time);next.y-=4.905*time*time;
+        const delta=next.clone().sub(previous),hit=this.contact(previous,delta.clone().normalize(),delta.length());
+        const height=surfaceAt(next.x,next.z);
+        const floorFraction=next.y<=height?THREE.MathUtils.clamp((previous.y-height)/Math.max(.000001,previous.y-next.y),0,1):Infinity;
+        if(hit&&hit.distance<delta.length()*floorFraction){local=hit;break;}
+        if(floorFraction<=1)break;
+        previous=next;
+      }
+      if(!local){this.onWaterEmission?.({origin:origin.clone(),velocity,litres});continue;}
       if(local.box||this.insideBox(local.point)){this.onRunoff?.({point:local.point.clone(),normal:local.normal.clone(),litres,mortarKg:0});continue;}
       this.applyWater(local.point,local.normal,litres);
     }
@@ -354,7 +366,7 @@ export class MortarSystem {
   }
 
   update(dt: number): void {
-    dt = Math.min(.12, Math.max(0, dt)); this.simulationTime += dt; this.recovery = Math.max(0, this.recovery - dt); this.faceSplash=Math.max(0,this.faceSplash-dt*.28); this.jetTime -= dt; this.jet.visible = this.jetTime > 0;
+    dt = Math.min(.12, Math.max(0, dt)); this.simulationTime += dt; this.recovery = Math.max(0, this.recovery - dt); this.faceSplash=Math.max(0,this.faceSplash-dt*.28);
     this.refreshOpeningGeometry();
     this.maintenanceTime += dt;
     for (const [key, cell] of this.water) {

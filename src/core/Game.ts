@@ -14,6 +14,7 @@ import { MarkingSystem } from '../systems/MarkingSystem';
 import { ChasingSystem } from '../systems/ChasingSystem';
 import { MortarSystem } from '../systems/MortarSystem';
 import { RoomWaterSystem } from '../systems/RoomWaterSystem';
+import { WATER_GUN_MODES } from '../systems/WaterGun';
 import { LevelingSystem, type LevelDirection } from '../systems/LevelingSystem';
 import { ConduitSystem, type PvcTool } from '../systems/ConduitSystem';
 import { InteractionSystem } from '../systems/InteractionSystem';
@@ -29,7 +30,7 @@ const TOOL_HINTS: Record<RigTool, string> = {
   spring: 'BENDING SPRING · shape the 20 mm PVC',
   cutter: 'PVC CUTTER · single-action cut to length',
   trowel: 'TROWEL · hold, release in the green center · ↑ / ↓ loft angle',
-  hose: 'WATER HOSE · hold to mist the masonry; avoid saturation',
+  hose: 'WATER GUN | hold to spray | SHOWER / JET / FLOOD / MIST',
 };
 
 const SPRAY_COLORS = [
@@ -59,6 +60,7 @@ export class Game {
   sprayColorIndex = 0;
   hammerMode: HammerMode = 'chase';
   hammerSpeed = 1;
+  waterGunModeIndex = 1;
   aimControlMode: AimControlMode = 'auto-use';
   aimProfile: MobileAimProfile = 'normal';
   wallAssistEnabled = true;
@@ -151,10 +153,24 @@ export class Game {
     const mortarTool = this.started && !leveling && (this.selectedTool === 'trowel' || this.selectedTool === 'hose');
     // The player's arms hold tools near the body; aiming does not extend them.
     this.fpsRig.position.z=this.selectedTool==='hammer'?-.22:-.42;
+    if(this.selectedTool==='hose'){
+      this.fpsRig.show('hose');this.fpsRig.hoseActive=this.input.actionHeld;
+      this.fpsRig.update(dt,this.player.velocity.lengthSq()>.02,spraying);
+      const camera=this.renderer.camera,origin=camera.getWorldPosition(new THREE.Vector3()),direction=camera.getWorldDirection(new THREE.Vector3());
+      const wallHit=this.room.brickWall.aim(camera);
+      let distance=wallHit?origin.distanceTo(new THREE.Vector3(wallHit.point.x,wallHit.point.y,wallHit.point.z)):8;
+      if(direction.y<-.001){const floorDistance=(this.roomWater.field.surfaceAt(origin.x,origin.z)-origin.y)/direction.y;if(floorDistance>0)distance=Math.min(distance,floorDistance);}
+      this.fpsRig.aimWaterGun(camera,origin.addScaledVector(direction,distance));
+      this.fpsRig.poseArms(camera);
+    }
     const releaseOrigin = this.fpsRig.toolTipWorld(this.renderer.camera, this.selectedTool);
     if (mortarTool && this.selectedTool === 'trowel') this.mortar.swing(this.input.actionHeld,dt,this.renderer.camera,releaseOrigin);
     else this.mortar.cancel();
-    if (mortarTool && this.selectedTool === 'hose' && this.input.actionHeld) this.mortar.wet(this.renderer.camera,releaseOrigin,dt);
+    const waterSetting=WATER_GUN_MODES[this.waterGunModeIndex];
+    const waterHeld=mortarTool&&this.selectedTool==='hose'&&this.input.actionHeld;
+    const nozzleDirection=this.fpsRig.waterGunDirectionWorld();
+    if(waterHeld)this.mortar.wet(this.renderer.camera,releaseOrigin,dt,waterSetting,(x,z)=>this.roomWater.field.surfaceAt(x,z),nozzleDirection);
+    this.roomWater.setJetState({active:waterHeld,origin:releaseOrigin,direction:nozzleDirection,...waterSetting});
     this.mortar.update(dt);
     this.roomWater.update(dt);
     this.mortar.preview(this.renderer.camera,releaseOrigin,mortarTool && this.selectedTool === 'trowel');
@@ -165,7 +181,7 @@ export class Game {
     this.fpsRig.mortarHolding=this.mortar.throwFeedback.holding;
     this.fpsRig.mortarSwingDegrees=this.mortar.throwFeedback.swingDegrees;
     this.chasing.update(dt);
-    this.fpsRig.update(dt, this.player.velocity.lengthSq() > 0.02, spraying);
+    if(this.selectedTool!=='hose')this.fpsRig.update(dt, this.player.velocity.lengthSq() > 0.02, spraying);
     this.fpsRig.show(this.selectedTool);
     if (this.selectedTool === 'hammer') this.fpsRig.contact(this.renderer.camera, this.room.brickWall);
     else this.fpsRig.poseArms(this.renderer.camera);
@@ -184,6 +200,7 @@ export class Game {
     const waterHit=this.room.brickWall.aim(this.renderer.camera);
     const wet=waterHit ? this.mortar.moistureAt(new THREE.Vector3(waterHit.point.x,waterHit.point.y,waterHit.point.z)) : {pore:0,film:0};
     this.hud.updateMortar(this.selectedTool,this.mortar.charge,this.mortar.angleDegrees,wet,active ? this.mortar.coverage(active):0,this.mortar.recovery,this.mortar.lastOutcome,this.roomWater.telemetry.floorLitres,this.mortar.throwFeedback);
+    this.hud.updateWaterGun(waterSetting,this.roomWater.telemetry.floorLitres,this.roomWater.telemetry.meanDepthMm);
     if (this.mission.complete && !this.resultShown) { this.resultShown = true; this.hud.showResult(); if (document.pointerLockElement) void document.exitPointerLock(); }
     this.renderer.render();
   }
@@ -192,7 +209,7 @@ export class Game {
     const point = this.mission.activePoint;
     return JSON.stringify({
       mortar: this.mortar.telemetry,
-      water: this.roomWater.telemetry,
+      water: {...this.roomWater.telemetry,gunMode:WATER_GUN_MODES[this.waterGunModeIndex].id,gunLitres:this.mortar.waterGunLitres},
       hammer: { speedMultiplier: this.hammerSpeed, paused: this.hammerSpeed === 0, impactIntervalSeconds: this.hammerSpeed > 0 ? .24 / this.hammerSpeed : null },
       body: this.fpsRig.debugPose(),
       workPosition: this.player.workPosition,
@@ -309,6 +326,11 @@ export class Game {
     addEventListener('wirehouse:rotate-chisel', () => {
       this.room.brickWall.chiselEdgeAngle = (this.room.brickWall.chiselEdgeAngle + Math.PI/4) % Math.PI;
       document.querySelector('#chisel-angle b')!.textContent = `${Math.round(this.room.brickWall.chiselEdgeAngle*180/Math.PI)}°`;
+    });
+    addEventListener('wirehouse:cycle-water-mode',()=>{this.waterGunModeIndex=(this.waterGunModeIndex+1)%WATER_GUN_MODES.length;});
+    document.querySelector('#water-gun-mode')?.addEventListener('change',event=>{
+      const index=WATER_GUN_MODES.findIndex(mode=>mode.id===(event.target as HTMLSelectElement).value);
+      if(index>=0)this.waterGunModeIndex=index;
     });
     addEventListener('wirehouse:cycle-hammer-mode', () => {
       this.hammerMode = this.hammerMode === 'chase' ? 'demolish' : 'chase';

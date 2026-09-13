@@ -1,5 +1,6 @@
 import type { InstallationPoint } from '../electrical/InstallationPoint';
 import type { RigTool } from '../player/FPSRig';
+import { WATER_GUN_MODES, type WaterGunSetting } from '../systems/WaterGun';
 
 export interface MortarThrowFeedback {
   holding: boolean;
@@ -59,6 +60,7 @@ export class HUD {
               <button id="chisel-angle" type="button"><span>EDGE ANGLE · R</span><b>0°</b></button>
               <label class="hammer-speed-setting" for="hammer-speed"><span>CHISEL SPEED · − / +</span><output id="hammer-speed-value">100%</output><input id="hammer-speed" type="range" min="0" max="250" step="25" value="100" aria-label="Chisel destruction speed"><small>0% stops impacts · slower for control</small></label>
             </div>
+            <label class="hammer-speed-setting" for="water-gun-mode"><span>WATER GUN | FLOW</span><select id="water-gun-mode" aria-label="Water gun flow mode">${WATER_GUN_MODES.map(mode=>`<option value="${mode.id}" ${mode.id==='shower'?'selected':''}>${mode.label} | ${mode.flowLitresPerSecond} L/s</option>`).join('')}</select><small>FLOOD boosts the game flow to fill the room. MIST gently wets chases.</small></label>
             <details id="mortar-settings"><summary>TROWEL / WATER</summary>
               <p>Hold the aim pad or mouse button, then release in the green zone. Adjust the loft or pack nearby mortar here.</p>
             <div class="mortar-buttons"><button type="button" id="mortar-angle-down" aria-label="Lower trowel throw angle">− ANGLE</button><button type="button" id="mortar-swing">HOLD · RELEASE</button><button type="button" id="mortar-angle-up" aria-label="Raise trowel throw angle">+ ANGLE</button></div>
@@ -79,7 +81,7 @@ export class HUD {
             <div><kbd>T / R</kbd><span>CHISEL / ANGLE</span><kbd>F</kbd><span>FULLSCREEN</span><kbd>ESC</kbd><span>RELEASE MOUSE</span></div>
           </aside>
           <div id="mortar-panel" class="hud-card" hidden>
-            <strong id="mortar-readout"></strong>
+            <strong id="mortar-readout"></strong><div id="water-gun-readout" hidden></div>
             <div id="mortar-flow" data-quality="ready" data-holding="false">
               <div class="throw-flow-heading"><span>RELEASE TIMING</span><b id="throw-quality">HOLD TO SWING</b></div>
               <div id="throw-timing-track" role="meter" aria-label="Mortar release timing; perfect from 42 to 58 percent" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
@@ -185,6 +187,7 @@ export class HUD {
     root.querySelector('#tool-mode-toggle')?.addEventListener('click', event => {
       const kind = (event.currentTarget as HTMLButtonElement).dataset.modeKind;
       if (kind === 'spray') window.dispatchEvent(new CustomEvent('wirehouse:cycle-spray-mode'));
+      if (kind === 'hose') window.dispatchEvent(new CustomEvent('wirehouse:cycle-water-mode'));
       if (kind === 'hammer') window.dispatchEvent(new CustomEvent('wirehouse:cycle-hammer-mode'));
     });
     const settingsToggle = root.querySelector<HTMLButtonElement>('#settings-toggle');
@@ -238,7 +241,7 @@ export class HUD {
       if (bubble) bubble.style.transform = `translate(calc(-50% + ${Math.max(-76, Math.min(76, -tilt * 24))}px), -50%)`;
       if (depthMarker) depthMarker.style.left = `${50 + Math.max(-42, Math.min(42, depth * 2.5))}%`;
     }
-    this.tool.innerHTML = `<span>SELECTED TOOL</span><b class="selected">${selectedTool.toUpperCase()}</b><em>${selectedTool==='trowel'?'HOLD · RELEASE':selectedTool==='hose'?'HOLD TO MIST':'LEFT CLICK TO USE'}</em>`;
+    this.tool.innerHTML = `<span>SELECTED TOOL</span><b class="selected">${selectedTool.toUpperCase()}</b><em>${selectedTool==='trowel'?'HOLD · RELEASE':selectedTool==='hose'?'HOLD TO SPRAY':'LEFT CLICK TO USE'}</em>`;
     this.shell.querySelectorAll<HTMLButtonElement>('button[data-tool]').forEach(button => {
       const selected = button.dataset.tool === selectedTool;
       button.classList.toggle('selected', selected);
@@ -246,10 +249,18 @@ export class HUD {
       if(selected&&toolChanged){const nav=button.parentElement!;nav.scrollLeft=button.offsetLeft-(nav.clientWidth-button.offsetWidth)/2;}
     });
     const modeToggle = this.shell.querySelector<HTMLButtonElement>('#tool-mode-toggle');
-    const hasContextMode = selectedTool === 'spray' || selectedTool === 'hammer';
+    const hasContextMode = selectedTool === 'spray' || selectedTool === 'hammer' || selectedTool === 'hose';
     modeToggle?.classList.toggle('visible', hasContextMode);
     if (modeToggle) modeToggle.dataset.modeKind = hasContextMode ? selectedTool : '';
     this.shell.dataset.aimed = targeted ? 'true' : 'false';
+  }
+
+  updateWaterGun(setting:WaterGunSetting,floorLitres:number,depthMm:number):void {
+    const select=this.shell.querySelector<HTMLSelectElement>('#water-gun-mode')!;select.value=setting.id;
+    const readout=this.shell.querySelector<HTMLElement>('#water-gun-readout')!;readout.hidden=this.selectedTool!=='hose';
+    if(this.selectedTool==='hose')this.shell.querySelector<HTMLElement>('#mortar-readout')!.textContent=`${setting.label} | ${setting.speedMps} m/s`;
+    readout.textContent=`${setting.flowLitresPerSecond} L/s | ${Math.round(floorLitres)} L | ${(depthMm/10).toFixed(1)} cm`;
+    if(this.selectedTool==='hose')this.shell.querySelector<HTMLElement>('#tool-mode-toggle span')!.textContent=setting.label;
   }
 
   updateHammerSpeed(speed:number):void {

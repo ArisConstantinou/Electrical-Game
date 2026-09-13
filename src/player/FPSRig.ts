@@ -222,6 +222,21 @@ export class FPSRig extends THREE.Group {
       arm.hand.userData.gripping=t===0||t===1;
     }
   }
+  /** Aim the physical nozzle around the held grip, before sampling its outlet. */
+  aimWaterGun(camera:THREE.Camera,target:THREE.Vector3):void {
+    const tool=this.tools.get('hose')!,grip=new THREE.Vector3().fromArray(tool.userData.gripPoint);
+    const anchor=grip.clone().applyQuaternion(tool.quaternion).add(tool.position);
+    for(let i=0;i<3;i++){
+      const outlet=this.toolTipWorld(camera,'hose');
+      const direction=target.clone().sub(outlet).normalize().applyQuaternion(this.getWorldQuaternion(new THREE.Quaternion()).invert());
+      tool.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,-1),direction);
+      tool.position.copy(anchor).sub(grip.clone().applyQuaternion(tool.quaternion));
+      this.constrainHeldTool(camera);
+    }
+  }
+  waterGunDirectionWorld():THREE.Vector3 {
+    return new THREE.Vector3(0,0,-1).applyQuaternion(this.tools.get('hose')!.getWorldQuaternion(new THREE.Quaternion()));
+  }
   private bodyFrame(camera:THREE.Camera): { eye:THREE.Vector3; right:THREE.Vector3; forward:THREE.Vector3 } {
     const eye=camera.getWorldPosition(new THREE.Vector3()),forward=camera.getWorldDirection(new THREE.Vector3());
     forward.y=0;forward.normalize();

@@ -14,4 +14,20 @@ assert.ok(Math.abs(field.volumeLitres-1507.2)<1e-6,'flooding preserves every lit
 assert.ok(field.wetArea>smallArea&&field.wetArea>field.width*field.depth*.99,'sustained water fills the room');
 assert.ok(field.maxDepth>.05,'1500 litres must raise the actual water height');
 assert.ok([...field.depths].every(h=>Number.isFinite(h)&&h>=0),'depth stays nonnegative');
-console.log(JSON.stringify({receivedLitres:field.receivedLitres,volumeLitres:field.volumeLitres,conservationError:field.receivedLitres-field.volumeLitres,wetAreaM2:field.wetArea,maxDepthMm:field.maxDepth*1000,rows:field.rows,columns:field.columns}));
+const sustained=new RoomWaterField();
+for(let i=0;i<1200;i++){sustained.add(-1.2,-1.8,40/30);sustained.update(1/30);}
+assert.ok(Math.abs(sustained.volumeLitres-1600)<1e-6,'40 L/s gun has no source clipping');
+assert.ok(sustained.wetArea>sustained.width*sustained.depth*.99,'continuous high flow reaches the entire room floor');
+assert.ok(sustained.maxDepth>.05,'sustained gun use raises actual surface height');
+const shallowMax=sustained.maxDepth;
+// The deep saved-volume case verifies that the floor surface has no puddle cap.
+sustained.add(0,0,30000);
+for(let i=0;i<1800;i++)sustained.update(1/30);
+assert.ok(Math.abs(sustained.volumeLitres-31600)<1e-5,'deep room fill conserves volume');
+assert.ok(Math.min(...sustained.depths)>1,'every floor cell is deeper than one metre');
+assert.ok(sustained.maxDepth>shallowMax+1,'water height keeps rising beyond shallow puddles');
+assert.ok([...sustained.depths].every(h=>Number.isFinite(h)&&h>=0),'high flow remains finite and nonnegative');
+const beforeInvalid=sustained.volumeLitres;
+sustained.add(0,0,Infinity);sustained.add(NaN,0,10);sustained.add(0,0,-1);sustained.update(NaN);
+assert.equal(sustained.volumeLitres,beforeInvalid,'invalid input cannot corrupt the conservative field');
+console.log(JSON.stringify({receivedLitres:field.receivedLitres,volumeLitres:field.volumeLitres,conservationError:field.receivedLitres-field.volumeLitres,wetAreaM2:field.wetArea,maxDepthMm:field.maxDepth*1000,sustainedGunLitres:1600,deepFillLitres:sustained.volumeLitres,deepMinMetres:Math.min(...sustained.depths),deepMaxMetres:sustained.maxDepth,rows:field.rows,columns:field.columns}));

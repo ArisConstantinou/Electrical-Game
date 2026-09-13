@@ -13,19 +13,20 @@ for(const backend of process.argv.includes('--gpu-only')?['webgpu']:['webgpu','w
  await page.waitForFunction(()=>window.__wireTheHouse,{timeout:120000});
  await page.locator('#start-button').click();await page.waitForTimeout(200);
  if(backend==='webgpu'){
-  // Excavate through normal hammer input, then keep spraying while capturing
-  // exposed inner masonry, moving runoff and the real nozzle stream.
-  await page.keyboard.press('Digit4');
-  for(let i=0;i<5;i++)await page.keyboard.press('BracketLeft');
-  await page.evaluate(()=>{const g=window.__wireTheHouse,c=g.renderer.camera;c.position.set(-.35,g.player.eyeHeight,-1.22);c.lookAt(-.35,1.10,-2.41);g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;});
-  await page.keyboard.down('KeyE');await page.waitForTimeout(4300);await page.keyboard.up('KeyE');
-  for(const y of [1.04,1.10,1.16])for(const x of [-.41,-.35,-.29]){
-    await page.evaluate(({x,y})=>{const g=window.__wireTheHouse,c=g.renderer.camera;c.lookAt(x,y,-2.41);g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;},{x,y});
-    await page.keyboard.down('KeyE');await page.waitForTimeout(520);await page.keyboard.up('KeyE');
-  }
-  await page.evaluate(async()=>{await window.__wireTheHouse.room.brickWall.waitForGeometry();});
+  // Diagnostic cavity uses the production impact API; hose input below is
+  // native. This fixture is independent of the hammer's evolving body stance.
+  await page.evaluate(async()=>{
+    const g=window.__wireTheHouse,w=g.room.brickWall,v=w.volume,c=g.renderer.camera.clone(false),contact=w.contactProvider;
+    w.contactProvider=null;w.chiselTiltDegrees=0;
+    try{for(let pass=0;pass<25;pass++)for(let x=-.47;x<=-.23;x+=.028)for(let y=.96;y<=1.24;y+=.028){
+      c.position.set(x,y,v.frontZ+.6);c.lookAt(x,y,v.frontZ);c.updateMatrixWorld(true);
+      const hit=v.raycast(c.position,c.getWorldDirection(c.position.clone().set(0,0,0)),1);
+      if(hit&&v.frontZ-hit.point.z<.05)w.removeAtAim(c);
+    }}finally{w.contactProvider=contact;}
+    while(v.pendingSupportCount)w.processPendingSupport();await w.waitForGeometry();
+  });
   await page.keyboard.press('Digit8');
-  await page.evaluate(async()=>{if(document.pointerLockElement)await document.exitPointerLock();});await page.locator('#work-height').click();
+  await page.evaluate(async()=>{if(document.pointerLockElement)await document.exitPointerLock();});await page.locator('#settings-toggle').click();await page.locator('#mortar-settings summary').click();await page.locator('#work-height').click();await page.locator('#settings-close').click();
   const nozzleContact=await page.evaluate(()=>{
     const g=window.__wireTheHouse,c=g.renderer.camera,front=g.room.brickWall.volume.frontZ;let best=null;
     // Choose a camera fixture with an unobstructed physical nozzle ray into
@@ -50,9 +51,9 @@ for(const backend of process.argv.includes('--gpu-only')?['webgpu']:['webgpu','w
   const flowing=await page.evaluate(()=>({held:window.__wireTheHouse.input.actionHeld,interiorRunoffDepthMm:window.__waterInteriorRunoffDepth,water:window.__wireTheHouse.roomWater.telemetry,masonry:window.__wireTheHouse.room.brickWall.telemetry}));
   assert.equal(flowing.held,true);assert.ok(flowing.water.runoffLitres>.04);assert.ok(flowing.water.activeDrops>0);
   assert.ok(flowing.interiorRunoffDepthMm>5,'Actual wet callback reaches the inside cavity surface');
-  report.push({scenario:'held hose into normally excavated masonry',nozzleContact,flowing});
+  report.push({scenario:'native held hose into production impact API cavity fixture',nozzleContact,flowing});
   await page.keyboard.up('KeyE');
-  await page.locator('#work-height').click();
+  await page.locator('#settings-toggle').click();await page.locator('#work-height').click();await page.locator('#settings-close').click();
  }
  await page.keyboard.press('Digit8');
  await page.evaluate(()=>{const g=window.__wireTheHouse,c=g.renderer.camera;c.position.set(0,1.65,.4);c.lookAt(-.4,0,-.2);g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;});
