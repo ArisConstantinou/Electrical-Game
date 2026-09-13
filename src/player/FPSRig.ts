@@ -74,7 +74,12 @@ export class FPSRig extends THREE.Group {
     // Follow the CHISEL axis through the aperture. Empty chambers consume no
     // impact and no energy: the next contact is a surviving rib or rear shell.
     const origin=entry.clone().addScaledVector(direction,-.02);
-    const hit=wall.volume.raycast(origin,direction,Math.min(.38,.24/Math.abs(direction.z)));
+    // Finishing starts at the rib under the crosshair inside the open chase.
+    // Tilting upward changes the blade attack, not the selected depth/target.
+    // Ordinary excavation still follows the shaft through the front aperture.
+    const hit=wall.chiselTiltDegrees < 0
+      ? wall.volume.raycast(eye,view,2.35)
+      : wall.volume.raycast(origin,direction,Math.min(.38,.24/Math.abs(direction.z)));
     this.chiselInAir=!hit;
     const target=hit?new THREE.Vector3(hit.point.x,hit.point.y,hit.point.z):entry.clone().addScaledVector(direction,Math.min(.34,.19/Math.abs(direction.z)));
     const local=this.worldToLocal(target.clone());

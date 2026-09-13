@@ -16,24 +16,24 @@ export interface MasonryVolumeOptions {
   solidMaterial?: MaterialId;
   maxConnectivityNodes?: number;
 }
-export interface MasonryImpactInput { point: Vec3; direction: Vec3; edge?: Vec3; energyJ?: number; chisel: 'pointed' | 'flat'; seed?: number }
+export interface MasonryImpactInput { point: Vec3; direction: Vec3; edge?: Vec3; energyJ?: number; chisel: 'pointed' | 'flat'; seed?: number; /** Upward finishing stroke: preserve the locally established cavity backing. */ trim?: boolean }
 export interface MasonryRayHit { point: Vec3; normal: Vec3; distance: number; material: MaterialId }
 export interface MasonryImpactResult {
   contact: MasonryRayHit | null; removedNodes: number; removedVolume: number;
   removedByMaterial: Record<string, number>; fragments: MasonryFragment[]; cracks: MasonryCrack[];
   changedChunks: string[]; seed: number; bounds: { min: Vec3; max: Vec3 } | null;
-  stats: { milliseconds: number; affectedNodes: number; weakenedNodes: number; connectivityVisited: number; detachedNodes: number; activeChunks: number; openedFissureNodes?: number };
+  stats: { milliseconds: number; affectedNodes: number; weakenedNodes: number; connectivityVisited: number; detachedNodes: number; activeChunks: number; openedFissureNodes?: number; trimMode?: boolean; trimFloorZ?: number | null };
 }
 interface Chunk { damage: Uint8Array; removed: Uint8Array; changes: number }
 export interface MasonrySave {
   version: 1; seed: number; sequence: number; options: MasonryVolumeOptions; removedVolume?: number;
   chunks: Array<{ key: string; edits: Array<[number, number, number]> }>;
-  pendingSupport?: Array<{ starts: Vec3[]; x0: number; x1: number; y0: number; y1: number }>;
+  pendingSupport?: Array<{ starts: Vec3[]; x0: number; x1: number; y0: number; y1: number; trimFloorZ?: number }>;
 }
 interface Node { x: number; y: number; z: number; id: number; material: MaterialId }
 interface SupportJob {
   starts: Vec3[]; startIndex: number; visited: Set<number>; anchors: Set<number>;
-  queue: Node[]; head: number; x0: number; x1: number; y0: number; y1: number;
+  queue: Node[]; head: number; x0: number; x1: number; y0: number; y1: number; trimFloorZ?: number;
 }
 const clamp = (v: number, min: number, max: number): number => Math.min(max, Math.max(min, v));
 const unit = (v: Vec3): Vec3 => { const n = Math.hypot(v.x, v.y, v.z) || 1; return { x: v.x / n, y: v.y / n, z: v.z / n }; };
@@ -55,6 +55,8 @@ export class MasonryVolume {
   private readonly dirty = new Set<string>();
   private readonly exposedAir = new Set<number>();
   private readonly pendingSupport: SupportJob[] = [];
+  private trimPatch: { anchor: Vec3; floorZ: number } | null = null;
+  get trimmingState(): { anchor: Vec3; floorZ: number } | null { return this.trimPatch ? { anchor: { ...this.trimPatch.anchor }, floorZ: this.trimPatch.floorZ } : null; }
   private sequence = 0;
   private totalRemoved = 0;
   private totalDetached = 0;
@@ -306,8 +308,47 @@ export class MasonryVolume {
     if (chunk.removed[offset]) return;
     chunk.removed[offset] = 1; chunk.changes++; this.totalRemoved++; removed.push(node); this.markDirty(node.x, node.y);
   }
+  /** Only columns whose exterior clay has actually been removed can establish a
+   * finishing plane. Unopened factory cavities and remote deep holes do not count.
+   * Keep the backing nodes plus one lattice layer: tetrahedral faces cannot recede
+   * behind that plane when a neighbouring protrusion is clipped away. */
+  private hasLocalExteriorOpening(point: Vec3): boolean {
+    const c = this.coordinates(point), rx = Math.ceil(.048 / this.hx), ry = Math.ceil(.048 / this.hy);
+    for (let y = Math.max(1, c.y - ry); y <= Math.min(this.ny, c.y + ry); y++) for (let x = Math.max(1, c.x - rx); x <= Math.min(this.nx, c.x + rx); x++) {
+      const p = this.nodePosition(x, y, 1);
+      if (Math.hypot(p.x - point.x, p.y - point.y) <= .048 && this.baseMaterial(x, y, 1) && !this.nodeMaterial(x, y, 1) && !this.nodeMaterial(x, y, 2)) return true;
+    }
+    return false;
+  }
+  private establishTrimPlane(point: Vec3): number | null {
+    const center = this.coordinates(point), radius = .048;
+    const depths: number[] = [];
+    const rx = Math.ceil(radius / this.hx), ry = Math.ceil(radius / this.hy);
+    for (let y = Math.max(1, center.y - ry); y <= Math.min(this.ny, center.y + ry); y++) {
+      for (let x = Math.max(1, center.x - rx); x <= Math.min(this.nx, center.x + rx); x++) {
+        const p = this.nodePosition(x, y, 1);
+        if (Math.hypot(p.x - point.x, p.y - point.y) > radius) continue;
+        // A surviving outer shell still blocks access to its manufactured void.
+        if (this.nodeMaterial(x, y, 1) || this.nodeMaterial(x, y, 2)) continue;
+        let removedExterior = false;
+        for (let z = 1; z <= 2; z++) if (this.baseMaterial(x, y, z)) removedExterior = true;
+        if (!removedExterior) continue;
+        for (let z = 3; z <= this.nz; z++) {
+          if (!this.nodeMaterial(x, y, z)) continue;
+          if (z >= 4 && this.nodeAirExposed(x, y, z - 1)) depths.push(this.nodePosition(x, y, z).z);
+          break;
+        }
+      }
+    }
+    if (depths.length < 3) return null;
+    // Deeper local faces define the floor, with isolated bore holes rejected.
+    depths.sort((a, b) => a - b);
+    return depths[Math.floor(depths.length * .25)];
+  }
+
   impact(input: MasonryImpactInput): MasonryImpactResult {
     const started = performance.now(); this.sequence++;
+    if (!input.trim) this.trimPatch = null;
     // A new impact may sever a previously discovered anchor path; deferred searches restart
     // against the new topology rather than retaining stale support claims.
     for (const job of this.pendingSupport) { job.startIndex = 0; job.visited.clear(); job.anchors.clear(); job.queue = []; job.head = 0; }
@@ -321,6 +362,23 @@ export class MasonryVolume {
       stats: { milliseconds: 0, affectedNodes: 0, weakenedNodes: 0, connectivityVisited: 0, detachedNodes: 0, activeChunks: this.chunks.size },
     };
     if (!contact) { result.stats.milliseconds = performance.now() - started; return result; }
+    let trimFloorZ: number | undefined;
+    if (input.trim) {
+      if (this.trimPatch && Math.hypot(contact.point.x - this.trimPatch.anchor.x, contact.point.y - this.trimPatch.anchor.y) > .065) this.trimPatch = null;
+      if (!this.trimPatch) {
+        const floorZ = this.establishTrimPlane(contact.point);
+        if (floorZ !== null) this.trimPatch = { anchor: { ...contact.point }, floorZ };
+      }
+      result.stats.trimMode = Boolean(this.trimPatch); result.stats.trimFloorZ = this.trimPatch?.floorZ ?? null;
+      if (!this.trimPatch && this.hasLocalExteriorOpening(contact.point)) {
+        // A partly opened damaged cavity with no reliable backing is not a licence
+        // to deepen. Pristine facing, however, retains ordinary upward chipping.
+        result.stats.trimMode = true; result.stats.milliseconds = performance.now() - started; return result;
+      }
+      trimFloorZ = this.trimPatch?.floorZ;
+      // Searches queued by the preceding excavation must not later bypass the guard.
+      if (trimFloorZ !== undefined) for (const job of this.pendingSupport) job.trimFloorZ = Math.max(job.trimFloorZ ?? -Infinity, trimFloorZ);
+    }
     let edge = input.edge ? unit(input.edge) : unit({ x: 1 - direction.x * direction.x, y: -direction.x * direction.y, z: -direction.x * direction.z });
     const edgeDot = edge.x * direction.x + edge.y * direction.y + edge.z * direction.z;
     edge = unit({ x: edge.x - direction.x * edgeDot, y: edge.y - direction.y * edgeDot, z: edge.z - direction.z * edgeDot });
@@ -343,6 +401,10 @@ export class MasonryVolume {
     for (let y = Math.max(1, c.y - r); y <= Math.min(this.ny, c.y + r); y++) for (let x = Math.max(1, c.x - r); x <= Math.min(this.nx, c.x + r); x++) for (let z = Math.max(1, c.z - r); z <= Math.min(this.nz, c.z + r); z++) {
       const material = this.nodeMaterial(x, y, z); if (!material) continue;
       const p = this.nodePosition(x, y, z), delta = { x: p.x - contact.point.x, y: p.y - contact.point.y, z: p.z - contact.point.z };
+      if (trimFloorZ !== undefined) {
+        if (p.z <= trimFloorZ + this.hz + 1e-9 || p.z >= this.frontZ - this.hz * 1.5) continue;
+        if (!NEIGHBORS.some(d => this.nodeAirExposed(x + d[0], y + d[1], z + d[2]) && !this.nodeMaterial(x + d[0], y + d[1], z + d[2]))) continue;
+      }
       const along = delta.x * direction.x + delta.y * direction.y + delta.z * direction.z;
       if (along < -.045 || along > depthLimit) continue;
       const u = delta.x * edge.x + delta.y * edge.y + delta.z * edge.z;
@@ -412,7 +474,7 @@ export class MasonryVolume {
         }
       } else result.stats.weakenedNodes++;
     }
-    if (removed.length) this.detachIslands(removed, result, c, r + 2);
+    if (removed.length) this.detachIslands(removed, result, c, r + 2, trimFloorZ);
     if (removed.length) this.exposeCavities(removed);
     this.aggregateFragments(removed, result);
     result.removedNodes = removed.length;
@@ -426,12 +488,12 @@ export class MasonryVolume {
     result.changedChunks = [...this.dirty]; result.stats.activeChunks = this.chunks.size;
     result.stats.milliseconds = performance.now() - started; return result;
   }
-  private detachIslands(removed: Node[], result: MasonryImpactResult, center: Vec3, radius: number): void {
+  private detachIslands(removed: Node[], result: MasonryImpactResult, center: Vec3, radius: number, trimFloorZ?: number): void {
     const x0 = Math.max(1, center.x - radius), x1 = Math.min(this.nx, center.x + radius);
     const y0 = Math.max(1, center.y - radius), y1 = Math.min(this.ny, center.y + radius);
     const starts: Vec3[] = [];
     for (const n of removed) for (const d of NEIGHBORS) starts.push({ x: n.x + d[0], y: n.y + d[1], z: n.z + d[2] });
-    const job: SupportJob = { starts, startIndex: 0, visited: new Set(), anchors: new Set(), queue: [], head: 0, x0, x1, y0, y1 };
+    const job: SupportJob = { starts, startIndex: 0, visited: new Set(), anchors: new Set(), queue: [], head: 0, x0, x1, y0, y1, trimFloorZ };
     if (!this.advanceSupport(job, this.maxConnectivityNodes, removed, result)) this.pendingSupport.push(job);
   }
   private advanceSupport(job: SupportJob, budget: number, removed: Node[], result: MasonryImpactResult): boolean {
@@ -450,7 +512,7 @@ export class MasonryVolume {
       let anchored = false;
       while (job.head < job.queue.length && steps < budget) {
         const n = job.queue[job.head++]; steps++;
-        if (n.x <= job.x0 || n.x >= job.x1 || n.y <= job.y0 || n.y >= job.y1 || n.z === this.nz || n.y <= 1 || n.x <= 1 || n.x >= this.nx) { anchored = true; break; }
+        if ((job.trimFloorZ !== undefined && this.nodePosition(n.x, n.y, n.z).z <= job.trimFloorZ + this.hz + 1e-9) || n.x <= job.x0 || n.x >= job.x1 || n.y <= job.y0 || n.y >= job.y1 || n.z === this.nz || n.y <= 1 || n.x <= 1 || n.x >= this.nx) { anchored = true; break; }
         for (const d of NEIGHBORS) {
           const x = n.x + d[0], y = n.y + d[1], z = n.z + d[2], id = this.index(x, y, z);
           if (job.anchors.has(id)) { anchored = true; break; }
@@ -466,7 +528,7 @@ export class MasonryVolume {
         job.queue = []; job.head = 0;
       } else if (job.head === job.queue.length) {
         const before = removed.length;
-        for (const n of job.queue) if (this.nodeMaterial(n.x, n.y, n.z)) this.remove(n, removed);
+        for (const n of job.queue) if (this.nodeMaterial(n.x, n.y, n.z) && (job.trimFloorZ === undefined || this.nodePosition(n.x, n.y, n.z).z > job.trimFloorZ + this.hz + 1e-9)) this.remove(n, removed);
         const detached = removed.length - before; result.stats.detachedNodes += detached; this.totalDetached += detached;
         job.queue = []; job.head = 0;
       }
@@ -551,7 +613,7 @@ export class MasonryVolume {
     }
   }
   serialize(): MasonrySave {
-    return { version: 1, seed: this.seed, sequence: this.sequence, removedVolume: this.totalRemovedVolume, options: { ...this.options, seed: this.seed }, pendingSupport: this.pendingSupport.map(job => ({ starts: job.starts, x0: job.x0, x1: job.x1, y0: job.y0, y1: job.y1 })), chunks: [...this.chunks].map(([key, chunk]) => {
+    return { version: 1, seed: this.seed, sequence: this.sequence, removedVolume: this.totalRemovedVolume, options: { ...this.options, seed: this.seed }, pendingSupport: this.pendingSupport.map(job => ({ starts: job.starts, x0: job.x0, x1: job.x1, y0: job.y0, y1: job.y1, ...(job.trimFloorZ !== undefined ? { trimFloorZ: job.trimFloorZ } : {}) })), chunks: [...this.chunks].map(([key, chunk]) => {
       const edits: Array<[number, number, number]> = [];
       for (let i = 0; i < chunk.damage.length; i++) if (chunk.damage[i] || chunk.removed[i]) edits.push([i, chunk.damage[i], chunk.removed[i]]);
       return { key, edits };
@@ -560,7 +622,7 @@ export class MasonryVolume {
   restore(save: MasonrySave): void {
     if (save.version !== 1 || save.seed !== this.seed) throw new Error('Masonry save version or seed mismatch');
     for (const key of this.chunks.keys()) this.dirty.add(key);
-    this.chunks.clear(); this.exposedAir.clear(); this.pendingSupport.length = 0; this.totalRemoved = 0; this.totalDetached = 0; this.totalRemovedVolume = save.removedVolume ?? 0; this.sequence = save.sequence;
+    this.trimPatch = null; this.chunks.clear(); this.exposedAir.clear(); this.pendingSupport.length = 0; this.totalRemoved = 0; this.totalDetached = 0; this.totalRemovedVolume = save.removedVolume ?? 0; this.sequence = save.sequence;
     for (const job of save.pendingSupport ?? []) this.pendingSupport.push({ ...job, startIndex: 0, visited: new Set(), anchors: new Set(), queue: [], head: 0 });
     const count = this.tileSize * this.tileSize * (this.nz + 2);
     for (const entry of save.chunks) {

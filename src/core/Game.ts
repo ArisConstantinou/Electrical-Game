@@ -67,7 +67,6 @@ export class Game {
   private readonly chasing: ChasingSystem;
   private readonly interaction: InteractionSystem;
   private lastTime = performance.now();
-  private shake = 0;
   private resultShown = false;
   private actionCooldown = 0;
   private wasSpraying = false;
@@ -172,7 +171,7 @@ export class Game {
     this.hud.update(active, aimed, this.mission.progress, this.selectedTool);
     const sprayColor = SPRAY_COLORS[this.sprayColorIndex];
     this.hud.updateSprayControls(this.sprayMode, sprayColor.name, sprayColor.css, this.selectedTool === 'spray');
-    this.hud.updateHammerControls(this.hammerMode, this.selectedTool === 'hammer');
+    this.hud.updateHammerControls(this.hammerMode, this.selectedTool === 'hammer', this.room.brickWall.chiselTiltDegrees < 0);
     this.hud.updateAimControl(this.aimControlMode);
     this.hud.updateAimSpeed(this.aimProfile);
     this.hud.updateWallAssist(this.wallAssistEnabled);
@@ -180,11 +179,6 @@ export class Game {
     const waterHit=this.room.brickWall.aim(this.renderer.camera);
     const wet=waterHit ? this.mortar.moistureAt(new THREE.Vector3(waterHit.point.x,waterHit.point.y,waterHit.point.z)) : {pore:0,film:0};
     this.hud.updateMortar(this.selectedTool,this.mortar.charge,this.mortar.angleDegrees,wet,active ? this.mortar.coverage(active):0,this.mortar.recovery,this.mortar.lastOutcome,this.roomWater.telemetry.floorLitres,this.mortar.throwFeedback);
-    if (this.shake > 0) {
-      this.shake = Math.max(0, this.shake - dt * 3.7);
-      this.renderer.camera.rotation.x += (Math.random() - 0.5) * this.shake * 0.025;
-      this.renderer.camera.rotation.y += (Math.random() - 0.5) * this.shake * 0.02;
-    }
     if (this.mission.complete && !this.resultShown) { this.resultShown = true; this.hud.showResult(); if (document.pointerLockElement) void document.exitPointerLock(); }
     this.renderer.render();
   }
@@ -214,7 +208,7 @@ export class Game {
     const hammering = this.selectedTool === 'hammer';
     const result = this.interaction.action(target, this.selectedTool, this.renderer.camera, continuing);
     if(result.success)this.fpsRig.toolAction=1;
-    if (hammering && result.success) { this.fpsRig.strike(); this.shake = 1; }
+    if (hammering && result.success) this.fpsRig.strike();
     if (result.message) this.hud.notify(result.message, result.success);
   }
 
@@ -273,7 +267,7 @@ export class Game {
       const angles=[25,50,70,85,0,-25,-50,-70,-85];
       wall.chiselTiltDegrees=delta ? Math.max(-85,Math.min(85,wall.chiselTiltDegrees+delta)) : angles[(angles.indexOf(wall.chiselTiltDegrees)+1)%angles.length];
       document.querySelector('#chisel-tilt b')!.textContent=`${Math.abs(wall.chiselTiltDegrees)} deg ${wall.chiselTiltDegrees<0 ? "UP" : "DOWN"}`;
-      this.hud.notify(`Hammer tilt: ${Math.abs(wall.chiselTiltDegrees)} deg ${wall.chiselTiltDegrees<0 ? "upward" : "downward"}`);
+      this.hud.notify(wall.chiselTiltDegrees<0 ? `Upward ${Math.abs(wall.chiselTiltDegrees)}° · trim exposed ribs at the existing cavity depth` : `Hammer tilt: ${wall.chiselTiltDegrees}° downward`);
     });
     addEventListener('wirehouse:rotate-chisel', () => {
       this.room.brickWall.chiselEdgeAngle = (this.room.brickWall.chiselEdgeAngle + Math.PI/4) % Math.PI;

@@ -299,9 +299,10 @@ export class HUD {
     if (swatch) swatch.style.background = colorCss;
   }
 
-  updateHammerControls(mode: string, visible: boolean): void {
+  updateHammerControls(mode: string, visible: boolean, trimming = false): void {
     const modeText = this.shell.querySelector<HTMLElement>('#tool-mode-toggle span');
     if (visible && modeText) modeText.textContent = mode.toUpperCase();
+    if (visible && trimming) this.tool.querySelector('em')!.textContent = 'UP · EDGE CLEANUP';
   }
 
   updateAimControl(mode: 'auto-use' | 'double-tap'): void {

@@ -159,7 +159,7 @@ export class BrickWall extends THREE.Group {
       if (hit) contact = {point: hit.point, direction: camera.getWorldDirection(new THREE.Vector3()), edge: new THREE.Vector3(Math.cos(this.chiselEdgeAngle), Math.sin(this.chiselEdgeAngle), 0), energyJ: this.chiselEnergyJ, chisel: this.chiselType};
     }
     if (!contact) return null;
-    const result = this.volume.impact(contact);
+    const result = this.volume.impact({ ...contact, trim: this.chiselTiltDegrees < 0 });
     if (!result.contact) return null;
     this.lastResult = result;
     this.impactCount++;
@@ -265,7 +265,7 @@ export class BrickWall extends THREE.Group {
   get telemetry() {
     let triangles = 0, geometryBytes = 0;
     for (const mesh of this.chunks.values()) { triangles += mesh.geometry.getAttribute('position').count / 3; geometryBytes += mesh.geometry.getAttribute('position').array.byteLength * 3; }
-    return {model:'sparse-3d-brittle-masonry', pendingSupportJobs:this.volume.pendingSupportCount, volumeBytes:this.volume.memoryBytes, pendingMeshes:this.pendingMeshes.size+this.inFlightMeshes.size,workerMeshing:Boolean(this.meshWorker),lastWorkerMs:this.lastWorkerMs,peakGeometryLatencyMs:this.peakGeometryLatencyMs,workerError:this.workerError, impactCount:this.impactCount, removedNodes:this.removedNodes, removedVolumeCm3:this.removedVolume*1e6, maximumDepthMm:this.maxDepth*1000, damagedChunks:this.chunks.size, surfaceTriangles:triangles, geometryBytes, deformedWallCells:0, lastCalculationMs:this.lastCalculationMs, peakCalculationMs:this.peakCalculationMs, lastMeshMs:this.lastMeshMs, peakMeshMs:this.peakMeshMs, lastImpact:this.lastResult ? {removedNodes:this.lastResult.removedNodes,removedByMaterial:this.lastResult.removedByMaterial,stats:this.lastResult.stats} : null, fractureSegments:0, fractureRendering:'removed-material-surfaces', openedFissureNodes:this.lastResult?.stats.openedFissureNodes??0};
+    return {model:'sparse-3d-brittle-masonry', trimming:this.volume.trimmingState, pendingSupportJobs:this.volume.pendingSupportCount, volumeBytes:this.volume.memoryBytes, pendingMeshes:this.pendingMeshes.size+this.inFlightMeshes.size,workerMeshing:Boolean(this.meshWorker),lastWorkerMs:this.lastWorkerMs,peakGeometryLatencyMs:this.peakGeometryLatencyMs,workerError:this.workerError, impactCount:this.impactCount, removedNodes:this.removedNodes, removedVolumeCm3:this.removedVolume*1e6, maximumDepthMm:this.maxDepth*1000, damagedChunks:this.chunks.size, surfaceTriangles:triangles, geometryBytes, deformedWallCells:0, lastCalculationMs:this.lastCalculationMs, peakCalculationMs:this.peakCalculationMs, lastMeshMs:this.lastMeshMs, peakMeshMs:this.peakMeshMs, lastImpact:this.lastResult ? {removedNodes:this.lastResult.removedNodes,removedByMaterial:this.lastResult.removedByMaterial,stats:this.lastResult.stats} : null, fractureSegments:0, fractureRendering:'removed-material-surfaces', openedFissureNodes:this.lastResult?.stats.openedFissureNodes??0};
   }
   saveDamage() { return {volume:this.volume.serialize(),cracks:[] as Array<{points:Array<{x:number;y:number;z:number}>;width:number}>,impactCount:this.impactCount,removedVolume:this.removedVolume,maxDepth:this.maxDepth}; }
   restoreDamage(saved: ReturnType<BrickWall['saveDamage']>): void {
