@@ -138,9 +138,9 @@ export class MortarField {
 
   /** Remove material occupying moved box openings; quantity is counted at the
    * same fixed nodes as deposition, independent of remesh triangle counts. */
-  removeWhere(blocked:(point:THREE.Vector3)=>boolean):number {
+  removeWhere(blocked:(point:THREE.Vector3)=>boolean,freshOnly=false):number {
     let removed=0;const point=new THREE.Vector3();
-    for(const node of [...this.nodes.values()])if(blocked(point.set(node.x*this.spacing,node.y*this.spacing,node.z*this.spacing))){removed+=node.value*this.nodeMass;this.set(node.x,node.y,node.z,0,node.age);}
+    for(const node of [...this.nodes.values()])if((!freshOnly||node.age<FRESH_SECONDS)&&blocked(point.set(node.x*this.spacing,node.y*this.spacing,node.z*this.spacing))){removed+=node.value*this.nodeMass;this.set(node.x,node.y,node.z,0,node.age);}
     if(removed>0)this.revision++;return removed;
   }
 

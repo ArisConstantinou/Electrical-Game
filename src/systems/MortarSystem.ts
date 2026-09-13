@@ -297,7 +297,7 @@ export class MortarSystem {
     return pieces;
   }
 
-  private deposit(p: THREE.Vector3, mass: number, normal: THREE.Vector3): number {
+  private deposit(p: THREE.Vector3, mass: number, normal: THREE.Vector3, sync=true): number {
     if (mass <= .001) return 0;
     // An impact facet must not rotate a separate sheet. Wet material joins a
     // fixed-world scalar volume and grows along the working face.
@@ -313,7 +313,7 @@ export class MortarSystem {
       return hit?hit.point.z:null;
     }};
     const held = this.field.add(p, growth, mass, blocked,profile);
-    if (held > 0) { this.syncFieldGeometry(); this.geometryRevision++; }
+    if (held > 0) { if(sync)this.syncFieldGeometry(); this.geometryRevision++; }
     return held;
   }
 
@@ -327,6 +327,28 @@ export class MortarSystem {
       else {const mesh=new THREE.Mesh(chunk.geometry,this.mortarMaterial);mesh.name='Continuous wet mortar volume';mesh.castShadow=mesh.receiveShadow=true;this.group.add(mesh);this.deposits.push({fieldKey:chunk.key,position:sphere.center.clone(),radius:sphere.radius,mass:chunk.mass,mesh,age:chunk.age,normal:Z.clone(),support:1-Math.min(1,chunk.dilution)});}
     }
     this.fieldMeshTime=0;
+  }
+
+  /** A pressed box extrudes fresh mortar out of its occupied envelope. Backing
+   * behind the actual casing stays in place; excess remains counted as slurry. */
+  pressBox(point:InstallationPoint):{displacedKg:number;repackedKg:number;looseKg:number}{
+    point.updateWorldMatrix(true,true);
+    const regions=point.boxGroup.boxes.map(box=>({inverse:box.matrixWorld.clone().invert(),width:box.width/2+.002,height:box.height/2+.002,depth:box.depth}));
+    const removed=this.field.removeWhere(q=>regions.some(region=>{const p=q.clone().applyMatrix4(region.inverse);return Math.abs(p.x)<region.width&&Math.abs(p.y)<region.height&&p.z>=-region.depth&&p.z<.12;}),true);
+    if(!removed)return{displacedKg:0,repackedKg:0,looseKg:0};
+    this.stuckMass=Math.max(0,this.stuckMass-removed);
+    let held=0;
+    for(const box of point.boxGroup.boxes)for(const side of [-1,1]){
+      for(const horizontal of [true,false]){
+        const p=new THREE.Vector3(horizontal?side*(box.width/2+.027):0,horizontal?0:side*(box.height/2+.026),-box.depth*.55).applyMatrix4(box.matrixWorld);
+        held+=this.deposit(p,removed/(point.boxGroup.boxes.length*4),Z,false);
+      }
+    }
+    this.stuckMass+=held;
+    const loose=Math.max(0,removed-held);
+    if(loose)this.queueSlurry(point.boxGroup.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0,0,.015)),Z,loose);
+    this.openingSignature='';this.field.invalidateGeometry();this.syncFieldGeometry();this.geometryRevision++;
+    return{displacedKg:removed,repackedKg:held,looseKg:loose};
   }
 
   private refreshOpeningGeometry(): void {
@@ -479,7 +501,7 @@ export class MortarSystem {
       closest.userData.mass += clod.mass; const r = Math.cbrt(closest.userData.mass / DENSITY) * 1.8; closest.scale.set(r, .006, r * .8); this.group.remove(clod.mesh);
     }
   }
-  private updateStages(): void { for (const point of this.points) if (point.stage === 'fitted' && this.evaluateCoverage(point, true) >= .68) point.setStage('mortared'); }
+  private updateStages(): void { for (const point of this.points) if (point.stage === 'fitted' && (!point.boxGroup.userData.placement||point.boxGroup.userData.placement.secured) && this.evaluateCoverage(point, true) >= .68) point.setStage('mortared'); }
   coverage(point: InstallationPoint): number { return this.evaluateCoverage(point, false); }
   private evaluateCoverage(point: InstallationPoint, stableOnly: boolean): number {
     point.updateWorldMatrix(true, true);

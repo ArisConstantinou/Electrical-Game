@@ -14,6 +14,8 @@ import { MarkingSystem } from '../systems/MarkingSystem';
 import { ChasingSystem } from '../systems/ChasingSystem';
 import { MortarSystem } from '../systems/MortarSystem';
 import { RoomWaterSystem } from '../systems/RoomWaterSystem';
+import { BoxPlacementSystem } from '../systems/BoxPlacementSystem';
+import { GAME_CONFIG } from '../data/gameConfig';
 import { WATER_GUN_MODES } from '../systems/WaterGun';
 import { LevelingSystem, type LevelDirection } from '../systems/LevelingSystem';
 import { ConduitSystem, type PvcTool } from '../systems/ConduitSystem';
@@ -51,6 +53,7 @@ export class Game {
   readonly conduit: ConduitSystem;
   readonly mortar: MortarSystem;
   readonly roomWater: RoomWaterSystem;
+  readonly boxPlacement: BoxPlacementSystem;
   readonly ready: Promise<void>;
   readonly leveling = new LevelingSystem();
   readonly hud: HUD;
@@ -60,7 +63,7 @@ export class Game {
   sprayColorIndex = 0;
   hammerMode: HammerMode = 'chase';
   hammerSpeed = 1;
-  waterGunModeIndex = 1;
+  waterGunModeIndex = 3;
   aimControlMode: AimControlMode = 'auto-use';
   aimProfile: MobileAimProfile = 'normal';
   wallAssistEnabled = true;
@@ -93,9 +96,12 @@ export class Game {
     this.conduit = new ConduitSystem(this.renderer.scene, this.room.brickWall);
     this.mortar = new MortarSystem(this.renderer.scene, this.room.brickWall, this.mission.points);
     this.roomWater = new RoomWaterSystem(this.renderer.scene, this.room.brickWall);
+    this.boxPlacement = new BoxPlacementSystem(this.room.brickWall,this.mortar,this.mission.points);
     this.mortar.onRunoff = event => this.roomWater.addRunoff(event);
     this.mortar.onWaterEmission = event => this.roomWater.addEmission(event);
     this.interaction = new InteractionSystem(new MarkingSystem(this.room.brickWall), this.chasing, this.leveling, this.mortar, this.conduit);
+    this.interaction.placementSystem=this.boxPlacement;
+    this.leveling.placementSystem=this.boxPlacement;
     this.applySpraySettings();
     this.desktopControls = new DesktopControls(this.hud.shell, this.renderer.webgl.domElement, this.player, this.input);
     this.mobileControls = new MobileControls(
@@ -124,15 +130,17 @@ export class Game {
     });
   }
 
-  step(dt: number): void {
+  step(dt: number, waterDt = dt): void {
     this.hammerWorkStance.restore(this.renderer.camera);
     const active = this.mission.activePoint;
     const leveling = active?.stage === 'leveling';
     if (leveling && !this.wasLeveling && document.pointerLockElement) void document.exitPointerLock();
     this.wasLeveling = leveling;
-    this.player.wallWorkEnabled=this.selectedTool==='hammer'&&!leveling;
+    const handWork=this.selectedTool==='fitting'||this.selectedTool==='level';
+    this.player.wallWorkEnabled=(this.selectedTool==='hammer'||handWork)&&!leveling;
     const wallAxisZ=Math.cos(THREE.MathUtils.degToRad(this.room.brickWall.chiselTiltDegrees))*Math.cos(THREE.MathUtils.degToRad(this.room.brickWall.chiselSideDegrees));
-    this.player.wallWorkDistance=.38+.39*Math.abs(wallAxisZ);
+    this.player.wallWorkDistance=handWork?.46:.38+.39*Math.abs(wallAxisZ);
+    this.player.handWorkTargetY=handWork?this.boxWorkAim()?.y??null:null;
     if (this.started && !leveling) this.player.update(Math.min(dt, 0.05));
     this.renderer.camera.rotation.set(this.player.pitch, this.player.yaw, 0);
     this.hammerWorkStance.update(this.renderer.camera, dt, this.room.brickWall.chiselSideDegrees, this.started && this.selectedTool === 'hammer' && !leveling);
@@ -169,10 +177,15 @@ export class Game {
     const waterSetting=WATER_GUN_MODES[this.waterGunModeIndex];
     const waterHeld=mortarTool&&this.selectedTool==='hose'&&this.input.actionHeld;
     const nozzleDirection=this.fpsRig.waterGunDirectionWorld();
-    if(waterHeld)this.mortar.wet(this.renderer.camera,releaseOrigin,dt,waterSetting,(x,z)=>this.roomWater.field.surfaceAt(x,z),nozzleDirection);
+    const waterSeconds=THREE.MathUtils.clamp(waterDt,0,.25);
+    if(waterHeld)this.mortar.wet(this.renderer.camera,releaseOrigin,waterSeconds,waterSetting,(x,z)=>this.roomWater.field.surfaceAt(x,z),nozzleDirection);
     this.roomWater.setJetState({active:waterHeld,origin:releaseOrigin,direction:nozzleDirection,...waterSetting});
     this.mortar.update(dt);
-    this.roomWater.update(dt);
+    this.boxPlacement.update(dt);
+    // Keep hose litres tied to elapsed time on slower phones, while advancing
+    // fluid collision in small stable steps. Rendering still happens once.
+    if(waterSeconds===0)this.roomWater.update(0);
+    for(let remaining=waterSeconds;remaining>1e-8;remaining-=.05)this.roomWater.update(Math.min(.05,remaining));
     this.mortar.preview(this.renderer.camera,releaseOrigin,mortarTool && this.selectedTool === 'trowel');
     this.fpsRig.hoseActive=this.selectedTool==='hose'&&this.input.actionHeld;
     this.fpsRig.levelTiltDegrees=active?.boxGroup.tiltDegrees??0;
@@ -209,6 +222,7 @@ export class Game {
     const point = this.mission.activePoint;
     return JSON.stringify({
       mortar: this.mortar.telemetry,
+      boxPlacement:this.boxPlacement.telemetry,
       water: {...this.roomWater.telemetry,gunMode:WATER_GUN_MODES[this.waterGunModeIndex].id,gunLitres:this.mortar.waterGunLitres},
       hammer: { speedMultiplier: this.hammerSpeed, paused: this.hammerSpeed === 0, impactIntervalSeconds: this.hammerSpeed > 0 ? .24 / this.hammerSpeed : null },
       body: this.fpsRig.debugPose(),
@@ -227,9 +241,9 @@ export class Game {
     const active = this.mission.activePoint;
     if (!active) return;
     if (['fitting','level','spring','cutter'].includes(this.selectedTool)) {
-      const freeBox=this.selectedTool==='fitting'&&!active.boxGroup.visible;
-      const hit=freeBox?this.room.brickWall.aim(this.renderer.camera):null;
-      const point=freeBox?(hit?new THREE.Vector3(hit.point.x,hit.point.y,hit.point.z):null):active.getWorldPosition(new THREE.Vector3());
+      // Fitting reaches the box mouth at the wall plane, not the surviving
+      // backing brick deep inside the cavity behind it.
+      const point=this.selectedTool==='fitting'?this.boxWorkAim():active.boxGroup.getWorldPosition(new THREE.Vector3());
       if(!point||!this.fpsRig.canReachPoint(this.renderer.camera,point)){
         this.hud.notify('Out of reach. Move closer or crouch for low work.',false);return;
       }
@@ -238,7 +252,7 @@ export class Game {
       if(!continuing&&!this.player.workPosition.locked)this.hud.notify('Approach the wall to settle into the working position.',false);
       return;
     }
-    const spatialTool = this.selectedTool === 'spray' || this.selectedTool === 'hammer' || (this.selectedTool === 'fitting' && !active.boxGroup.visible);
+    const spatialTool = this.selectedTool === 'spray' || this.selectedTool === 'hammer' || this.selectedTool === 'fitting';
     const target = active.stage === 'leveling' ? active : spatialTool ? active : this.mission.target(this.renderer.camera);
     if (!target) { this.hud.notify('Aim at the work area you chose.', false); return; }
     const hammering = this.selectedTool === 'hammer';
@@ -246,6 +260,21 @@ export class Game {
     if(result.success)this.fpsRig.toolAction=1;
     if (hammering && result.success) this.fpsRig.strike();
     if (result.message) this.hud.notify(result.message, result.success);
+  }
+
+  private boxWorkAim():THREE.Vector3|null {
+    const camera=this.renderer.camera,origin=camera.getWorldPosition(new THREE.Vector3()),direction=camera.getWorldDirection(new THREE.Vector3());
+    const box=this.mission.activePoint?.boxGroup;
+    if(box?.visible){
+      box.updateWorldMatrix(true,true);
+      const hit=new THREE.Ray(origin,direction).intersectBox(new THREE.Box3().setFromObject(box),new THREE.Vector3());
+      if(hit&&hit.distanceTo(origin)<=GAME_CONFIG.interaction.maxDistance)return hit;
+    }
+    if(direction.z>=-.01)return null;
+    const distance=(this.room.brickWall.volume.frontZ-origin.z)/direction.z;
+    if(distance<=0||distance>2.35)return null;
+    const point=origin.addScaledVector(direction,distance);
+    return Math.abs(point.x)<=3&&point.y>=0&&point.y<=3?point:null;
   }
 
   private bindEvents(): void {
@@ -408,9 +437,10 @@ export class Game {
   private isContinuousAction(): boolean { return this.selectedTool === 'spray' || this.selectedTool === 'hammer' || this.selectedTool === 'hose'; }
 
   private loop = (time: number): void => {
-    const dt = Math.min((time - this.lastTime) / 1000, 0.05);
+    const elapsed = Math.max(0,Math.min((time - this.lastTime) / 1000,.25));
+    const dt = Math.min(elapsed, 0.05);
     this.lastTime = time;
-    this.step(dt);
+    this.step(dt,elapsed);
     requestAnimationFrame(this.loop);
   };
 }

@@ -6,11 +6,13 @@ import type { ConduitSystem } from './ConduitSystem';
 import type { LevelingSystem } from './LevelingSystem';
 import type { MortarSystem } from './MortarSystem';
 import type { MarkingSystem } from './MarkingSystem';
+import type { BoxPlacementSystem } from './BoxPlacementSystem';
 
 export interface InteractionResult { success: boolean; message: string }
 export type HammerMode = 'chase' | 'demolish';
 
 export class InteractionSystem {
+  placementSystem?:BoxPlacementSystem;
   hammerMode: HammerMode = 'chase';
   constructor(
     private readonly marking: MarkingSystem,
@@ -28,6 +30,8 @@ export class InteractionSystem {
   setHammerMode(mode: HammerMode): void { this.hammerMode = mode; }
 
   action(point: InstallationPoint, tool: RigTool, camera: THREE.Camera, continuing = false): InteractionResult {
+    if(tool==='fitting'&&this.placementSystem)return this.placementSystem.place(point,camera);
+    if(['level','spring','cutter'].includes(tool)&&point.boxGroup.userData.placement&&!point.boxGroup.userData.placement.secured)return{success:false,message:'The box is loose. Support and secure it with mortar before continuing.'};
     if (tool === 'spray') {
       const firstMark = point.stage === 'inspect';
       const painted = this.marking.spray(camera, point);

@@ -18,6 +18,8 @@
     "test:masonry-benchmark": "node tests/masonry-benchmark.mjs",
     "test:hammer-stance": "node tests/hammer-stance-smoke.mjs",
     "test:mortar": "node tests/mortar-application-smoke.mjs",
+    "test:box-placement": "node tests/hand-work-stance.mjs && node tests/box-placement-ui.mjs",
+    "test:default-flood": "node tests/default-flood-ui.mjs",
     "test:tools-visual": "node tests/tools-visual-smoke.mjs",
     "test:room-water-field": "node tests/room-water-field.mjs",
     "test:room-water": "node tests/room-water-smoke.mjs",

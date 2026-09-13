@@ -22,7 +22,7 @@ The existing clay and mortar onBeforeCompile grain shaders have explicit TSL equ
 
 Up to 128 moving water batches carry real litres and gravity. When the visual pool is full, batches merge conservatively instead of deleting their water. Moving drops collide with actual masonry occupancy and accumulate on the floor. `received = airborne + floor` is exposed as telemetry. Runoff `mortarKg` is informational turbidity metadata; the mortar system remains the sole owner of mortar mass.
 
-Limits: the floor solver is a conservative shallow-flow approximation, not a full 3D fluid solve. The current room boundary does not model escape through the unfinished rear opening. Water Pro underwater post-processing is disabled because its stock submersion plane is Y=0; above-water puddles/flood surfaces rise correctly, but swimming/submerged-camera optics are not implemented. This work does not claim physical iPhone/Safari verification.
+Limits: the floor solver is a conservative shallow-flow approximation, not a full 3D fluid solve. The current room boundary does not model escape through the unfinished rear opening. Water Pro stock underwater post-processing remains disabled because its submersion plane is Y=0. The finite-room integration now supplies the actual local submersion state to the Water Pro surface and applies bounded, distance-dependent absorption along the submerged part of the sight ray. Swimming and full underwater post-processing are not implemented. This work does not claim physical iPhone/Safari verification.
 
 ## Validation
 
@@ -50,3 +50,12 @@ Actual Water Pro now uses physical clear fresh-water optics, scene reflections w
 `node tests/water-gun-ui.mjs` covers real held/released input, mode selection, desktop/mobile settings, bounded water resources, zero browser errors and both renderer backends. A declared camera fixture and accelerated Game.step time exercise 120 seconds of held FLOOD: 4800 litres are emitted by gameplay, without addFloorWater injection, covering the 29.0848 square metre room and raising mean depth by approximately 16.5 cm. Field tests separately validate 1 metre-plus fill, positive depths and conservation. Earlier benchmark figures above describe the previous implementation and are not measurements of this revision.
 
 The nozzle is posed around its single-hand grip before emission is sampled. The same world outlet and axis drive visible and physical water; moving aim immediately invalidates the visual update throttle. Full finite surface triangles and optical-only Gaussian depth reconstruction remove the square wet-cell contour without modifying physical volume.
+
+
+## Default visible flooding revision
+
+FLOOD is now the default water-gun mode at an explicitly boosted 160 L/s. In this 29.0848 m² closed room it supplies approximately 33 cm average depth per minute while held, allowing a visible body of water instead of only a thin wet floor. MIST, SHOWER and JET remain available for gentler work. The HUD prioritizes the actual mean water level, total floor litres and selected flow.
+
+Water supply follows active elapsed wall time even below 20 FPS; the liquid collision solver advances in at most 50 ms steps. A 250 ms bound prevents background-tab catch-up bursts. Other player/tool integration keeps its existing limits. Native real-time flooding tests must validate the default path without changing modes, injecting litres or advancing simulation time.
+
+The Water Pro integration supplies a 128px room cubemap through the vendor SkyProvider seam, replacing the bright-sky fallback previously used when SSR missed. Live FFT amplitude grows with depth, with soft displacement limits up to6.5cm; the measured vendor sampler produces centimetre-scale moving heights and non-flat normals. Optical depth follows the actual finite room level. Shallow puddles remain nearly calm. These are authored room-scale waves, not an ocean-height simulation.

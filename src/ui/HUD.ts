@@ -60,7 +60,7 @@ export class HUD {
               <button id="chisel-angle" type="button"><span>EDGE ANGLE · R</span><b>0°</b></button>
               <label class="hammer-speed-setting" for="hammer-speed"><span>CHISEL SPEED · − / +</span><output id="hammer-speed-value">100%</output><input id="hammer-speed" type="range" min="0" max="250" step="25" value="100" aria-label="Chisel destruction speed"><small>0% stops impacts · slower for control</small></label>
             </div>
-            <label class="hammer-speed-setting" for="water-gun-mode"><span>WATER GUN | FLOW</span><select id="water-gun-mode" aria-label="Water gun flow mode">${WATER_GUN_MODES.map(mode=>`<option value="${mode.id}" ${mode.id==='shower'?'selected':''}>${mode.label} | ${mode.flowLitresPerSecond} L/s</option>`).join('')}</select><small>FLOOD boosts the game flow to fill the room. MIST gently wets chases.</small></label>
+            <label class="hammer-speed-setting" for="water-gun-mode"><span>WATER GUN | FLOW</span><select id="water-gun-mode" aria-label="Water gun flow mode">${WATER_GUN_MODES.map(mode=>`<option value="${mode.id}" ${mode.id==='flood'?'selected':''}>${mode.label} | ${mode.flowLitresPerSecond} L/s</option>`).join('')}</select><small>FLOOD fills the room with boosted game flow. Choose MIST for gentle chase wetting.</small></label>
             <details id="mortar-settings"><summary>TROWEL / WATER</summary>
               <p>Hold the aim pad or mouse button, then release in the green zone. Adjust the loft or pack nearby mortar here.</p>
             <div class="mortar-buttons"><button type="button" id="mortar-angle-down" aria-label="Lower trowel throw angle">− ANGLE</button><button type="button" id="mortar-swing">HOLD · RELEASE</button><button type="button" id="mortar-angle-up" aria-label="Raise trowel throw angle">+ ANGLE</button></div>
@@ -229,8 +229,11 @@ export class HUD {
       this.shell.querySelector('#objective-compact')!.textContent = 'SITE / INSPECTION';
       return;
     }
-    this.objective.textContent = `${point.definition.label} · ${stageLabel[point.stage]}`;
-    this.shell.querySelector('#objective-compact')!.textContent = `${point.definition.label.split(' · ')[0]} · ${compactStage[point.stage]??'WORK'}`;
+    const placement=point.boxGroup.userData.placement;
+    const loose=placement&&!placement.secured;
+    const floor=loose&&placement.state==='floor';
+    this.objective.textContent = `${point.definition.label} · ${floor?'RETRIEVE BOX WITH BOX TOOL':loose?'TRIAL FIT · CHECK DEPTH AND SUPPORT':stageLabel[point.stage]}`;
+    this.shell.querySelector('#objective-compact')!.textContent = `${point.definition.label.split(' · ')[0]} · ${floor?'RETRIEVE BOX':loose?'TRIAL FIT':compactStage[point.stage]??'WORK'}`;
     this.levelPanel.classList.toggle('visible', point.stage === 'leveling');
     if (point.stage === 'leveling') {
       const tilt = point.boxGroup.tiltDegrees;
@@ -258,8 +261,8 @@ export class HUD {
   updateWaterGun(setting:WaterGunSetting,floorLitres:number,depthMm:number):void {
     const select=this.shell.querySelector<HTMLSelectElement>('#water-gun-mode')!;select.value=setting.id;
     const readout=this.shell.querySelector<HTMLElement>('#water-gun-readout')!;readout.hidden=this.selectedTool!=='hose';
-    if(this.selectedTool==='hose')this.shell.querySelector<HTMLElement>('#mortar-readout')!.textContent=`${setting.label} | ${setting.speedMps} m/s`;
-    readout.textContent=`${setting.flowLitresPerSecond} L/s | ${Math.round(floorLitres)} L | ${(depthMm/10).toFixed(1)} cm`;
+    if(this.selectedTool==='hose')this.shell.querySelector<HTMLElement>('#mortar-readout')!.textContent=setting.id==='flood'?'FLOOD | HOLD TO FILL ROOM':`${setting.label} | ${setting.speedMps} m/s`;
+    readout.textContent=`LEVEL ${(depthMm/10).toFixed(1)} cm | ${Math.round(floorLitres).toLocaleString('en')} L | ${setting.flowLitresPerSecond} L/s`;
     if(this.selectedTool==='hose')this.shell.querySelector<HTMLElement>('#tool-mode-toggle span')!.textContent=setting.label;
   }
 

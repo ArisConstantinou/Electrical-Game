@@ -26,7 +26,7 @@ export class MissionSystem {
     const point = this.activePoint;
     if (!point) return null;
     const position = new THREE.Vector3();
-    point.getWorldPosition(position);
+    (point.boxGroup.visible ? point.boxGroup : point).getWorldPosition(position);
     const toPoint = position.sub(camera.position);
     const distance = toPoint.length();
     const direction = new THREE.Vector3();

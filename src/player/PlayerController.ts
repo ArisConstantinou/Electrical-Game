@@ -9,7 +9,9 @@ export class PlayerController {
   wallWorkDistance = .76;
   readonly workPosition = { locked: false, distanceM: 0, targetDistanceM: .76, released: false };
   crouched = false;
-  get eyeHeight(): number { return this.crouched || this.input.pressed('ControlLeft') || this.input.pressed('ControlRight') ? .95 : GAME_CONFIG.player.eyeHeight; }
+  handWorkTargetY:number|null=null;
+  private handWorkEyeHeight:number|null=null;
+  get eyeHeight(): number { return this.crouched || this.input.pressed('ControlLeft') || this.input.pressed('ControlRight') ? .95 : this.handWorkEyeHeight ?? GAME_CONFIG.player.eyeHeight; }
   yaw = 0;
   pitch = -0.62;
   readonly velocity = new THREE.Vector3();
@@ -32,12 +34,19 @@ export class PlayerController {
 
   update(dt: number): void {
     const wallDistance = Math.abs(this.camera.position.z - GAME_CONFIG.room.wallFrontZ);
+    const handWork=this.handWorkTargetY!==null&&this.wallWorkEnabled&&Math.cos(this.yaw)>.65&&wallDistance<.94&&!this.workPosition.released;
+    // Bend knees/hips for low hand work. The body never rises above standing
+    // eye height, and distant or high wall areas still require repositioning.
+    this.handWorkEyeHeight=handWork?THREE.MathUtils.clamp(this.handWorkTargetY!+.34,.68,GAME_CONFIG.player.eyeHeight):null;
     this.wallAssistAmount = this.wallAssistEnabled ? 1 - THREE.MathUtils.smoothstep(wallDistance, 0.6, 1.7) : 0;
     if (this.input.mobileLook.x !== 0 || this.input.mobileLook.y !== 0) {
       const assistedAimSpeed = THREE.MathUtils.lerp(this.mobileAimSpeed, Math.min(this.mobileAimSpeed, 0.82), this.wallAssistAmount);
       const assistedVertical = THREE.MathUtils.lerp(this.mobileVerticalScale, Math.min(this.mobileVerticalScale, 0.5), this.wallAssistAmount);
       this.look(this.input.mobileLook.x * dt, this.input.mobileLook.y * dt * assistedVertical, assistedAimSpeed);
     }
+    const view=this.camera.getWorldDirection(new THREE.Vector3());
+    const handFocus=handWork?this.camera.position.clone().addScaledVector(view,(GAME_CONFIG.room.wallFrontZ-this.camera.position.z)/view.z):null;
+    const previousX=this.camera.position.x;
     const keyboardX = Number(this.input.pressed('KeyD')) - Number(this.input.pressed('KeyA'));
     const keyboardY = Number(this.input.pressed('KeyW')) - Number(this.input.pressed('KeyS'));
     let x = keyboardX + this.input.mobileMove.x;
@@ -83,6 +92,7 @@ export class PlayerController {
     this.camera.position.x = THREE.MathUtils.clamp(this.camera.position.x, -GAME_CONFIG.room.width / 2 + radius, GAME_CONFIG.room.width / 2 - radius);
     this.camera.position.z = THREE.MathUtils.clamp(this.camera.position.z, -GAME_CONFIG.room.depth / 2 + radius + 0.25, GAME_CONFIG.room.depth / 2 - radius);
     this.camera.position.y = THREE.MathUtils.damp(this.camera.position.y, this.eyeHeight, 14, dt);
+    if(handFocus){handFocus.x+=this.camera.position.x-previousX;this.camera.lookAt(handFocus);this.pitch=this.camera.rotation.x;this.yaw=this.camera.rotation.y;}
   }
 
   setMobileAimProfile(profile: MobileAimProfile): void {

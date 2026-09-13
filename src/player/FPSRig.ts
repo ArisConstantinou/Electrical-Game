@@ -295,6 +295,12 @@ export class FPSRig extends THREE.Group {
     // The free wrist hangs beside the hip in BODY space, independent of the
     // held tool's position, pitch, recoil or trowel swing.
     const wrist=this.shoulder(camera,arm.side).add(new THREE.Vector3(0,-.55,0)).addScaledVector(right,-.045).addScaledVector(forward,.025);
+    // Kneeling cannot carry the standing hip-height hand through the floor.
+    // Raise the wrist and fold the free forearm slightly forward beside the
+    // knee. The two-bone solver keeps both arm lengths fixed; the hanging
+    // fingers retain clear floor space and standing posture stays identical.
+    const floorLift=Math.max(0,.23-wrist.y);
+    wrist.y+=floorLift;wrist.addScaledVector(forward,Math.min(.14,floorLift*.55));
     const frame=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(right,new THREE.Vector3(0,1,0),forward.clone().negate()));
     const rotation=frame.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0,-Math.PI/2,Math.PI)));
     arm.group.updateWorldMatrix(true,false);
