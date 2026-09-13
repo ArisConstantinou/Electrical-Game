@@ -35,14 +35,16 @@ export class InteractionSystem {
     }
     if (tool === 'hammer') {
       const impact = this.chasing.freeHit(camera, continuing);
-      if (impact && point.stage !== 'inspect') {
+      if (impact) {
+        if (point.stage === 'inspect' && impact.points[0]) point.placeAt(impact.points[0].x, impact.points[0].y);
         point.chaseHits++;
         this.chasing.refreshProgress(point);
       }
       return {success:Boolean(impact), message: !impact ? 'Place the chisel against the masonry.' : point.stage === 'chased' ? 'Cavity clear. The back boxes fit.' : ''};
     }
-    if (tool === 'fitting' && point.stage === 'chased') {
-      if (!this.chasing.canFitBoxes(point)) return {success:false,message:'The box touches remaining masonry. Widen or deepen the cavity.'};
+    if (tool === 'fitting' && ['inspect', 'marked', 'chasing', 'chased'].includes(point.stage)) {
+      if (!this.chasing.positionBoxAtAim(point, camera)) return {success:false,message:'Aim at the wall cavity where you want the box.'};
+      if (!this.chasing.canFitBoxes(point)) return {success:false,message:`The box touches remaining masonry. This group needs about ${Math.round((point.boxGroup.groupWidth + .016) * 1000)} × 94 × 49 mm of clear cavity.`};
       point.boxGroup.visible = true;
       const direction = point.definition.id === 'B' ? -1 : 1;
       point.boxGroup.setInitialError(direction * (2.25 + point.definition.id.charCodeAt(0) % 2), direction * 0.006);
@@ -53,6 +55,10 @@ export class InteractionSystem {
       return { success: false, message: 'Mist the masonry with the hose (8), then cast mortar with the trowel (7). Fill all four sides.' };
     }
     if (tool === 'level' && point.stage === 'mortared') {
+      if (!this.mortar.ready(point)) {
+        point.setStage('fitted');
+        return {success:false,message:'The mortar bed has lost support. Refill the gaps before leveling.'};
+      }
       this.leveling.begin(point);
       return { success: true, message: 'Leveling mode: correct tilt and flush depth.' };
     }
@@ -65,11 +71,16 @@ export class InteractionSystem {
       return { success: passed, message: passed ? 'LEVEL and FLUSH passed.' : 'Not yet: bubble and depth must both be inside tolerance.' };
     }
     if ((tool === 'spring' || tool === 'cutter') && (point.stage === 'leveled' || point.stage === 'conduit')) {
+      if (!this.mortar.ready(point)) {
+        point.boxGroup.levelBar.visible = false;
+        point.setStage('fitted');
+        return {success:false,message:'Water or movement has opened the mortar bed. Repack and recheck the box first.'};
+      }
       this.conduit.selectTool(tool);
       const result = this.conduit.action(point);
       return { success: result.changed, message: result.message };
     }
-    const required: Record<string, string> = { inspect: 'SPRAY', marked: 'HAMMER', chasing: 'HAMMER', chased: 'FITTING TOOL', fitted: 'HOSE / TROWEL', mortared: 'SPIRIT LEVEL', leveling: 'SPIRIT LEVEL', leveled: 'SPRING / CUTTER', conduit: 'SPRING / CUTTER', complete: 'NONE' };
+    const required: Record<string, string> = { inspect: 'HAMMER · SPRAY MARKS OPTIONAL', marked: 'HAMMER OR FIT A CLEARED CAVITY', chasing: 'HAMMER OR FIT A CLEARED CAVITY', chased: 'FITTING TOOL', fitted: 'HOSE / TROWEL', mortared: 'SPIRIT LEVEL', leveling: 'SPIRIT LEVEL', leveled: 'SPRING / CUTTER', conduit: 'SPRING / CUTTER', complete: 'NONE' };
     return { success: false, message: `Select ${required[point.stage]} for this step.` };
   }
 }

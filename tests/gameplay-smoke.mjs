@@ -13,10 +13,30 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
 const state = page => page.evaluate(() => JSON.parse(window.render_game_to_text()));
 const mortarTouchSessions = new WeakMap();
 const snap = async (page, name) => {
-  await page.evaluate(async () => { await window.__wireTheHouse.room.brickWall.waitForGeometry(); window.__wireTheHouse.renderer.render(); });
+  await page.evaluate(async () => { const g=window.__wireTheHouse;await g.room.brickWall.waitForGeometry();await g.renderer.waitForFrame();g.renderer.render();await g.renderer.waitForFrame();if(g.renderer.renderError)throw Error(g.renderer.renderError); });
   await page.screenshot({ path: join(output, `${name}.png`) });
   await writeFile(join(output, `${name}.json`), JSON.stringify(await state(page), null, 2));
 };
+async function inspectInstalledFronts(page,tag){
+  const views=await page.evaluate(async()=>{
+    const g=window.__wireTheHouse,r=g.renderer;await r.waitForFrame();
+    const visible=g.fpsRig.visible,images=[];
+    try{
+      // An independent normal inspection camera cannot enter a protruding blob
+      // merely because the player's last working pose was close to the wall.
+      g.fpsRig.visible=false;
+      for(const point of g.mission.points.filter(p=>p.boxGroup.visible)){
+        const view=r.camera.clone(false);view.near=.01;view.fov=40;
+        view.position.set(point.position.x,point.position.y,g.room.brickWall.volume.frontZ+.9);
+        view.lookAt(point.position);view.updateProjectionMatrix();view.updateMatrixWorld(true);
+        r.webgl.render(r.scene,view);
+        images.push({id:point.definition.id,png:r.webgl.domElement.toDataURL('image/png')});
+      }
+      return images;
+    }finally{g.fpsRig.visible=visible;}
+  });
+  for(const view of views)await writeFile(join(output,`${tag}-box-${view.id}-normal-front.png`),Buffer.from(view.png.split(',')[1],'base64'));
+}
 async function createPage(mobile = false) {
   const page = await browser.newPage(mobile
     ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true }
@@ -27,6 +47,8 @@ async function createPage(mobile = false) {
   // leaves this unset; game modules, physics and inputs are never intercepted.
   if(freezeHotUpdates)await page.route('**/@vite/client',async route=>{const response=await route.fetch(),body=await response.text();const needle='async function handleMessage(payload) {';assert(body.includes(needle),'Unknown Vite HMR client');await route.fulfill({response,body:body.replace(needle,`${needle}\nif(payload.type==='update'||payload.type==='full-reload')return;`)});});
   await page.goto(baseUrl, { waitUntil: 'networkidle' });
+  await page.waitForFunction(()=>Boolean(window.__wireTheHouse));
+  await page.evaluate(async()=>{await Promise.race([window.__wireTheHouse.ready,new Promise((_,reject)=>setTimeout(()=>reject(Error('Game.ready did not settle within 45 seconds')),45000))]);await window.__wireTheHouse.renderer.waitForFrame();});
   await page.locator('#start-button')[mobile ? 'tap' : 'click']();
   await page.waitForTimeout(150);
   // Fixtures position the player and aim. Wall state and mission stages are
@@ -59,6 +81,19 @@ async function createPage(mobile = false) {
         window.advanceTime(17);
         window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE', key: 'e', bubbles: true }));
         window.advanceTime(250);
+      },
+      mortarRays() {
+        const g=window.__wireTheHouse,p=g.mission.activePoint,m=g.mortar,w=p.boxGroup.groupWidth/2+.026,h=p.boxGroup.groupHeight/2+.024,out=[];
+        p.updateWorldMatrix(true,true);
+        const meshes=m.deposits.filter(d=>d.age>=1.3).map(d=>d.mesh);for(const mesh of meshes)mesh.updateWorldMatrix(true,false);
+        for(let side=0;side<4;side++)for(let i=0;i<12;i++){
+          const t=-.9+1.8*i/11,q=p.position.clone().set(side<2?t*w:(side===2?-w:w),side<2?(side===0?-h:h):t*h,.024);
+          p.boxGroup.localToWorld(q);const direction=q.clone().set(0,0,-1).transformDirection(p.boxGroup.matrixWorld);
+          const hit=m.field.raycast(q,direction,.065),material=hit?m.field.stateAt(hit.point):null;
+          m.ray.set(q,direction);m.ray.near=0;m.ray.far=.065;
+          out.push({side,index:i,origin:q.toArray(),direction:direction.toArray(),target:{side,x:q.x,y:q.y,z:q.z-.024},densityAtOrigin:m.field.sample(q),fieldHit:hit?{point:hit.point.toArray(),distance:hit.distance}:null,material,stable:Boolean(hit&&material.age>=1.3),meshHit:Boolean(m.ray.intersectObjects(meshes,false).length)});
+        }
+        return out;
       },
       touch(continuous = false, target = null, holdMs = 17) {
         const pad = document.querySelector('#look-joystick'), r = pad.getBoundingClientRect();
@@ -115,6 +150,19 @@ async function markPoint(page,mobile,relocate=false) {
   if(relocate){const actual=await page.evaluate(()=>({...window.__wireTheHouse.mission.activePoint.position}));assert(Math.abs(actual.x-before.x)>.07 && Math.abs(actual.y-before.y)>.04,'First spray did not relocate point');}
   assert(after.workSurface.freeSprayMarks>0,'No persistent paint');
 }
+async function beginUnmarkedPoint(page,mobile){
+  const before=await state(page),marks=before.workSurface.freeSprayMarks;
+  await select(page,'fitting',mobile);await aimActive(page);await action(page,mobile);
+  assert((await state(page)).activePoint.stage==='inspect','Intact unmarked masonry accepted the box');
+  const prompt=await page.locator('#interaction-prompt').textContent();
+  assert(/remaining masonry|widen|deepen|touches/i.test(prompt),'Unmarked placement was gated by spray instead of actual masonry');
+  // The first contact chooses the work position through the ordinary hammer input.
+  await select(page,'hammer',mobile);await aimActive(page);
+  if(mobile)await page.evaluate(()=>window.__gameplayQA.touch(true,null,30));else await action(page);
+  assert((await state(page)).activePoint.stage!=='inspect','Unmarked hammer did not begin excavation');
+  assert((await state(page)).workSurface.freeSprayMarks===marks,'Unmarked start unexpectedly painted the wall');
+  return marks;
+}
 async function chiselControls(page, mobile) {
   const tap = selector => page.locator(selector)[mobile ? 'tap' : 'click']();
   const initial = (await state(page)).workSurface;
@@ -147,7 +195,8 @@ async function excavate(page,mobile,conduit=false) {
   for(;strikes<1600;){
     const result=await page.evaluate(({mobile,conduit})=>{
       const game=window.__wireTheHouse,wall=game.room.brickWall,volume=wall.volume,point=game.mission.activePoint;
-      const complete=()=>conduit?wall.canFitConduit(point):wall.canFitBoxes(point)&&wall.getChaseCoverage(point.definition.id)>=.98;
+      const hasGuide=(wall.samples.get(point.definition.id)?.length??0)>0;
+      const complete=()=>conduit?wall.canFitConduit(point):wall.canFitBoxes(point)&&(!hasGuide||wall.getChaseCoverage(point.definition.id)>=.98);
       let used=0;
       for(;used<20&&!complete();used++){
         const p=point.position,halfWidth=conduit?.013:point.boxGroup.groupWidth/2+.010;
@@ -156,6 +205,10 @@ async function excavate(page,mobile,conduit=false) {
         const coords=v=>({x:Math.round((v.x+volume.width/2)/volume.hx+.5),y:Math.round(v.y/volume.hy+.5),z:Math.round((volume.frontZ-v.z)/volume.hz+.5)});
         const a=coords(min),b=coords(max);let target=null;
         outer:for(let z=Math.min(a.z,b.z);z<=Math.max(a.z,b.z);z++)for(let y=Math.min(a.y,b.y);y<=Math.max(a.y,b.y);y++)for(let x=Math.min(a.x,b.x);x<=Math.max(a.x,b.x);x++)if(volume.nodeMaterial(x,y,z)){target=volume.nodePosition(x,y,z);break outer;}
+        if(!target){
+          // A sloped tetra face may overlap the fit box from an adjacent node.
+          edge:for(let z=Math.min(a.z,b.z)-1;z<=Math.max(a.z,b.z)+1;z++)for(let y=Math.min(a.y,b.y)-1;y<=Math.max(a.y,b.y)+1;y++)for(let x=Math.min(a.x,b.x)-1;x<=Math.max(a.x,b.x)+1;x++)if(volume.nodeMaterial(x,y,z)){target=volume.nodePosition(x,y,z);break edge;}
+        }
         if(!target){target=wall.samples.get(point.definition.id)?.find(sample=>!volume.cavityBox({x:sample.x-.009,y:sample.y-.009,z:-2.45},{x:sample.x+.009,y:sample.y+.009,z:-2.411}).clear);if(!target)break;}
         window.__gameplayQA.aim(target.x,target.y,target.z-.002);
         if(mobile)window.__gameplayQA.touch(true,{x:target.x,y:target.y,z:target.z-.002});else window.__gameplayQA.press();
@@ -228,21 +281,20 @@ async function applyMortar(page,mobile,repack=false){
     for(let side=0;side<4;side++)for(const t of [-.72,0,.72]){const q=p.position.clone().set(side<2?t*w:(side===2?-w:w),side<2?(side===0?-h:h):t*h,0);p.boxGroup.localToWorld(q);out.push({side,x:q.x,y:q.y,z:q.z});}
     return out;
   });
-  await select(page,'hose',mobile);
-  await dampenTargets(page,mobile,targets);
+  // Initial prewetting precedes the first scoops. Repacking an existing bed must
+  // not repeatedly hose the fresh mortar away while trying to fill its gaps.
+  if(!repack){await select(page,'hose',mobile);await dampenTargets(page,mobile,targets);}
   const damp=await state(page);assert(damp.mortar.wetCells>0,'Hose inputs deposited no water');
   await select(page,'trowel',mobile);
   await assertLayout(page,mobile);
   const angle=(await state(page)).mortar.angleDegrees;
   if(mobile){await page.locator('#mortar-angle-up').tap();assert((await state(page)).mortar.angleDegrees===angle+5,'Touch throw angle failed');await page.locator('#mortar-angle-down').tap();}
   else{await page.keyboard.press('ArrowUp');assert((await state(page)).mortar.angleDegrees===angle+2,'Keyboard throw angle failed');await page.keyboard.press('ArrowDown');}
-  let casts=0;
-  for(let attempt=0;attempt<120&&(await state(page)).activePoint.stage==='fitted';attempt++){
+  let casts=0,bestCoverage=-1,lastImprovement=0;
+  for(let attempt=0;attempt<48&&(await state(page)).activePoint.stage==='fitted';attempt++){
     const target=!repack&&attempt<targets.length?targets[attempt]:await page.evaluate(side=>{
-      const g=window.__wireTheHouse,p=g.mission.activePoint,m=g.mortar,w=p.boxGroup.groupWidth/2+.026,h=p.boxGroup.groupHeight/2+.024,missing=[];p.updateWorldMatrix(true,true);
-      const meshes=m.deposits.filter(d=>d.age>=1.3).map(d=>d.mesh);for(const mesh of meshes)mesh.updateWorldMatrix(true,false);
-      for(let i=0;i<12;i++){const t=-.9+1.8*i/11,q=p.position.clone().set(side<2?t*w:(side===2?-w:w),side<2?(side===0?-h:h):t*h,.024);p.boxGroup.localToWorld(q);const direction=q.clone().set(0,0,-1).transformDirection(p.boxGroup.matrixWorld);m.ray.set(q,direction);m.ray.near=0;m.ray.far=.065;if(!m.ray.intersectObjects(meshes,false).length)missing.push({side,x:q.x,y:q.y,z:q.z-.024});}
-      return missing.length<=3?null:missing[Math.floor(missing.length/2)];
+      const missing=window.__gameplayQA.mortarRays().filter(ray=>ray.side===side&&!ray.stable);
+      return missing.length<=3?null:missing[Math.floor(missing.length/2)].target;
     },attempt%4);
     if(!target)continue;
     const support=await page.evaluate(({target,attempt})=>{
@@ -268,11 +320,17 @@ async function applyMortar(page,mobile,repack=false){
     assert(!await page.evaluate(()=>window.__wireTheHouse.input.actionHeld),'Mortar release remained held');
     if(casts%4===0){
       report.lastMortarGeometry=await page.evaluate(()=>{const m=window.__wireTheHouse.mortar;return{patches:m.deposits.length,vertices:m.deposits.reduce((s,d)=>s+d.mesh.geometry.getAttribute('position').count,0),largestPatch:Math.max(0,...m.deposits.map(d=>d.mesh.geometry.getAttribute('position').count))};});
+      report.lastCoverageRays=await page.evaluate(()=>window.__gameplayQA.mortarRays());
+      report.lastMortarCamera=await page.evaluate(()=>{const g=window.__wireTheHouse,p=g.mission.activePoint;return{camera:g.renderer.camera.position.toArray(),direction:g.renderer.camera.getWorldDirection(g.renderer.camera.position.clone()).toArray(),tip:g.fpsRig.toolTipWorld(g.renderer.camera,'trowel').toArray(),boxMatrix:p.boxGroup.matrixWorld.elements,boxPosition:p.position.toArray()};});
+      await writeFile(join(output,'mortar-checkpoint.json'),JSON.stringify({casts,point:(await state(page)).activePoint.id,geometry:report.lastMortarGeometry,aim:report.lastMortarAim,rays:report.lastCoverageRays,camera:report.lastMortarCamera,mortar:(await state(page)).mortar},null,2));
       console.log(JSON.stringify({mortarPoint:(await state(page)).activePoint.id,mobile,casts,geometry:report.lastMortarGeometry,mortar:(await state(page)).mortar}));
       report.lastMortarDeposits=await page.evaluate(()=>{const g=window.__wireTheHouse,p=g.mission.activePoint;p.updateWorldMatrix(true,true);return g.mortar.deposits.map(d=>({local:p.boxGroup.worldToLocal(d.position.clone()).toArray(),mass:d.mass,normal:d.normal.toArray()}));});
       if(casts>=12)assert((await state(page)).mortar.stuckKg>before.mortar.stuckKg+.005,`No retained mortar after ${casts} physical casts; geometry=${JSON.stringify(report.lastMortarGeometry)}`);
     }
-    if((await state(page)).activePoint.stage==='mortared')break;
+    const current=await state(page),fraction=current.mortar.coverage.find(p=>p.id===current.activePoint.id).fraction;
+    if(fraction>bestCoverage+.001){bestCoverage=fraction;lastImprovement=casts;}
+    if(current.activePoint.stage==='mortared')break;
+    assert(casts<12||casts-lastImprovement<8,`Mortar coverage plateau after ${casts} casts; inspect mortar-checkpoint.json before adding more material`);
   }
   const after=await state(page);assert(after.mortar.launchedKg>before.mortar.launchedKg&&after.mortar.stuckKg>before.mortar.stuckKg,'No actual ballistic mortar stuck');
   if(after.activePoint.stage!=='mortared'){
@@ -281,6 +339,7 @@ async function applyMortar(page,mobile,repack=false){
   assert(after.activePoint.stage==='mortared',`Four-sided mortar bed incomplete after ${casts} casts: ${JSON.stringify(after.mortar)}`);
   report.scenarios.push({platform:mobile?'mobile-emulated':'desktop',point:after.activePoint.id,mortarCasts:casts,repack,launchedKg:after.mortar.launchedKg-before.mortar.launchedKg,stuckKg:after.mortar.stuckKg-before.mortar.stuckKg});
   await snap(page,`${mobile?'mobile':'desktop'}-point-${after.activePoint.id}-${repack?'repacked':'mortar-casts'}`);
+  await inspectInstalledFronts(page,`${mobile?'mobile':'desktop'}-after-${after.activePoint.id}-${repack?'repack':'mortar'}`);
 }
 async function fitAndLevel(page,mobile){
   await select(page,'hose',mobile);
@@ -334,11 +393,11 @@ async function finishPipe(page,mobile){
 }
 async function workedScenePerformance(page){
   return page.evaluate(async()=>{
-    const game=window.__wireTheHouse;window.advanceTime(3000);await game.room.brickWall.waitForGeometry();
+    const game=window.__wireTheHouse;window.advanceTime(3000);await game.room.brickWall.waitForGeometry();await game.renderer.waitForFrame();
     const frames=[];let previous=await new Promise(requestAnimationFrame);
     for(let i=0;i<60;i++){const now=await new Promise(requestAnimationFrame);frames.push(now-previous);previous=now;}
     const sorted=[...frames].sort((a,b)=>a-b),info=game.renderer.webgl.info,m=game.mortar;
-    return{samples:frames.length,meanFrameMs:frames.reduce((a,b)=>a+b,0)/frames.length,p95FrameMs:sorted[Math.floor(sorted.length*.95)],worstFrameMs:Math.max(...frames),renderCalls:info.render.calls,triangles:info.render.triangles,memory:{geometries:info.memory.geometries,textures:info.memory.textures},deposits:m.deposits.length,mortarVertices:m.deposits.reduce((s,d)=>s+d.mesh.geometry.getAttribute('position').count,0),restingBatches:m.telemetry.restingBatches,airborne:m.projectiles.length};
+    return{samples:frames.length,meanFrameMs:frames.reduce((a,b)=>a+b,0)/frames.length,p95FrameMs:sorted[Math.floor(sorted.length*.95)],worstFrameMs:Math.max(...frames),renderCalls:info.render.calls,triangles:info.render.triangles,memory:{geometries:info.memory.geometries,textures:info.memory.textures},deposits:m.deposits.length,mortarVertices:m.deposits.reduce((s,d)=>s+d.mesh.geometry.getAttribute('position').count,0),mortarVolumeField:m.telemetry.volumeField,restingBatches:m.telemetry.restingBatches,airborne:m.projectiles.length,rendererError:game.renderer.renderError};
   });
 }
 async function assertResultTitle(page){
@@ -355,11 +414,16 @@ try{
   assert(await desktop.locator('#settings-panel').getAttribute('aria-hidden')==='false','Settings failed');await desktop.locator('#chisel-type').click();
   assert((await state(desktop)).workSurface.chisel==='pointed','Chisel selector failed');await desktop.locator('#chisel-type').click();await chiselControls(desktop,false);await desktop.locator('#settings-close').click();
   for(const id of ['A','B','C']){
-    assert((await state(desktop)).activePoint.id===id,`Expected point ${id}`);await markPoint(desktop,false,id==='A');
-    await select(desktop,'fitting');await aimActive(desktop);await action(desktop);assert((await state(desktop)).activePoint.stage==='marked','Uncut wall accepted boxes');
+    assert((await state(desktop)).activePoint.id===id,`Expected point ${id}`);
+    const unmarkedCount=id==='C'?await beginUnmarkedPoint(desktop,false):null;
+    if(id!=='C'){
+      await markPoint(desktop,false,id==='A');
+      await select(desktop,'fitting');await aimActive(desktop);await action(desktop);assert((await state(desktop)).activePoint.stage==='marked','Uncut wall accepted boxes');
+    }
     const strokes=await excavate(desktop,false);await snap(desktop,`desktop-point-${id}-real-cavity`);
     await fitAndLevel(desktop,false);await finishPipe(desktop,false);assert((await state(desktop)).points.find(p=>p.id===id).stage==='complete',`Point ${id} incomplete`);
-    report.scenarios.push({platform:'desktop',point:id,boxStrokes:strokes,complete:true});
+    if(id==='C')assert((await state(desktop)).workSurface.freeSprayMarks===unmarkedCount,'Free-work Point C used spray');
+    report.scenarios.push({platform:'desktop',point:id,boxStrokes:strokes,complete:true,unmarked:id==='C'});
   }
   assert((await state(desktop)).mission.complete,'Full mission incomplete');report.desktopWorkedScene=await workedScenePerformance(desktop);report.desktopResultTitle=await assertResultTitle(desktop);await snap(desktop,'desktop-first-fix-complete');await desktop.close();
   const mobile=await createPage(true);report.mobileLayout=await assertLayout(mobile,true);await snap(mobile,'mobile-entry');
@@ -379,12 +443,15 @@ try{
   assert((await state(mobile)).points[0].stage==='complete','Mobile point workflow incomplete');report.scenarios.push({platform:'mobile-emulated',point:'A',boxStrokes:strokes,complete:true,realTouchHold:true});
   await snap(mobile,'mobile-point-A-complete');
   for(const id of ['B','C']){
-    assert((await state(mobile)).activePoint.id===id,`Expected mobile point ${id}`);await markPoint(mobile,true);
+    assert((await state(mobile)).activePoint.id===id,`Expected mobile point ${id}`);
+    const unmarkedCount=id==='C'?await beginUnmarkedPoint(mobile,true):null;
+    if(id!=='C')await markPoint(mobile,true);
     const strokes=await excavate(mobile,true);await fitAndLevel(mobile,true);await finishPipe(mobile,true);
     assert((await state(mobile)).points.find(p=>p.id===id).stage==='complete',`Mobile point ${id} incomplete`);
-    report.scenarios.push({platform:'mobile-emulated',point:id,boxStrokes:strokes,complete:true});
+    if(id==='C')assert((await state(mobile)).workSurface.freeSprayMarks===unmarkedCount,'Mobile free-work Point C used spray');
+    report.scenarios.push({platform:'mobile-emulated',point:id,boxStrokes:strokes,complete:true,unmarked:id==='C'});
   }
   assert((await state(mobile)).mission.complete,'Full mobile mission incomplete');report.mobileWorkedScene=await workedScenePerformance(mobile);report.mobileResultTitle=await assertResultTitle(mobile);await snap(mobile,'mobile-first-fix-complete');
   await mobile.close();assert(!errors.length,errors.join('\n'));console.log(JSON.stringify(report,null,2));
-}catch(error){report.failure=String(error.stack??error);report.failureStates=[];for(const context of browser.contexts())for(const page of context.pages()){try{report.failureStates.push(await state(page));await page.screenshot({path:join(output,'gameplay-failure.png')});}catch{}}throw error;}
+}catch(error){report.failure=String(error.stack??error);report.failureStates=[];for(const context of browser.contexts())for(const page of context.pages()){try{report.failureStates.push(await state(page));await page.screenshot({path:join(output,'gameplay-failure.png')});await inspectInstalledFronts(page,'failure');}catch{}}throw error;}
 finally{await writeFile(join(output,'gameplay-report.json'),JSON.stringify(report,null,2));await browser.close();}

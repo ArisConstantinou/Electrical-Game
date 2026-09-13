@@ -24,7 +24,6 @@ wallMaterial.onBeforeCompile = shader => {
     diffuseColor.rgb *= .90 + grain*.15 + mottling*.045 - grooves*.035;
   `);
 };
-const crackMaterial = new THREE.MeshBasicMaterial({ color: 0x41251e, transparent: true, opacity: .63, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 });
 type MeshData = ReturnType<MasonryVolume['buildChunkMesh']>;
 
 /** The wall owns one continuous material volume. Brick IDs never select damage. */
@@ -66,8 +65,6 @@ export class BrickWall extends THREE.Group {
   private peakCalculationMs = 0;
   private peakMeshMs = 0;
   private lastResult: ReturnType<MasonryVolume['impact']> | null = null;
-  private readonly crackPaths: Array<{points: Array<{x:number;y:number;z:number}>;width:number}> = [];
-  private readonly crackMesh = new THREE.Mesh(new THREE.BufferGeometry(), crackMaterial);
   private lastCoverage = new Map<string, {revision:number; value:number}>();
 
   constructor(_definitions: InstallationDefinition[], options: MasonryVolumeOptions = {}) {
@@ -97,9 +94,7 @@ export class BrickWall extends THREE.Group {
     this.pristine.name = 'Batched untouched masonry';
     this.pristine.userData.studioEntityId = 'world:brick-wall:permanent-field';
     this.pristine.castShadow = this.pristine.receiveShadow = true;
-    this.add(this.pristine, this.crackMesh);
-    this.crackMesh.name = 'Material cracks beyond detached fragments';
-    this.crackMesh.raycast = () => undefined;
+    this.add(this.pristine);
     this.canvas.width = 2048; this.canvas.height = 1024;
     const context = this.canvas.getContext('2d');
     if (!context) throw new Error('Paint canvas unavailable');
@@ -149,7 +144,7 @@ export class BrickWall extends THREE.Group {
     if(!result?.removedNodes) return null;
     this.removedNodes=this.volume.removedNodeCount;this.removedVolume=this.volume.removedVolume;
     this.lastCoverage.clear();this.lastResult=result;
-    this.flushGeometry();this.rebuildCracks();
+    this.flushGeometry();
     return {points:result.fragments.map(f=>new THREE.Vector3(f.position.x,f.position.y,f.position.z)),kind:'demolish-split',brickSize:new THREE.Vector3(.05,.05,.02),seed:result.seed,destroyed:false,fragments:result.fragments,removedVolume:result.removedVolume};
   }
   recessChaseAtAim(camera: THREE.Camera, _pointId: string): MasonryImpact | null {
@@ -171,13 +166,10 @@ export class BrickWall extends THREE.Group {
     this.removedNodes += result.removedNodes;
     this.removedVolume += result.removedVolume;
     if (result.removedNodes) this.maxDepth = Math.min(this.volume.depth, Math.max(this.maxDepth, this.volume.frontZ - contact.point.z + .008));
-    this.crackPaths.push(...result.cracks);
-    if (this.crackPaths.length > 800) this.crackPaths.splice(0, this.crackPaths.length - 800);
     this.lastCalculationMs = performance.now() - start;
     this.peakCalculationMs = Math.max(this.peakCalculationMs, this.lastCalculationMs);
     const meshStart = performance.now();
     this.flushGeometry();
-    this.rebuildCracks();
     this.clearPaint(contact.point, .045);
     this.lastMeshMs = performance.now() - meshStart;
     this.peakMeshMs = Math.max(this.peakMeshMs, this.lastMeshMs);
@@ -226,22 +218,6 @@ export class BrickWall extends THREE.Group {
     geometry.computeBoundingSphere();
     return geometry;
   }
-  private rebuildCracks(): void {
-    const positions: number[] = [];
-    for (const path of this.crackPaths) for (let i = 1; i < path.points.length; i++) {
-      const a = path.points[i - 1], b = path.points[i];
-      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, mz = (a.z + b.z) / 2;
-      if (!this.isSolidAt(mx, my, mz - .006)) continue;
-      const dx = b.x - a.x, dy = b.y - a.y, length = Math.hypot(dx, dy);
-      if (length < .0001) continue;
-      const width = Math.min(.0011, path.width) / 2;
-      const nx = -dy / length * width, ny = dx / length * width;
-      const az = a.z + .001, bz = b.z + .001;
-      positions.push(a.x-nx,a.y-ny,az, b.x-nx,b.y-ny,bz, b.x+nx,b.y+ny,bz, a.x-nx,a.y-ny,az, b.x+nx,b.y+ny,bz, a.x+nx,a.y+ny,az);
-    }
-    const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    geometry.computeBoundingSphere(); this.crackMesh.geometry.dispose(); this.crackMesh.geometry = geometry;
-  }
 
   canFitBoxes(point: InstallationPoint): boolean {
     const p = point.position;
@@ -289,13 +265,13 @@ export class BrickWall extends THREE.Group {
   get telemetry() {
     let triangles = 0, geometryBytes = 0;
     for (const mesh of this.chunks.values()) { triangles += mesh.geometry.getAttribute('position').count / 3; geometryBytes += mesh.geometry.getAttribute('position').array.byteLength * 3; }
-    return {model:'sparse-3d-brittle-masonry', pendingSupportJobs:this.volume.pendingSupportCount, volumeBytes:this.volume.memoryBytes, pendingMeshes:this.pendingMeshes.size+this.inFlightMeshes.size,workerMeshing:Boolean(this.meshWorker),lastWorkerMs:this.lastWorkerMs,peakGeometryLatencyMs:this.peakGeometryLatencyMs,workerError:this.workerError, impactCount:this.impactCount, removedNodes:this.removedNodes, removedVolumeCm3:this.removedVolume*1e6, maximumDepthMm:this.maxDepth*1000, damagedChunks:this.chunks.size, surfaceTriangles:triangles, geometryBytes, deformedWallCells:0, lastCalculationMs:this.lastCalculationMs, peakCalculationMs:this.peakCalculationMs, lastMeshMs:this.lastMeshMs, peakMeshMs:this.peakMeshMs, lastImpact:this.lastResult ? {removedNodes:this.lastResult.removedNodes,removedByMaterial:this.lastResult.removedByMaterial,stats:this.lastResult.stats} : null, fractureSegments:this.crackMesh.geometry.getAttribute('position')?.count/6||0};
+    return {model:'sparse-3d-brittle-masonry', pendingSupportJobs:this.volume.pendingSupportCount, volumeBytes:this.volume.memoryBytes, pendingMeshes:this.pendingMeshes.size+this.inFlightMeshes.size,workerMeshing:Boolean(this.meshWorker),lastWorkerMs:this.lastWorkerMs,peakGeometryLatencyMs:this.peakGeometryLatencyMs,workerError:this.workerError, impactCount:this.impactCount, removedNodes:this.removedNodes, removedVolumeCm3:this.removedVolume*1e6, maximumDepthMm:this.maxDepth*1000, damagedChunks:this.chunks.size, surfaceTriangles:triangles, geometryBytes, deformedWallCells:0, lastCalculationMs:this.lastCalculationMs, peakCalculationMs:this.peakCalculationMs, lastMeshMs:this.lastMeshMs, peakMeshMs:this.peakMeshMs, lastImpact:this.lastResult ? {removedNodes:this.lastResult.removedNodes,removedByMaterial:this.lastResult.removedByMaterial,stats:this.lastResult.stats} : null, fractureSegments:0, fractureRendering:'removed-material-surfaces', openedFissureNodes:this.lastResult?.stats.openedFissureNodes??0};
   }
-  saveDamage() { return {volume:this.volume.serialize(),cracks:structuredClone(this.crackPaths),impactCount:this.impactCount,removedVolume:this.removedVolume,maxDepth:this.maxDepth}; }
+  saveDamage() { return {volume:this.volume.serialize(),cracks:[] as Array<{points:Array<{x:number;y:number;z:number}>;width:number}>,impactCount:this.impactCount,removedVolume:this.removedVolume,maxDepth:this.maxDepth}; }
   restoreDamage(saved: ReturnType<BrickWall['saveDamage']>): void {
     this.volume.restore(saved.volume);
     this.impactCount=saved.impactCount;this.removedNodes=this.volume.removedNodeCount;this.removedVolume=this.volume.removedVolume;this.maxDepth=saved.maxDepth;
-    this.lastCoverage.clear();this.lastResult=null;this.crackPaths.splice(0,this.crackPaths.length,...structuredClone(saved.cracks));
-    this.flushGeometry();this.rebuildCracks();
+    this.lastCoverage.clear();this.lastResult=null;
+    this.flushGeometry();
   }
 }

@@ -13,6 +13,7 @@ import { MissionSystem } from '../systems/MissionSystem';
 import { MarkingSystem } from '../systems/MarkingSystem';
 import { ChasingSystem } from '../systems/ChasingSystem';
 import { MortarSystem } from '../systems/MortarSystem';
+import { RoomWaterSystem } from '../systems/RoomWaterSystem';
 import { LevelingSystem, type LevelDirection } from '../systems/LevelingSystem';
 import { ConduitSystem, type PvcTool } from '../systems/ConduitSystem';
 import { InteractionSystem } from '../systems/InteractionSystem';
@@ -48,6 +49,8 @@ export class Game {
   readonly mission: MissionSystem;
   readonly conduit: ConduitSystem;
   readonly mortar: MortarSystem;
+  readonly roomWater: RoomWaterSystem;
+  readonly ready: Promise<void>;
   readonly leveling = new LevelingSystem();
   readonly hud: HUD;
   readonly fpsRig = new FPSRig();
@@ -55,6 +58,7 @@ export class Game {
   sprayMode: 'dots' | 'live' = 'live';
   sprayColorIndex = 0;
   hammerMode: HammerMode = 'chase';
+  hammerSpeed = 1;
   aimControlMode: AimControlMode = 'auto-use';
   aimProfile: MobileAimProfile = 'normal';
   wallAssistEnabled = true;
@@ -87,6 +91,9 @@ export class Game {
     this.chasing = new ChasingSystem(this.renderer.scene, this.room.brickWall);
     this.conduit = new ConduitSystem(this.renderer.scene, this.room.brickWall);
     this.mortar = new MortarSystem(this.renderer.scene, this.room.brickWall, this.mission.points);
+    this.roomWater = new RoomWaterSystem(this.renderer.scene, this.room.brickWall);
+    this.mortar.onRunoff = event => this.roomWater.addRunoff(event);
+    this.mortar.onWaterEmission = event => this.roomWater.addEmission(event);
     this.interaction = new InteractionSystem(new MarkingSystem(this.room.brickWall), this.chasing, this.leveling, this.mortar, this.conduit);
     this.applySpraySettings();
     this.desktopControls = new DesktopControls(this.hud.shell, this.renderer.webgl.domElement, this.player, this.input);
@@ -104,7 +111,16 @@ export class Game {
     });
     addEventListener('resize', this.renderer.resize);
     this.assets.markLoaded('procedural-core');
-    requestAnimationFrame(this.loop);
+    const startButton = root.querySelector<HTMLButtonElement>('#start-button')!;
+    startButton.disabled = true;
+    startButton.textContent = 'PREPARING WATER AND SITE…';
+    this.ready = this.renderer.ready.then(async () => {
+      await this.renderer.attachRoomWater(this.roomWater);
+      startButton.disabled = false;
+      startButton.textContent = 'ENTER THE SITE';
+      this.lastTime = performance.now();
+      requestAnimationFrame(this.loop);
+    });
   }
 
   step(dt: number): void {
@@ -125,9 +141,9 @@ export class Game {
     const spraying = this.selectedTool === 'spray' && this.input.actionHeld;
     if (this.wasSpraying && !spraying) this.interaction.endSprayStroke();
     this.wasSpraying = spraying;
-    if (this.started && this.selectedTool !== 'trowel' && this.selectedTool !== 'hose' && (requested || repeatable)) {
+    if (this.started && this.selectedTool !== 'trowel' && this.selectedTool !== 'hose' && (this.selectedTool !== 'hammer' || this.hammerSpeed > 0) && (requested || repeatable)) {
       this.performAction(repeatable && !requested);
-      this.actionCooldown = this.selectedTool === 'spray' ? 0.045 : this.selectedTool === 'hammer' ? 0.24 : 0.18;
+      this.actionCooldown = this.selectedTool === 'spray' ? 0.045 : this.selectedTool === 'hammer' ? 0.24 / Math.max(.25, this.hammerSpeed) : 0.18;
     }
     const mortarTool = this.started && !leveling && (this.selectedTool === 'trowel' || this.selectedTool === 'hose');
     const nearbySurface=this.room.brickWall.aim(this.renderer.camera);
@@ -138,6 +154,7 @@ export class Game {
     else this.mortar.cancel();
     if (mortarTool && this.selectedTool === 'hose' && this.input.actionHeld) this.mortar.wet(this.renderer.camera,releaseOrigin,dt);
     this.mortar.update(dt);
+    this.roomWater.update(dt);
     this.mortar.preview(this.renderer.camera,releaseOrigin,mortarTool && this.selectedTool === 'trowel');
     this.fpsRig.hoseActive=this.selectedTool==='hose'&&this.input.actionHeld;
     this.fpsRig.levelTiltDegrees=active?.boxGroup.tiltDegrees??0;
@@ -160,7 +177,7 @@ export class Game {
     this.hud.updateAimInput(this.aimInputMode);
     const waterHit=this.room.brickWall.aim(this.renderer.camera);
     const wet=waterHit ? this.mortar.moistureAt(new THREE.Vector3(waterHit.point.x,waterHit.point.y,waterHit.point.z)) : {pore:0,film:0};
-    this.hud.updateMortar(this.selectedTool,this.mortar.charge,this.mortar.angleDegrees,wet,active ? this.mortar.coverage(active):0,this.mortar.recovery,this.mortar.lastOutcome);
+    this.hud.updateMortar(this.selectedTool,this.mortar.charge,this.mortar.angleDegrees,wet,active ? this.mortar.coverage(active):0,this.mortar.recovery,this.mortar.lastOutcome,this.roomWater.telemetry.floorLitres);
     if (this.shake > 0) {
       this.shake = Math.max(0, this.shake - dt * 3.7);
       this.renderer.camera.rotation.x += (Math.random() - 0.5) * this.shake * 0.025;
@@ -174,6 +191,8 @@ export class Game {
     const point = this.mission.activePoint;
     return JSON.stringify({
       mortar: this.mortar.telemetry,
+      water: this.roomWater.telemetry,
+      hammer: { speedMultiplier: this.hammerSpeed, paused: this.hammerSpeed === 0, impactIntervalSeconds: this.hammerSpeed > 0 ? .24 / this.hammerSpeed : null },
       coordinateSystem: 'metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall',
       mode: !this.started ? 'start' : this.mission.complete ? 'mission-complete' : point?.stage === 'leveling' ? 'leveling' : 'playing',
       player: { crouched:this.player.eyeHeight<1.1, x: Number(this.renderer.camera.position.x.toFixed(3)), y: Number(this.renderer.camera.position.y.toFixed(3)), z: Number(this.renderer.camera.position.z.toFixed(3)), yaw: Number(this.player.yaw.toFixed(3)), pitch: Number(this.player.pitch.toFixed(3)) },
@@ -187,7 +206,7 @@ export class Game {
   private performAction(continuing = false): void {
     const active = this.mission.activePoint;
     if (!active) return;
-    const spatialTool = this.selectedTool === 'spray' || this.selectedTool === 'hammer';
+    const spatialTool = this.selectedTool === 'spray' || this.selectedTool === 'hammer' || (this.selectedTool === 'fitting' && !active.boxGroup.visible);
     const target = active.stage === 'leveling' ? active : spatialTool ? active : this.mission.target(this.renderer.camera);
     if (!target) { this.hud.notify('Aim at the work area you chose.', false); return; }
     const hammering = this.selectedTool === 'hammer';
@@ -198,8 +217,18 @@ export class Game {
   }
 
   private bindEvents(): void {
+    const setHammerSpeed = (value:number) => {
+      this.hammerSpeed = THREE.MathUtils.clamp(Math.round(value * 4) / 4, 0, 2.5);
+      this.actionCooldown = Math.min(this.actionCooldown, this.hammerSpeed > 0 ? .24 / this.hammerSpeed : 0);
+      this.hud.updateHammerSpeed(this.hammerSpeed);
+    };
+    addEventListener('wirehouse:hammer-speed',event=>setHammerSpeed((event as CustomEvent<number>).detail));
+    addEventListener('keydown',event=>{
+      if(this.selectedTool !== 'hammer' || event.repeat) return;
+      if(event.code === 'Minus' || event.code === 'Equal') {event.preventDefault();setHammerSpeed(this.hammerSpeed + (event.code === 'Equal' ? .25 : -.25));}
+    });
     addEventListener('wirehouse:work-height',()=>{this.player.crouched=!this.player.crouched;document.querySelector('#work-height')!.textContent=this.player.crouched?'STAND UP':'CROUCH · LOW WORK';});
-    const pack=()=>{if(this.started&&this.selectedTool==='trowel'){this.mortar.cancel();this.input.actionHeld=false;const success=this.mortar.pack(this.renderer.camera);this.mortar.lastOutcome=success?'Pressed into the recess. Keep the box openings clear.':'Move the trowel within reach of the exposed bed around the box.';if(success)this.fpsRig.toolAction=1;}};
+    const pack=()=>{if(this.started&&this.selectedTool==='trowel'){this.mortar.cancel();this.input.actionHeld=false;const success=this.mortar.pack(this.renderer.camera);this.mortar.lastOutcome=success?'Pressed into the gap. Excess mortar falls away.':'Move closer and aim at exposed material in the gap.';if(success)this.fpsRig.toolAction=1;}};
     addEventListener('wirehouse:mortar-pack',pack);
     addEventListener('keydown',event=>{if(event.code==='KeyP'&&!event.repeat)pack();});
     const cancelSwing=()=>this.mortar.cancel();

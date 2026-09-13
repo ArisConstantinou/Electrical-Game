@@ -56,7 +56,7 @@ export class MobileControls {
 
   private onPointerDown = (event: PointerEvent): void => {
     if (event.pointerType === 'mouse') return;
-    if ((event.target as HTMLElement).closest('button')) return;
+    if ((event.target as HTMLElement).closest('button,input,select,textarea,label,a')) return;
     event.preventDefault();
     const joystick = document.querySelector<HTMLElement>('#joystick');
     const lookJoystick = document.querySelector<HTMLElement>('#look-joystick');

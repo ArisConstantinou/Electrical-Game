@@ -8,6 +8,7 @@ export interface MasonryFragment {
   /** Exact removed-material triangles relative to position, including crushed chips and detached islands. */
   positions?: Float32Array;
 }
+/** Diagnostics of physically opened material paths; never a decal or an overlay. */
 export interface MasonryCrack { points: Vec3[]; width: number; material: MaterialId }
 export interface MasonryVolumeOptions {
   width?: number; height?: number; depth?: number; frontZ?: number; cellSize?: number;
@@ -21,7 +22,7 @@ export interface MasonryImpactResult {
   contact: MasonryRayHit | null; removedNodes: number; removedVolume: number;
   removedByMaterial: Record<string, number>; fragments: MasonryFragment[]; cracks: MasonryCrack[];
   changedChunks: string[]; seed: number; bounds: { min: Vec3; max: Vec3 } | null;
-  stats: { milliseconds: number; affectedNodes: number; weakenedNodes: number; connectivityVisited: number; detachedNodes: number; activeChunks: number };
+  stats: { milliseconds: number; affectedNodes: number; weakenedNodes: number; connectivityVisited: number; detachedNodes: number; activeChunks: number; openedFissureNodes?: number };
 }
 interface Chunk { damage: Uint8Array; removed: Uint8Array; changes: number }
 export interface MasonrySave {
@@ -331,8 +332,13 @@ export class MasonryVolume {
     const crackRadius = radius * 1.75;
     const depthLimit = input.chisel === 'flat' ? .013 : .019;
     const c = this.coordinates(contact.point), r = Math.ceil(crackRadius / Math.min(this.hx, this.hy, this.hz)) + 1;
-    const candidates: Array<{ node: Node; gain: number; crushing: boolean; distance: number }> = [];
+    const candidates: Array<{ node: Node; gain: number; crushing: boolean; fissure: boolean; distance: number }> = [];
     const removed: Node[] = [];
+    // Persistent grain directions are tied to the material region, not a newly drawn
+    // random line per hit. Narrow tensile corridors concentrate damage outside the
+    // crushed core. Their material remains fully present until its strength fails.
+    const grainSeed = hash(Math.floor(c.x / 5), Math.floor(c.y / 5), Math.floor(c.z / 5), this.seed);
+    const grainAngle = (grainSeed % 6283) / 1000;
     // Local contact-facing slab: even a large energy setting cannot jump a chamber to its rear wall.
     for (let y = Math.max(1, c.y - r); y <= Math.min(this.ny, c.y + r); y++) for (let x = Math.max(1, c.x - r); x <= Math.min(this.nx, c.x + r); x++) for (let z = Math.max(1, c.z - r); z <= Math.min(this.nz, c.z + r); z++) {
       const material = this.nodeMaterial(x, y, z); if (!material) continue;
@@ -347,7 +353,15 @@ export class MasonryVolume {
       const angular = Math.atan2(v, u), anisotropy = 1 + .18 * Math.sin(angular * 3 + (seed % 97)) + .12 * Math.cos(angular * 5 - (seed % 71));
       const effectiveRadius = radius * anisotropy;
       const core = radial < effectiveRadius;
-      const falloff = core ? Math.pow(Math.max(0, 1 - radial / effectiveRadius), .72) : .12 * Math.max(0, 1 - radial / crackRadius);
+      let corridor = false;
+      for (let branch = 0; branch < 3; branch++) {
+        const angle = grainAngle + branch * 2.094 + .22 * Math.sin(radial * 85 + branch);
+        const forward = u / stretch * Math.cos(angle) + v * Math.sin(angle);
+        const sideways = Math.abs(u / stretch * Math.sin(angle) - v * Math.cos(angle));
+        if (forward > 0 && sideways < this.cellSize * .62) corridor = true;
+      }
+      const fissure = !core && corridor;
+      const falloff = core ? Math.pow(Math.max(0, 1 - radial / effectiveRadius), .72) : (fissure ? .8 : .12) * Math.max(0, 1 - radial / crackRadius);
       const materialScale = material === MaterialId.Render ? 1.4 : material === MaterialId.Concrete ? .26 : material === MaterialId.Mortar ? .72 : 1;
       const backwardCoupling = along < -.008 ? .65 * Math.max(.1, 1 + along / .055) : 1;
       const address = this.chunkAddress(x, y, z), weakness = (this.chunks.get(address.key)?.damage[address.offset] ?? 0) / this.strength(x, y, z, material);
@@ -356,7 +370,7 @@ export class MasonryVolume {
       const angleCoupling = .45 + .55 * incidence + (input.chisel === 'flat' ? shear * Math.min(1, weakness) * .95 : 0);
       const gain = energy * 25 * falloff * materialScale * backwardCoupling * angleCoupling * (.75 + (hash(x, y, z, seed) % 1000) / 2000) * (1 - Math.max(0, along) / (depthLimit * 1.7));
       if (gain < 1) continue;
-      candidates.push({ node: { x, y, z, id: this.index(x, y, z), material }, gain, crushing: core, distance: radial + Math.max(0, along) * 1.5 });
+      candidates.push({ node: { x, y, z, id: this.index(x, y, z), material }, gain, crushing: core, fissure, distance: radial + Math.max(0, along) * 1.5 });
     }
     candidates.sort((a, b) => a.distance - b.distance);
     // The stress field follows real material edges rather than line of sight. A cavity blocks
@@ -384,22 +398,19 @@ export class MasonryVolume {
       const n = candidate.node, { chunk, offset } = this.mutable(n.x, n.y, n.z);
       chunk.damage[offset] = clamp(chunk.damage[offset] + Math.max(1, Math.round(candidate.gain)), 0, 255);
       result.stats.affectedNodes++;
-      if (chunk.damage[offset] >= this.strength(n.x, n.y, n.z, n.material) && candidate.crushing && fractureBudget > 0) {
+      // A tensile opening must advance from an existing broken face. It cannot
+      // punch a disconnected decorative trench or jump across a hollow chamber.
+      const brokenNeighbor = candidate.fissure ? NEIGHBORS.find(d => {
+        const x = n.x + d[0], y = n.y + d[1], z = n.z + d[2];
+        return this.baseMaterial(x, y, z) !== MaterialId.Air && this.nodeMaterial(x, y, z) === MaterialId.Air;
+      }) : undefined;
+      if (chunk.damage[offset] >= this.strength(n.x, n.y, n.z, n.material) && (candidate.crushing || brokenNeighbor) && fractureBudget > 0) {
         this.remove(n, removed); fractureBudget -= n.material === MaterialId.Concrete ? 5 : n.material === MaterialId.Mortar ? 1.6 : 1;
+        if (candidate.fissure && brokenNeighbor) {
+          result.stats.openedFissureNodes = (result.stats.openedFissureNodes ?? 0) + 1;
+          result.cracks.push({ points: [this.nodePosition(n.x + brokenNeighbor[0], n.y + brokenNeighbor[1], n.z + brokenNeighbor[2]), this.nodePosition(n.x, n.y, n.z)], width: this.cellSize, material: n.material });
+        }
       } else result.stats.weakenedNodes++;
-    }
-    // Return small visible crack branches that track stored weakened material; cracks do not remove volume.
-    const crackCandidates = candidates.filter(n => !removed.includes(n.node) && n.gain >= 2);
-    for (let branch = 0; branch < Math.min(3, crackCandidates.length); branch++) {
-      const angle = (seed % 628) * .01 + branch * 2.1, points: Vec3[] = [];
-      for (let step = 0; step < 4; step++) {
-        const d = radius * (.25 + step * .27), wobble = ((hash(branch, step, 0, seed) % 100) / 100 - .5) * .005;
-        const p = { x: contact.point.x + edge.x * Math.cos(angle) * d + across.x * (Math.sin(angle) * d + wobble), y: contact.point.y + edge.y * Math.cos(angle) * d + across.y * (Math.sin(angle) * d + wobble), z: contact.point.z + edge.z * Math.cos(angle) * d + across.z * (Math.sin(angle) * d + wobble) };
-        const hit = this.raycast({ x: p.x - direction.x * .014, y: p.y - direction.y * .014, z: p.z - direction.z * .014 }, direction, .028);
-        if (!hit) break;
-        points.push({ x: hit.point.x - direction.x * .0005, y: hit.point.y - direction.y * .0005, z: hit.point.z - direction.z * .0005 });
-      }
-      if (points.length >= 2) result.cracks.push({ points, width: .0007 + (seed % 5) * .00012, material: contact.material });
     }
     if (removed.length) this.detachIslands(removed, result, c, r + 2);
     if (removed.length) this.exposeCavities(removed);

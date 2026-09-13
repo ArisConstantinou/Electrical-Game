@@ -1,22 +1,33 @@
 import * as THREE from 'three';
 import type { InstallationPoint } from '../electrical/InstallationPoint';
 import type { BrickWall } from '../world/BrickWall';
+import { MortarField } from './MortarField';
 
 type WaterCell = { pore: number; film: number; mesh: THREE.Mesh; position: THREE.Vector3; normal: THREE.Vector3 };
-type Clod = { mesh: THREE.Mesh; velocity: THREE.Vector3; mass: number; age: number; contacts: number };
-type Deposit = { position: THREE.Vector3; radius: number; mass: number; mesh: THREE.Mesh; age: number; normal: THREE.Vector3; support: number };
+type Clod = { mesh: THREE.Mesh; velocity: THREE.Vector3; mass: number; age: number; contacts: number; slurry: boolean };
+type Deposit = { fieldKey?: string; position: THREE.Vector3; radius: number; mass: number; mesh: THREE.Mesh; age: number; normal: THREE.Vector3; support: number };
 type Contact = { point: THREE.Vector3; normal: THREE.Vector3; distance: number; box: boolean };
-type Opening = { inverse: THREE.Matrix4; halfWidth: number; halfHeight: number };
+type Opening = { inverse: THREE.Matrix4; halfWidth: number; halfHeight: number; minZ: number; maxZ: number };
 const Z = new THREE.Vector3(0, 0, 1);
 const DENSITY = 1900;
 const MAX_PATCHES = 256;
 const MAX_WATER = 240;
-const MAX_VERTICES = 600000;
 
-/** Qualitative wet mortar: finite mass, real surface contact and accelerated setting.
+
+/** Qualitative wet mortar: finite mass, real surface contact and separate fresh-mortar stability.
  * See docs/MORTAR_APPLICATION_RESEARCH.md; these coefficients are not calibrated. */
 export class MortarSystem {
   readonly group = new THREE.Group();
+  readonly field = new MortarField();
+  onRunoff?: (event: { point: THREE.Vector3; normal: THREE.Vector3; litres: number; mortarKg: number }) => void;
+  onWaterEmission?: (event: { origin: THREE.Vector3; velocity: THREE.Vector3; litres: number }) => void;
+  washedMass = 0;
+  private pendingWashMass = 0;
+  private readonly pendingWashPoint = new THREE.Vector3();
+  private readonly pendingWashNormal = new THREE.Vector3(0,0,1);
+  private fieldMeshTime = 0;
+  private supportDirty = false;
+  private lastWallRemovalCount = -1;
   readonly water = new Map<string, WaterCell>();
   readonly deposits: Deposit[] = [];
   readonly projectiles: Clod[] = [];
@@ -32,8 +43,8 @@ export class MortarSystem {
   lastOutcome = 'Dampen clean masonry, then hold and release to cast.';
   private readonly settled: THREE.Mesh[] = [];
   private readonly resting: Array<{ mesh: THREE.Mesh; mass: number }> = [];
-  private readonly mortarMaterial = new THREE.MeshStandardMaterial({ color: 0x817969, roughness: .94, flatShading: false, side: THREE.DoubleSide });
-  private readonly clodGeometry = new THREE.IcosahedronGeometry(1, 1);
+  private readonly mortarMaterial = new THREE.MeshStandardMaterial({ color: 0x817969, roughness: .84, flatShading: false, side: THREE.DoubleSide });
+  private readonly clodGeometry = new THREE.SphereGeometry(1, 18, 12).toNonIndexed();
   private readonly wetGeometry = new THREE.PlaneGeometry(.125, .125);
   private readonly wetMaterial: THREE.MeshBasicMaterial;
   private readonly ray = new THREE.Raycaster();
@@ -66,7 +77,7 @@ export class MortarSystem {
       shader.vertexShader = 'varying vec3 mortarWorld;\n' + shader.vertexShader;
       shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n mortarWorld = (modelMatrix * vec4(position, 1.0)).xyz;');
       shader.fragmentShader = 'varying vec3 mortarWorld;\n' + shader.fragmentShader;
-      shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n float grain=fract(sin(dot(floor(mortarWorld*1600.0),vec3(127.1,311.7,74.7)))*43758.5453); diffuseColor.rgb*=.88+grain*.22;');
+      shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n float grain=fract(sin(dot(floor(mortarWorld*1600.0),vec3(127.1,311.7,74.7)))*43758.5453); diffuseColor.rgb*=.96+grain*.06;');
     };
   }
 
@@ -108,33 +119,25 @@ export class MortarSystem {
 
   private waterKey(p: THREE.Vector3): string { return `${Math.round(p.x / .08)}:${Math.round(p.y / .08)}:${Math.round(p.z / .04)}`; }
   wet(camera: THREE.Camera, origin: THREE.Vector3, dt: number): void {
-    const direction = camera.getWorldDirection(new THREE.Vector3());
-    const cameraOrigin = camera.getWorldPosition(new THREE.Vector3());
-    const aim = this.contact(cameraOrigin, direction, 3); if (!aim) return;
-    const nozzleDirection = aim.point.clone().sub(origin);
-    const hit = this.contact(origin, nozzleDirection.clone().normalize(), nozzleDirection.length() + .01);
-    if (!hit || hit.box) return;
-    this.jet.geometry.dispose(); this.jet.geometry = new THREE.BufferGeometry().setFromPoints([origin, hit.point]); this.jetTime = .08; this.jet.visible = true;
-    const tangent = new THREE.Vector3(1, 0, 0).applyQuaternion(new THREE.Quaternion().setFromUnitVectors(Z, hit.normal));
-    const up = new THREE.Vector3().crossVectors(hit.normal, tangent).normalize();
-    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
-      const candidate = hit.point.clone().addScaledVector(tangent, dx * .065).addScaledVector(up, dy * .065);
-      const sprayDirection = candidate.sub(origin);
-      const local = this.contact(origin, sprayDirection.clone().normalize(), sprayDirection.length() + .06);
-      if (!local || local.box || this.insideBox(local.point)) continue;
-      const key = this.waterKey(local.point); let cell = this.water.get(key);
-      if (!cell) {
-        if (this.water.size >= MAX_WATER) continue;
-        const geometry = this.waterFootprint(local.point, local.normal, origin);
-        if (!geometry.getAttribute('position').count) { geometry.dispose(); continue; }
-        const mesh = new THREE.Mesh(geometry, this.wetMaterial.clone()); mesh.position.copy(local.point).addScaledVector(local.normal, .0015);
-        mesh.quaternion.setFromUnitVectors(Z, local.normal); this.group.add(mesh);
-        cell = { pore: 0, film: 0, mesh, position: local.point.clone(), normal: local.normal.clone() }; this.water.set(key, cell);
-      }
-      const dose = Math.max(0, dt) * .95 / (1 + dx * dx + dy * dy), absorbed = Math.min(1 - cell.pore, dose * .85);
-      cell.pore += absorbed; cell.film = Math.min(1, cell.film + Math.max(0, dose - absorbed) * 4);
+    const totalLitres=Math.max(0,dt)*.12;if(!totalLitres)return;
+    const direction=camera.getWorldDirection(new THREE.Vector3()),cameraOrigin=camera.getWorldPosition(new THREE.Vector3());
+    const aim=this.contact(cameraOrigin,direction,3);
+    if(!aim){this.onWaterEmission?.({origin:origin.clone(),velocity:direction.multiplyScalar(5),litres:totalLitres});return;}
+    const nozzleDirection=aim.point.clone().sub(origin),hit=this.contact(origin,nozzleDirection.clone().normalize(),nozzleDirection.length()+.01);
+    if(!hit){this.onWaterEmission?.({origin:origin.clone(),velocity:nozzleDirection.normalize().multiplyScalar(5),litres:totalLitres});return;}
+    this.jet.geometry.dispose();this.jet.geometry=new THREE.BufferGeometry().setFromPoints([origin,hit.point]);this.jetTime=.08;this.jet.visible=true;
+    const tangent=new THREE.Vector3(1,0,0).applyQuaternion(new THREE.Quaternion().setFromUnitVectors(Z,hit.normal)),up=new THREE.Vector3().crossVectors(hit.normal,tangent).normalize();
+    const totalWeight=1+4*.5+4/3;
+    for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++){
+      const litres=totalLitres/(1+dx*dx+dy*dy)/totalWeight;
+      const target=hit.point.clone().addScaledVector(tangent,dx*.045).addScaledVector(up,dy*.045),delta=target.sub(origin);
+      const local=this.contact(origin,delta.clone().normalize(),delta.length()+.07);
+      if(!local){this.onWaterEmission?.({origin:origin.clone(),velocity:delta.normalize().multiplyScalar(5),litres});continue;}
+      if(local.box||this.insideBox(local.point)){this.onRunoff?.({point:local.point.clone(),normal:local.normal.clone(),litres,mortarKg:0});continue;}
+      this.applyWater(local.point,local.normal,litres);
     }
   }
+
   /** A spray footprint contains only exposed first-hit triangles, not an air-spanning plane. */
   private waterFootprint(point: THREE.Vector3, normal: THREE.Vector3, origin: THREE.Vector3): THREE.BufferGeometry {
     const rotation = new THREE.Quaternion().setFromUnitVectors(Z, normal), inverse = rotation.clone().invert();
@@ -166,30 +169,30 @@ export class MortarSystem {
   }
   retention(p: THREE.Vector3, v: THREE.Vector3, normal: THREE.Vector3): number {
     const wet = this.moistureAt(p), speed = v.length(), incidence = Math.max(0, -v.clone().normalize().dot(normal));
-    return THREE.MathUtils.clamp((.35 + .65 * Math.min(1, wet.pore / .45)) * (1 - .8 * wet.film) * Math.min(1, speed / 2) * incidence ** 1.3 / (1 + Math.max(0, speed - 6) * .12), 0, .93);
+    const receiver=this.field.stateAt(p.clone().addScaledVector(normal,-.006));
+    const prepared=receiver.value>.35&&receiver.age<3600?.90*(1-Math.min(.65,receiver.dilution*.3)):(.35+.65*Math.min(1,wet.pore/.45));
+    return THREE.MathUtils.clamp(prepared * (1 - .8 * wet.film) * Math.min(1, speed / 2) * incidence ** 1.3 / (1 + Math.max(0, speed - 6) * .12), 0, .93);
   }
-  launch(origin: THREE.Vector3, velocity: THREE.Vector3, mass = .24): void {
+  launch(origin: THREE.Vector3, velocity: THREE.Vector3, mass = .65): void {
     if (this.projectiles.length >= 48 || !Number.isFinite(mass) || mass <= 0) return;
     this.spawnClod(origin, velocity, mass); this.launchedMass += mass;
   }
-  private spawnClod(origin: THREE.Vector3, velocity: THREE.Vector3, mass: number): void {
+  private spawnClod(origin: THREE.Vector3, velocity: THREE.Vector3, mass: number, slurry = false): void {
     const mesh = new THREE.Mesh(this.clodGeometry, this.mortarMaterial); mesh.position.copy(origin); mesh.castShadow = true;
-    const scale = Math.cbrt(mass / .24); mesh.scale.set(.032 * scale, .023 * scale, .045 * scale);
-    this.group.add(mesh); this.projectiles.push({ mesh, velocity: velocity.clone(), mass, age: 0, contacts: 0 });
+    const scale = Math.cbrt(mass / .65); mesh.scale.set(.046 * scale, .030 * scale, .064 * scale);
+    this.group.add(mesh); this.projectiles.push({ mesh, velocity: velocity.clone(), mass, age: 0, contacts: 0, slurry });
   }
-  /** Optional close hand packing: actual reachable ring contact, never automatic box fill. */
+  /** Close cohesive packing is available at every real reachable surface or gap. */
   pack(camera: THREE.Camera): boolean {
     if (this.recovery > 0) return false;
     const hit = this.contact(camera.getWorldPosition(new THREE.Vector3()), camera.getWorldDirection(new THREE.Vector3()), .9);
     if (!hit || hit.box || this.insideBox(hit.point)) return false;
-    const nearby = this.points.some(point => point.stage === 'fitted' && hit.point.distanceTo(point.getWorldPosition(new THREE.Vector3())) < point.boxGroup.groupWidth * .6 + .14);
-    if (!nearby) return false;
-    const mass = .10, fraction = this.retention(hit.point, hit.normal.clone().multiplyScalar(-2), hit.normal);
+    const mass = .65, fraction = this.retention(hit.point, hit.normal.clone().multiplyScalar(-2), hit.normal);
     const held = this.deposit(hit.point, mass * fraction, hit.normal);
     if (!held) return false;
     this.launchedMass += mass; this.stuckMass += held;
     this.spawnClod(hit.point.clone().addScaledVector(hit.normal, .015), hit.normal.clone().multiplyScalar(.12).add(new THREE.Vector3(0, -.15, 0)), mass - held);
-    this.recovery = .4; this.lastOutcome = 'Packed against the actual support; loose excess falls.'; return true;
+    this.recovery = .4; this.lastOutcome = held<mass*.25?'The nearby void is full; loose excess slumps off.':'Packed into the exposed cavity; loose excess falls.'; return true;
   }
 
   /** Earliest current solid, including deposited mortar and actual box casing. */
@@ -198,7 +201,9 @@ export class MortarSystem {
     const wallHit = this.wall.volume.raycast(origin, direction, distance);
     let result: Contact | null = wallHit ? { point: new THREE.Vector3(wallHit.point.x, wallHit.point.y, wallHit.point.z), normal: new THREE.Vector3(wallHit.normal.x, wallHit.normal.y, wallHit.normal.z), distance: new THREE.Vector3(wallHit.point.x, wallHit.point.y, wallHit.point.z).distanceTo(origin), box: false } : null;
     this.ray.set(origin, direction); this.ray.near = .0001; this.ray.far = distance;
-    const meshes: THREE.Object3D[] = this.deposits.filter(d => this.ray.ray.distanceSqToPoint(d.position) < (d.radius + .04) ** 2).map(d => d.mesh);
+    const fieldHit=this.field.raycast(origin,direction,result?Math.min(distance,result.distance):distance);
+    if(fieldHit&&(!result||fieldHit.distance<result.distance))result={...fieldHit,box:false};
+    const meshes: THREE.Object3D[] = [];
     meshes.push(...this.resting.map(clod => clod.mesh));
     for (const point of this.points) if (point.boxGroup.visible) { point.updateWorldMatrix(true, true); meshes.push(...point.boxGroup.boxes); }
     for (const mesh of meshes) mesh.updateWorldMatrix(true, false);
@@ -214,11 +219,11 @@ export class MortarSystem {
     const result: Opening[] = [];
     for (const point of this.points) if (point.boxGroup.visible) {
       point.updateWorldMatrix(true, true);
-      for (const box of point.boxGroup.boxes) result.push({ inverse: box.matrixWorld.clone().invert(), halfWidth: box.width / 2 - .001, halfHeight: box.height / 2 - .001 });
+      for (const box of point.boxGroup.boxes) result.push({ inverse: box.matrixWorld.clone().invert(), halfWidth: box.width / 2 - .001, halfHeight: box.height / 2 - .001, minZ: -(box.depth ?? .047), maxZ: 20 });
     }
     return result;
   }
-  private insideBox(p: THREE.Vector3): boolean { return this.openings().some(box => { const q = p.clone().applyMatrix4(box.inverse); return Math.abs(q.x) < box.halfWidth && Math.abs(q.y) < box.halfHeight; }); }
+  private insideBox(p: THREE.Vector3): boolean { return this.openings().some(box => { const q = p.clone().applyMatrix4(box.inverse); return Math.abs(q.x) < box.halfWidth && Math.abs(q.y) < box.halfHeight && q.z > box.minZ && q.z < box.maxZ; }); }
 
   /** Subtract opening prisms from every face, including edge crossings and tilted boxes. */
   private clipOpenings(polygon: THREE.Vector3[], openings: Opening[]): THREE.Vector3[][] {
@@ -227,15 +232,15 @@ export class MortarSystem {
       const outside: THREE.Vector3[][] = [];
       for (const piece of pieces) {
         const local=piece.map(p=>p.clone().applyMatrix4(box.inverse));
-        if(local.every(p=>p.x>=box.halfWidth-1e-9)||local.every(p=>p.x<=-box.halfWidth+1e-9)||local.every(p=>p.y>=box.halfHeight-1e-9)||local.every(p=>p.y<=-box.halfHeight+1e-9)){outside.push(piece);continue;}
+        if(local.every(p=>p.x>=box.halfWidth-1e-9)||local.every(p=>p.x<=-box.halfWidth+1e-9)||local.every(p=>p.y>=box.halfHeight-1e-9)||local.every(p=>p.y<=-box.halfHeight+1e-9)||local.every(p=>p.z<=box.minZ+1e-9)||local.every(p=>p.z>=box.maxZ-1e-9)){outside.push(piece);continue;}
         let remaining = piece;
-        for (const [axis, sign, extent] of [[0, 1, box.halfWidth], [0, -1, box.halfWidth], [1, 1, box.halfHeight], [1, -1, box.halfHeight]]) {
+        for (const [axis, sign, extent] of [[0, 1, box.halfWidth], [0, -1, box.halfWidth], [1, 1, box.halfHeight], [1, -1, box.halfHeight], [2, 1, box.maxZ], [2, -1, -box.minZ]]) {
           if (remaining.length < 3) break;
           const inside: THREE.Vector3[] = [], rejected: THREE.Vector3[] = [];
           for (let i = 0; i < remaining.length; i++) {
             const a = remaining[i], b = remaining[(i + 1) % remaining.length];
             const la = a.clone().applyMatrix4(box.inverse), lb = b.clone().applyMatrix4(box.inverse);
-            const da = (axis === 0 ? la.x : la.y) * sign - extent, db = (axis === 0 ? lb.x : lb.y) * sign - extent;
+            const da = (axis === 0 ? la.x : axis === 1 ? la.y : la.z) * sign - extent, db = (axis === 0 ? lb.x : axis === 1 ? lb.y : lb.z) * sign - extent;
             (da <= 0 ? inside : rejected).push(a);
             if ((da <= 0) !== (db <= 0)) { const p = a.clone().lerp(b, da / (da - db)); inside.push(p); rejected.push(p); }
           }
@@ -250,121 +255,70 @@ export class MortarSystem {
 
   private deposit(p: THREE.Vector3, mass: number, normal: THREE.Vector3): number {
     if (mass <= .001) return 0;
-    if (this.deposits.length >= MAX_PATCHES) this.mergeStablePatches();
-    // Record compaction preserves material; this separate generous vertex budget
-    // bounds memory even during an indefinitely long free-play session.
-    if (this.deposits.length >= MAX_PATCHES || this.deposits.reduce((sum, d) => sum + d.mesh.geometry.getAttribute('position').count, 0) >= MAX_VERTICES) return 0;
-    // A trowelful spreads and packs across a rough chase edge. Its growth axis
-    // follows the working face instead of amplifying each tiny fracture facet.
-    normal = normal.z > .25 ? normal.clone().lerp(Z,.65).normalize() : normal;
-    const radius = .028 + Math.sqrt(mass) * .085, orientation = new THREE.Quaternion().setFromUnitVectors(Z, normal);
-    const tangent = new THREE.Vector3(1, 0, 0).applyQuaternion(orientation), up = new THREE.Vector3(0, 1, 0).applyQuaternion(orientation);
-    const openings = this.openings(), vertices: Array<THREE.Vector3 | null> = [];
-    const count = 20;
-    // Shared projected vertices produce a coherent surface rather than floating balls.
-    for (let ring = 0; ring <= 2; ring++) for (let i = 0; i < (ring ? count : 1); i++) {
-      const angle = i * Math.PI * 2 / count, noise = 1 + .075 * Math.sin(angle * 7 + p.x * 53 + p.y * 37);
-      const q = p.clone().addScaledVector(tangent, Math.cos(angle) * radius * ring / 2 * noise).addScaledVector(up, Math.sin(angle) * radius * ring / 2 * noise);
-      const hit = this.contact(q.clone().addScaledVector(normal, .11), normal.clone().negate(), .22);
-      vertices.push(hit && !hit.box && hit.normal.dot(normal) > .15 && Math.abs(hit.point.clone().sub(p).dot(normal)) < .08 ? hit.point : null);
-    }
-    const triangles: THREE.Vector3[][] = [];
-    const add = (a: number, b: number, c: number): void => {
-      const va = vertices[a], vb = vertices[b], vc = vertices[c]; if (!va || !vb || !vc) return;
-      const middle = va.clone().add(vb).add(vc).multiplyScalar(1 / 3);
-      const support = this.contact(middle.clone().addScaledVector(normal, .035), normal.clone().negate(), .07);
-      if (!support || support.box) return;
-      for (const piece of this.clipOpenings([va, vb, vc], openings)) for (let i = 1; i < piece.length - 1; i++) triangles.push([piece[0], piece[i], piece[i + 1]]);
+    // An impact facet must not rotate a separate sheet. Wet material joins a
+    // fixed-world scalar volume and grows along the working face.
+    const growth = normal.z > .25 ? normal.clone().lerp(Z, .65).normalize() : normal.clone();
+    const boxes = this.openings(), volume = this.wall.volume;
+    const blocked = (q: THREE.Vector3): boolean => {
+      if (typeof volume.isOccupied === 'function' && volume.isOccupied(q.x,q.y,q.z)) return true;
+      return boxes.some(box => { const local=q.clone().applyMatrix4(box.inverse); return Math.abs(local.x)<box.halfWidth && Math.abs(local.y)<box.halfHeight && local.z>box.minZ && local.z<box.maxZ; });
     };
-    for (let i = 0; i < count; i++) {
-      const j = (i + 1) % count;
-      add(0, 1 + i, 1 + j); add(1 + i, 21 + i, 21 + j); add(1 + i, 21 + j, 1 + j);
-    }
-    let area = 0;
-    for (const [a, b, c] of triangles) area += new THREE.Vector3().crossVectors(b.clone().sub(a), c.clone().sub(a)).length() * .5;
-    if (area < 1e-6) return 0;
-    const thickness = Math.min(.018, mass / (DENSITY * Math.PI * radius * radius)), held = Math.min(mass, area * thickness * DENSITY);
-    if (held < .001) return 0;
-    const positions: number[] = [], offset = normal.clone().multiplyScalar(thickness);
-    const emit = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3): void => {
-      // Extruded side/top faces are clipped again: oblique normals cannot enter an opening.
-      for (const piece of this.clipOpenings([a, b, c], openings)) for (let i = 1; i < piece.length - 1; i++) for (const v of [piece[0], piece[i], piece[i + 1]]) positions.push(v.x, v.y, v.z);
-    };
-    for (const [a, b, c] of triangles) {
-      const aa = a.clone().add(offset), bb = b.clone().add(offset), cc = c.clone().add(offset);
-      emit(aa, bb, cc); emit(c, b, a);
-      for (const [v, w, vv, ww] of [[a, b, aa, bb], [b, c, bb, cc], [c, a, cc, aa]]) { emit(v, w, ww); emit(v, ww, vv); }
-    }
-    const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3)); this.finishGeometry(geometry);
-    const mesh = new THREE.Mesh(geometry, this.mortarMaterial); mesh.receiveShadow = mesh.castShadow = true; mesh.name = 'Surface conforming mortar with clipped box openings'; this.group.add(mesh);
-    this.deposits.push({ position: p.clone(), radius, mass: held, mesh, age: 0, normal: normal.clone(), support: 1 - this.moistureAt(p).film });
-    this.geometryRevision++; return held;
+    const frontZ=typeof volume.frontZ==='number'?volume.frontZ:(normal.z>.5?0:undefined);
+    const profile=frontZ===undefined?undefined:{frontZ,supportZ:(x:number,y:number):number|null=>{
+      const origin=new THREE.Vector3(x,y,frontZ+.016),hit=volume.raycast(origin,new THREE.Vector3(0,0,-1),.22);
+      return hit?hit.point.z:null;
+    }};
+    const held = this.field.add(p, growth, mass, blocked,profile);
+    if (held > 0) { this.syncFieldGeometry(); this.geometryRevision++; }
+    return held;
   }
 
-  /** Compact two stable nearby records without deleting their geometry or mass. */
-  private mergeStablePatches(): void {
-    let a = -1, b = -1, distance = Infinity;
-    for (let i = 0; i < this.deposits.length; i++) {
-      if (this.deposits[i].age < 1.3) continue;
-      for (let j = i + 1; j < this.deposits.length; j++) {
-        if (this.deposits[j].age < 1.3) continue;
-        const delta = this.deposits[i].position.distanceToSquared(this.deposits[j].position);
-        if (delta < distance) { a = i; b = j; distance = delta; }
-      }
+  private syncFieldGeometry(): void {
+    const boxes=this.openings();
+    for(const chunk of this.field.remesh(triangle=>this.clipOpenings(triangle,boxes))){
+      const index=this.deposits.findIndex(d=>d.fieldKey===chunk.key),old=index<0?undefined:this.deposits[index];
+      if(!chunk.geometry.getAttribute('position').count){chunk.geometry.dispose();if(old){this.group.remove(old.mesh);old.mesh.geometry.dispose();this.deposits.splice(index,1);}continue;}
+      const sphere=chunk.geometry.boundingSphere!;
+      if(old){old.mesh.geometry.dispose();old.mesh.geometry=chunk.geometry;old.position.copy(sphere.center);old.radius=sphere.radius;old.mass=chunk.mass;old.age=chunk.age;old.support=1-Math.min(1,chunk.dilution);}
+      else {const mesh=new THREE.Mesh(chunk.geometry,this.mortarMaterial);mesh.name='Continuous wet mortar volume';mesh.castShadow=mesh.receiveShadow=true;this.group.add(mesh);this.deposits.push({fieldKey:chunk.key,position:sphere.center.clone(),radius:sphere.radius,mass:chunk.mass,mesh,age:chunk.age,normal:Z.clone(),support:1-Math.min(1,chunk.dilution)});}
     }
-    if (a < 0) return;
-    const first = this.deposits[a], second = this.deposits[b];
-    const p = first.mesh.geometry.getAttribute('position'), q = second.mesh.geometry.getAttribute('position');
-    const positions = new Float32Array((p.count + q.count) * 3); positions.set(p.array); positions.set(q.array, p.count * 3);
-    const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3)); this.finishGeometry(geometry);
-    first.mesh.geometry.dispose(); first.mesh.geometry = geometry;
-    first.normal.multiplyScalar(first.mass).addScaledVector(second.normal, second.mass).normalize();
-    first.mass += second.mass; first.age = Math.min(first.age, second.age); first.support = Math.min(first.support, second.support);
-    first.position.copy(geometry.boundingSphere!.center); first.radius = geometry.boundingSphere!.radius;
-    this.group.remove(second.mesh); second.mesh.geometry.dispose(); this.deposits.splice(b, 1); this.geometryRevision++;
+    this.fieldMeshTime=0;
   }
 
-  /** Leveling moves the real opening. Reclip existing triangles against its new
-   * transform; surface-area ratio estimates detached mass, not exact CSG volume. */
   private refreshOpeningGeometry(): void {
-    const boxes = this.openings();
-    const signature = boxes.map(box => box.inverse.elements.map(v => v.toFixed(5)).join(',')).join('|');
-    if (signature === this.openingSignature) return;
-    this.openingSignature = signature;
-    if (!this.deposits.length) return;
-    for (let index = this.deposits.length - 1; index >= 0; index--) {
-      const deposit = this.deposits[index], old = deposit.mesh.geometry.getAttribute('position');
-      const positions: number[] = []; let beforeArea = 0, afterArea = 0;
-      for (let i = 0; i < old.count; i += 3) {
-        const a = new THREE.Vector3().fromBufferAttribute(old, i), b = new THREE.Vector3().fromBufferAttribute(old, i + 1), c = new THREE.Vector3().fromBufferAttribute(old, i + 2);
-        beforeArea += new THREE.Vector3().crossVectors(b.clone().sub(a), c.clone().sub(a)).length();
-        for (const piece of this.clipOpenings([a, b, c], boxes)) for (let j = 1; j < piece.length - 1; j++) {
-          const aa = piece[0], bb = piece[j], cc = piece[j + 1];
-          if(new THREE.Vector3().crossVectors(bb.clone().sub(aa),cc.clone().sub(aa)).lengthSq()<1e-18)continue;
-          afterArea += new THREE.Vector3().crossVectors(bb.clone().sub(aa), cc.clone().sub(aa)).length();
-          for (const p of [aa, bb, cc]) positions.push(p.x, p.y, p.z);
-        }
-      }
-      const loss = deposit.mass * THREE.MathUtils.clamp(1 - afterArea / Math.max(1e-12, beforeArea), 0, 1);
-      // Clipping may partition an entirely exterior triangle into several pieces.
-      // Keeping unchanged area avoids exponential tessellation on every level nudge.
-      if (loss < 1e-8) continue;
-      deposit.mass -= loss; this.stuckMass = Math.max(0, this.stuckMass - loss);
-      if (loss > 1e-8) {
-        const position = deposit.position.clone().addScaledVector(deposit.normal, .03);
-        if (this.projectiles.length < 48) this.spawnClod(position, new THREE.Vector3(0, -.35, .12), loss);
-        else {
-          // Merge detached material into a nearby existing moving clod at capacity.
-          let nearest = this.projectiles[0];
-          for (const clod of this.projectiles) if (clod.mesh.position.distanceToSquared(position) < nearest.mesh.position.distanceToSquared(position)) nearest = clod;
-          nearest.mass += loss; const scale = Math.cbrt(nearest.mass / .24); nearest.mesh.scale.set(.032 * scale, .023 * scale, .045 * scale);
-        }
-      }
-      deposit.mesh.geometry.dispose();
-      if (positions.length < 9 || deposit.mass < 1e-8) { this.group.remove(deposit.mesh); this.deposits.splice(index, 1); }
-      else { const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3)); this.finishGeometry(geometry); deposit.mesh.geometry = geometry; }
+    const boxes=this.openings(),signature=boxes.map(box=>box.inverse.elements.map(v=>v.toFixed(5)).join(',')).join('|');
+    if(signature===this.openingSignature)return;this.openingSignature=signature;
+    const removed=this.field.removeWhere(q=>boxes.some(box=>{const local=q.clone().applyMatrix4(box.inverse);return Math.abs(local.x)<box.halfWidth&&Math.abs(local.y)<box.halfHeight && local.z>box.minZ && local.z<box.maxZ;}));
+    if(removed>0){this.stuckMass=Math.max(0,this.stuckMass-removed);const point=this.deposits[0]?.position??new THREE.Vector3(0,1,0);this.queueSlurry(point,Z,removed);}
+    this.field.invalidateGeometry();this.syncFieldGeometry();this.geometryRevision++;
+  }
+
+  private queueSlurry(point:THREE.Vector3,normal:THREE.Vector3,mass:number):void {
+    if(mass<=0)return;this.pendingWashPoint.multiplyScalar(this.pendingWashMass).addScaledVector(point,mass);this.pendingWashMass+=mass;this.pendingWashPoint.multiplyScalar(1/this.pendingWashMass);this.pendingWashNormal.copy(normal);
+  }
+
+  /** Litres are a delivered quantity, not litres/second. Fresh mortar can be
+   * diluted/washed away; substrate prewetting is a separate state. */
+  applyWater(point:THREE.Vector3,normal:THREE.Vector3,litres:number):{absorbedLitres:number;runoffLitres:number;washedMortarKg:number} {
+    litres=Math.max(0,litres);let cell=this.water.get(this.waterKey(point));
+    if(!cell&&this.water.size<MAX_WATER){const geometry=this.waterFootprint(point,normal,point.clone().addScaledVector(normal,.18));const mesh=new THREE.Mesh(geometry,this.wetMaterial.clone());mesh.position.copy(point).addScaledVector(normal,.0015);mesh.quaternion.setFromUnitVectors(Z,normal);this.group.add(mesh);cell={pore:0,film:0,mesh,position:point.clone(),normal:normal.clone()};this.water.set(this.waterKey(point),cell);}
+    const washed=this.field.wash(point,litres);
+    let restingWash=0;
+    for(let i=this.resting.length-1;i>=0;i--){
+      const clod=this.resting[i],geometry=clod.mesh.geometry,sphere=geometry.boundingSphere;
+      if(!sphere||point.distanceTo(sphere.center)>sphere.radius+.008)continue;
+      const loss=Math.min(clod.mass,litres*.70),old=clod.mass;clod.mass-=loss;restingWash+=loss;this.restingMass-=loss;
+      if(clod.mass<1e-6){this.group.remove(clod.mesh);geometry.dispose();this.resting.splice(i,1);}
+      else{const positions=geometry.getAttribute('position'),scale=Math.cbrt(clod.mass/old),q=new THREE.Vector3();
+        for(let j=0;j<positions.count;j++){q.fromBufferAttribute(positions,j).sub(sphere.center).multiplyScalar(scale).add(sphere.center);positions.setXYZ(j,q.x,q.y,q.z);}positions.needsUpdate=true;geometry.computeBoundingSphere();}
     }
-    this.geometryRevision++;
+    const washedTotal=washed.removedKg+restingWash;
+    if(restingWash>0){this.washedMass+=restingWash;this.queueSlurry(point,normal,restingWash);}
+    const absorbed=cell?Math.min(litres*.85,Math.max(0,1-cell.pore)*.08):0,runoff=litres-absorbed;
+    if(cell){cell.pore=Math.min(1,cell.pore+absorbed/.08);cell.film=Math.min(1,cell.film+runoff/.04);}
+    if(washed.removedKg>0){this.supportDirty=true;this.stuckMass=Math.max(0,this.stuckMass-washed.removedKg);this.washedMass+=washed.removedKg;this.queueSlurry(point,normal,washed.removedKg);this.geometryRevision++;this.lastOutcome='Fresh mortar softened and washed away; slurry is falling.';}
+    this.onRunoff?.({point:point.clone(),normal:normal.clone(),litres:runoff,mortarKg:washedTotal});
+    return{absorbedLitres:absorbed,runoffLitres:runoff,washedMortarKg:washedTotal};
   }
 
   update(dt: number): void {
@@ -385,33 +339,55 @@ export class MortarSystem {
       (stream.mesh.material as THREE.MeshBasicMaterial).opacity = Math.min(.2, stream.life * .15);
       if (stream.life <= 0 || stream.mesh.position.y < 0) { this.group.remove(stream.mesh); (stream.mesh.material as THREE.Material).dispose(); this.streams.splice(i, 1); }
     }
-    for (let i = this.deposits.length - 1; i >= 0; i--) {
-      const deposit = this.deposits[i]; deposit.age += dt;
-      // Weak fresh deposits can release a cohesive lump; sound ones do not drip like paint.
-      if (deposit.age > 1.2 && deposit.age < 1.2 + dt && deposit.support < .45 && this.projectiles.length < 48) {
-        this.stuckMass = Math.max(0, this.stuckMass - deposit.mass); this.spawnClod(deposit.position.clone().addScaledVector(deposit.normal, .018), deposit.normal.clone().multiplyScalar(.10).add(new THREE.Vector3(0, -.25, 0)), deposit.mass);
-        this.group.remove(deposit.mesh); deposit.mesh.geometry.dispose(); this.deposits.splice(i, 1); this.geometryRevision++; this.lastOutcome = 'Excess water weakened the fresh patch; a clump fell.';
+    this.field.tick(dt);this.fieldMeshTime+=dt;
+    const removalCount=this.wall.volume.removedNodeCount ?? 0;
+    if(removalCount!==this.lastWallRemovalCount){this.lastWallRemovalCount=removalCount;this.supportDirty=true;}
+    if(this.supportDirty&&this.fieldMeshTime>=.10){
+      this.supportDirty=false;
+      const volume=this.wall.volume;
+      if(typeof volume.isOccupied==='function'){
+        const released=this.field.releaseUnsupported(q=>volume.isOccupied(q.x,q.y,q.z));
+        if(released.mass>0){this.stuckMass=Math.max(0,this.stuckMass-released.mass);this.queueSlurry(released.point,Z,released.mass);this.geometryRevision++;}
       }
     }
+    for(const deposit of this.deposits)deposit.age+=dt;
+    if(this.field.dirty.size&&this.fieldMeshTime>=.10)this.syncFieldGeometry();
+    if(this.pendingWashMass>.002&&this.projectiles.length<48){this.spawnClod(this.pendingWashPoint.clone().addScaledVector(this.pendingWashNormal,.025),new THREE.Vector3(0,-.25,.08),this.pendingWashMass,true);this.pendingWashMass=0;}
     if (this.maintenanceTime > .4) { this.maintenanceTime = 0; this.updateStages(); }
     const steps = Math.max(1, Math.ceil(dt / .012)), h = dt / steps;
     for (let step = 0; step < steps; step++) for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const clod = this.projectiles[i], a = clod.mesh.position, next = a.clone().addScaledVector(clod.velocity, h); next.y -= .5 * 9.81 * h * h; clod.velocity.y -= 9.81 * h; clod.age += h;
       const d = next.clone().sub(a), hit = this.contact(a, d.clone().normalize(), d.length());
       if (hit) {
-        const fraction = hit.box || this.insideBox(hit.point) || clod.contacts > 2 ? 0 : this.retention(hit.point, clod.velocity, hit.normal);
+        const fraction = clod.slurry || hit.box || this.insideBox(hit.point) || clod.contacts > 2 ? 0 : this.retention(hit.point, clod.velocity, hit.normal);
         const held = this.deposit(hit.point, clod.mass * fraction, hit.normal); this.stuckMass += held; clod.mass -= held; clod.contacts++;
-        this.lastOutcome = held > .07 ? 'Mortar held. Pack all four sides before leveling.' : held > .005 ? 'Some mortar held; excess is falling.' : 'Glancing / wet contact: mortar slipped off.';
+        this.lastOutcome = held > .07 ? 'Mortar held. Pack all four sides before leveling.' : held > .005 ? 'Some mortar held; excess is falling.' : 'Little free capacity or glancing contact: excess slumps off.';
         if (clod.mass < .001) { this.floorMass += clod.mass; this.group.remove(clod.mesh); this.projectiles.splice(i, 1); continue; }
+        let narrowLedge=false;
+        if(!clod.slurry&&hit.normal.y>.4&&clod.contacts>=2){
+          const r=Math.cbrt(clod.mass/DENSITY)*.9,right=new THREE.Vector3(1,0,0).projectOnPlane(hit.normal).normalize(),forward=new THREE.Vector3().crossVectors(hit.normal,right).normalize();let supported=0;
+          for(const axis of [right,forward])for(const sign of [-1,1]){
+            const probe=hit.point.clone().addScaledVector(axis,r*sign).addScaledVector(hit.normal,.025),support=this.contact(probe,hit.normal.clone().negate(),.04);
+            if(support&&support.normal.y>.25&&support.distance<.035)supported++;
+          }
+          narrowLedge=supported<4;
+        }
+        if((clod.slurry||narrowLedge||hit.normal.y<.92)&&hit.normal.y>.25){
+          // Diluted material flows along a ledge to its real edge; it does not
+          // gain a new yield stress and freeze into stacked solid pancakes.
+          const flow=new THREE.Vector3(0,-.12,.30).projectOnPlane(hit.normal);
+          clod.velocity.copy(flow);clod.mesh.position.copy(hit.point).addScaledVector(hit.normal,.010);
+          continue;
+        }
         if (hit.normal.y > .4 && clod.contacts >= 2 && Math.abs(clod.velocity.dot(hit.normal)) < 1.6) {
           this.restOnLedge(clod, hit); this.projectiles.splice(i, 1); continue;
         }
         // Clear the newly deposited thickness as well as the old hit surface.
         clod.mesh.position.copy(hit.point).addScaledVector(hit.normal, .030);
         const vn = clod.velocity.dot(hit.normal); clod.velocity.addScaledVector(hit.normal, -vn).multiplyScalar(.3).addScaledVector(hit.normal, .16); clod.velocity.y = Math.min(-.4, clod.velocity.y - .22);
-        const scale = Math.cbrt(clod.mass / .24); clod.mesh.scale.set(.032 * scale, .023 * scale, .045 * scale); continue;
+        const scale = Math.cbrt(clod.mass / .65); clod.mesh.scale.set(.032 * scale, .023 * scale, .045 * scale); continue;
       }
-      clod.mesh.position.copy(next); clod.mesh.rotation.x += h * 3;
+      clod.mesh.position.copy(next);
       if (next.y < .012) { this.settle(clod); this.projectiles.splice(i, 1); }
       // No age-based teleport to floor: trajectories continue falling under gravity.
     }
@@ -464,18 +440,18 @@ export class MortarSystem {
     const cached = this.coverageCache.get(key);
     if (cached && cached.revision === this.geometryRevision && cached.transform === transform && this.simulationTime - cached.time < .2) return cached.value;
     const width = point.boxGroup.groupWidth / 2 + .026, height = point.boxGroup.groupHeight / 2 + .024, counts = [0, 0, 0, 0];
-    const center = point.boxGroup.getWorldPosition(new THREE.Vector3()), reach = Math.hypot(width, height) + .09;
-    const meshes = this.deposits.filter(deposit => (!stableOnly || deposit.age >= 1.3) && deposit.position.distanceTo(center) <= reach + deposit.radius).map(deposit => deposit.mesh);
     for (let side = 0; side < 4; side++) for (let i = 0; i < 12; i++) {
       const t = -.9 + 1.8 * i / 11;
       const q = new THREE.Vector3(side < 2 ? t * width : side === 2 ? -width : width, side < 2 ? side === 0 ? -height : height : t * height, .024).applyMatrix4(point.boxGroup.matrixWorld);
       const direction = new THREE.Vector3(0, 0, -1).transformDirection(point.boxGroup.matrixWorld);
-      this.ray.set(q, direction); this.ray.near = 0; this.ray.far = .065;
-      // Actual clipped triangle coverage and box-local depth, never XY bounding circles.
-      if (this.ray.intersectObjects(meshes, false).length > 0) counts[side]++;
+      // The segment measures actual occupied material, including when its
+      // origin is already inside a thick bed and no exit face lies within65mm.
+      // This is the same finite, clipped field used by collision, not an XY mask.
+      const hit=this.field.raycast(q,direction,.065);
+      if(hit&&(!stableOnly||this.field.stateAt(hit.point).age>=1.3))counts[side]++;
     }
     const value = Math.min(...counts) / 12;
     this.coverageCache.set(key, { time: this.simulationTime, revision: this.geometryRevision, transform, value }); return value;
   }
-  get telemetry() { return { angleDegrees: this.angleDegrees, power: this.charge, recovery: this.recovery, airborne: this.projectiles.length, launchedKg: this.launchedMass, stuckKg: this.stuckMass, restingKg: this.restingMass, restingBatches: this.resting.length, floorKg: this.floorMass, movingKg: this.projectiles.reduce((sum, clod) => sum + clod.mass, 0), wetCells: this.water.size, patches: this.deposits.length, outcome: this.lastOutcome, acceleratedSetting: true, geometryLimit: MAX_PATCHES, coverage: this.points.map(point => ({ id: point.definition.id, fraction: this.coverage(point) })) }; }
+  get telemetry() { return { angleDegrees: this.angleDegrees, power: this.charge, recovery: this.recovery, airborne: this.projectiles.length, launchedKg: this.launchedMass, stuckKg: this.stuckMass, restingKg: this.restingMass, restingBatches: this.resting.length, floorKg: this.floorMass, movingKg: this.pendingWashMass + this.projectiles.reduce((sum, clod) => sum + clod.mass, 0), washedKg: this.washedMass, volumeField: this.field.statistics, wetCells: this.water.size, patches: this.deposits.length, outcome: this.lastOutcome, initialStabilitySeconds: 1.3, freshWorkingSeconds: 3600, geometryLimit: MAX_PATCHES, coverage: this.points.map(point => ({ id: point.definition.id, fraction: this.coverage(point) })) }; }
 }

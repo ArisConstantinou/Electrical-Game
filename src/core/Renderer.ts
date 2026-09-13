@@ -1,10 +1,21 @@
 import * as THREE from 'three';
+import { WebGPURenderer, MeshStandardNodeMaterial } from 'three/webgpu';
+import { positionWorld, materialColor, sin, dot, floor, fract, vec2, vec3, smoothstep } from 'three/tsl';
 import { GAME_CONFIG } from '../data/gameConfig';
+import type { RoomWaterSystem } from '../systems/RoomWaterSystem';
+import type { RoomWaterRuntime } from '../generated/room-water-runtime';
 
 export class Renderer {
   readonly scene = new THREE.Scene();
   readonly camera = new THREE.PerspectiveCamera(72, 1, 0.025, 60);
-  readonly webgl: THREE.WebGLRenderer;
+  readonly webgl: WebGPURenderer;
+  readonly ready:Promise<void>;
+  private readonly gpu:WebGPURenderer;
+  private water:RoomWaterRuntime|null=null;
+  private renderTask:Promise<void>|null=null;
+  private lastRenderTime=performance.now();
+  private readonly materialCache=new WeakMap<THREE.Material,THREE.Material>();
+  renderError='';
 
   constructor(container: HTMLElement) {
     this.scene.background = new THREE.Color(0xaab9bd);
@@ -14,10 +25,17 @@ export class Renderer {
     this.camera.name = 'First-person camera';
     this.camera.userData.studioEntityId = 'camera:first-person';
     this.camera.rotation.order = 'YXZ';
-    this.webgl = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    this.gpu = new WebGPURenderer({ antialias: true, powerPreference: 'high-performance', forceWebGL:new URLSearchParams(location.search).get('renderer')==='webgl' });
+    // Preserve the established diagnostics path. WebGPU calls counts render
+    // passes cumulatively; old WebGL info.render.calls meant frame draw calls.
+    const info=this.gpu.info;
+    this.webgl=new Proxy(this.gpu,{get:(target,key)=>{
+      if(key==='info')return{...info,render:{...info.render,calls:info.render.drawCalls},memory:info.memory};
+      const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;
+    }});
     this.webgl.setPixelRatio(Math.min(devicePixelRatio, GAME_CONFIG.renderer.maxPixelRatio));
     this.webgl.shadowMap.enabled = true;
-    this.webgl.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.webgl.shadowMap.type = THREE.PCFShadowMap;
     this.webgl.outputColorSpace = THREE.SRGBColorSpace;
     this.webgl.toneMapping = THREE.ACESFilmicToneMapping;
     this.webgl.toneMappingExposure = 1.05;
@@ -25,6 +43,7 @@ export class Renderer {
     this.webgl.domElement.setAttribute('aria-label', 'WIRE THE HOUSE first-person game');
     container.append(this.webgl.domElement);
     this.resize();
+    this.ready=this.gpu.init().then(()=>undefined);
   }
 
   resize = (): void => {
@@ -34,7 +53,45 @@ export class Renderer {
     this.camera.aspect = Math.max(1, width) / Math.max(1, height);
     this.camera.updateProjectionMatrix();
     this.webgl.setSize(width, height, false);
+    this.water?.resize(width,height);
   };
 
-  render(): void { this.webgl.render(this.scene, this.camera); }
+  async attachRoomWater(room:RoomWaterSystem):Promise<void>{
+    await this.ready;
+    if(new URLSearchParams(location.search).get('waterPro')==='0'){room.waterProBackend='diagnostic-disabled';return;}
+    const {createRoomWater}=await import('../generated/room-water-runtime.js');
+    this.water=await createRoomWater(this.gpu,this.scene,this.camera,room);
+  }
+  private prepareMaterials():void{
+    this.scene.traverse(object=>{
+      const mesh=object as THREE.Mesh;if(!mesh.isMesh||Array.isArray(mesh.material))return;
+      const old=mesh.material as THREE.MeshStandardMaterial;
+      if(!old.isMeshStandardMaterial||(old as unknown as MeshStandardNodeMaterial).isNodeMaterial)return;
+      const shader=String(old.onBeforeCompile),masonry=shader.includes('masonryPosition'),mortar=shader.includes('mortarWorld');
+      if(!masonry&&!mortar)return;
+      let material=this.materialCache.get(old);
+      if(!material){
+        const node=new MeshStandardNodeMaterial();node.copy(old);
+        if(masonry){
+          const grain=fract(sin(dot(floor(positionWorld.xy.mul(1800)),vec2(127.1,311.7))).mul(43758.5453));
+          const mottling=sin(positionWorld.x.mul(93).add(sin(positionWorld.y.mul(71)))).mul(sin(positionWorld.y.mul(127)));
+          const grooves=smoothstep(.82,.99,sin(positionWorld.y.mul(3200)));
+          node.colorNode=materialColor.mul(grain.mul(.15).add(.90).add(mottling.mul(.045)).sub(grooves.mul(.035)));
+        }else{
+          const grain=fract(sin(dot(floor(positionWorld.mul(1600)),vec3(127.1,311.7,74.7))).mul(43758.5453));
+          node.colorNode=materialColor.mul(grain.mul(.06).add(.96));
+        }
+        material=node;this.materialCache.set(old,node);
+      }
+      mesh.material=material;
+    });
+  }
+  render():void{
+    if(this.renderTask)return;
+    this.prepareMaterials();
+    const now=performance.now(),dt=Math.min(.05,(now-this.lastRenderTime)/1000);this.lastRenderTime=now;
+    if(!this.water){this.gpu.render(this.scene,this.camera);return;}
+    this.renderTask=this.water.update(dt).then(()=>{this.gpu.render(this.scene,this.camera);}).catch(error=>{this.renderError=String(error);console.error('Room Water Pro rendering failed',error);}).finally(()=>{this.renderTask=null;});
+  }
+  async waitForFrame():Promise<void>{await this.ready;await this.renderTask;}
 }

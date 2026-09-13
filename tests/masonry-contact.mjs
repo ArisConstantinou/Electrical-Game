@@ -25,6 +25,7 @@ const capture=async(name,oblique=false)=>{
   const canvas=await page.evaluate(async oblique=>{
     const g=window.__wireTheHouse;
     await g.room.brickWall.waitForGeometry();
+    await g.renderer.waitForFrame();
     if(oblique){
       const entry=window.__contactQA.entry,view=g.renderer.camera.clone(false);
       view.fov=54;view.near=.008;view.position.set(entry.x+.34,entry.y+.11,-1.98);
@@ -36,7 +37,7 @@ const capture=async(name,oblique=false)=>{
         // Capture synchronously before the gameplay RAF renders its main camera.
         return g.renderer.webgl.domElement.toDataURL('image/png');
       }finally{arms.visible=wasVisible;}
-    }else g.renderer.render();
+    }else {g.renderer.render();await g.renderer.waitForFrame();}
   },oblique);
   if(canvas)await writeFile(join(out,`${name}.png`),Buffer.from(canvas.split(',')[1],'base64'));
   else await page.screenshot({path:join(out,`${name}.png`)});

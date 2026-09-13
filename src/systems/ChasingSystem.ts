@@ -70,9 +70,21 @@ export class ChasingSystem {
 
   canFitBoxes(point: InstallationPoint): boolean { return this.wall.canFitBoxes(point); }
 
+  positionBoxAtAim(point: InstallationPoint, camera: THREE.Camera): boolean {
+    const origin = camera.getWorldPosition(new THREE.Vector3());
+    const direction = camera.getWorldDirection(new THREE.Vector3());
+    if (direction.z >= -.01) return false;
+    const distance = (GAME_CONFIG.room.wallFrontZ - origin.z) / direction.z;
+    if (distance <= 0 || distance > GAME_CONFIG.interaction.maxDistance) return false;
+    const position = origin.addScaledVector(direction, distance);
+    if (Math.abs(position.x) > GAME_CONFIG.room.width / 2 || position.y < 0 || position.y > GAME_CONFIG.room.height) return false;
+    point.placeAt(position.x, position.y);
+    return true;
+  }
+
   refreshProgress(point: InstallationPoint): void {
-    if (point.stage !== 'marked' && point.stage !== 'chasing' && point.stage !== 'chased') return;
-    const complete = this.canFitBoxes(point) && this.wall.getChaseCoverage(point.definition.id) >= 0.98;
+    if (!['inspect', 'marked', 'chasing', 'chased'].includes(point.stage)) return;
+    const complete = this.canFitBoxes(point);
     point.setStage(complete ? 'chased' : 'chasing');
   }
 

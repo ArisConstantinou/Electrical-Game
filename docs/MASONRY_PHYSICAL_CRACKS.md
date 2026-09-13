@@ -1,0 +1,11 @@
+# Physical fracture openings
+
+The old `BrickWall` crack mesh drew narrow brown triangle strips over intact material. It had no collision or removed volume and could look like marker lines. It has been removed, including its material, accumulated paths and per-impact geometry rebuild.
+
+Visible cracks now consist of actual removed material in `MasonryVolume`. Narrow, seeded tensile corridors accumulate damage in the same contact-connected field as crushing. An opening advances only after local strength fails and it touches previously removed material. Each node consumes the same finite fracture budget as crushing. The resulting voids, fresh broken faces, detached fragments, collision and placement clearance all use the existing tetrahedral volume. Repeated impacts can widen an opening and release adjacent unsupported shell or rib fragments. There is no special whole-brick failure rule.
+
+The corridor model is a procedural brittle-fracture approximation, not a finite-element stress solution. At the current 8 mm lattice spacing, resolved gaps are approximately 4–8 mm and larger, with angular broken boundaries. Submillimetre hairline cracks are retained as material weakness until enough material fails to form a resolvable opening. They are not replaced with painted lines. No surviving vertices are pushed inward.
+
+Saved crack overlays from older snapshots are intentionally ignored; their actual saved material damage remains valid. New saves retain an empty legacy `cracks` array for compatibility and persist all real openings in the volume edits. Telemetry reports `fractureRendering: removed-material-surfaces`, zero overlay segments, and the most recent impact's `openedFissureNodes`.
+
+Validation: `node tests/masonry-cracks.mjs` checks real voids along the full opened path, chisel ray passage, placement-clearance agreement, mass-bearing fragments, accumulated weakness, persistence, and real hammer inputs in desktop and mobile-sized browser views. Its close inspection camera hides the camera-relative tool only. The mobile-sized diagnostic uses keyboard hammer inputs and is not a physical-device touch certification. The existing `tests/masonry-volume.mjs` checks fragment volume, hollow progression, replay, blade orientation, deferred support and worker mesh truth.

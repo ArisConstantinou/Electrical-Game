@@ -12,7 +12,7 @@ try{
 for(const mobile of [false,true]){
  const page=await browser.newPage({viewport:mobile?{width:390,height:844}:{width:1366,height:768},deviceScaleFactor:1,isMobile:mobile,hasTouch:mobile});
  page.on('pageerror',e=>report.errors.push(e.message));page.on('console',m=>{if(m.type()==='error')report.errors.push(m.text());});
- await page.goto(url,{waitUntil:'networkidle'});await page.locator('#start-button')[mobile?'tap':'click']();await page.waitForTimeout(180);
+ await page.goto(url,{waitUntil:'networkidle'});await page.waitForFunction(()=>Boolean(window.__wireTheHouse));await page.locator('#start-button')[mobile?'tap':'click']();await page.waitForTimeout(180);
  const platform=mobile?'mobile':'desktop';
  for(const [index,tool]of tools.entries()){
   await page.keyboard.press(`Digit${index+1}`);
@@ -22,7 +22,7 @@ for(const mobile of [false,true]){
    c.position.set(-.55,1.65,-.88);c.lookAt(-.48,1.50,-2.41);g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;g.step(1/60);
   });
   await page.waitForTimeout(90);
-  await page.evaluate(async()=>{const g=window.__wireTheHouse;await g.room.brickWall.waitForGeometry();g.renderer.render();});
+  await page.evaluate(async()=>{const g=window.__wireTheHouse;await g.room.brickWall.waitForGeometry();g.renderer.render();await g.renderer.waitForFrame();});
   const data=await page.evaluate(()=>{
    const g=window.__wireTheHouse,selected=g.selectedTool,group=g.fpsRig.tools.get(selected);
    const visibleTools=[...g.fpsRig.tools].filter(([,value])=>value.visible).map(([key])=>key);
@@ -63,11 +63,13 @@ for(const mobile of [false,true]){
   if(mobile)check(data.layout.shellScrollLeft===0&&data.layout.pageScrollX===0,`mobile: ${tool} selection scrolled the game viewport`);
   if(mobile)check(data.layout.mobileLookCenterUnblocked,`mobile: ${tool} blocks the look-pad centre`);
   if(mobile)check(data.layout.selectedButton.x>=0&&data.layout.selectedButton.x+data.layout.selectedButton.width<=data.layout.width,`mobile: selected ${tool} button is clipped`);
+  await page.evaluate(async()=>{await window.__wireTheHouse.renderer.waitForFrame();});
   await page.screenshot({path:join(output,`${platform}-${index+1}-${tool}.png`)});
  }
  // Architecture diagnostics omit only the viewmodel, keeping the room unchanged.
  for(const [name,target]of [['work-wall',[0,1.2,-2.41]],['supplies-right',[2.72,.35,2.04]],['supplies-left',[-2.85,.12,1.45]]]){
   await page.evaluate(target=>{const g=window.__wireTheHouse,c=g.renderer.camera;c.position.set(0,1.65,0);c.lookAt(...target);g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;g.fpsRig.visible=false;g.renderer.render();},target);
+  await page.evaluate(async()=>{await window.__wireTheHouse.renderer.waitForFrame();});
   await page.screenshot({path:join(output,`${platform}-room-${name}.png`)});
  }
  const room=await page.evaluate(()=>{

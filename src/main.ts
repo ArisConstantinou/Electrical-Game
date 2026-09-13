@@ -10,6 +10,7 @@ for (const eventName of ['selectstart', 'dragstart'] as const) {
 }
 
 const game = new Game(root);
+await game.ready;
 window.__wireTheHouse = game;
 window.render_game_to_text = () => game.renderState();
 window.advanceTime = (ms: number) => {

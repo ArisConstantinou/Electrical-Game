@@ -44,5 +44,5 @@ export default defineConfig({
   plugins: [studioOverrides()],
   server: { host: '127.0.0.1', port: 5362, strictPort: true },
   preview: { host: '127.0.0.1', port: 5363, strictPort: true },
-  build: { target: 'es2022', sourcemap: true },
+  build: { target: 'es2022', sourcemap: false },
 });

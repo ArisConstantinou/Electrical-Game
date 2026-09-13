@@ -29,6 +29,7 @@ try {
       return { pos: c.position.toArray(), focus: c.position.clone().addScaledVector(d, (-2.41 - c.position.z) / d.z).toArray(), side: g.hammerWorkStance.sideDegrees, offset: g.hammerWorkStance.offset.toArray() };
     });
     const initial = await read(), prefix = mobile ? 'mobile' : 'desktop';
+    await page.evaluate(async()=>{await window.__wireTheHouse.renderer.waitForFrame();});
     await page.screenshot({ path: `${out}/${prefix}-straight.png` });
     const selectSide = async side => {
       if (mobile) {
@@ -55,6 +56,7 @@ try {
         assert(Math.sign(state.offset[0]) === -Math.sign(side));
         assert(Math.abs(state.offset[0]) > .35, 'Camera never moved to handle side');
       } else assert(Math.hypot(...state.pos.map((n, i) => n - initial.pos[i])) < .002, 'Stance accumulated walking drift');
+      await page.evaluate(async()=>{await window.__wireTheHouse.renderer.waitForFrame();});
       await page.screenshot({ path: `${out}/${prefix}-${side}.png` });
       results.push({ mobile, ...state });
     }

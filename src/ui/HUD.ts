@@ -2,7 +2,7 @@ import type { InstallationPoint } from '../electrical/InstallationPoint';
 import type { RigTool } from '../player/FPSRig';
 
 const stageLabel: Record<string, string> = {
-  inspect: 'INSPECT & MARK', marked: 'CHASE MASONRY', chasing: 'CHASE MASONRY', chased: 'FIT BOXES', fitted: 'APPLY MORTAR',
+  inspect: 'CHOOSE A CAVITY · MARKS OPTIONAL', marked: 'CHASE MASONRY', chasing: 'CHASE MASONRY', chased: 'FIT BOXES', fitted: 'APPLY MORTAR',
   mortared: 'LEVEL GROUP', leveling: 'LEVEL + FLUSH', leveled: 'MEASURE PVC ROUTE', conduit: 'INSTALL 20 mm PVC', complete: 'POINT PASSED',
 };
 
@@ -44,6 +44,7 @@ export class HUD {
               <button id="chisel-tilt" type="button"><span>HAMMER TILT · [ / ]</span><b>25 deg DOWN</b></button>
               <button id="chisel-side" type="button"><span>SIDE LEAN / J K</span><b>0 deg STRAIGHT</b></button>
               <button id="chisel-angle" type="button"><span>EDGE ANGLE · R</span><b>0°</b></button>
+              <label class="hammer-speed-setting" for="hammer-speed"><span>CHISEL SPEED · − / +</span><output id="hammer-speed-value">100%</output><input id="hammer-speed" type="range" min="0" max="250" step="25" value="100" aria-label="Chisel destruction speed"><small>0% stops impacts · slower for control</small></label>
             </div>
             <div id="mobile-control-settings" aria-label="Mobile aim settings">
               <button id="aim-input-mode" type="button" aria-label="Change aim input style"><span>AIM INPUT</span><b>DRAG</b></button>
@@ -100,7 +101,7 @@ export class HUD {
           <section id="start-screen" class="screen-panel">
             <div class="eyebrow">CYPRUS · RESIDENTIAL FIRST FIX</div>
             <h1>WIRE<br><span>THE HOUSE</span></h1>
-            <p>Mark the clay brick. Chase real masonry. Set every recessed box level and flush. Finish the rigid PVC routes before the builders plaster.</p>
+            <p>Choose where to work; spray marks are optional. Chase real masonry, pack the recess and set each box level and flush. Finish the PVC routes before plastering.</p>
             <div class="brief-grid"><span>3 installation points</span><span>No cable pulling</span><span>Desktop + mobile</span></div>
             <button id="start-button">ENTER THE SITE</button>
             <small>WASD · MOUSE LOOK · LEFT CLICK / E USE TOOL · WHEEL / 1–8 TOOLS · V SPRAY · C COLOR · X CHASE / DEMOLISH</small>
@@ -117,6 +118,7 @@ export class HUD {
     root.querySelector('#chisel-side')!.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:side-chisel')));
     root.querySelector('#chisel-tilt')!.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:tilt-chisel')));
     root.querySelector('#chisel-angle')!.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:rotate-chisel')));
+    root.querySelector<HTMLInputElement>('#hammer-speed')!.addEventListener('input',event=>dispatchEvent(new CustomEvent('wirehouse:hammer-speed',{detail:Number((event.target as HTMLInputElement).value)/100})));
     root.querySelector('#work-height')!.addEventListener('click',()=>dispatchEvent(new CustomEvent('wirehouse:work-height')));
     root.querySelector('#mortar-pack')!.addEventListener('click',()=>dispatchEvent(new CustomEvent('wirehouse:mortar-pack')));
     root.querySelector('#mortar-angle-down')!.addEventListener('click',()=>dispatchEvent(new CustomEvent('wirehouse:mortar-angle',{detail:-5})));
@@ -208,11 +210,15 @@ export class HUD {
     this.shell.dataset.aimed = targeted ? 'true' : 'false';
   }
 
-  updateMortar(tool:RigTool,power:number,angle:number,wet:{pore:number;film:number},coverage:number,recovery:number,outcome:string):void {
+  updateHammerSpeed(speed:number):void {
+    this.shell.querySelector<HTMLInputElement>('#hammer-speed')!.value=String(speed*100);
+    this.shell.querySelector<HTMLOutputElement>('#hammer-speed-value')!.textContent=speed===0?'STOPPED':`${Math.round(speed*100)}%`;
+  }
+  updateMortar(tool:RigTool,power:number,angle:number,wet:{pore:number;film:number},coverage:number,recovery:number,outcome:string,floorLitres=0):void {
     const panel=this.shell.querySelector<HTMLElement>('#mortar-panel')!;panel.hidden=tool!=='trowel'&&tool!=='hose';
     this.shell.querySelector<HTMLElement>('#mortar-readout')!.textContent=tool==='hose'?`CHASE SURFACE · ${wet.film>.3?'TOO WET':wet.pore>.3?'DAMP':'DRY'} · ${Math.round(wet.pore*100)}%`:`SWING ${Math.round(power*100)}% · ${angle}° · BED ${Math.round(coverage*100)}%`;
     this.shell.querySelector<HTMLElement>('#swing-power')!.style.width=`${tool==='hose'?wet.pore*100:power*100}%`;
-    this.shell.querySelector<HTMLElement>('#mortar-hint')!.textContent=tool==='hose'?'Mist the exposed sides and back of the chase. Avoid standing water.':recovery>0?'Recovering / loading next trowelful…':outcome;
+    this.shell.querySelector<HTMLElement>('#mortar-hint')!.textContent=tool==='hose'?`Soak exposed chase surfaces. Excess water washes fresh mortar away. Floor water: ${floorLitres.toFixed(1)} L.`:recovery>0?'Recovering / loading next trowelful…':outcome;
     this.shell.querySelector<HTMLElement>('#mortar-swing')!.textContent=tool==='hose'?'HOLD · MIST':'HOLD · RELEASE';
     this.shell.querySelector<HTMLElement>('#mortar-pack')!.hidden=tool==='hose';
     for(const id of ['#mortar-angle-up','#mortar-angle-down'])this.shell.querySelector<HTMLElement>(id)!.hidden=tool==='hose';

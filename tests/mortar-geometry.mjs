@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import * as THREE from 'three';
 
@@ -9,13 +11,15 @@ import * as THREE from 'three';
 // separately by gameplay-smoke.mjs and the browser mortar acceptance test.
 const require = createRequire(import.meta.url);
 const ts = require('typescript');
-const source = await readFile(new URL('../src/systems/MortarSystem.ts', import.meta.url), 'utf8');
-const compiled = ts.transpileModule(source, {
-  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
-}).outputText;
-const moduleExports = {};
-new Function('require', 'exports', compiled)(require, moduleExports);
-const { MortarSystem } = moduleExports;
+const modules = new Map();
+function loadSource(filename) {
+  filename=resolve(filename);if(modules.has(filename))return modules.get(filename);
+  const moduleExports={};modules.set(filename,moduleExports);
+  const compiled=ts.transpileModule(readFileSync(filename,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
+  new Function('require','exports',compiled)(name=>name.startsWith('.')?loadSource(resolve(dirname(filename),name+'.ts')):require(name),moduleExports);
+  return moduleExports;
+}
+const {MortarSystem}=loadSource(fileURLToPath(new URL('../src/systems/MortarSystem.ts',import.meta.url)));
 const report = { suite: 'mortar-geometry', fixtures: 'analytical solid surfaces; production MortarSystem and Three.js', checks: [] };
 
 function wallFixture(axis = 'z', coordinate = 0) {
@@ -82,7 +86,7 @@ function openingIntrusion(system, box) {
     for (let i = 0; i < positions.count; i += 3) {
       let polygon = [0, 1, 2].map(j => new THREE.Vector3().fromBufferAttribute(positions, i + j).applyMatrix4(deposit.mesh.matrixWorld).applyMatrix4(inverse));
       testedTriangles++;
-      for (const [axis, sign, extent] of [['x', 1, halfWidth], ['x', -1, halfWidth], ['y', 1, halfHeight], ['y', -1, halfHeight]]) {
+      for (const [axis, sign, extent] of [['x', 1, halfWidth], ['x', -1, halfWidth], ['y', 1, halfHeight], ['y', -1, halfHeight], ['z', 1, 19.999], ['z', -1, (box.depth??.047)-.00001]]) {
         const clipped = [];
         for (let k = 0; k < polygon.length; k++) {
           const a = polygon[k], b = polygon[(k + 1) % polygon.length];
@@ -154,22 +158,22 @@ function openingIntrusion(system, box) {
   advance(system, 4); assertMass(system, 'detached opening material after fall');
 }
 
-// Stable-record compaction must not achieve its bound by deleting material.
+// Repeated throws join one spatial field. Rebuilding an unchanged field must
+// preserve quantity and triangle count rather than appending old skins.
 {
-  const system = new MortarSystem(new THREE.Scene(), wallFixture(), []);
-  seedPatch(system, new THREE.Vector3(0, 1, 0));
-  seedPatch(system, new THREE.Vector3(.065, 1, 0));
-  advance(system, 1.4);
-  const before = { records: system.deposits.length, vertices: vertexCount(system), mass: system.deposits.reduce((sum, d) => sum + d.mass, 0) };
-  assert.equal(before.records, 2, 'Compaction fixture needs two supported deposits');
-  system.mergeStablePatches();
-  const after = { records: system.deposits.length, vertices: vertexCount(system), mass: system.deposits.reduce((sum, d) => sum + d.mass, 0) };
-  assert.equal(after.records, 1, 'Stable records did not compact');
-  assert.equal(after.vertices, before.vertices, 'Compaction discarded surface triangles');
-  assert(Math.abs(after.mass - before.mass) < 1e-12, 'Compaction lost retained mass');
-  const bounds = system.deposits[0].mesh.geometry.boundingSphere;
-  assert(bounds.radius > .05 && bounds.center.x > 0, 'Compacted collision bounds omit one constituent');
-  report.checks.push({ name: 'stable geometry compaction', before, after, ...assertMass(system, 'compaction') });
+  const system=new MortarSystem(new THREE.Scene(),wallFixture(),[]);
+  const first=seedPatch(system,new THREE.Vector3(0,1,0),.30);
+  const second=seedPatch(system,new THREE.Vector3(.035,1,.018),.30);
+  advance(system,1.4);
+  const before={chunks:system.deposits.length,vertices:vertexCount(system),mass:system.field.mass};
+  assert(first>.01&&second>.01,'Union fixture needs two actual additions');
+  for(let i=0;i<3;i++){system.field.invalidateGeometry();system.syncFieldGeometry();}
+  const after={chunks:system.deposits.length,vertices:vertexCount(system),mass:system.field.mass};
+  assert.equal(after.vertices,before.vertices,'Unchanged remesh proliferated triangles');
+  assert.equal(after.chunks,before.chunks,'Unchanged remesh proliferated patch records');
+  assert(Math.abs(after.mass-first-second)<1e-8,'Union/remesh lost deposited mass');
+  assert(system.deposits.every(d=>d.fieldKey),'A per-throw independent shell survived in the union system');
+  report.checks.push({name:'continuous union and idempotent remesh',before,after,...assertMass(system,'union')});
 }
 
 // Full geometric coverage is visible immediately, but the mission must wait
