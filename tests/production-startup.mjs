@@ -2,6 +2,7 @@ import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve, sep } from 'node:path';
+import { blockPointerLock } from './browser-safety.mjs';
 
 const base = process.argv[2] ?? 'http://127.0.0.1:5362/Electrical-Game/';
 const out = process.argv[3] ?? 'output/production-startup';
@@ -13,6 +14,7 @@ const report = { base, delivery: localBuild ? 'Unmodified dist files through bro
 try {
   for (const fallback of [false, true]) {
     const context = await browser.newContext({ viewport: fallback ? { width: 390, height: 844 } : { width: 1366, height: 768 }, isMobile: fallback, hasTouch: fallback });
+    await blockPointerLock(context);
     if (localBuild) await context.route('http://127.0.0.1:5362/Electrical-Game/**', async route => {
       const relative = decodeURIComponent(new URL(route.request().url()).pathname.slice('/Electrical-Game/'.length)) || 'index.html';
       const file = resolve(dist, relative);

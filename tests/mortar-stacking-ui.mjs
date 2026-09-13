@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
+import { blockPointerLock } from './browser-safety.mjs';
 const url=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/';
 const out=process.argv[3]??'output/mortar-stacking-ui';await mkdir(out,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:true});
@@ -11,6 +12,7 @@ const shot=async(page,label)=>{await page.evaluate(async()=>{const r=window.__wi
 try{for(const distance of [.46,.85])for(const mobile of [false,true]){
  if(process.env.QA_STACK_PLATFORM&&process.env.QA_STACK_PLATFORM!==`${mobile?'mobile':'desktop'}-${distance===.46?'near':'far'}`)continue;
  const name=(mobile?'mobile':'desktop')+'-'+(distance===.46?'near':'far'),page=await browser.newPage({viewport:mobile?{width:390,height:844}:{width:1366,height:768},isMobile:mobile,hasTouch:mobile});
+ await blockPointerLock(page.context());
  // Seed the actual masonry constructor before its first render/worker mesh.
  await page.addInitScript(()=>{const fill=crypto.getRandomValues.bind(crypto);crypto.getRandomValues=array=>{if(array instanceof Uint32Array&&array.length===1){array[0]=260913;return array;}return fill(array);};});
  page.on('pageerror',e=>report.errors.push(`${name}: ${e.message}`));

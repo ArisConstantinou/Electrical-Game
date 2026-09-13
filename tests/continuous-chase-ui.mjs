@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
+import { blockPointerLock } from './browser-safety.mjs';
 
 const url=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/';
 const out=process.argv[3]??'output/continuous-chase-ui';
@@ -17,6 +18,7 @@ const state=page=>page.evaluate(()=>{const g=window.__wireTheHouse,w=g.room.bric
 try{for(const mobile of (baseline?[false]:[false,true])){
   const platform=mobile?'mobile':'desktop',context=await browser.newContext({viewport:mobile?{width:390,height:844}:{width:1366,height:768},isMobile:mobile,hasTouch:mobile}),page=await context.newPage();
   page.on('pageerror',e=>report.errors.push(e.message));
+  await blockPointerLock(context);
   await page.goto(url);await page.waitForFunction(()=>window.__wireTheHouse?.renderer.renderCamera,{timeout:120000});
   await page.locator('#start-button')[mobile?'tap':'click']();await page.waitForTimeout(800);
   await page.evaluate(()=>{document.exitPointerLock();const g=window.__wireTheHouse;window.__chaseStep=g.step.bind(g);g.step=()=>{};window.__chasePristine=g.room.brickWall.volume.serialize();});

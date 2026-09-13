@@ -119,7 +119,7 @@ export async function createRoomWater(renderer,scene,camera,room){
     const path=delta.length().mul(fraction);
     const transmission=vec3(.18,.055,.035).mul(path).negate().exp();
     const underwater=output.rgb.mul(transmission).add(vec3(.025,.105,.12).mul(transmission.oneMinus()));
-    return vec4(atmosphericFog.rgb.mix(underwater,immersed),output.a);
+    return vec4(immersed.mix(atmosphericFog.rgb,underwater),output.a);
   })();
   room.waterProActive=true;room.waterProBackend=water.backend;
   return{

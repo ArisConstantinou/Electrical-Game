@@ -40,11 +40,12 @@ try {
   strike(upward,.792,1.542,true);
   assert.deepEqual(upward.serialize().chunks,ordinary.serialize().chunks,'Pristine upward strike is the original local impact, not hidden-cavity trimming');
   assert(surfaceImpacts>0 && intactRemoved>0,'Upward contact must retain normal surface chipping');
-  for(let i=0;i<12;i++) strike(v,.8+Math.sin(i*2.4)*.043,1.55+Math.cos(i*2.4)*.043);
+  // Rounded bores have curved, thicker shoulders than the old rectangular bay.
+  for(let i=0;i<24;i++) strike(v,.8+Math.sin(i*2.4)*.043,1.55+Math.cos(i*2.4)*.043);
   drain(v);
   const cavity = v.serialize(), before=nodeEdits(v), first = strike(v,.792,1.542,true);
   const plane=v.trimmingState.floorZ;
-  assert(plane<front-.04 && plane>front-.08,'Use first exposed local chamber backing');
+  assert(plane<front-.04 && plane>front-v.depth/2,'Use the exposed first-bay backing, never the second bay');
   let removed=first.removedNodes;
   for(let i=0;i<40;i++) { removed+=strike(v,.792,1.542,true).removedNodes; assert.equal(v.trimmingState.floorZ,plane,'Repeated finishing must not ratchet the backing deeper'); }
   const pendingBefore=v.pendingSupportCount;
@@ -66,7 +67,7 @@ try {
   assert(clayRemoved>20);
   // The same chisel returned straight can intentionally excavate deeper.
   const protectedBefore=nodeEdits(v);
-  for(let i=0;i<20;i++) strike(v,.792,1.542);
+  for(let i=0;i<20 && hitAt(v,.792,1.542);i++) strike(v,.792,1.542);
   assert.equal(v.trimmingState,null,'A normal stroke exits and clears finishing plane');drain(v);
   assert([...nodeEdits(v)].some(([key,n])=>n.p.z<=plane&&(n.removed??0)>(protectedBefore.get(key)?.removed??0)),'Normal excavation must still remove deeper material');
   // A distant exposed patch has its own shallower plane, never the wall-wide deepest point.

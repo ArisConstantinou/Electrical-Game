@@ -87,7 +87,8 @@ try {
   // Deferred connectivity is deliberately constrained to test its backing guard too.
   const trim = new MasonryVolume({ seed: 193187, maxConnectivityNodes: 16 });
   const drain = v => { let n = 0; while (v.pendingSupportCount && n++ < 3000) v.processPendingSupport(128); assert.equal(v.pendingSupportCount, 0); };
-  for (let i = 0; i < 12; i++) strike(trim, .8 + Math.sin(i * 2.4) * .043, 1.55 + Math.cos(i * 2.4) * .043, .025);
+  // Open through the curved shoulders of the new rounded first bay.
+  for (let i = 0; i < 24; i++) strike(trim, .8 + Math.sin(i * 2.4) * .043, 1.55 + Math.cos(i * 2.4) * .043, .025);
   drain(trim);
   const before = edits(trim);
   strike(trim, .792, 1.542, .05, horizontal, 'flat', true);

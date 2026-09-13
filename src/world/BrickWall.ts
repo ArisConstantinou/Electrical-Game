@@ -1,4 +1,7 @@
+/// <reference types="vite/client" />
 import * as THREE from 'three';
+import { MeshStandardNodeMaterial } from 'three/webgpu';
+import { attribute, dot, floor, fract, mix, positionWorld, sin, smoothstep, texture as sampleTexture, uniform, uv, vec2 } from 'three/tsl';
 import { GAME_CONFIG } from '../data/gameConfig';
 import type { InstallationDefinition } from '../data/installationRules';
 import type { InstallationPoint } from '../electrical/InstallationPoint';
@@ -11,19 +14,23 @@ export interface MasonryImpact {
   points: THREE.Vector3[]; kind: MasonryImpactKind; brickSize: THREE.Vector3; seed: number; destroyed: boolean;
   fragments: MasonryFragment[]; removedVolume: number;
 }
-const wallMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, flatShading: true });
-// Sub-millimetre surface grain only: this shader never moves geometry.
-wallMaterial.onBeforeCompile = shader => {
-  shader.vertexShader = 'varying vec3 masonryPosition;\n' + shader.vertexShader;
-  shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n masonryPosition = (modelMatrix * vec4(position, 1.0)).xyz;');
-  shader.fragmentShader = 'varying vec3 masonryPosition;\n' + shader.fragmentShader;
-  shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
-    float grain = fract(sin(dot(floor(masonryPosition.xy*1800.0), vec2(127.1,311.7))) * 43758.5453);
-    float mottling = sin(masonryPosition.x*93.0 + sin(masonryPosition.y*71.0))*sin(masonryPosition.y*127.0);
-    float grooves = smoothstep(.82,.99,sin(masonryPosition.y*3200.0));
-    diffuseColor.rgb *= .90 + grain*.15 + mottling*.045 - grooves*.035;
-  `);
-};
+// The supplied photograph is kept unedited. Geometry UVs select its clay-only
+// interior, so the white photographic background never reaches the wall.
+const brickImageReady = uniform(0);
+const brickImage = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}assets/masonry/brick-side-reference.png`, () => { brickImageReady.value = 1; });
+brickImage.colorSpace = THREE.SRGBColorSpace;
+brickImage.anisotropy = 8;
+const wallMaterial = new MeshStandardNodeMaterial({ roughness: 1, metalness: 0, flatShading: true });
+wallMaterial.name = 'Reference clay face with independent fractured masonry';
+const masonryColor = attribute<'vec3'>('color', 'vec3');
+const grain = fract(sin(dot(floor(positionWorld.xy.mul(1800)), vec2(127.1,311.7))).mul(43758.5453));
+const mottling = sin(positionWorld.x.mul(93).add(sin(positionWorld.y.mul(71)))).mul(sin(positionWorld.y.mul(127)));
+const grooves = smoothstep(.82,.99,sin(positionWorld.y.mul(3200)));
+const rawMasonry = masonryColor.mul(grain.mul(.15).add(.90).add(mottling.mul(.045)).sub(grooves.mul(.035)));
+const photographedClay = sampleTexture(brickImage, uv()).rgb.mul(masonryColor.r.div(.49));
+// A face mask keeps real mortar joints, internal chambers and broken edges on
+// their own rough clay/mortar colors in both WebGPU and the WebGL backend.
+wallMaterial.colorNode = mix(rawMasonry, photographedClay, attribute<'float'>('brickFace', 'float').mul(brickImageReady));
 type MeshData = ReturnType<MasonryVolume['buildChunkMesh']>;
 
 /** The wall owns one continuous material volume. Brick IDs never select damage. */
@@ -90,6 +97,7 @@ export class BrickWall extends THREE.Group {
     base.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
     base.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
     base.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    this.addBrickSurfaceAttributes(base);
     base.setIndex(indices);
     base.index!.setUsage(THREE.DynamicDrawUsage);
     base.computeBoundingSphere();
@@ -218,8 +226,39 @@ export class BrickWall extends THREE.Group {
     geometry.setAttribute('position', new THREE.BufferAttribute(data.positions, 3));
     geometry.setAttribute('normal', new THREE.BufferAttribute(data.normals, 3));
     geometry.setAttribute('color', new THREE.BufferAttribute(data.colors, 3));
+    this.addBrickSurfaceAttributes(geometry);
     geometry.computeBoundingSphere();
     return geometry;
+  }
+
+  private addBrickSurfaceAttributes(geometry: THREE.BufferGeometry): void {
+    const positions = geometry.getAttribute('position'), normals = geometry.getAttribute('normal'), colors = geometry.getAttribute('color');
+    const coordinates = new Float32Array(positions.count * 2), faces = new Float32Array(positions.count);
+    const pitchX = this.volume.width / 21, pitchY = this.volume.height / 23;
+    for (let i = 0; i < positions.count; i += 3) {
+      const centerX = (positions.getX(i) + positions.getX(i + 1) + positions.getX(i + 2)) / 3;
+      const centerY = (positions.getY(i) + positions.getY(i + 1) + positions.getY(i + 2)) / 3;
+      // Choose one brick for the complete triangle. Boundary vertices must not
+      // wrap back to the opposite UV edge and stretch the photo across a seam.
+      const row = Math.floor(centerY / pitchY), offset = row % 2 ? pitchX * .5 : 0;
+      const column = Math.floor((centerX + this.volume.width / 2 - offset) / pitchX);
+      const brickX = column * pitchX + offset - this.volume.width / 2;
+      const originalPlane = [0, 1, 2].every(j => {
+        const z = positions.getZ(i + j);
+        return Math.abs(z - this.volume.frontZ) < 1e-5 || Math.abs(z - (this.volume.frontZ - this.volume.depth)) < 1e-5;
+      });
+      const clay = colors.getX(i) > colors.getY(i) * 2;
+      const face = Number(clay && originalPlane && Math.abs(normals.getZ(i)) > .999);
+      for (let j = 0; j < 3; j++) {
+        const u = THREE.MathUtils.clamp((positions.getX(i + j) - brickX) / pitchX, 0, 1);
+        const v = THREE.MathUtils.clamp((positions.getY(i + j) - row * pitchY) / pitchY, 0, 1);
+        coordinates[(i + j) * 2] = (58 + u * 621) / 735;
+        coordinates[(i + j) * 2 + 1] = (55 + v * 523) / 630;
+        faces[i + j] = face;
+      }
+    }
+    geometry.setAttribute('uv', new THREE.BufferAttribute(coordinates, 2));
+    geometry.setAttribute('brickFace', new THREE.BufferAttribute(faces, 1));
   }
 
   canFitBoxes(point: InstallationPoint): boolean {

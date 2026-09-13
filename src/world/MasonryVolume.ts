@@ -14,6 +14,8 @@ export interface MasonryVolumeOptions {
   width?: number; height?: number; depth?: number; frontZ?: number; cellSize?: number;
   tileSize?: number; seed?: number; renderThickness?: number; material?: 'hollow-clay' | 'concrete';
   solidMaterial?: MaterialId;
+  /** Explicit profile keeps older saved damage aligned with its original solids. */
+  hollowProfile?: 'rounded-five' | 'legacy-rectangular';
   maxConnectivityNodes?: number;
 }
 export interface MasonryImpactInput { point: Vec3; direction: Vec3; edge?: Vec3; energyJ?: number; chisel: 'pointed' | 'flat'; /** Flat cutting-edge width in metres, 10–50 mm. Pointed chisels ignore it. */ widthM?: number; seed?: number; /** Upward finishing stroke: preserve the locally established cavity backing. */ trim?: boolean }
@@ -64,7 +66,7 @@ export class MasonryVolume {
   private readonly maxConnectivityNodes: number;
 
   constructor(options: MasonryVolumeOptions = {}) {
-    this.options = { ...options }; this.width = options.width ?? 6; this.height = options.height ?? 3;
+    this.options = { ...options, hollowProfile: options.hollowProfile ?? 'rounded-five' }; this.width = options.width ?? 6; this.height = options.height ?? 3;
     this.depth = options.depth ?? .18; this.frontZ = options.frontZ ?? -2.41;
     this.cellSize = options.cellSize ?? .008; this.tileSize = options.tileSize ?? 24;
     this.seed = (options.seed ?? (globalThis.crypto?.getRandomValues(new Uint32Array(1))[0] ?? Math.floor(Math.random() * 0xffffffff))) >>> 0;
@@ -123,12 +125,19 @@ export class MasonryVolume {
     if (localY < .006 || localY > pitchY - .006 || localX < .006 || localX > pitchX - .006) return MaterialId.Mortar;
     const shell = .015;
     if (d < shell || d > clayDepth - shell || localX < .018 || localX > pitchX - .018 || localY < .016 || localY > pitchY - .016) return MaterialId.Clay;
-    // Thin clay webs subdivide the true empty chambers in both width and depth.
+    // Five bores along the brick length, two through its depth. The solid side
+    // faces the room; the perforated end section is only revealed by fracture.
+    // Rounded bores retain curved shell fragments rather than rectangular slots.
     const innerWidth = pitchX - .036;
     const ribPitch = innerWidth / 5;
-    const ribX = ((localX - .018) % ribPitch + ribPitch) % ribPitch;
-    if (ribX < .006 || ribX > ribPitch - .006 || Math.abs(d - clayDepth / 3) < .006 || Math.abs(d - 2 * clayDepth / 3) < .006) return MaterialId.Clay;
-    return MaterialId.Air;
+    if (this.options.hollowProfile === 'legacy-rectangular') {
+      const ribX = ((localX - .018) % ribPitch + ribPitch) % ribPitch;
+      return ribX < .006 || ribX > ribPitch - .006 || Math.abs(d - clayDepth / 3) < .006 || Math.abs(d - 2 * clayDepth / 3) < .006 ? MaterialId.Clay : MaterialId.Air;
+    }
+    const boreX = ((localX - .018) % ribPitch + ribPitch) % ribPitch - ribPitch * .5;
+    const depthPitch = (clayDepth - shell * 2) / 2;
+    const boreZ = ((d - shell) % depthPitch + depthPitch) % depthPitch - depthPitch * .5;
+    return (boreX / (ribPitch * .42)) ** 2 + (boreZ / (depthPitch * .5 - .006)) ** 2 < 1 ? MaterialId.Air : MaterialId.Clay;
   }
   nodeMaterial(x: number, y: number, z: number): MaterialId {
     const material = this.baseMaterial(x, y, z);
@@ -371,11 +380,13 @@ export class MasonryVolume {
       }
       result.stats.trimMode = Boolean(this.trimPatch); result.stats.trimFloorZ = this.trimPatch?.floorZ ?? null;
       if (!this.trimPatch && this.hasLocalExteriorOpening(contact.point)) {
-        // A partly opened damaged cavity with no reliable backing is not a licence
-        // to deepen. Pristine facing, however, retains ordinary upward chipping.
-        result.stats.trimMode = true; result.stats.milliseconds = performance.now() - started; return result;
+        // A pinhole in a rounded shell may not yet expose a reliable backing.
+        // Continue peeling its shallow lip instead of permanently refusing every
+        // subsequent upward blow. This temporary guard cannot reach the rear bay.
+        trimFloorZ = this.frontZ - .045;
+        result.stats.trimMode = true;
       }
-      trimFloorZ = this.trimPatch?.floorZ;
+      trimFloorZ ??= this.trimPatch?.floorZ;
       // Searches queued by the preceding excavation must not later bypass the guard.
       if (trimFloorZ !== undefined) for (const job of this.pendingSupport) job.trimFloorZ = Math.max(job.trimFloorZ ?? -Infinity, trimFloorZ);
     }
@@ -386,8 +397,14 @@ export class MasonryVolume {
     const across = unit({ x: direction.y * edge.z - direction.z * edge.y, y: direction.z * edge.x - direction.x * edge.z, z: direction.x * edge.y - direction.y * edge.x });
     const incidence = clamp(-(direction.x * contact.normal.x + direction.y * contact.normal.y + direction.z * contact.normal.z), .05, 1);
     const shear = 1 - incidence;
+    // A slanted flat blade wedges the brittle facing sideways. Couple this to
+    // the wall plane so newly jagged triangle normals cannot flip its behaviour.
+    // Very shallow grazing still has to retain some inward purchase.
+    const tangentLength = Math.hypot(direction.x, direction.y);
+    const pry = input.chisel === 'flat' ? clamp((tangentLength - .12) / .65, 0, 1) * clamp(Math.abs(direction.z) / .25, 0, 1) : 0;
+    const tangent = tangentLength > 1e-6 ? { x: direction.x / tangentLength, y: direction.y / tangentLength } : { x: 0, y: 1 };
     const radius = input.chisel === 'flat' ? .046 : .038;
-    const crackRadius = radius * 1.75;
+    const crackRadius = radius * 1.75 + pry * .035;
     const width = clamp(Number.isFinite(input.widthM) ? input.widthM! : .025, .01, .05);
     // Extend the finite cutting edge only along its own axis. The 25 mm reference
     // retains its established stress field; a wider blade shares that field over
@@ -407,11 +424,23 @@ export class MasonryVolume {
       const material = this.nodeMaterial(x, y, z); if (!material) continue;
       const p = this.nodePosition(x, y, z), delta = { x: p.x - contact.point.x, y: p.y - contact.point.y, z: p.z - contact.point.z };
       if (trimFloorZ !== undefined) {
-        if (p.z <= trimFloorZ + this.hz + 1e-9 || p.z >= this.frontZ - this.hz * 1.5) continue;
+        // The exposed front lip is part of the flake being pried off. Protect
+        // the backing, not that lip, or upward contact gets stuck on it forever.
+        if (p.z <= trimFloorZ + this.hz + 1e-9) continue;
         if (!NEIGHBORS.some(d => this.nodeAirExposed(x + d[0], y + d[1], z + d[2]) && !this.nodeMaterial(x + d[0], y + d[1], z + d[2]))) continue;
       }
       const along = delta.x * direction.x + delta.y * direction.y + delta.z * direction.z;
-      if (along < -.045 || along > depthLimit) continue;
+      const wallDepth = -delta.z;
+      const lateral = delta.x * tangent.x + delta.y * tangent.y;
+      const sideways = delta.x * -tangent.y + delta.y * tangent.x;
+      // Asymmetric shallow flake ahead of the blade, with a rough perimeter.
+      // It cannot reach the next chamber wall just because the shaft is tilted.
+      const plateLength = .025 + pry * .040;
+      const plateWidth = .022 + width * .42;
+      const plateRadius = Math.hypot((lateral - pry * .018) / plateLength, sideways / plateWidth);
+      const plateEdge = 1 + .12 * Math.sin(Math.atan2(sideways, lateral) * 5 + grainAngle);
+      const plate = pry > 0 && material === MaterialId.Clay && wallDepth >= -.010 && wallDepth <= .024 && plateRadius < plateEdge;
+      if (!plate && (along < -.045 || along > depthLimit)) continue;
       const u = delta.x * edge.x + delta.y * edge.y + delta.z * edge.z;
       const v = delta.x * across.x + delta.y * across.y + delta.z * across.z;
       const stretch = input.chisel === 'flat' ? 1.55 : 1;
@@ -436,9 +465,13 @@ export class MasonryVolume {
       // Grazing contact couples less crushing energy to intact clay, but a flat blade can
       // shear/pry an already weakened connected shell. Blade rotation remains independent.
       const angleCoupling = .45 + .55 * incidence + (input.chisel === 'flat' ? shear * Math.min(1, weakness) * .95 : 0);
-      const gain = energy * 25 * falloff * materialScale * backwardCoupling * angleCoupling * (.75 + (hash(x, y, z, seed) % 1000) / 2000) * (1 - Math.max(0, along) / (depthLimit * 1.7));
+      const crushingGain = energy * 25 * falloff * materialScale * backwardCoupling * angleCoupling * (.75 + (hash(x, y, z, seed) % 1000) / 2000) * Math.max(0, 1 - Math.max(0, along) / (depthLimit * 1.7));
+      // Weakening accumulates across blows; existing cracks improve purchase.
+      // Wedge efficiency releases a larger area at the same input blow energy.
+      const plateGain = plate ? energy * 43 * pry * Math.pow(Math.max(0, 1 - plateRadius / plateEdge), .38) * (1 + Math.min(1, weakness) * .35) : 0;
+      const gain = Math.max(crushingGain, plateGain);
       if (gain < 1) continue;
-      candidates.push({ node: { x, y, z, id: this.index(x, y, z), material }, gain, crushing: core, fissure, distance: radial + Math.max(0, along) * 1.5 });
+      candidates.push({ node: { x, y, z, id: this.index(x, y, z), material }, gain, crushing: core || plate, fissure, distance: plate ? plateRadius * radius : radial + Math.max(0, along) * 1.5 });
     }
     candidates.sort((a, b) => a.distance - b.distance);
     // The stress field follows real material edges rather than line of sight. A cavity blocks
@@ -460,7 +493,7 @@ export class MasonryVolume {
         reached.add(id); frontier.push(candidate.node);
       }
     }
-    let fractureBudget = energy * 16;
+    let fractureBudget = energy * 16 * (1 + pry * 2.2);
     for (const candidate of candidates) {
       if (!reached.has(candidate.node.id)) continue;
       const n = candidate.node, { chunk, offset } = this.mutable(n.x, n.y, n.z);
@@ -485,7 +518,7 @@ export class MasonryVolume {
     // A broad flat edge releases connected shell flakes as well as fines. Keep
     // those flakes together instead of pulverising every strike into 10–20 nodes.
     // This only partitions material already removed by the same energy budget.
-    this.aggregateFragments(removed, result, input.chisel === 'flat' ? Math.round(64 * width / .025) : 32);
+    this.aggregateFragments(removed, result, input.chisel === 'flat' ? Math.round(64 * width / .025 * (1 + pry * 2)) : 32);
     result.removedNodes = removed.length;
     result.removedVolume = result.fragments.reduce((sum, fragment) => sum + fragment.volume, 0);
     this.totalRemovedVolume += result.removedVolume;
@@ -634,6 +667,11 @@ export class MasonryVolume {
   }
   restore(save: MasonrySave): void {
     if (save.version !== 1 || save.seed !== this.seed) throw new Error('Masonry save version or seed mismatch');
+    const profile = save.options.hollowProfile ?? 'legacy-rectangular';
+    if (profile !== this.options.hollowProfile) {
+      this.options.hollowProfile = profile;
+      for (const key of this.chunkKeys) this.dirty.add(key);
+    }
     for (const key of this.chunks.keys()) this.dirty.add(key);
     this.trimPatch = null; this.chunks.clear(); this.exposedAir.clear(); this.pendingSupport.length = 0; this.totalRemoved = 0; this.totalDetached = 0; this.totalRemovedVolume = save.removedVolume ?? 0; this.sequence = save.sequence;
     for (const job of save.pendingSupport ?? []) this.pendingSupport.push({ ...job, startIndex: 0, visited: new Set(), anchors: new Set(), queue: [], head: 0 });

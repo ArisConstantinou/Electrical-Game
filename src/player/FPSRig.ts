@@ -107,14 +107,24 @@ export class FPSRig extends THREE.Group {
     const upward=wall.chiselTiltDegrees<0;
     const rayOrigin=upward?eye:origin,rayDirection=upward?view:direction;
     const reach=upward?distance+.28/Math.max(.08,Math.abs(view.z)):Math.min(.38,.24/Math.abs(direction.z));
-    let hit=wall.volume.raycast(rayOrigin,rayDirection,reach),bladeOffsetM=0;
+    const actualAxisContact=(candidate:ReturnType<typeof wall.volume.raycast>)=>{
+      if(!upward||!candidate)return candidate;
+      // A camera ray can just graze a fracture corner that the tilted shaft
+      // never reaches. Do not let that nearer false contact block every later
+      // strike or hide a reachable section farther along the cutting edge.
+      const point=candidate.point;
+      const origin={x:point.x-direction.x*.012,y:point.y-direction.y*.012,z:point.z-direction.z*.012};
+      const physical=wall.volume.raycast(origin,direction,.028);
+      return physical?{...candidate,point:physical.point,normal:physical.normal,material:physical.material}:null;
+    };
+    let hit=actualAxisContact(wall.volume.raycast(rayOrigin,rayDirection,reach)),bladeOffsetM=0;
     if(wall.chiselType==='flat'){
       // A wide edge cannot pass through a hole merely because its centre is air.
       // At most nine rays, spaced no farther apart than the material lattice.
       const half=wall.chiselWidthM/2,steps=Math.ceil(half/.007);
       for(let i=1;i<=steps;i++)for(const sign of [-1,1]){
         const offset=sign*half*i/steps;
-        const candidate=wall.volume.raycast(rayOrigin.clone().addScaledVector(edge,offset),rayDirection,reach);
+        const candidate=actualAxisContact(wall.volume.raycast(rayOrigin.clone().addScaledVector(edge,offset),rayDirection,reach));
         if(candidate&&(!hit||candidate.distance<hit.distance-1e-6)){hit=candidate;bladeOffsetM=offset;}
       }
     }
