@@ -128,10 +128,14 @@ export class Game {
     const leveling = active?.stage === 'leveling';
     if (leveling && !this.wasLeveling && document.pointerLockElement) void document.exitPointerLock();
     this.wasLeveling = leveling;
+    this.player.wallWorkEnabled=this.selectedTool==='hammer'&&!leveling;
+    const wallAxisZ=Math.cos(THREE.MathUtils.degToRad(this.room.brickWall.chiselTiltDegrees))*Math.cos(THREE.MathUtils.degToRad(this.room.brickWall.chiselSideDegrees));
+    this.player.wallWorkDistance=.38+.39*Math.abs(wallAxisZ);
     if (this.started && !leveling) this.player.update(Math.min(dt, 0.05));
     this.renderer.camera.rotation.set(this.player.pitch, this.player.yaw, 0);
     this.hammerWorkStance.update(this.renderer.camera, dt, this.room.brickWall.chiselSideDegrees, this.started && this.selectedTool === 'hammer' && !leveling);
     this.fpsRig.workStanceSide = this.hammerWorkStance.sideDegrees / 75;
+    this.fpsRig.workPositionLocked=this.player.workPosition.locked;
     this.actionCooldown = Math.max(0, this.actionCooldown - dt);
     const requested = this.input.consumeAction();
     // Both hammer modes deliver local repeated percussive strikes while held.
@@ -191,6 +195,7 @@ export class Game {
       water: this.roomWater.telemetry,
       hammer: { speedMultiplier: this.hammerSpeed, paused: this.hammerSpeed === 0, impactIntervalSeconds: this.hammerSpeed > 0 ? .24 / this.hammerSpeed : null },
       body: this.fpsRig.debugPose(),
+      workPosition: this.player.workPosition,
       coordinateSystem: 'metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall',
       mode: !this.started ? 'start' : this.mission.complete ? 'mission-complete' : point?.stage === 'leveling' ? 'leveling' : 'playing',
       player: { crouched:this.player.eyeHeight<1.1, x: Number(this.renderer.camera.position.x.toFixed(3)), y: Number(this.renderer.camera.position.y.toFixed(3)), z: Number(this.renderer.camera.position.z.toFixed(3)), yaw: Number(this.player.yaw.toFixed(3)), pitch: Number(this.player.pitch.toFixed(3)) },
@@ -213,7 +218,8 @@ export class Game {
       }
     }
     if(this.selectedTool==='hammer'&&!this.fpsRig.contact(this.renderer.camera,this.room.brickWall)){
-      this.hud.notify(this.fpsRig.reachable?'Place the chisel against remaining masonry.':this.fpsRig.reachReason,false);return;
+      if(!continuing&&!this.player.workPosition.locked)this.hud.notify('Approach the wall to settle into the working position.',false);
+      return;
     }
     const spatialTool = this.selectedTool === 'spray' || this.selectedTool === 'hammer' || (this.selectedTool === 'fitting' && !active.boxGroup.visible);
     const target = active.stage === 'leveling' ? active : spatialTool ? active : this.mission.target(this.renderer.camera);

@@ -5,6 +5,9 @@ import { GAME_CONFIG } from '../data/gameConfig';
 export type MobileAimProfile = 'precise' | 'normal' | 'fast';
 
 export class PlayerController {
+  wallWorkEnabled = false;
+  wallWorkDistance = .76;
+  readonly workPosition = { locked: false, distanceM: 0, targetDistanceM: .76, released: false };
   crouched = false;
   get eyeHeight(): number { return this.crouched || this.input.pressed('ControlLeft') || this.input.pressed('ControlRight') ? .95 : GAME_CONFIG.player.eyeHeight; }
   yaw = 0;
@@ -47,7 +50,35 @@ export class PlayerController {
     const forward = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
     const right = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
     this.velocity.copy(forward).multiplyScalar(y * speed).addScaledVector(right, x * speed);
+    const previousZ=this.camera.position.z;
     this.camera.position.addScaledVector(this.velocity, dt);
+    const work=this.workPosition;
+    const wallDistanceNow=this.camera.position.z-GAME_CONFIG.room.wallFrontZ;
+    const facingWall=Math.cos(this.yaw)>.65;
+    if(!this.wallWorkEnabled || !facingWall){work.locked=false;}
+    // Backward intent explicitly releases the stance. Do not immediately snap
+    // back while the player is standing inside the entry zone after release.
+    if(work.locked && y<-.12){work.locked=false;work.released=true;}
+    if(wallDistanceNow>1.15 || y>.2)work.released=false;
+    if(this.wallWorkEnabled && facingWall && !work.released && !work.locked && wallDistanceNow<.94 && wallDistanceNow>.30)work.locked=true;
+    work.targetDistanceM=this.wallWorkDistance;
+    if(work.locked){
+      // Preserve the aimed wall point while the body settles to its standoff.
+      // Lateral walking still advances the work point along the wall.
+      const view=new THREE.Vector3(0,0,-1).applyEuler(new THREE.Euler(this.pitch,this.yaw,0,this.camera.rotation.order));
+      const focus=this.camera.position.clone(); focus.z=previousZ;
+      focus.addScaledVector(view,(GAME_CONFIG.room.wallFrontZ-previousZ)/view.z);
+      const target=GAME_CONFIG.room.wallFrontZ+this.wallWorkDistance;
+      this.camera.position.z=THREE.MathUtils.damp(previousZ,target,18,dt);
+      if(Math.abs(this.camera.position.z-target)<.002)this.camera.position.z=target;
+      if(Math.abs(this.camera.position.z-previousZ)>1e-8){
+        this.camera.lookAt(focus);
+        this.pitch=this.camera.rotation.x; this.yaw=this.camera.rotation.y;
+      }
+      // Forward force is absorbed by the stance; sideways walking remains free.
+      if(y>=0)this.velocity.z=0;
+    }
+    work.distanceM=this.camera.position.z-GAME_CONFIG.room.wallFrontZ;
     const radius = GAME_CONFIG.player.radius;
     this.camera.position.x = THREE.MathUtils.clamp(this.camera.position.x, -GAME_CONFIG.room.width / 2 + radius, GAME_CONFIG.room.width / 2 - radius);
     this.camera.position.z = THREE.MathUtils.clamp(this.camera.position.z, -GAME_CONFIG.room.depth / 2 + radius + 0.25, GAME_CONFIG.room.depth / 2 - radius);

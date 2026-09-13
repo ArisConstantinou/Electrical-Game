@@ -7,7 +7,7 @@ export class DesktopControls {
   constructor(surface: HTMLElement, private readonly lockTarget: HTMLElement, player: PlayerController, input: Input) {
     let primaryDown = false;
     surface.addEventListener('pointerdown', event => {
-      if ((event.pointerType && event.pointerType !== 'mouse') || (event.target as Element).closest('button,input,select,textarea,label,a')) return;
+      if ((event.pointerType && event.pointerType !== 'mouse') || (event.target as Element).closest('button,input,select,textarea,label,a,summary,#settings-panel')) return;
       if (event.button === 2) {
         event.preventDefault();
         input.actionHeld = false;

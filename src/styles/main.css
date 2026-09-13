@@ -269,3 +269,45 @@ button {
   #mortar-hint {max-height:51px;overflow:auto;}
 }
 @media (prefers-reduced-motion:reduce) {#mortar-flow[data-holding="true"] .throw-flow-sheen {animation:none;}}
+
+/* Keep the work surface clear: all extra mortar actions live in Settings. */
+#objective-compact {display:none;}
+#mortar-settings {margin-top:10px;padding:10px;border:1px solid #716557;background:#28241f;}
+#mortar-settings summary {min-height:44px;display:flex;align-items:center;font-size:14px;font-weight:700;cursor:pointer;}
+#mortar-settings summary::before {content:'+';margin-right:8px;color:#d99860;}
+#mortar-settings[open] summary::before {content:'-';}
+#mortar-settings p,#mortar-settings small {font-size:14px;line-height:1.4;color:#d7d9cb;}
+#mortar-settings button {min-height:44px;font-size:12px;}
+#mortar-settings .mortar-buttons {flex-wrap:wrap;}
+#mortar-settings #mortar-swing {flex-basis:100%;order:3;}
+#mortar-settings #work-height,#mortar-settings #mortar-pack {width:100%;margin-right:0;}
+#mortar-panel {top:140px;left:22px;width:300px;padding:10px;pointer-events:none;}
+#mortar-panel .throw-flow-heading {margin:4px 0 9px;}
+#mortar-panel #trowel-swing-gauge {position:static;display:flex;align-items:center;justify-content:space-between;width:100%;padding:7px 0 0;margin:0;box-shadow:none;border:0;border-radius:0;background:none;backdrop-filter:none;}
+#mortar-panel #trowel-swing-gauge[hidden] {display:none;}
+#mortar-panel .swing-gauge-title,#mortar-panel .swing-gauge-dial,#mortar-panel .swing-strength-track {display:none;}
+#mortar-panel #trowel-swing-degrees {position:static;inset:auto;font-size:14px;line-height:1.2;}
+#mortar-panel #trowel-swing-degrees::before {content:'SWING ';font-size:12px;color:#e8d5b3;}
+#mortar-panel #trowel-swing-strength {font-size:14px;}
+@media (pointer:coarse), (max-width:760px) {
+  #top-hud {top:max(10px,env(safe-area-inset-top));left:10px;width:calc(100% - 78px);padding:8px 10px;border-left-width:3px;}
+  #top-hud .mission-kicker,#top-hud #objective {display:none;}
+  #objective-compact {display:block;font-size:14px;line-height:20px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  #top-hud .progress-track {margin-top:6px;height:2px;}
+  #mortar-panel {top:max(68px,calc(env(safe-area-inset-top) + 62px));left:10px;width:min(300px,calc(100% - 20px));padding:8px 10px;}
+  #mortar-panel[data-active-tool="trowel"] #mortar-readout {display:none;}
+  #mortar-panel .throw-flow-heading {margin:0 0 8px;}
+  #mortar-panel .throw-flow-heading>span {display:none;}
+  #mortar-panel #throw-quality {font-size:12px;}
+  #mortar-panel #throw-timing-track {height:14px;}
+  #mortar-panel .throw-zone-labels {display:none;}
+  #mortar-panel #trowel-swing-gauge {padding-top:7px;}
+  #mortar-panel[data-holding="false"] {background:rgba(25,28,24,.68);}
+  #interaction-prompt {top:max(66px,calc(env(safe-area-inset-top) + 60px));}
+  #look-joystick > small {display:none;}
+  .look-joystick-ring,.joystick-ring {background:rgba(20,18,15,.12);box-shadow:none;}
+  #game-shell.aim-input-drag .look-joystick-ring {background:rgba(20,18,15,.15);}
+}
+@media (max-height:520px) and (pointer:coarse) {
+  #mortar-panel {top:max(68px,calc(env(safe-area-inset-top) + 62px));left:10px;width:min(280px,calc(100% - 20px));}
+}

@@ -24,12 +24,13 @@ async function sample(page) {
     const g = window.__wireTheHouse, q = selector => document.querySelector(selector);
     const visible = element => { const r = element.getBoundingClientRect(), s = getComputedStyle(element); return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden'; };
     const rect = element => { const r = element.getBoundingClientRect(); return { x: r.x, y: r.y, right: r.right, bottom: r.bottom, width: r.width, height: r.height }; };
-    const selectors = ['#mortar-panel', '#trowel-swing-gauge', '#throw-timing-track', '#mortar-swing'];
+    const selectors = ['#mortar-panel', '#trowel-swing-gauge', '#throw-timing-track', '#top-hud'];
     const bounds = selectors.map(selector => ({ selector, visible: visible(q(selector)), ...rect(q(selector)) }));
     const labels = [...document.querySelectorAll('#mortar-panel strong,#mortar-panel small,#mortar-panel button,#mortar-panel b,#mortar-panel span,#trowel-swing-gauge output,#trowel-swing-gauge span,#trowel-swing-gauge b')].filter(e => visible(e) && e.textContent.trim());
     const badFonts = labels.filter(e => parseFloat(getComputedStyle(e).fontSize) < 12).map(e => ({ text: e.textContent, font: getComputedStyle(e).fontSize }));
     const rig = g.fpsRig.tools.get('trowel');
-    return { feedback: g.mortar.throwFeedback, mass: g.mortar.launchedMass, projectiles: g.mortar.projectiles.map(p => ({ mass: p.mass, bond: p.bond, velocity: p.velocity.toArray() })), rig: { degrees: g.fpsRig.mortarSwingDegrees, holding: g.fpsRig.mortarHolding, rotation: rig.rotation.toArray() }, ui: { quality: q('#mortar-flow').dataset.quality, holding: q('#mortar-flow').dataset.holding, cursor: parseFloat(q('#throw-timing-cursor').style.left), meter: Number(q('#throw-timing-track').getAttribute('aria-valuenow')), degrees: parseFloat(q('#trowel-swing-degrees').textContent.replace('−', '-')), strength: parseFloat(q('#trowel-swing-strength').textContent), splash: Number(q('#mortar-face-splash').style.opacity), flowVisible: visible(q('#mortar-flow')), gaugeVisible: visible(q('#trowel-swing-gauge')) }, layout: { width: innerWidth, height: innerHeight, scrollWidth: document.documentElement.scrollWidth, scrollHeight: document.documentElement.scrollHeight, bounds, badFonts }, rendererError: g.renderer.lastError ?? '' };
+    const compact = { unified: q('#mortar-panel').contains(q('#trowel-swing-gauge')), floatingButtons: q('#mortar-panel').querySelectorAll('button').length, dialVisible: visible(q('.swing-gauge-dial')), missionHeight: q('#top-hud').getBoundingClientRect().height, panelHeight: q('#mortar-panel').getBoundingClientRect().height };
+    return { feedback: g.mortar.throwFeedback, mass: g.mortar.launchedMass, projectiles: g.mortar.projectiles.map(p => ({ mass: p.mass, bond: p.bond, velocity: p.velocity.toArray() })), rig: { degrees: g.fpsRig.mortarSwingDegrees, holding: g.fpsRig.mortarHolding, rotation: rig.rotation.toArray() }, ui: { quality: q('#mortar-flow').dataset.quality, holding: q('#mortar-flow').dataset.holding, cursor: parseFloat(q('#throw-timing-cursor').style.left), meter: Number(q('#throw-timing-track').getAttribute('aria-valuenow')), degrees: parseFloat(q('#trowel-swing-degrees').textContent.replace('−', '-')), strength: parseFloat(q('#trowel-swing-strength').textContent), splash: Number(q('#mortar-face-splash').style.opacity), flowVisible: visible(q('#mortar-flow')), gaugeVisible: visible(q('#trowel-swing-gauge')) }, layout: { compact, width: innerWidth, height: innerHeight, scrollWidth: document.documentElement.scrollWidth, scrollHeight: document.documentElement.scrollHeight, bounds, badFonts }, rendererError: g.renderer.lastError ?? '' };
   });
 }
 function checkUI(data, name) {
@@ -47,6 +48,13 @@ function checkUI(data, name) {
   assert.equal(data.layout.badFonts.length, 0, `${name}: unreadable labels ${JSON.stringify(data.layout.badFonts)}`);
   assert(data.layout.scrollWidth <= data.layout.width + 1 && data.layout.scrollHeight <= data.layout.height + 1, `${name}: viewport overflow`);
   for (const b of data.layout.bounds) assert(b.visible && b.x >= -1 && b.y >= -1 && b.right <= data.layout.width + 1 && b.bottom <= data.layout.height + 1, `${name}: clipped ${b.selector}: ${JSON.stringify(b)}`);
+  assert(data.layout.compact.unified, `${name}: swing readouts must share the timing panel`);
+  assert.equal(data.layout.compact.floatingButtons, 0, `${name}: old mortar buttons obstruct the wall`);
+  assert(!data.layout.compact.dialVisible, `${name}: duplicate large dial is visible`);
+  if (!name.startsWith('desktop')) {
+    assert(data.layout.compact.missionHeight <= 52, `${name}: mission header too large`);
+    assert(data.layout.compact.panelHeight <= 90, `${name}: mortar panel too large`);
+  }
   assert.equal(data.rendererError, '', `${name}: renderer error`);
 }
 
@@ -66,16 +74,25 @@ try {
       g.player.yaw = camera.rotation.y; g.player.pitch = camera.rotation.x; camera.updateMatrixWorld(true);
     });
     const cdp = config.mobile ? await page.context().newCDPSession(page) : null;
+    let heldTouch = null;
     const select = async tool => {
-      if (config.mobile) await page.locator(`[data-tool="${tool}"]`).tap();
+      if (config.mobile && heldTouch) {
+        const button = page.locator(`button[data-tool="${tool}"]`);
+        await button.scrollIntoViewIfNeeded();
+        const r = await button.boundingBox(); assert(r);
+        // A second finger switches tools while the first continues holding aim.
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [heldTouch, {x:r.x+r.width/2,y:r.y+r.height/2,id:2}] });
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [heldTouch] });
+      } else if (config.mobile) await page.locator(`button[data-tool="${tool}"]`).tap();
       else await page.keyboard.press(tool === 'trowel' ? 'Digit7' : 'Digit8');
       await advance(page, 0);
     };
     const hold = async held => {
       if (!config.mobile) await page.keyboard[held ? 'down' : 'up']('KeyE');
       else {
-        const r = await page.locator('#mortar-swing').boundingBox(); assert(r);
-        await cdp.send('Input.dispatchTouchEvent', { type: held ? 'touchStart' : 'touchEnd', touchPoints: held ? [{ x: r.x + r.width / 2, y: r.y + r.height / 2, id: 1 }] : [] });
+        const r = await page.locator('#look-joystick').boundingBox(); assert(r);
+        heldTouch = held ? { x: r.x + r.width / 2, y: r.y + r.height / 2, id: 1 } : null;
+        await cdp.send('Input.dispatchTouchEvent', { type: held ? 'touchStart' : 'touchEnd', touchPoints: heldTouch ? [heldTouch] : [] });
       }
       await page.waitForFunction(held => window.__wireTheHouse.input.actionHeld === held, held);
     };
@@ -115,12 +132,40 @@ try {
       const before = await sample(page); await hold(true); await advance(page, .3);
       if (kind === 'tool-switch') await select('hose');
       else if (kind === 'blur') await page.evaluate(() => window.dispatchEvent(new Event('blur')));
-      else await cdp.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
+      else { await cdp.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] }); heldTouch = null; }
       if (kind !== 'pointer-cancel') await hold(false);
       await advance(page, .1);
       assert.equal((await sample(page)).mass, before.mass, `${config.name}: ${kind} accidentally launched`);
       item.cancellations.push(kind); await select('trowel');
     }
+    await select('trowel');
+    const relocated = ['#mortar-angle-down', '#mortar-angle-up', '#mortar-swing', '#work-height', '#mortar-pack'];
+    for (const selector of relocated) assert(!(await page.locator(selector).isVisible()), `${config.name}: ${selector} should be out of the work view`);
+    await page.locator('#settings-toggle')[config.mobile ? 'tap' : 'click']();
+    await page.locator('#mortar-settings summary')[config.mobile ? 'tap' : 'click']();
+    for (const selector of relocated) {
+      await page.locator(selector).scrollIntoViewIfNeeded();
+      assert(await page.locator(selector).isVisible(), `${config.name}: relocated ${selector} inaccessible`);
+      const box = await page.locator(selector).boundingBox(); assert(box && box.height >= 44, `${selector}: touch target too small`);
+    }
+    await page.locator('#mortar-angle-up').scrollIntoViewIfNeeded();
+    await page.waitForTimeout(250);
+    await page.screenshot({ path: join(out, `${config.name}-settings-before.png`) });
+    const useSetting = async selector => {
+      await page.locator(selector).scrollIntoViewIfNeeded();
+      await page.waitForTimeout(80);
+      const target = await page.locator(selector).evaluate(e => { const r=e.getBoundingClientRect(), x=r.x+r.width/2, y=r.y+r.height/2; return {x,y,hit:e.contains(document.elementFromPoint(x,y))}; });
+      assert(target.hit, `${config.name}: ${selector} is visually obstructed`);
+      if (config.mobile) await page.touchscreen.tap(target.x,target.y); else await page.mouse.click(target.x,target.y);
+    };
+    const angleBefore = await page.evaluate(() => window.__wireTheHouse.mortar.angleDegrees);
+    await useSetting('#mortar-angle-up');
+    assert.equal(await page.evaluate(() => window.__wireTheHouse.mortar.angleDegrees), angleBefore + 5, 'Settings angle control must remain functional');
+    await useSetting('#mortar-angle-down');
+    assert.equal(await page.evaluate(() => window.__wireTheHouse.mortar.angleDegrees), angleBefore);
+    item.settings = { relocated, nativeAngleAdjustment: true };
+    await page.screenshot({ path: join(out, `${config.name}-settings.png`) });
+    await page.locator('#settings-close')[config.mobile ? 'tap' : 'click']();
     await select('hose');
     const hose = await sample(page); assert(!hose.ui.flowVisible && !hose.ui.gaugeVisible, 'Trowel timing must not obscure hose controls');
     assert(await page.locator('#mortar-panel').isVisible(), 'Hose moisture panel must remain');

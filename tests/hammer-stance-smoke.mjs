@@ -24,6 +24,7 @@ try {
       g.player.yaw = 0; g.player.pitch = -.4; g.step(1 / 60);
     });
     await page.waitForTimeout(200);
+    await page.evaluate(() => { for(let i=0;i<60;i++)window.__wireTheHouse.step(1/60); });
     const read = () => page.evaluate(() => {
       const g = window.__wireTheHouse, c = g.renderer.camera, d = c.getWorldDirection(c.position.clone());
       return { pos: c.position.toArray(), focus: c.position.clone().addScaledVector(d, (-2.41 - c.position.z) / d.z).toArray(), side: g.hammerWorkStance.sideDegrees, offset: g.hammerWorkStance.offset.toArray() };
@@ -49,6 +50,7 @@ try {
     };
     for (const side of (mobile ? [65, -65, 0] : [70, -70, 0])) {
       await selectSide(side); await page.waitForTimeout(1000);
+      await page.evaluate(() => { for(let i=0;i<60;i++)window.__wireTheHouse.step(1/60); });
       const state = await read();
       assert(Math.abs(state.side - side) < .02);
       assert(Math.hypot(...state.focus.map((n, i) => n - initial.focus[i])) < .002, 'Aim moved during stance');
@@ -61,11 +63,12 @@ try {
       results.push({ mobile, ...state });
     }
     await selectSide(mobile ? 65 : 70); await page.waitForTimeout(700);
+    const beforeSwitch = await read();
     // Changing tool releases the stance while retaining the selected side for later.
     if (mobile) await page.locator('[data-tool="spray"]').tap();
     else await page.keyboard.press('Digit3');
     await page.waitForTimeout(1000);
-    assert(Math.hypot(...(await read()).pos.map((n, i) => n - (initial.pos[i]-initial.offset[i]))) < .002, 'Tool switch did not restore normal camera');
+    assert(Math.hypot(...(await read()).pos.map((n, i) => n - (beforeSwitch.pos[i]-beforeSwitch.offset[i]))) < .002, 'Tool switch did not release the head lean at the current walking position');
     if (mobile) await page.locator('[data-tool="hammer"]').tap();
     else await page.keyboard.press('Digit4');
     await page.waitForTimeout(1000);

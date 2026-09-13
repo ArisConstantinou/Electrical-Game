@@ -38,7 +38,7 @@ export class MobileControls {
     });
     addEventListener('pointerup', this.onPointerUp, { passive: false });
     addEventListener('pointercancel', this.onPointerUp, { passive: false });
-    document.querySelectorAll<HTMLButtonElement>('[data-tool]').forEach(button => button.addEventListener('pointerdown', event => {
+    document.querySelectorAll<HTMLButtonElement>('button[data-tool]').forEach(button => button.addEventListener('pointerdown', event => {
       event.preventDefault();
       window.dispatchEvent(new CustomEvent('wirehouse:select-tool', { detail: button.dataset.tool }));
     }));
@@ -65,7 +65,7 @@ export class MobileControls {
 
   private onPointerDown = (event: PointerEvent): void => {
     if (event.pointerType === 'mouse') return;
-    if ((event.target as HTMLElement).closest('button,input,select,textarea,label,a')) return;
+    if ((event.target as HTMLElement).closest('button,input,select,textarea,label,a,summary,#settings-panel')) return;
     event.preventDefault();
     const joystick = document.querySelector<HTMLElement>('#joystick');
     const lookJoystick = document.querySelector<HTMLElement>('#look-joystick');
@@ -82,6 +82,11 @@ export class MobileControls {
         this.lookX = event.clientX;
         this.lookY = event.clientY;
         this.dragDistance = 0;
+      }
+      // The trowel now uses the clear aim pad for its hold/release gesture;
+      // advanced angle/packing controls live in Settings.
+      if(this.surface.dataset.activeTool==='trowel'){
+        this.lookActionPointer=event.pointerId;this.input.actionHeld=true;
       }
       if (this.aimControlMode === 'double-tap' || (this.aimInputMode === 'stick' && !this.isContinuousTool)) this.detectDoubleTapAction(event, lookJoystick);
     } else if (this.lookPointer === null) {
@@ -227,6 +232,6 @@ export class MobileControls {
   }
 
   private get isContinuousTool(): boolean {
-    return this.selectedToolIsContinuous();
+    return this.selectedToolIsContinuous() || this.surface.dataset.activeTool==='trowel';
   }
 }

@@ -128,7 +128,7 @@ try {
       await aim(page, { z: -1.59, ...configuration });
       const pose = await page.evaluate(() => { const g = window.__wireTheHouse; for (let i = 0; i < 40; i++) g.step(1 / 60); return { ...g.fpsRig.debugPose(), stanceOffset: g.hammerWorkStance.offset.toArray() }; });
       validatePose(pose, `${name} stance ${JSON.stringify(configuration)}`);
-      assert(Math.hypot(...pose.stanceOffset) <= .185, `${name}: stance teleported the body to another working position`);
+      assert(Math.hypot(...pose.stanceOffset) <= .48, `${name}: stance exceeded the bounded torso/head lean`);
       if (configuration.targetY === 2.95) {
         assert.equal(pose.reachable, false, 'Ceiling-height wall must require a higher body position');
         const before = await read(page); await hold(page, mobile); const after = await read(page);
@@ -140,9 +140,11 @@ try {
     await page.evaluate(() => { const w = window.__wireTheHouse.room.brickWall; w.chiselTiltDegrees = 25; w.chiselSideDegrees = 0; });
     await aim(page, { z: -1.96, targetY: 1.3 });
     const tooCloseBefore = await read(page); const tooClosePoses = await hold(page, mobile); const tooCloseAfter = await read(page);
-    assert(tooClosePoses.every(p => !p.reachable), `${name}: hammer handle accepted inside the player's face`);
-    assert.equal(tooCloseAfter.workSurface.impactCount, tooCloseBefore.workSurface.impactCount, `${name}: too-close strike bypassed safe working space`);
-    await shot(page, `${name}-too-close-resting`);
+    assert.equal(tooCloseAfter.workPosition.locked, true, `${name}: close approach did not enter the work stance`);
+    assert(Math.abs(tooCloseAfter.workPosition.distanceM-tooCloseAfter.workPosition.targetDistanceM)<.005, `${name}: close approach failed to settle at working distance`);
+    assert(tooClosePoses.some(p=>p.reachable), `${name}: settled stance cannot work`);
+    assert(tooCloseAfter.workSurface.impactCount>tooCloseBefore.workSurface.impactCount, `${name}: settled stance received no strikes`);
+    await shot(page, `${name}-too-close-settled`);
     await aim(page, { z: -1.59, targetY: 1.3 });
     const toolPoses = [];
     for (const tool of Object.keys(keys)) {

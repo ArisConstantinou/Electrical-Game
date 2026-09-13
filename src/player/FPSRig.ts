@@ -41,12 +41,17 @@ export class FPSRig extends THREE.Group {
   mortarHolding = false;
   chiselInAir = false;
   workStanceSide = 0;
+  workPositionLocked = false;
+  private feedDepth = .02;
+  private presentedDepthZ: number | null = null;
+  private hammerGripBlend = 0;
 
   /** Seat the real visible tip on the first remaining solid, then read it back. */
   contact(camera: THREE.Camera, wall: BrickWall): ChiselContact | null {
     this.selectedTool='hammer';
     this.reachReason='Out of reach. Move closer, change your stance or crouch.';
     const hammer = this.tools.get('hammer')!;
+    this.poseHammerGrips(hammer);
     if (this.flatTip) {
       this.flatTip.visible = wall.chiselType === 'flat'; this.flatTip.rotation.z = wall.chiselEdgeAngle;
       // Match metres in the world despite the camera rig's presentation scale.
@@ -61,7 +66,7 @@ export class FPSRig extends THREE.Group {
     const tilt=THREE.MathUtils.degToRad(wall.chiselTiltDegrees);
     // The working wall supplies world up and its normal. Looking around must
     // not silently change the independently chosen vertical/lateral attack.
-    const side=THREE.MathUtils.degToRad(wall.chiselSideDegrees);
+    const side=THREE.MathUtils.degToRad(this.workStanceSide*75);
     const desiredWorld=new THREE.Vector3(Math.sin(side)*Math.cos(tilt),-Math.sin(tilt),-Math.cos(side)*Math.cos(tilt));
     // The zero-roll cutting edge stays horizontal in the wall's frame. A
     // shortest-arc rotation from the camera adds an accidental blade roll when
@@ -103,18 +108,30 @@ export class FPSRig extends THREE.Group {
       }
     }
     this.chiselInAir=!hit;
-    const target=hit?new THREE.Vector3(hit.point.x,hit.point.y,hit.point.z).addScaledVector(edge,-bladeOffsetM):entry.clone().addScaledVector(direction,Math.min(.34,.19/Math.abs(direction.z)));
+    if(hit)this.feedDepth=THREE.MathUtils.clamp((wall.volume.frontZ-hit.point.z)/Math.abs(direction.z),0,.24);
+    // Losing a shell contact must not throw the entire tool through the cell,
+    // then teleport it back to the resting pose on the next pixel of aim.
+    const target=hit?new THREE.Vector3(hit.point.x,hit.point.y,hit.point.z).addScaledVector(edge,-bladeOffsetM):entry.clone().addScaledVector(direction,this.feedDepth);
+    const surfaceTarget=target.clone();
+    if(this.workPositionLocked&&this.presentedDepthZ!==null){
+      target.z=this.presentedDepthZ+THREE.MathUtils.clamp(target.z-this.presentedDepthZ,-.0025,.004);
+    }
+    this.presentedDepthZ=target.z;
     const local=this.worldToLocal(target.clone());
     hammer.position.copy(local).sub(this.tipAnchor.clone().applyQuaternion(hammer.quaternion));
     hammer.updateWorldMatrix(true, true);
     const housing=camera.worldToLocal(hammer.localToWorld(new THREE.Vector3(.02,-.055,-.1)));
-    if(housing.z>-.32){this.reachReason='Too close to the hammer. Step back or adjust its angle.';this.restHammer(camera);return null;}
-    if (!this.gripsReachable(camera, hammer)) { this.restHammer(camera); return null; }
+    if(housing.z>-.26 || !this.gripsReachable(camera,hammer)){
+      this.reachable=false;this.chiselInAir=true;
+      if(this.workPositionLocked){this.constrainHeldTool(camera);this.poseArms(camera);this.chiselTipWorld.copy(hammer.localToWorld(this.tipAnchor.clone()));}
+      else this.restHammer(camera);
+      return null;
+    }
     this.reachable = true;
     const tip = hammer.localToWorld(this.tipAnchor.clone());
     this.chiselTipWorld.copy(tip);
     this.poseArms(camera);
-    if (!hit) return null;
+    if (!hit || target.distanceTo(surfaceTarget)>.003 || (this.hammerGripBlend>0 && this.hammerGripBlend<1)) return null;
     return {point:tip.clone().addScaledVector(edge,bladeOffsetM), direction, edge, chisel:wall.chiselType, energyJ:wall.chiselEnergyJ, widthM:wall.chiselWidthM, bladeOffsetM};
   }
 
@@ -142,6 +159,10 @@ export class FPSRig extends THREE.Group {
   }
   strike(): void { this.strikeAmount = 1; }
   update(dt: number, moving: boolean, spraying = false): void {
+    // Positive chisel attack puts the rear handle on the body's LEFT. Swap
+    // grips with that torso lean; returning to straight restores the right hand.
+    const gripTarget=this.workStanceSide>.12?1:0;
+    this.hammerGripBlend+=THREE.MathUtils.clamp(gripTarget-this.hammerGripBlend,-dt*2.8,dt*2.8);
     const bob = moving ? Math.sin(performance.now() * 0.012) * 0.006 : 0;
     this.position.y = this.restingY + bob;
     this.strikeAmount = Math.max(0, this.strikeAmount - dt * 5.5);
@@ -180,6 +201,24 @@ export class FPSRig extends THREE.Group {
   }
 
   private addTool(key: RigTool, group: THREE.Group): void { group.name = `FPS ${key} tool`; group.userData.studioEntityId = `fps-rig:${key}`; this.tools.set(key, group); this.add(group); }
+  private poseHammerGrips(hammer:THREE.Group):void {
+    const rear=new THREE.Vector3().fromArray(hammer.userData.gripPoint);
+    const auxiliary=hammer.getObjectByName('Rotatable auxiliary handle')!;
+    auxiliary.rotation.z=this.hammerGripBlend*Math.PI;
+    const front=new THREE.Vector3().fromArray(auxiliary.userData.gripPoint).applyQuaternion(auxiliary.quaternion).add(auxiliary.position);
+    hammer.userData.secondaryGripPoint=front.toArray();
+    // Regrip in sequence: one hand stays on the rear handle while the other
+    // travels around the housing. Percussion pauses until both hands are seated.
+    for(const arm of this.armSets.get('hammer')??[]){
+      const t=THREE.MathUtils.smoothstep(this.hammerGripBlend,arm.side<0?0:.5,arm.side<0?.5:1);
+      arm.hand.position.lerpVectors(arm.side<0?front:rear,arm.side<0?rear:front,t);
+      arm.hand.position.y-=Math.sin(t*Math.PI)*.09;
+      const supporting=arm.side<0?1-t:t;
+      arm.hand.rotation.set(0,0,arm.side*supporting*Math.PI/2);
+      arm.hand.userData.gripRole=supporting>.99?'auxiliary':supporting<.01?'rear':'regripping';
+      arm.hand.userData.gripping=t===0||t===1;
+    }
+  }
   private bodyFrame(camera:THREE.Camera): { eye:THREE.Vector3; right:THREE.Vector3; forward:THREE.Vector3 } {
     const eye=camera.getWorldPosition(new THREE.Vector3()),forward=camera.getWorldDirection(new THREE.Vector3());
     forward.y=0;forward.normalize();
@@ -216,6 +255,7 @@ export class FPSRig extends THREE.Group {
   }
   private restHammer(camera:THREE.Camera):void {
     this.reachable=false;this.chiselInAir=true;
+    this.presentedDepthZ=null;
     const hammer=this.tools.get('hammer')!;
     hammer.position.set(0,-.055,0);hammer.rotation.set(.12,-.08,0);
     this.constrainHeldTool(camera);this.poseArms(camera);
@@ -237,7 +277,7 @@ export class FPSRig extends THREE.Group {
     return {tool:this.selectedTool,reachable:this.reachable,arms:(this.armSets.get(this.selectedTool)??[]).map(arm=>({
       side:arm.side,upperLengthM:UPPER_ARM_M,forearmLengthM:FOREARM_M,
       shoulder:arm.shoulder.toArray(),elbow:arm.elbow.toArray(),wrist:arm.wrist.toArray(),
-      grip:arm.hand.getWorldPosition(new THREE.Vector3()).toArray(),fingers:arm.hand.children.filter(o=>o.userData.digit).length,gripping:true,
+      grip:arm.hand.getWorldPosition(new THREE.Vector3()).toArray(),fingers:arm.hand.children.filter(o=>o.userData.digit).length,gripping:arm.hand.userData.gripping??true,gripRole:arm.hand.userData.gripRole,
     }))};
   }
   private attachArms(kind:RigTool,group:THREE.Group):void {

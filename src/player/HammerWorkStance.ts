@@ -32,8 +32,9 @@ export class HammerWorkStance {
     const blend=this.sideDegrees/75;
     // Peek along the left of the motor in a straight stroke; reverse with a leftward stroke.
     // The fixed head offset keeps the housing away from the line of sight to the bit.
-    const peek=-.17*(1-2*THREE.MathUtils.smoothstep(-blend,0,.5));
-    camera.position.copy(this.base).add(new THREE.Vector3(peek,-.025*Math.abs(blend),0));
+    const lean=.24+.22*Math.sin(Math.abs(this.sideDegrees)*Math.PI/180);
+    const peek=-lean*(1-2*THREE.MathUtils.smoothstep(-blend,0,.5));
+    camera.position.copy(this.base).add(new THREE.Vector3(peek,.12,0));
     const radius = GAME_CONFIG.player.radius;
     camera.position.x = THREE.MathUtils.clamp(camera.position.x, -GAME_CONFIG.room.width / 2 + radius, GAME_CONFIG.room.width / 2 - radius);
     camera.position.z = THREE.MathUtils.clamp(camera.position.z, GAME_CONFIG.room.wallFrontZ + .32, GAME_CONFIG.room.depth / 2 - radius);

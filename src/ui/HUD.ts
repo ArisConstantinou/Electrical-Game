@@ -16,6 +16,8 @@ const stageLabel: Record<string, string> = {
   mortared: 'LEVEL GROUP', leveling: 'LEVEL + FLUSH', leveled: 'MEASURE PVC ROUTE', conduit: 'INSTALL 20 mm PVC', complete: 'POINT PASSED',
 };
 
+const compactStage:Record<string,string>={inspect:'CHOOSE CAVITY',marked:'CHASE',chasing:'CHASE',chased:'FIT BOXES',fitted:'MORTAR',mortared:'LEVEL',leveling:'LEVEL',leveled:'PVC ROUTE',conduit:'INSTALL PVC',complete:'PASSED'};
+
 export class HUD {
   readonly shell: HTMLElement;
   private readonly objective: HTMLElement;
@@ -36,7 +38,7 @@ export class HUD {
           <div id="game-stage"></div>
           <div id="top-hud" class="hud-card">
             <div class="mission-kicker">LIVING ROOM · FIRST FIX</div>
-            <div id="objective">Approach Point A</div>
+            <div id="objective">Approach Point A</div><div id="objective-compact">Approach Point A</div>
             <div class="progress-track"><span id="mission-progress"></span></div>
           </div>
           <div id="tool-status" class="hud-card"></div>
@@ -53,10 +55,15 @@ export class HUD {
               <button id="chisel-type" type="button"><span>CHISEL · T</span><b>FLAT</b></button>
               <label class="hammer-speed-setting" for="chisel-width"><span>BLADE WIDTH · , / .</span><output id="chisel-width-value">2.5 cm</output><input id="chisel-width" type="range" min="10" max="50" step="5" value="25" aria-label="Flat chisel width in millimetres"><small id="chisel-width-hint">1–5 cm · wider blade, broader chips</small></label>
               <button id="chisel-tilt" type="button"><span>HAMMER TILT · [ / ]</span><b>25 deg DOWN</b></button>
-              <button id="chisel-side" type="button"><span>SIDE LEAN / J K</span><b>0 deg STRAIGHT</b></button>
+              <button id="chisel-side" type="button"><span>CHISEL DIRECTION / J K</span><b>0 deg STRAIGHT</b></button>
               <button id="chisel-angle" type="button"><span>EDGE ANGLE · R</span><b>0°</b></button>
               <label class="hammer-speed-setting" for="hammer-speed"><span>CHISEL SPEED · − / +</span><output id="hammer-speed-value">100%</output><input id="hammer-speed" type="range" min="0" max="250" step="25" value="100" aria-label="Chisel destruction speed"><small>0% stops impacts · slower for control</small></label>
             </div>
+            <details id="mortar-settings"><summary>TROWEL / WATER</summary>
+              <p>Hold the aim pad or mouse button, then release in the green zone. Adjust the loft or pack nearby mortar here.</p>
+            <div class="mortar-buttons"><button type="button" id="mortar-angle-down" aria-label="Lower trowel throw angle">− ANGLE</button><button type="button" id="mortar-swing">HOLD · RELEASE</button><button type="button" id="mortar-angle-up" aria-label="Raise trowel throw angle">+ ANGLE</button></div>
+            <button type="button" id="work-height">CROUCH · LOW WORK</button><button type="button" id="mortar-pack">P · PRESS / PACK NEARBY</button><small id="mortar-hint"></small>
+            </details>
             <div id="mobile-control-settings" aria-label="Mobile aim settings">
               <button id="aim-input-mode" type="button" aria-label="Change aim input style"><span>AIM INPUT</span><b>DRAG</b></button>
               <button id="aim-control-mode" type="button" aria-label="Change aim action mode"><span>AIM ACTION</span><b>AUTO USE</b></button>
@@ -81,9 +88,7 @@ export class HUD {
               <div class="throw-zone-labels"><span>WEAK BOND</span><b>PERFECT</b><span>SPLASH BACK</span></div>
             </div>
             <div id="mortar-wet-track" class="progress-track"><span id="swing-power"></span></div>
-            <div class="mortar-buttons"><button type="button" id="mortar-angle-down" aria-label="Lower trowel throw angle">− ANGLE</button><button type="button" id="mortar-swing">HOLD · RELEASE</button><button type="button" id="mortar-angle-up" aria-label="Raise trowel throw angle">+ ANGLE</button></div>
-            <button type="button" id="work-height">CROUCH · LOW WORK</button><button type="button" id="mortar-pack">P · PRESS / PACK NEARBY</button><small id="mortar-hint"></small>
-          </div>
+
           <aside id="trowel-swing-gauge" class="hud-card" aria-label="Live trowel swing and strength" hidden>
             <div class="swing-gauge-title">TROWEL SWING</div>
             <svg class="swing-gauge-dial" viewBox="0 0 160 94" aria-hidden="true">
@@ -96,6 +101,7 @@ export class HUD {
             <div class="swing-strength-label"><span>POWER</span><b id="trowel-swing-strength">0%</b></div>
             <div class="swing-strength-track"><span id="trowel-strength-fill"></span></div>
           </aside>
+          </div>
           <div id="mortar-face-splash" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
           <div id="reticle" aria-hidden="true"><span></span><span></span></div>
           <div id="interaction-prompt" role="status"></div>
@@ -207,6 +213,7 @@ export class HUD {
   update(point: InstallationPoint | null, targeted: boolean, missionProgress: number, selectedTool: RigTool): void {
     const toolChanged=this.selectedTool!==selectedTool;
     this.selectedTool = selectedTool;
+    this.shell.dataset.activeTool=selectedTool;
     this.shell.classList.toggle('mortar-tool',selectedTool==='trowel'||selectedTool==='hose');
     this.progress.style.width = `${missionProgress}%`;
     this.reticle.classList.toggle('active', targeted);
@@ -216,9 +223,11 @@ export class HUD {
     }
     if (!point) {
       this.objective.textContent = 'Site ready for inspection';
+      this.shell.querySelector('#objective-compact')!.textContent = 'SITE / INSPECTION';
       return;
     }
     this.objective.textContent = `${point.definition.label} · ${stageLabel[point.stage]}`;
+    this.shell.querySelector('#objective-compact')!.textContent = `${point.definition.label.split(' · ')[0]} · ${compactStage[point.stage]??'WORK'}`;
     this.levelPanel.classList.toggle('visible', point.stage === 'leveling');
     if (point.stage === 'leveling') {
       const tilt = point.boxGroup.tiltDegrees;
@@ -230,7 +239,7 @@ export class HUD {
       if (depthMarker) depthMarker.style.left = `${50 + Math.max(-42, Math.min(42, depth * 2.5))}%`;
     }
     this.tool.innerHTML = `<span>SELECTED TOOL</span><b class="selected">${selectedTool.toUpperCase()}</b><em>${selectedTool==='trowel'?'HOLD · RELEASE':selectedTool==='hose'?'HOLD TO MIST':'LEFT CLICK TO USE'}</em>`;
-    this.shell.querySelectorAll<HTMLButtonElement>('[data-tool]').forEach(button => {
+    this.shell.querySelectorAll<HTMLButtonElement>('button[data-tool]').forEach(button => {
       const selected = button.dataset.tool === selectedTool;
       button.classList.toggle('selected', selected);
       button.setAttribute('aria-pressed', String(selected));
@@ -262,6 +271,7 @@ export class HUD {
     this.shell.querySelector<HTMLElement>('#mortar-pack')!.hidden=tool==='hose';
     for(const id of ['#mortar-angle-up','#mortar-angle-down'])this.shell.querySelector<HTMLElement>(id)!.hidden=tool==='hose';
     const active=tool==='trowel';
+    panel.dataset.activeTool=tool;
     const flow=this.shell.querySelector<HTMLElement>('#mortar-flow')!;
     const gauge=this.shell.querySelector<HTMLElement>('#trowel-swing-gauge')!;
     flow.hidden=!active;gauge.hidden=!active;
@@ -269,6 +279,7 @@ export class HUD {
     const state=feedback??{holding:false,phase:power,quality:'ready',swingDegrees:-50+power*140,strength:power,splash:0,lastRelease:0};
     const phase=Math.max(0,Math.min(1,state.phase));
     const strength=Math.max(0,Math.min(1,state.strength));
+    panel.dataset.holding=String(state.holding);
     flow.dataset.quality=state.quality;flow.dataset.holding=String(state.holding);gauge.dataset.quality=state.quality;
     this.shell.querySelector<HTMLElement>('#throw-timing-cursor')!.style.left=`${phase*100}%`;
     this.shell.querySelector<HTMLElement>('#throw-timing-track')!.setAttribute('aria-valuenow',String(Math.round(phase*100)));
@@ -342,7 +353,7 @@ export class HUD {
     look?.setAttribute('aria-label', mode === 'drag' ? 'Drag aim pad; drag to aim and use spray or hammer' : 'Aim joystick; move it to use spray or hammer');
     const hint = this.shell.querySelector<HTMLElement>('#aim-control-label');
     const autoUse = this.shell.querySelector<HTMLElement>('#aim-control-mode b')?.textContent === 'AUTO USE';
-    const dragAction = this.selectedTool === 'spray' ? 'AIM + SPRAY' : this.selectedTool === 'hammer' ? 'AIM + HAMMER' : this.selectedTool === 'hose' ? 'AIM + WATER' : this.selectedTool === 'trowel' ? 'AIM · USE HOLD BUTTON' : 'RELEASE TO USE';
+    const dragAction = this.selectedTool === 'spray' ? 'AIM + SPRAY' : this.selectedTool === 'hammer' ? 'AIM + HAMMER' : this.selectedTool === 'hose' ? 'AIM + WATER' : this.selectedTool === 'trowel' ? 'HOLD · RELEASE' : 'RELEASE TO USE';
     if (hint) hint.textContent = mode === 'drag' ? (autoUse ? `DRAG · ${dragAction}` : 'DRAG · AIM') : (autoUse ? 'AIM · AUTO TOOL' : 'AIM · 2× HOLD');
   }
 }
