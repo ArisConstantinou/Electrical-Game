@@ -68,5 +68,3 @@ if(!baseline)for(const platform of ['desktop','mobile'])for(const side of [-1,1]
 }
 assert.deepEqual(report.errors,[]);
 console.log(JSON.stringify({url,baseline,cases:report.cases.length,summary:report.cases.map(c=>({platform:c.platform,side:c.side,speed:c.speed,reachFailures:[...c.stationary,...c.left,...c.right].filter(s=>!s.reachable).length,stationaryRemoved:c.stationary.at(-1).volume-c.initial.volume,leftRemoved:c.left.at(-1).volume-c.stationary.at(-1).volume,maxBodyFeed:Math.max(...c.stationary.map(s=>s.fit.feedM??0)),largestRubbleM:Math.max(...[...c.stationary,...c.left,...c.right].flatMap(s=>s.rubble??[]).flatMap(r=>r.size)),stoppedImpacts:c.stoppedAfter.impacts-c.stoppedBefore.impacts})),errors:report.errors}));
-
-
