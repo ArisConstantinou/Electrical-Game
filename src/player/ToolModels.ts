@@ -84,11 +84,13 @@ function spray(): THREE.Group {
 }
 
 function trowel(): THREE.Group {
-  const group = new THREE.Group(), metal = steel(), darkSteel = mat(0x727a79, .35, .7);
+  // Satin working steel spreads the sun highlight across the blade. The
+  // polished finish produced a clipped white patch with blue/yellow fringes.
+  const group = new THREE.Group(), metal = mat(0xb7bfbe, .65, .78), darkSteel = mat(0x727a79, .55, .7);
   const blade = outline([[-.070, .155], [-.010, -.021], [.050, -.043], [.085, -.013], [.071, .044]]);
-  const plate = part(group, extrude(blade, .0018), metal, [.01, .018, -.09], 'Triangular polished steel pointing blade'); plate.rotation.x = -.12;
+  const plate = part(group, extrude(blade, .0018), metal, [.01, .018, -.09], 'Triangular satin steel pointing blade'); plate.rotation.x = -.12;
   // A narrow contrasting bevel is geometry, not a thick wedge/putty knife blade.
-  rod(group, [-.060, .172, -.112], [.081, .062, -.097], .0007, mat(0xe6e8e5, .2, .85), 'Ground cutting edge');
+  rod(group, [-.060, .172, -.112], [.081, .062, -.097], .0007, mat(0xe6e8e5, .5, .85), 'Ground cutting edge');
   tube(group, [[.049, -.002, -.086], [.097, -.029, -.059], [.109, -.020, -.014], [.131, -.049, .030]], .006, darkSteel, 'Bent forged swan-neck tang');
   const handleStart: Point = [.141, -.058, .039], handleEnd: Point = [.224, -.155, .077];
   rod(group, handleStart, handleEnd, .0148, mat(0xb98443, .68), 'Shaped varnished hardwood handle', .0128);

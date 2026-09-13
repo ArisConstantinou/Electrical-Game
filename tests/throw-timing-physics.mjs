@@ -78,4 +78,37 @@ report.push({check:'Actual early, ideal and late contact, gravity, adhesion and 
   assert.equal(system.projectiles.length,47);assert(Math.abs(system.launchedMass-.47)<1e-9);assert.equal(system.throwFeedback.lastRelease,0);
   report.push({check:'Projectile budget rejects a whole late scoop atomically',...ledger(system)});
 }
+// A close trowel can penetrate both masonry and an already growing bed. The
+// entire finite scoop must start in free space and strike the exposed surface.
+{
+ const {system,camera}=fixture(),tip=new THREE.Vector3(0,1.02,-.09),loads=[];
+ for(let i=0;i<4;i++){
+  system.swing(true,.475,camera,tip);system.swing(false,0,camera,tip);
+  const projectile=system.projectiles.find(p=>!p.slurry);
+  assert(projectile,'Close throw did not create its scoop');
+  assert(projectile.mesh.position.z>-.045,'Scoop started behind solid backing');
+  assert(system.field.sample(projectile.mesh.position)<.35,'Scoop started inside existing mortar');
+  advance(system,1);loads.push(system.field.mass);
+ }
+ assert(loads[1]>loads[0]+.1&&loads[2]>loads[1]+.1,'Repeated close casts fail to build on the visible bed');
+ system.preview(camera,tip,true);
+ assert(system.target.visible&&system.target.position.z>=-.045,'Preview points behind the receiver');
+ report.push({check:'Close casts start outside masonry and accumulated mortar',loadsKg:loads,...ledger(system)});
+}
+
+// Desktop/mobile tool offsets share the same sighted ballistic target.
+{
+ const samples=[];
+ for(const x of [-.04,-.125])for(const phase of [.2,.5,.8]){
+  const {system,camera}=fixture();system.angleDegrees=12;
+  const origin=new THREE.Vector3(x,1.16,.15),velocity=system.velocity(camera,phase,origin);
+  const time=(-.045-origin.z)/velocity.z,impact=origin.clone().addScaledVector(velocity,time);impact.y-=4.905*time*time;
+  assert(Math.abs(impact.x)<1e-8&&Math.abs(impact.y-1.1)<1e-8,'Offset cast missed crosshair');
+  assert(Math.abs(velocity.length()-(2+phase*6))<1e-8,'Aiming correction changed timing strength');
+  system.angleDegrees=22;assert(system.velocity(camera,phase,origin).y>velocity.y,'Manual loft no longer raises throw');
+  samples.push({offsetX:x,phase,impact:impact.toArray(),speed:velocity.length()});
+ }
+ report.push({check:'Ballistic aim converges at unchanged timing speed; manual loft remains active',samples});
+}
+
 console.log(JSON.stringify({suite:'throw-timing-physics',passed:true,checks:report},null,2));

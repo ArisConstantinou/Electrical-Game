@@ -162,4 +162,33 @@ function components(system){
  report.checks.push({name:'sealed clay shell blocks remote cavity filling',...massBalance(m)});
 }
 
+// A full lip must not shrink a whole scoop's footprint to its small retained
+// fraction and permanently exclude the adjacent empty groove.
+{
+ const m=new MortarSystem(new THREE.Scene(),cavity(.10,.14,.117),[]),lip=new THREE.Vector3(0,1.064,0);
+ const profile={frontZ:0,supportZ:()=>-.117};
+ for(let i=0;i<12;i++)m.field.add(lip,Z,.65,q=>q.z<-.117||q.y<1.03,profile);
+ const origin=new THREE.Vector3(0,1,.1),direction=Z.clone().negate();
+ assert.equal(m.field.raycast(origin,direction,.25),null,'Fixture groove was already filled');
+ let total=0;const increments=[];
+ for(let i=0;i<20;i++){const held=m.deposit(lip,.118,Z,false,.65);increments.push(held);total+=held;}
+ const hit=m.field.raycast(origin,direction,.25);
+ assert(total>.3,'Full lip rejects every retained scoop');
+ assert(hit&&hit.point.z>-.012,'Adjacent deep groove cannot fill to the face');
+ report.checks.push({name:'Full scoop spreads past a saturated lip into the empty groove',retainedKg:total,grooveSurfaceZ:hit.point.z,increments});
+}
+
+// Small retained portions must seed a visible backed volume. They previously
+// remained below the isosurface threshold and were discarded on every cast.
+{
+ const {MortarField}=load(fileURLToPath(new URL('../src/systems/MortarField.ts',import.meta.url)));
+ const f=new MortarField(),point=new THREE.Vector3(0,1,-.117),profile={frontZ:0,supportZ:()=>-.117};
+ let accepted=0;for(let i=0;i<10;i++)accepted+=f.add(point,Z,.02,q=>q.z<-.117,profile);
+ assert(accepted>.19,'Small useful portions repeatedly vanish instead of building a seed');
+ assert(f.raycast(new THREE.Vector3(0,1,.05),Z.clone().negate(),.2),'Retained mass has no visible skin');
+ assert(Math.abs(f.mass-accepted)<1e-8,'Compacting diffuse tails duplicates material');
+ assert(f.releaseUnsupported(q=>q.z<-.117).mass<.001,'Cohesive seed is not backed by masonry');
+ report.checks.push({name:'Small retained portions form a visible supported seed',acceptedKg:accepted});
+}
+
 console.log(JSON.stringify({...report,passed:true},null,2));

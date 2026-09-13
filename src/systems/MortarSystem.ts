@@ -117,8 +117,9 @@ export class MortarSystem {
       // Reserve the entire scoop atomically; never lose the backward share at
       // the projectile budget. Explicit launch() retains its original contract.
       if(this.projectiles.length+(late>0?3:1)<=48){
+        origin=this.releaseOrigin(camera,origin);
         const mass=.65,bond=phase<.42?.04+.96*(phase/.42)**2:1;
-        this.spawnClod(origin,this.velocity(camera,phase),mass*(1-backFraction),false,bond);
+        this.spawnClod(origin,this.velocity(camera,phase,origin),mass*(1-backFraction),false,bond);
         if(late>0){
           const towardFace=camera.getWorldPosition(new THREE.Vector3()).sub(origin);
           if(towardFace.lengthSq()<1e-6)camera.getWorldDirection(towardFace).negate();
@@ -133,14 +134,46 @@ export class MortarSystem {
       this.cancel();
     }
   }
-  velocity(camera: THREE.Camera, power: number): THREE.Vector3 {
+  velocity(camera: THREE.Camera, power: number, origin?: THREE.Vector3): THREE.Vector3 {
     const direction = camera.getWorldDirection(new THREE.Vector3());
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion()));
-    return direction.applyAxisAngle(right, THREE.MathUtils.degToRad(this.angleDegrees)).multiplyScalar(2 + THREE.MathUtils.clamp(power, 0, 1) * 6);
+    const speed=2+THREE.MathUtils.clamp(power,0,1)*6;
+    if(origin){
+      const hit=this.contact(camera.getWorldPosition(new THREE.Vector3()),direction,8);
+      if(hit){
+        // Converge the offset blade onto the crosshair, including gravity. A
+        // parallel camera ray used to coat the rim above the intended cavity.
+        const delta=hit.point.clone().sub(origin),b=9.81*delta.y-speed*speed;
+        const discriminant=b*b-9.81*9.81*delta.lengthSq();
+        if(discriminant>=0&&b<0&&delta.lengthSq()>1e-8){
+          const time=Math.sqrt(2*delta.lengthSq()/(-b+Math.sqrt(discriminant)));
+          const velocity=delta.multiplyScalar(1/time);velocity.y+=4.905*time;
+          // The default 12-degree loft is the sighted setting. Manual loft
+          // adjustments still raise/lower the cast; timing retains its speed.
+          return velocity.applyAxisAngle(right,THREE.MathUtils.degToRad(this.angleDegrees-12));
+        }
+      }
+    }
+    return direction.applyAxisAngle(right, THREE.MathUtils.degToRad(this.angleDegrees)).multiplyScalar(speed);
+  }
+  /** A close wrist swing can put the model's tip through a wall or the growing
+   * bed. Start on the visible side of the first obstruction, never inside it. */
+  private releaseOrigin(camera: THREE.Camera, tip: THREE.Vector3): THREE.Vector3 {
+    const eye=camera.getWorldPosition(new THREE.Vector3()),direction=tip.clone().sub(eye),distance=direction.length();
+    if(distance<1e-8)return tip.clone();
+    direction.multiplyScalar(1/distance);
+    const hit=this.contact(eye,direction,distance+.025);
+    let travel=hit?Math.max(0,hit.distance-.025):distance;
+    const frontZ=this.wall.volume.frontZ;
+    // A tip inside an OPEN hollow also starts beyond the receiving face and
+    // sends the scoop sideways into internal ribs, especially on mobile.
+    if(typeof frontZ==='number'&&eye.z>frontZ+.05&&direction.z<-.001)
+      travel=Math.min(travel,(frontZ+.05-eye.z)/direction.z);
+    return eye.addScaledVector(direction,travel);
   }
   preview(camera: THREE.Camera, origin: THREE.Vector3, visible: boolean): void {
     this.target.visible = false; if (!visible) return;
-    const p = origin.clone(), v = this.velocity(camera, this.wasHeld ? this.charge : .25);
+    const p = this.releaseOrigin(camera,origin), v = this.velocity(camera, this.wasHeld ? this.charge : .5,p);
     for (let i = 0; i < 100; i++) {
       const next = p.clone().addScaledVector(v, .025); next.y -= .5 * 9.81 * .025 ** 2;
       const d = next.clone().sub(p), hit = this.contact(p, d.clone().normalize(), d.length());
@@ -232,7 +265,7 @@ export class MortarSystem {
     const hit = this.contact(camera.getWorldPosition(new THREE.Vector3()), camera.getWorldDirection(new THREE.Vector3()), .9);
     if (!hit || hit.box || this.insideBox(hit.point)) return false;
     const mass = .65, fraction = this.retention(hit.point, hit.normal.clone().multiplyScalar(-2), hit.normal);
-    const held = this.deposit(hit.point, mass * fraction, hit.normal);
+    const held = this.deposit(hit.point, mass * fraction, hit.normal,true,mass);
     if (!held) return false;
     this.launchedMass += mass; this.stuckMass += held;
     this.spawnClod(hit.point.clone().addScaledVector(hit.normal, .015), hit.normal.clone().multiplyScalar(.12).add(new THREE.Vector3(0, -.15, 0)), mass - held);
@@ -297,7 +330,7 @@ export class MortarSystem {
     return pieces;
   }
 
-  private deposit(p: THREE.Vector3, mass: number, normal: THREE.Vector3, sync=true): number {
+  private deposit(p: THREE.Vector3, mass: number, normal: THREE.Vector3, sync=true,footprintMass=mass): number {
     if (mass <= .001) return 0;
     // An impact facet must not rotate a separate sheet. Wet material joins a
     // fixed-world scalar volume and grows along the working face.
@@ -312,7 +345,11 @@ export class MortarSystem {
       const origin=new THREE.Vector3(x,y,frontZ+.016),hit=volume.raycast(origin,new THREE.Vector3(0,0,-1),.22);
       return hit?hit.point.z:null;
     }};
-    const held = this.field.add(p, growth, mass, blocked,profile);
+    // Adhesion changes quantity, not the width of a scoop spreading across an
+    // existing bed. Shrinking both trapped casts on full lips above empty gaps.
+    const receiver=this.field.stateAt(p);
+    const spread=receiver.value>=.35?footprintMass:mass;
+    const held = this.field.add(p, growth, mass, blocked,profile,spread);
     if (held > 0) { if(sync)this.syncFieldGeometry(); this.geometryRevision++; }
     return held;
   }
@@ -426,7 +463,8 @@ export class MortarSystem {
       const d = next.clone().sub(a), hit = this.contact(a, d.clone().normalize(), d.length());
       if (hit) {
         const fraction = clod.slurry || hit.box || this.insideBox(hit.point) || clod.contacts > 2 ? 0 : this.retention(hit.point, clod.velocity, hit.normal)*clod.bond;
-        const held = this.deposit(hit.point, clod.mass * fraction, hit.normal); this.stuckMass += held; clod.mass -= held; clod.contacts++;
+        const held = this.deposit(hit.point, clod.mass * fraction, hit.normal,true,clod.mass); this.stuckMass += held; clod.contacts++;
+        clod.mass -= held;
         // Rejected weak throws cannot become a second, stronger throw when they
         // hit a lower rib. They flow down under the same contact/gravity solver.
         if(clod.bond<.999)clod.slurry=true;

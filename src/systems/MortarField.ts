@@ -68,9 +68,9 @@ export class MortarField {
     return null;
   }
 
-  add(point:THREE.Vector3,normal:THREE.Vector3,mass:number,blocked:(point:THREE.Vector3)=>boolean,profile?:MortarFillProfile):number {
+  add(point:THREE.Vector3,normal:THREE.Vector3,mass:number,blocked:(point:THREE.Vector3)=>boolean,profile?:MortarFillProfile,footprintMass=mass):number {
     if(mass<this.nodeMass*5||this.nodes.size>=this.maxNodes)return 0;
-    const axis=normal.clone().normalize(),radius=Math.max(.012,Math.cbrt(mass/.65)*.084);
+    const axis=normal.clone().normalize(),radius=Math.max(.012,Math.cbrt(footprintMass/.65)*.084);
     const depth=THREE.MathUtils.clamp(mass/this.density/(Math.PI*radius*radius)*2.5,.018,.075);
     const center=point.clone().addScaledVector(axis,depth*.3),reach=Math.max(radius,depth),h=this.spacing;
     const candidates:Array<{x:number;y:number;z:number;weight:number;old:number;age:number;dilution:number}>=[];
@@ -105,14 +105,28 @@ export class MortarField {
     for(const c of candidates){const value=Math.max(c.old,Math.min(1,c.weight*low)),increment=value-c.old;if(increment<1e-8)continue;if(!this.nodes.has(this.key(c.x,c.y,c.z))&&this.nodes.size>=this.maxNodes)break;
       added+=increment;this.set(c.x,c.y,c.z,value,c.age*c.old/value,c.dilution*c.old/value);
     }
-    // Do not retain diffuse numerical mass with no visible isosurface. It is
-    // returned to the projectile, just like any other unretained excess.
+    // Collect diffuse tails with no visible skin. Repeated small retained
+    // quantities must build a cohesive seed instead of being discarded forever.
     let unresolved=0;
     for(const c of candidates){const node=this.nodes.get(this.key(c.x,c.y,c.z));if(!node||node.value>=LEVEL)continue;
       let visible=false;for(let dx=-1;dx<=1&&!visible;dx++)for(let dy=-1;dy<=1&&!visible;dy++)for(let dz=-1;dz<=1;dz++)if(this.at(c.x+dx,c.y+dy,c.z+dz)>=LEVEL){visible=true;break;}
       if(!visible){const increment=Math.max(0,node.value-c.old);unresolved+=increment;this.set(c.x,c.y,c.z,c.old,c.age,c.dilution);}
     }
-    if(added>0)this.revision++;return (added-unresolved)*this.nodeMass;
+    let recovered=0;
+    if(unresolved>0){
+      // The strongest available profile cells are nearest the backed core.
+      // Compact rejected tails there, conserving the same finite quantity.
+      candidates.sort((a,b)=>b.weight-a.weight);
+      for(const c of candidates){
+        const node=this.nodes.get(this.key(c.x,c.y,c.z)),old=node?.value??0;
+        const increment=Math.min(unresolved-recovered,1-old);if(increment<1e-8)continue;
+        if(!node&&this.nodes.size>=this.maxNodes)break;
+        const value=old+increment;
+        this.set(c.x,c.y,c.z,value,(node?.age??0)*old/value,(node?.dilution??0)*old/value);
+        recovered+=increment;if(recovered>=unresolved-1e-8)break;
+      }
+    }
+    if(added>0)this.revision++;return (added-unresolved+recovered)*this.nodeMass;
   }
 
   tick(dt:number):void {for(const node of this.nodes.values()){node.age+=dt;node.dilution=Math.max(0,node.dilution-dt*.006);}}

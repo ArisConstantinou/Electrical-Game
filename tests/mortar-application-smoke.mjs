@@ -14,10 +14,12 @@ try {
   c.position.set(0,1.3,-1);c.lookAt(0,1.3,-2.41);c.updateMatrixWorld(true);
   const p=c.position.clone().set(0,1.3,-2.41),n=p.clone().set(0,0,1),v=p.clone().set(0,0,-4);
   const dry=m.retention(p,v,n);
-  for(let i=0;i<40;i++)m.wet(c,c.position,.025);
+  // Test adhesion at the actual wetted receiver. The hose now follows gravity
+  // and its stream from 1.4m away no longer lands at the camera's sight height.
+  for(let i=0;i<40;i++)m.applyWater(p,n,.001);
   const damp=m.retention(p,v,n),moist={...m.moistureAt(p)};
   const glancing=m.retention(p,v.clone().set(4,0,-.4),n),weak=m.retention(p,v.clone().set(0,0,-.3),n);
-  for(let i=0;i<220;i++)m.wet(c,c.position,.025);
+  for(let i=0;i<220;i++)m.applyWater(p,n,.001);
   const saturated=m.retention(p,v,n),flood={...m.moistureAt(p)};
   m.launch(p.clone().set(.8,1.2,-1.5),v.clone().set(0,0,-4));
   m.launch(p.clone().set(-.8,.8,-1.5),v.clone().set(0,-2,1));
