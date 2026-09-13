@@ -84,21 +84,108 @@ function spray(): THREE.Group {
 }
 
 function trowel(): THREE.Group {
-  // Satin working steel spreads the sun highlight across the blade. The
-  // polished finish produced a clipped white patch with blue/yellow fringes.
-  const group = new THREE.Group(), metal = mat(0xb7bfbe, .65, .78), darkSteel = mat(0x727a79, .55, .7);
-  const blade = outline([[-.070, .155], [-.010, -.021], [.050, -.043], [.085, -.013], [.071, .044]]);
-  const plate = part(group, extrude(blade, .0018), metal, [.01, .018, -.09], 'Triangular satin steel pointing blade'); plate.rotation.x = -.12;
-  // A narrow contrasting bevel is geometry, not a thick wedge/putty knife blade.
-  rod(group, [-.060, .172, -.112], [.081, .062, -.097], .0007, mat(0xe6e8e5, .5, .85), 'Ground cutting edge');
-  tube(group, [[.049, -.002, -.086], [.097, -.029, -.059], [.109, -.020, -.014], [.131, -.049, .030]], .006, darkSteel, 'Bent forged swan-neck tang');
-  const handleStart: Point = [.141, -.058, .039], handleEnd: Point = [.224, -.155, .077];
-  rod(group, handleStart, handleEnd, .0148, mat(0xb98443, .68), 'Shaped varnished hardwood handle', .0128);
-  rod(group, [.130, -.046, .027], [.149, -.067, .043], .0152, metal, 'Steel handle ferrule');
-  const grain = mat(0x8c6031, .9);
-  for (let i = 0; i < 4; i++) rod(group, [.149 + i * .002, -.064, .051], [.215 + i * .0015, -.144, .085], .00045, grain, 'Fine longitudinal wood grain');
-  const end = part(group, new THREE.SphereGeometry(.0128, 16, 10), mat(0xb98443, .68), handleEnd, 'Rounded handle end'); end.scale.set(1, .7, 1);
-  return gripFrame(metadata(group, [.183, -.108, .059], [-.060, .172, -.112]),[-.083,.097,-.038]);
+  const group = new THREE.Group();
+  // A 235 x 116 mm London-pattern blade, one forged neck, and a turned wood
+  // handle. The working face is XZ / +Y so the wrist can visibly turn it over.
+  const bladeSteel = mat(0xa9b1af, .57, .72), forgedSteel = mat(0x666e6a, .65, .65);
+  const bladeShape = new THREE.Shape();
+  bladeShape.moveTo(-.040, 0);
+  bladeShape.quadraticCurveTo(-.057, 0, -.058, .017);
+  bladeShape.bezierCurveTo(-.060, .058, -.027, .190, 0, .235);
+  bladeShape.bezierCurveTo(.027, .190, .060, .058, .058, .017);
+  bladeShape.quadraticCurveTo(.057, 0, .040, 0);
+  bladeShape.lineTo(-.040, 0);
+  const bladeGeometry = extrude(bladeShape, .0022, .00038);
+  const bladeVertices = bladeGeometry.getAttribute('position');
+  for (let i = 0; i < bladeVertices.count; i++) {
+    // Thick forged heel tapers toward a flexible, finely ground point.
+    bladeVertices.setZ(i, bladeVertices.getZ(i) * (1 - .53 * Math.max(0, bladeVertices.getY(i)) / .235));
+  }
+  bladeGeometry.computeVertexNormals();
+  const blade = part(group, bladeGeometry, bladeSteel, [.183, -.170, -.025], 'Taper-ground carbon steel masonry blade');
+  blade.rotation.x = -Math.PI / 2;
+  // Fine abrasion is part of the steel, without emissive or mirror-like glare.
+  const scratches: number[] = [];
+  for (let i = 0; i < 28; i++) {
+    const z = -.045 - (i % 9) * .018;
+    const halfWidth = .049 * (1 - Math.max(0, -z - .070) / .220);
+    const x = .183 + Math.sin(i * 2.39996) * halfWidth * .8;
+    scratches.push(x, -.1687, z, x + .0018, -.1687, z - .009 - (i % 4) * .004);
+  }
+  const scratchGeometry = new THREE.BufferGeometry();
+  scratchGeometry.setAttribute('position', new THREE.Float32BufferAttribute(scratches, 3));
+  const abrasion = new THREE.LineSegments(scratchGeometry, new THREE.LineBasicMaterial({ color: 0x79837d, transparent: true, opacity: .22, depthWrite: false }));
+  abrasion.name = 'Fine working-face abrasion'; group.add(abrasion);
+  const heel = part(group, new THREE.SphereGeometry(1, 20, 10), forgedSteel, [.183, -.167, -.062], 'Integral forged neck root');
+  heel.scale.set(.016, .004, .022);
+  tube(group, [[.183, -.166, -.066], [.183, -.161, -.047], [.183, -.145, -.033], [.183, -.112, -.023], [.183, -.108, -.003]], .0058, forgedSteel, 'Continuous forged swan neck');
+  // The grip remains at the existing wrist anchor, but the handle now runs
+  // along the tool rather than crossing its blade like a flat putty knife.
+  const handleGeometry = new THREE.LatheGeometry([
+    [0, -.065], [.0105, -.065], [.0130, -.060], [.0140, -.050],
+    [.0170, -.032], [.0180, -.010], [.0177, .015], [.0160, .042],
+    [.0150, .056], [.0110, .064], [0, .067],
+  ].map(p => new THREE.Vector2(p[0], p[1])), 32);
+  const handlePositions = handleGeometry.getAttribute('position'), handleColors: number[] = [];
+  for (let i = 0; i < handlePositions.count; i++) {
+    const x = handlePositions.getX(i), y = handlePositions.getY(i), z = handlePositions.getZ(i);
+    const angle = Math.atan2(z, x);
+    const grain = Math.sin(angle * 19 + Math.sin(y * 24) * 1.7) * .055 + Math.sin(angle * 47 + y * 31) * .022;
+    const color = new THREE.Color(0x9b5e2e).multiplyScalar(.96 + grain);
+    handleColors.push(color.r, color.g, color.b);
+  }
+  handleGeometry.setAttribute('color', new THREE.Float32BufferAttribute(handleColors, 3));
+  const wood = mat(0xffffff, .61); wood.vertexColors = true;
+  const handle = part(group, handleGeometry, wood, [.183, -.108, .059], 'Contoured ash hardwood grip');
+  handle.rotation.x = Math.PI / 2;
+  rod(group, [.183, -.108, -.009], [.183, -.108, .010], .0134, bladeSteel, 'Crimped steel handle ferrule');
+  const ferruleRim = torus(group, .0134, .0007, forgedSteel, [.183, -.108, .007], 'Ferrule rolled rim');
+  ferruleRim.rotation.set(0, 0, 0);
+  part(group, new THREE.SphereGeometry(.0035, 12, 8), forgedSteel, [.183, -.108, .126], 'Recessed tang end');
+
+  // One connected mound with a broad contact patch and irregular aggregate.
+  // Rest coordinates never change; FPSRig deforms this same buffer in place.
+  const loadGeometry = new THREE.SphereGeometry(1, 48, 28);
+  const loadPositions = loadGeometry.getAttribute('position'), loadColors: number[] = [];
+  for (let i = 0; i < loadPositions.count; i++) {
+    const x = loadPositions.getX(i), y = loadPositions.getY(i), z = loadPositions.getZ(i);
+    const lump = Math.sin(x * 9 + z * 5) * Math.sin(z * 11 - y * 7) * .16
+      + Math.sin(x * 31 + y * 19) * Math.cos(z * 29) * .045;
+    const radial = Math.hypot(x, z), scallop = 1 + .065 * Math.sin(Math.atan2(z, x) * 11) + .035 * Math.cos(Math.atan2(z, x) * 19);
+    const skin = (1 + lump * Math.max(0, y)) * (1 + (scallop - 1) * radial * radial);
+    const px = x * .063 * skin, pz = z * .104 * skin, worldZ = -.142 + pz;
+    const bladeHalfWidth = .058 * Math.max(0, 1 - Math.pow(Math.max(0, (-worldZ - .035) / .225), 1.25));
+    const overhang = Math.abs(px) > bladeHalfWidth + .002 || worldZ < -.258;
+    // Torn skirts hang outside the steel perimeter; the underside over the
+    // working face stays a flat contact patch instead of penetrating the blade.
+    const skirt = Math.max(0, 1 - Math.abs(y) * 1.7) * (.014 + .016 * (.5 + .5 * Math.sin(x * 38 + z * 23)));
+    const py = y > 0 ? y * .066 * skin : overhang ? -skirt * Math.min(1, -y * 8) : y * .0012;
+    loadPositions.setXYZ(i, px, py, pz);
+    const grain = Math.sin(x * 71 + z * 37) * Math.sin(z * 83 - y * 59);
+    const color = new THREE.Color(0x827a65).multiplyScalar(.94 + grain * .09 + lump * .2);
+    loadColors.push(color.r, color.g, color.b);
+  }
+  loadGeometry.setAttribute('color', new THREE.Float32BufferAttribute(loadColors, 3));
+  const restPositions = new Float32Array(loadPositions.array);
+  loadGeometry.setAttribute('restPosition', new THREE.BufferAttribute(restPositions, 3));
+  (loadPositions as THREE.BufferAttribute).setUsage(THREE.DynamicDrawUsage);
+  loadGeometry.computeVertexNormals();
+  const wetMortar = mat(0xffffff, .84, 0); wetMortar.vertexColors = true;
+  const load = part(group, loadGeometry, wetMortar, [.183, -.168, -.142], 'trowel-load');
+  load.userData.restPositions = restPositions;
+  load.userData.basePosition = load.position.toArray();
+  load.userData.deformationHeight = .066;
+  const residue = mat(0x817b67, .9);
+  tube(group, [[.183, -.164, -.066], [.183, -.158, -.047], [.183, -.142, -.033], [.183, -.117, -.024]], .0086, residue, 'Wet mortar residue on forged neck');
+  const smear = outline([[-.029,0],[-.035,.012],[-.023,.027],[-.027,.044],[-.012,.058],[.004,.052],[.022,.049],[.026,.031],[.030,.008],[.017,-.005]]);
+  const tail = part(group, extrude(smear, .0011), residue, [.183,-.168,-.038], 'Scraped mortar tail on blade heel'); tail.rotation.x=-Math.PI/2;
+  group.userData.bladeNormal = [0, 1, 0];
+  group.userData.bladeCenter = [.183, -.170, -.142];
+  group.userData.loadCenter = load.position.toArray();
+  group.userData.releasePoint = [.183, -.163, -.231];
+  const carryGrip = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, -1));
+  carryGrip.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2));
+  return gripFrame(metadata(group, [.183, -.108, .059], [.183, -.169, -.260]), [0, 0, -1], carryGrip);
 }
 
 function spring(): THREE.Group {

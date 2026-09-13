@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
+import { blockPointerLock } from './browser-safety.mjs';
 
 const url = process.argv[2] ?? 'http://127.0.0.1:5362/Electrical-Game/';
 const out = resolve(process.argv[3] ?? 'output/throw-timing-ui');
@@ -29,8 +30,20 @@ async function sample(page) {
     const labels = [...document.querySelectorAll('#mortar-panel strong,#mortar-panel small,#mortar-panel button,#mortar-panel b,#mortar-panel span,#trowel-swing-gauge output,#trowel-swing-gauge span,#trowel-swing-gauge b')].filter(e => visible(e) && e.textContent.trim());
     const badFonts = labels.filter(e => parseFloat(getComputedStyle(e).fontSize) < 12).map(e => ({ text: e.textContent, font: getComputedStyle(e).fontSize }));
     const rig = g.fpsRig.tools.get('trowel');
+    const arm = g.fpsRig.armSets.get('trowel').find(a => a.side === 1);
+    const Vector = g.renderer.camera.position.constructor;
+    const worldOrientation = rig.getWorldQuaternion(g.renderer.camera.quaternion.clone());
+    const handOrientation = arm.hand.getWorldQuaternion(worldOrientation.clone());
+    const straightArm = {
+      shoulder: arm.shoulder.toArray(), elbow: arm.elbow.toArray(), wrist: arm.wrist.toArray(),
+      forearmAxis: arm.wrist.clone().sub(arm.elbow).normalize().toArray(),
+      handAxis: new Vector(0, 1, 0).applyQuaternion(handOrientation).toArray(),
+      toolHeading: new Vector(0, 0, -1).applyQuaternion(worldOrientation).toArray(),
+      bladeNormal: new Vector().fromArray(rig.userData.bladeNormal).applyQuaternion(worldOrientation).toArray(),
+      cameraForward: g.renderer.camera.getWorldDirection(new Vector()).toArray(),
+    };
     const compact = { unified: q('#mortar-panel').contains(q('#trowel-swing-gauge')), floatingButtons: q('#mortar-panel').querySelectorAll('button').length, dialVisible: visible(q('.swing-gauge-dial')), missionHeight: q('#top-hud').getBoundingClientRect().height, panelHeight: q('#mortar-panel').getBoundingClientRect().height };
-    return { feedback: g.mortar.throwFeedback, mass: g.mortar.launchedMass, projectiles: g.mortar.projectiles.map(p => ({ mass: p.mass, bond: p.bond, velocity: p.velocity.toArray() })), rig: { degrees: g.fpsRig.mortarSwingDegrees, holding: g.fpsRig.mortarHolding, rotation: rig.rotation.toArray() }, ui: { quality: q('#mortar-flow').dataset.quality, holding: q('#mortar-flow').dataset.holding, cursor: parseFloat(q('#throw-timing-cursor').style.left), meter: Number(q('#throw-timing-track').getAttribute('aria-valuenow')), degrees: parseFloat(q('#trowel-swing-degrees').textContent.replace('−', '-')), strength: parseFloat(q('#trowel-swing-strength').textContent), splash: Number(q('#mortar-face-splash').style.opacity), flowVisible: visible(q('#mortar-flow')), gaugeVisible: visible(q('#trowel-swing-gauge')) }, layout: { compact, width: innerWidth, height: innerHeight, scrollWidth: document.documentElement.scrollWidth, scrollHeight: document.documentElement.scrollHeight, bounds, badFonts }, rendererError: g.renderer.lastError ?? '' };
+    return { straightArm, feedback: g.mortar.throwFeedback, mass: g.mortar.launchedMass, projectiles: g.mortar.projectiles.map(p => ({ mass: p.mass, bond: p.bond, velocity: p.velocity.toArray() })), rig: { degrees: g.fpsRig.mortarSwingDegrees, holding: g.fpsRig.mortarHolding, rotation: rig.rotation.toArray() }, ui: { quality: q('#mortar-flow').dataset.quality, holding: q('#mortar-flow').dataset.holding, cursor: parseFloat(q('#throw-timing-cursor').style.left), meter: Number(q('#throw-timing-track').getAttribute('aria-valuenow')), degrees: parseFloat(q('#trowel-swing-degrees').textContent.replace('−', '-')), strength: parseFloat(q('#trowel-swing-strength').textContent), splash: Number(q('#mortar-face-splash').style.opacity), flowVisible: visible(q('#mortar-flow')), gaugeVisible: visible(q('#trowel-swing-gauge')) }, layout: { compact, width: innerWidth, height: innerHeight, scrollWidth: document.documentElement.scrollWidth, scrollHeight: document.documentElement.scrollHeight, bounds, badFonts }, rendererError: g.renderer.lastError ?? '' };
   });
 }
 function checkUI(data, name) {
@@ -42,7 +55,14 @@ function checkUI(data, name) {
   assert.equal(u.degrees, Math.round(f.swingDegrees), `${name}: displayed swing degrees diverged`);
   assert.equal(u.strength, Math.round(f.strength * 100), `${name}: displayed strength diverged`);
   assert(Math.abs(data.rig.degrees - f.swingDegrees) < .001, `${name}: animated tool and gauge diverged`);
-  assert(Math.abs(data.rig.rotation[0] * 180 / Math.PI - f.swingDegrees) < .001, `${name}: actual visible trowel angle diverged`);
+  assert.equal(f.swingDegrees, f.motion.rollDegrees, `${name}: gauge must show axial roll`);
+  const arm = data.straightArm;
+  const dot = (a, b) => a.reduce((sum, value, i) => sum + value * b[i], 0);
+  const distance = (a, b) => Math.hypot(...a.map((value, i) => value - b[i]));
+  assert(dot(arm.forearmAxis, arm.handAxis) > .99999, `${name}: wrist bends away from the forearm`);
+  assert(dot(arm.forearmAxis, arm.toolHeading) > .99999, `${name}: tool twists away from the straight forearm axis`);
+  assert(Math.abs(distance(arm.shoulder, arm.elbow) - .31) < 1e-6, `${name}: upper arm stretched`);
+  assert(Math.abs(distance(arm.elbow, arm.wrist) - .27) < 1e-6, `${name}: forearm stretched`);
   assert.equal(data.rig.holding, f.holding);
   assert(u.flowVisible && u.gaugeVisible, `${name}: timing gauge hidden`);
   assert.equal(data.layout.badFonts.length, 0, `${name}: unreadable labels ${JSON.stringify(data.layout.badFonts)}`);
@@ -58,9 +78,23 @@ function checkUI(data, name) {
   assert.equal(data.rendererError, '', `${name}: renderer error`);
 }
 
+function checkStraightFlick(reference, data, name) {
+  const a = reference.straightArm, b = data.straightArm;
+  const dot = (u, v) => u.reduce((sum, value, i) => sum + value * v[i], 0);
+  assert(dot(a.toolHeading, b.toolHeading) > .99999, `${name}: flick changed tool heading instead of axial rotation`);
+  assert(Math.abs(dot(a.bladeNormal, b.bladeNormal) - Math.cos(data.feedback.motion.rollDegrees * Math.PI / 180)) < 1e-5, `${name}: actual blade normal does not follow the forearm roll`);
+  const wristTravel = b.wrist.map((value, i) => value - a.wrist[i]);
+  const elbowTravel = b.elbow.map((value, i) => value - a.elbow[i]);
+  assert(Math.hypot(...wristTravel) < .1, `${name}: flick became a long arm swing`);
+  assert(Math.hypot(...wristTravel.map((value, i) => value - elbowTravel[i])) < .001, `${name}: wrist bent independently of the forearm`);
+  if (data.feedback.stage === 'follow-through') assert(dot(wristTravel, a.cameraForward) > .01, `${name}: no measurable short forward flick`);
+}
+
 try {
   for (const config of [{ name: 'desktop', width: 1366, height: 768, mobile: false }, { name: 'mobile', width: 390, height: 844, mobile: true }, { name: 'landscape', width: 844, height: 390, mobile: true }]) {
-    const page = await browser.newPage({ viewport: { width: config.width, height: config.height }, isMobile: config.mobile, hasTouch: config.mobile, deviceScaleFactor: 1 });
+    const context = await browser.newContext({ viewport: { width: config.width, height: config.height }, isMobile: config.mobile, hasTouch: config.mobile, deviceScaleFactor: 1 });
+    await blockPointerLock(context);
+    const page = await context.newPage();
     page.on('pageerror', e => report.errors.push(`${config.name}: ${e.message}`));
     await page.goto(url, { waitUntil: 'networkidle' });
     await page.waitForFunction(() => Boolean(window.__wireTheHouse));
@@ -105,26 +139,48 @@ try {
       assert.equal(before.feedback.swingDegrees, 0, 'Idle trowel and live gauge must return to zero degrees');
       await hold(true); await advance(page, phase * .95);
       const held = await sample(page); checkUI(held, `${config.name}-${quality}`);
+      checkStraightFlick(before, held, `${config.name}-${quality}-holding`);
       assert.equal(held.feedback.quality, quality);
       assert.equal(held.mass, before.mass, 'Holding must not throw automatically');
       await frame(page); await page.screenshot({ path: join(out, `${config.name}-${quality}-holding.png`) });
       await hold(false); await advance(page, 0);
+      const committed = await sample(page); checkUI(committed, `${config.name}-${quality}-committed`);
+      assert.equal(committed.mass, before.mass, 'Button-up commits the wrist motion without immediately releasing mortar');
+      assert.equal(committed.feedback.lastRelease, before.feedback.lastRelease);
+      assert(committed.feedback.casting && committed.feedback.motion.loadVisible);
+      await advance(page, .15);
+      const flipping = await sample(page); checkUI(flipping, `${config.name}-${quality}-flipping`);
+      assert.equal(flipping.mass, before.mass, 'Mortar must stay on the blade until the .16-second release');
+      await advance(page, .01);
       const released = await sample(page); checkUI(released, `${config.name}-${quality}-released`);
+      checkStraightFlick(before, released, `${config.name}-${quality}-released`);
       assert(Math.abs(released.mass - before.mass - .65) < 1e-8, 'Release must consume exactly one scoop');
       assert.equal(released.feedback.lastRelease, before.feedback.lastRelease + 1);
       if (quality === 'late') { assert(released.feedback.splash > .8); assert(released.ui.splash > .65); }
       else assert.equal(released.feedback.splash, 0);
       await frame(page); await page.screenshot({ path: join(out, `${config.name}-${quality}-released.png`) });
-      await advance(page, .325);
+      assert.equal(released.feedback.motion.loadVisible, false);
+      await advance(page, .165);
       const recovering = await sample(page); checkUI(recovering, `${config.name}-${quality}-recovering`);
-      assert(Math.abs(recovering.feedback.swingDegrees) < Math.abs(released.feedback.swingDegrees), 'Recovery must visibly return the tool and gauge together');
-      item.phases.push({ quality, held, released, recovering });
+      checkStraightFlick(before, recovering, `${config.name}-${quality}-follow-through`);
+      assert.equal(recovering.feedback.stage, 'follow-through');
+      assert(recovering.feedback.motion.rollDegrees >= 150, 'Follow-through must keep the emptied blade turned over');
+      assert(recovering.feedback.swingDegrees > released.feedback.swingDegrees, 'Wrist must finish its forward arc before returning');
+      assert.equal(recovering.mass, released.mass, 'Follow-through must not emit a second scoop');
+      await advance(page, .495);
+      const reset = await sample(page); checkUI(reset, `${config.name}-${quality}-reset`);
+      checkStraightFlick(before, reset, `${config.name}-${quality}-reset`);
+      assert(Math.abs(reset.feedback.swingDegrees) < .001 && Math.abs(reset.feedback.motion.rollDegrees) < .001, 'The .82-second cast must return to the ready pose');
+      assert.equal(reset.feedback.lastRelease, before.feedback.lastRelease + 1);
+      item.phases.push({ quality, held, committed, flipping, released, recovering, reset });
     }
     await advance(page, 5);
     const beforeEnd = await sample(page);
     await hold(true); await advance(page, 2.4);
     const heldEnd = await sample(page); assert.equal(heldEnd.feedback.phase, 1); assert.equal(heldEnd.mass, beforeEnd.mass, 'Full bar must wait for release');
     await hold(false); await advance(page, 0);
+    assert.equal((await sample(page)).mass, beforeEnd.mass);
+    await advance(page, .16);
     assert(Math.abs((await sample(page)).mass - beforeEnd.mass - .65) < 1e-8);
     item.barEnd = { heldSeconds: 2.4, noAutomaticThrow: true };
     await advance(page, 5);
@@ -134,12 +190,13 @@ try {
       else if (kind === 'blur') await page.evaluate(() => window.dispatchEvent(new Event('blur')));
       else { await cdp.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] }); heldTouch = null; }
       if (kind !== 'pointer-cancel') await hold(false);
-      await advance(page, .1);
+      await advance(page, .9);
       assert.equal((await sample(page)).mass, before.mass, `${config.name}: ${kind} accidentally launched`);
       item.cancellations.push(kind); await select('trowel');
     }
     await select('trowel');
-    const relocated = ['#mortar-angle-down', '#mortar-angle-up', '#mortar-swing', '#work-height', '#mortar-pack'];
+    assert.equal(await page.locator('#mortar-pack').count(), 0, 'Press-to-pack control must be removed');
+    const relocated = ['#mortar-angle-down', '#mortar-angle-up', '#mortar-swing', '#work-height'];
     for (const selector of relocated) assert(!(await page.locator(selector).isVisible()), `${config.name}: ${selector} should be out of the work view`);
     await page.locator('#settings-toggle')[config.mobile ? 'tap' : 'click']();
     await page.locator('#mortar-settings summary')[config.mobile ? 'tap' : 'click']();
@@ -171,7 +228,8 @@ try {
     assert(await page.locator('#mortar-panel').isVisible(), 'Hose moisture panel must remain');
     await frame(page); await page.screenshot({ path: join(out, `${config.name}-hose.png`) });
     item.hose = hose;
-    await page.close();
+    assert.equal(await page.evaluate(() => document.pointerLockElement), null);
+    await context.close();
   }
   assert.deepEqual(report.errors, []);
   console.log(JSON.stringify({ passed: report.scenarios.map(s => ({ platform: s.platform, phases: s.phases.map(p => p.quality), cancellations: s.cancellations, barEnd: s.barEnd })), errors: report.errors }, null, 2));

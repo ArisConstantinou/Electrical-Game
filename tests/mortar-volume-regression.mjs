@@ -20,6 +20,13 @@ function cavity(halfWidth=.07,halfHeight=.07,depth=.06){
 function advance(system,seconds){for(let t=0;t<seconds-1e-9;t+=.01)system.update(Math.min(.01,seconds-t));}
 function massBalance(system){const t=system.telemetry,error=t.launchedKg-t.stuckKg-t.restingKg-t.floorKg-t.movingKg;assert(Math.abs(error)<1e-7,`Material disappeared/duplicated: ${error}kg`);assert(Math.abs(system.field.mass-t.stuckKg)<1e-7,'Field quantity differs from adhered-material ledger');return{launchedKg:t.launchedKg,adheredKg:t.stuckKg,restingKg:t.restingKg,floorKg:t.floorKg,movingKg:t.movingKg,washedKg:t.washedKg,errorKg:error};}
 function aim(camera,x,y,z=-.06){camera.position.set(x,y,.4);camera.lookAt(x,y,z);camera.updateMatrixWorld(true);}
+function cast(system,camera){
+  const origin=camera.position.clone().addScaledVector(camera.getWorldDirection(new THREE.Vector3()),.17),before=system.launchedMass;
+  system.swing(true,.475,camera,origin);system.swing(false,0,camera,origin);
+  assert.equal(system.launchedMass,before,'Button-up deposits mortar before the wrist releases');
+  system.swing(false,.16,camera,()=>origin);
+  assert(Math.abs(system.launchedMass-before-.65)<1e-9,'A cast must release one finite 0.65 kg scoop');
+}
 function components(system){
   const ids=new Map(),parents=[];
   const id=p=>{const key=p.map(v=>Math.round(v*1e5)).join(',');if(!ids.has(key)){ids.set(key,parents.length);parents.push(parents.length);}return ids.get(key);};
@@ -30,13 +37,13 @@ function components(system){
 }
 
 // The same API fills an arbitrary hole with no mission point, fitted-box state
-// or target ID. Four real trowel loads must build a connected interior volume.
+// or target ID. Four released finite trowel loads must build a connected interior volume.
 {
   const system=new MortarSystem(new THREE.Scene(),cavity(),[]),camera=new THREE.PerspectiveCamera();
   const targets=[[-.03,1.03],[.03,1.03],[0,.97],[0,1]];
   for(const[x,y]of targets)system.applyWater(new THREE.Vector3(x,y,-.059),Z,.025);
   const loadMass=[];
-  for(const[x,y]of targets){aim(camera,x,y);assert(system.pack(camera),'Generic reachable cavity rejected packing without fitted box');advance(system,.8);loadMass.push(system.stuckMass);}
+  for(const[x,y]of targets){aim(camera,x,y);cast(system,camera);advance(system,1.05);loadMass.push(system.stuckMass);}
   advance(system,3);
   let filled=0,samples=0;
   for(let x=-.05;x<=.05+1e-8;x+=.02)for(let y=.95;y<=1.05+1e-8;y+=.02)for(let z=-.045;z<=-.005+1e-8;z+=.01){samples++;if(system.field.sample(new THREE.Vector3(x,y,z))>=.35)filled++;}
@@ -46,7 +53,7 @@ function components(system){
   assert(system.deposits.every(d=>d.fieldKey&&d.mesh.position.lengthSq()===0&&d.mesh.quaternion.angleTo(new THREE.Quaternion())<1e-8),'Deposits still use per-throw rotating meshes');
   const before=system.deposits.map(d=>Array.from(d.mesh.geometry.getAttribute('position').array));advance(system,.5);
   assert.deepEqual(system.deposits.map(d=>Array.from(d.mesh.geometry.getAttribute('position').array)),before,'Unforced, settled mortar geometry keeps rotating or changing');
-  report.checks.push({name:'any cavity; four cohesive trowel loads',loadMassKg:loadMass,filledFraction:fraction,connectedSurfaceComponents:connected,...massBalance(system)});
+  report.checks.push({name:'any cavity; four ballistic trowel loads',loadMassKg:loadMass,filledFraction:fraction,connectedSurfaceComponents:connected,...massBalance(system)});
 }
 
 // A 74 mm single-gang installation with a 46 mm deep chase should be ready in
@@ -57,7 +64,7 @@ function components(system){
   const system=new MortarSystem(scene,cavity(.072,.072,.046),[point]),camera=new THREE.PerspectiveCamera(),targets=[[0,1.062],[0,.938],[-.063,1],[.063,1]];
   for(const[x,y]of targets)system.applyWater(new THREE.Vector3(x,y,-.045),Z,.035);
   const coverage=[];
-  for(const[x,y]of targets){aim(camera,x,y,-.046);assert(system.pack(camera),'Valid single-gang ring packing rejected');advance(system,.8);coverage.push(system.coverage(point));}
+  for(const[x,y]of targets){aim(camera,x,y,-.046);cast(system,camera);advance(system,1.05);coverage.push(system.coverage(point));}
   advance(system,1.5);assert(system.ready(point),`Single gang still incomplete after four trowels: ${system.coverage(point)}`);
   assert.equal(point.stage,'mortared','Stable completed single gang failed to advance');
   report.checks.push({name:'single gang in four trowels',coverageByLoad:coverage,finalCoverage:system.coverage(point),...massBalance(system)});

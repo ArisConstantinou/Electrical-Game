@@ -43,9 +43,12 @@ try {
     await steps(60); await capture('before');
     const cdp = mobile ? await context.newCDPSession(page) : null;
     const loads = [], targets = [[-.05, 1.36], [.05, 1.36], [-.05, 1.44], [.05, 1.44]];
-    const finishingTargets = [[-.08, 1.30], [.08, 1.30], [-.12, 1.30], [.12, 1.30]];
+    // Finish the whole visible perimeter. The old finishing path repeatedly
+    // aimed below the cavity and never returned to its upper corners. These
+    // fixed targets remain independent of measured fill and material queries.
+    const finishingTargets = [[-.08,1.34],[.08,1.34],[-.08,1.46],[.08,1.46],[-.10,1.40],[.10,1.40],[0,1.33],[0,1.47]];
     for (let i = 0; i < 28; i++) {
-      await page.evaluate(([x, y]) => { const g = window.__wireTheHouse, c = g.renderer.camera; c.lookAt(x, y, g.room.brickWall.volume.frontZ - .05); g.player.yaw = c.rotation.y; g.player.pitch = c.rotation.x; }, i < 16 ? targets[i % 4] : finishingTargets[i % 4]);
+      await page.evaluate(([x, y]) => { const g = window.__wireTheHouse, c = g.renderer.camera; c.lookAt(x, y, g.room.brickWall.volume.frontZ - .05); g.player.yaw = c.rotation.y; g.player.pitch = c.rotation.x; }, i < 16 ? targets[i % 4] : finishingTargets[(i-16) % finishingTargets.length]);
       await steps(12);
       if (cdp) { const b = await page.locator('#look-joystick').boundingBox(); await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: b.x + b.width / 2, y: b.y + b.height / 2, id: 17 }] }); } else await page.keyboard.down('KeyE');
       await steps(28);

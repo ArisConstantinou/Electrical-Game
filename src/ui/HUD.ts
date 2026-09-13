@@ -10,6 +10,8 @@ export interface MortarThrowFeedback {
   strength: number;
   splash: number;
   lastRelease: number;
+  casting?: boolean;
+  stage?: string;
 }
 
 const stageLabel: Record<string, string> = {
@@ -83,9 +85,9 @@ export class HUD {
             </div>
             <label class="hammer-speed-setting" for="water-gun-mode"><span>WATER GUN | FLOW</span><select id="water-gun-mode" aria-label="Water gun flow mode">${WATER_GUN_MODES.map(mode=>`<option value="${mode.id}" ${mode.id==='flood'?'selected':''}>${mode.label} | ${mode.flowLitresPerSecond} L/s</option>`).join('')}</select><small>FLOOD fills the room with boosted game flow. Choose MIST for gentle chase wetting.</small></label>
             <details id="mortar-settings"><summary>TROWEL / WATER</summary>
-              <p>Hold the aim pad or mouse button, then release in the green zone. Adjust the loft or pack nearby mortar here.</p>
+              <p>Hold the aim pad or mouse button, then release in the green zone. The wrist flips and throws the mortar into the chase.</p>
             <div class="mortar-buttons"><button type="button" id="mortar-angle-down" aria-label="Lower trowel throw angle">− ANGLE</button><button type="button" id="mortar-swing">HOLD · RELEASE</button><button type="button" id="mortar-angle-up" aria-label="Raise trowel throw angle">+ ANGLE</button></div>
-            <button type="button" id="work-height">CROUCH · LOW WORK</button><button type="button" id="mortar-pack">P · PRESS / PACK NEARBY</button><small id="mortar-hint"></small>
+            <button type="button" id="work-height">CROUCH · LOW WORK</button><small id="mortar-hint"></small>
             </details>
             <div id="mobile-control-settings" aria-label="Mobile aim settings">
               <button id="aim-input-mode" type="button" aria-label="Change aim input style"><span>AIM INPUT</span><b>DRAG</b></button>
@@ -120,7 +122,7 @@ export class HUD {
               <g id="trowel-swing-needle" transform="rotate(-70 80 73)"><path d="M 80 73 L 80 22"/><path class="swing-needle-tip" d="M 76 26 L 80 17 L 84 26 Z"/></g>
               <circle class="swing-gauge-pivot" cx="80" cy="73" r="5"/>
             </svg>
-            <output id="trowel-swing-degrees">−50°</output>
+            <output id="trowel-swing-degrees">0°</output>
             <div class="swing-strength-label"><span>POWER</span><b id="trowel-swing-strength">0%</b></div>
             <div class="swing-strength-track"><span id="trowel-strength-fill"></span></div>
           </aside>
@@ -162,7 +164,7 @@ export class HUD {
           <section id="start-screen" class="screen-panel">
             <div class="eyebrow">CYPRUS · RESIDENTIAL FIRST FIX</div>
             <h1>WIRE<br><span>THE HOUSE</span></h1>
-            <p>Choose where to work; spray marks are optional. Chase real masonry, pack the recess and set each box level and flush. Finish the PVC routes before plastering.</p>
+            <p>Choose where to work; spray marks are optional. Chase real masonry, throw mortar into the recess and set each box level and flush. Finish the PVC routes before plastering.</p>
             <div class="brief-grid"><span>3 installation points</span><span>No cable pulling</span><span>Desktop + mobile</span></div>
             <button id="start-button">ENTER THE SITE</button>
             <small>WASD · MOUSE LOOK · LEFT CLICK / E USE TOOL · WHEEL / 1–8 TOOLS · V SPRAY · C COLOR · X CHASE / DEMOLISH</small>
@@ -206,7 +208,6 @@ export class HUD {
     root.querySelector<HTMLInputElement>('#chisel-width')!.addEventListener('input',event=>dispatchEvent(new CustomEvent('wirehouse:chisel-width',{detail:Number((event.target as HTMLInputElement).value)/1000})));
     root.querySelector<HTMLInputElement>('#hammer-speed')!.addEventListener('input',event=>dispatchEvent(new CustomEvent('wirehouse:hammer-speed',{detail:Number((event.target as HTMLInputElement).value)/100})));
     root.querySelector('#work-height')!.addEventListener('click',()=>dispatchEvent(new CustomEvent('wirehouse:work-height')));
-    root.querySelector('#mortar-pack')!.addEventListener('click',()=>dispatchEvent(new CustomEvent('wirehouse:mortar-pack')));
     root.querySelector('#mortar-angle-down')!.addEventListener('click',()=>dispatchEvent(new CustomEvent('wirehouse:mortar-angle',{detail:-5})));
     root.querySelector('#mortar-angle-up')!.addEventListener('click',()=>dispatchEvent(new CustomEvent('wirehouse:mortar-angle',{detail:5})));
     this.shell = root.querySelector('#game-shell')!;
@@ -381,7 +382,6 @@ export class HUD {
     this.shell.querySelector<HTMLElement>('#swing-power')!.style.width=`${tool==='hose'?wet.pore*100:power*100}%`;
     this.shell.querySelector<HTMLElement>('#mortar-hint')!.textContent=tool==='hose'?`Soak exposed chase surfaces. Excess water washes fresh mortar away. Floor water: ${floorLitres.toFixed(1)} L.`:recovery>0?'Recovering / loading next trowelful…':outcome;
     this.shell.querySelector<HTMLElement>('#mortar-swing')!.textContent=tool==='hose'?'HOLD · MIST':'HOLD · RELEASE';
-    this.shell.querySelector<HTMLElement>('#mortar-pack')!.hidden=tool==='hose';
     for(const id of ['#mortar-angle-up','#mortar-angle-down'])this.shell.querySelector<HTMLElement>(id)!.hidden=tool==='hose';
     const active=tool==='trowel';
     panel.dataset.activeTool=tool;
@@ -389,7 +389,7 @@ export class HUD {
     const gauge=this.shell.querySelector<HTMLElement>('#trowel-swing-gauge')!;
     flow.hidden=!active;gauge.hidden=!active;
     this.shell.querySelector<HTMLElement>('#mortar-wet-track')!.hidden=tool!=='hose';
-    const state=feedback??{holding:false,phase:power,quality:'ready',swingDegrees:-50+power*140,strength:power,splash:0,lastRelease:0};
+    const state=feedback??{holding:false,phase:power,quality:'ready',swingDegrees:0,strength:power,splash:0,lastRelease:0};
     const phase=Math.max(0,Math.min(1,state.phase));
     const strength=Math.max(0,Math.min(1,state.strength));
     panel.dataset.holding=String(state.holding);
@@ -398,6 +398,7 @@ export class HUD {
     this.shell.querySelector<HTMLElement>('#throw-timing-track')!.setAttribute('aria-valuenow',String(Math.round(phase*100)));
     const qualityText=state.quality==='perfect'?'RELEASE NOW':state.quality==='early'?'BUILD THE SWING':state.quality==='late'?'LATE · SPLASH RISK':'HOLD TO SWING';
     this.shell.querySelector<HTMLElement>('#throw-quality')!.textContent=state.holding?qualityText:recovery>0?(state.quality==='perfect'?'PERFECT RELEASE':state.quality==='early'?'EARLY RELEASE':state.quality==='late'?'LATE RELEASE':'RELOADING'):'HOLD TO SWING';
+    if(state.casting&&recovery===0)this.shell.querySelector<HTMLElement>('#throw-quality')!.textContent='CASTING';
     this.shell.querySelector<HTMLElement>('#trowel-swing-degrees')!.textContent=`${Math.round(state.swingDegrees)}°`;
     this.shell.querySelector<SVGElement>('#trowel-swing-needle')!.setAttribute('transform',`rotate(${Math.max(-70,Math.min(70,state.swingDegrees-20))} 80 73)`);
     this.shell.querySelector<HTMLElement>('#trowel-swing-strength')!.textContent=`${Math.round(strength*100)}%`;

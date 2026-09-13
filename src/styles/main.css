@@ -287,7 +287,7 @@ button {
 #mortar-panel #trowel-swing-gauge[hidden] {display:none;}
 #mortar-panel .swing-gauge-title,#mortar-panel .swing-gauge-dial,#mortar-panel .swing-strength-track {display:none;}
 #mortar-panel #trowel-swing-degrees {position:static;inset:auto;font-size:14px;line-height:1.2;}
-#mortar-panel #trowel-swing-degrees::before {content:'SWING ';font-size:12px;color:#e8d5b3;}
+#mortar-panel #trowel-swing-degrees::before {content:'ROLL ';font-size:12px;color:#e8d5b3;}
 #mortar-panel #trowel-swing-strength {font-size:14px;}
 @media (pointer:coarse), (max-width:760px) {
   #top-hud {top:max(10px,env(safe-area-inset-top));left:10px;width:calc(100% - 78px);padding:8px 10px;border-left-width:3px;}

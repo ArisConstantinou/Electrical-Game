@@ -3,6 +3,10 @@ import type { Input } from '../core/Input';
 
 export class DesktopControls {
   private ignoreNextLockedMove = false;
+  private wheelTime = Number.NEGATIVE_INFINITY;
+  private wheelDirection = 0;
+  private wheelDistance = 0;
+  private wheelSelected = false;
 
   constructor(surface: HTMLElement, private readonly lockTarget: HTMLElement, player: PlayerController, input: Input) {
     let primaryDown = false;
@@ -62,8 +66,26 @@ export class DesktopControls {
       player.look(event.movementX, event.movementY);
     });
     surface.addEventListener('wheel', event => {
+      // Settings scroll, sideways touchpad motion and pinch zoom are not tool
+      // selections. In particular deltaY=0 must never become a +1 cycle.
+      if (surface.classList.contains('settings-open') || event.ctrlKey || event.shiftKey ||
+          (event.target instanceof Element && event.target.closest('button,input,select,textarea,label,a,summary,#settings-panel')) ||
+          !Number.isFinite(event.deltaY) || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
       event.preventDefault();
-      window.dispatchEvent(new CustomEvent('wirehouse:cycle-tool', { detail: Math.sign(event.deltaY) }));
+      const direction = Math.sign(event.deltaY);
+      if (event.timeStamp - this.wheelTime > 180 || direction !== this.wheelDirection) {
+        this.wheelDistance = 0;
+        this.wheelSelected = false;
+      }
+      this.wheelTime = event.timeStamp;
+      this.wheelDirection = direction;
+      const unit = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16 : event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? surface.clientHeight : 1;
+      this.wheelDistance += Math.abs(event.deltaY) * unit;
+      // A sustained touchpad gesture includes many momentum samples. Select
+      // once, then wait for a new gesture or a deliberate direction reversal.
+      if (this.wheelSelected || this.wheelDistance < 40) return;
+      this.wheelSelected = true;
+      window.dispatchEvent(new CustomEvent('wirehouse:cycle-tool', { detail: direction }));
     }, { passive: false });
     addEventListener('keydown', event => {
       const directTools: Partial<Record<string, string>> = { Digit1: 'spring', Digit2: 'cutter', Digit3: 'spray', Digit4: 'hammer', Digit5: 'fitting', Digit6: 'level', Digit7: 'trowel', Digit8: 'hose' };

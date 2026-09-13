@@ -200,7 +200,7 @@ export class Game {
       this.fpsRig.poseArms(camera);
     }
     const releaseOrigin = this.fpsRig.toolTipWorld(this.renderer.camera, this.selectedTool);
-    if (mortarTool && this.selectedTool === 'trowel') this.mortar.swing(this.input.actionHeld,dt,this.renderer.camera,releaseOrigin);
+    if (mortarTool && this.selectedTool === 'trowel') this.mortar.swing(this.input.actionHeld,dt,this.renderer.camera,()=>this.fpsRig.poseTrowel(this.renderer.camera,this.mortar.throwFeedback.motion,0,this.room.brickWall.volume.frontZ));
     else this.mortar.cancel();
     const waterSetting=WATER_GUN_MODES[this.waterGunModeIndex];
     const waterHeld=mortarTool&&this.selectedTool==='hose'&&this.input.actionHeld;
@@ -226,6 +226,7 @@ export class Game {
     if(this.selectedTool!=='hose')this.fpsRig.update(dt, this.player.velocity.lengthSq() > 0.02, spraying);
     this.fpsRig.show(this.selectedTool);
     if (this.selectedTool === 'hammer') this.fpsRig.contact(this.renderer.camera, this.room.brickWall);
+    else if(this.selectedTool==='trowel')this.fpsRig.poseTrowel(this.renderer.camera,this.mortar.throwFeedback.motion,dt,this.room.brickWall.volume.frontZ);
     else this.fpsRig.poseArms(this.renderer.camera);
     const waterHit = this.selectedTool === 'spray' || mortarTool ? this.room.brickWall.aim(this.renderer.camera) : null;
     const wallAim = Boolean(waterHit);
@@ -345,17 +346,6 @@ export class Game {
       if(event.code === 'Minus' || event.code === 'Equal') {event.preventDefault();setHammerSpeed(this.hammerSpeed + (event.code === 'Equal' ? .25 : -.25));}
     });
     addEventListener('wirehouse:work-height',()=>{this.player.crouched=!this.player.crouched;document.querySelector('#work-height')!.textContent=this.player.crouched?'STAND UP':'CROUCH · LOW WORK';});
-    const pack=()=>{if(this.started&&this.selectedTool==='trowel')this.pendingSceneActions.push(()=>{
-      if(this.selectedTool!=='trowel')return;
-      this.mortar.cancel();this.input.actionHeld=false;
-      const hit=this.room.brickWall.aim(this.renderer.camera);
-      const reachable=hit&&this.fpsRig.canReachPoint(this.renderer.camera,new THREE.Vector3(hit.point.x,hit.point.y,hit.point.z),.18);
-      const success=Boolean(reachable)&&this.mortar.pack(this.renderer.camera);
-      this.mortar.lastOutcome=success?'Pressed into the gap. Excess mortar falls away.':'Move closer and aim at exposed material in the gap.';
-      if(success)this.fpsRig.toolAction=1;
-    });};
-    addEventListener('wirehouse:mortar-pack',pack);
-    addEventListener('keydown',event=>{if(event.code==='KeyP'&&!event.repeat)pack();});
     const cancelSwing=()=>this.mortar.cancel();
     addEventListener('pointerdown',event=>{if(event.button===2)cancelSwing();});
     addEventListener('blur',cancelSwing);addEventListener('pointercancel',cancelSwing);

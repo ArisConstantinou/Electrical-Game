@@ -3,6 +3,7 @@ import type { InstallationPoint } from '../electrical/InstallationPoint';
 import type { BrickWall } from '../world/BrickWall';
 import { MortarField } from './MortarField';
 import { WATER_GUN_MODES, type WaterGunSetting } from './WaterGun';
+import { sampleTrowelMotion, TROWEL_CHARGE_SECONDS, TROWEL_RELEASE_SECONDS, TROWEL_CAST_SECONDS } from '../player/TrowelMotion';
 
 type WetBatch = { mesh: THREE.Mesh; used: number; live: number; free: Array<{ start: number; count: number }> };
 type WetPatch = { batch: WetBatch; start: number; count: number; alpha: number };
@@ -19,6 +20,36 @@ const WET_BATCH_VERTICES = 12288;
 // Overlap the 8 cm moisture lattice, so a swept wet surface has no dry pinholes.
 const WET_FOOTPRINT_SIZE = .16;
 
+/** One connected paste skin, with coarse clumps, thin torn lips and aggregate.
+ * Four shared variants and one shared morph target avoid per-clod vertex work. */
+function mortarClodGeometry(variant:number):THREE.BufferGeometry {
+  const geometry=new THREE.SphereGeometry(1,32,20);
+  const positions=geometry.getAttribute('position'),colors:number[]=[],stretched:number[]=[];
+  const phase=variant*1.37;
+  for(let i=0;i<positions.count;i++){
+    const x=positions.getX(i),y=positions.getY(i),z=positions.getZ(i);
+    const broad=Math.sin(x*5.3+z*3.7+phase)*Math.cos(y*4.8-z*3.1-phase);
+    const folds=Math.sin(x*13.1+y*7.7+phase)*Math.sin(z*12.7-y*8.9);
+    const grit=Math.sin(x*43.7+y*35.1+phase)*Math.cos(z*47.3-x*21.1);
+    const radial=.96+broad*.25+folds*.11+grit*.026;
+    // The free edge has alternating lobes and narrow, drooping paste fingers.
+    const edge=Math.pow(Math.max(0,1-Math.abs(y)),3);
+    const lip=edge*(.15*Math.sin(Math.atan2(z,x)*7+phase)+.07*Math.sin(Math.atan2(z,x)*13-phase));
+    const px=x*(radial+lip),py=y*radial+edge*folds*.12,pz=z*(radial+lip);
+    positions.setXYZ(i,px,py,pz);
+    const trailing=THREE.MathUtils.clamp((1-z)*.5,0,1);
+    stretched.push(px*(1-.23*trailing),py*(.9-.2*trailing)+.16*trailing*trailing,pz*(1.25+.25*trailing));
+    const color=new THREE.Color(0x817969).multiplyScalar(.94+broad*.065+grit*.075+Math.max(0,folds)*.055);
+    colors.push(color.r,color.g,color.b);
+  }
+  geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
+  geometry.computeVertexNormals();
+  geometry.morphAttributes.position=[new THREE.Float32BufferAttribute(stretched,3)];
+  const target=new THREE.BufferGeometry();target.setAttribute('position',new THREE.Float32BufferAttribute(stretched,3));target.setIndex(geometry.index!.clone());target.computeVertexNormals();
+  geometry.morphAttributes.normal=[target.getAttribute('normal').clone()];target.dispose();
+  geometry.computeBoundingSphere();
+  const skin=geometry.toNonIndexed();geometry.dispose();return skin;
+}
 
 /** Qualitative wet mortar: finite mass, real surface contact and separate fresh-mortar stability.
  * See docs/MORTAR_APPLICATION_RESEARCH.md; these coefficients are not calibrated. */
@@ -51,7 +82,11 @@ export class MortarSystem {
   private readonly settled: THREE.Mesh[] = [];
   private readonly resting: Array<{ mesh: THREE.Mesh; mass: number }> = [];
   private readonly mortarMaterial = new THREE.MeshStandardMaterial({ color: 0x817969, roughness: .84, flatShading: false, side: THREE.DoubleSide });
-  private readonly clodGeometry = new THREE.SphereGeometry(1, 18, 12).toNonIndexed();
+  private readonly clodGeometry = mortarClodGeometry(0);
+  private readonly clodGeometries = [this.clodGeometry,mortarClodGeometry(1),mortarClodGeometry(2),mortarClodGeometry(3)];
+  private readonly clodMaterial = new THREE.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:.88,side:THREE.DoubleSide});
+  private readonly clodDirection = new THREE.Vector3();
+  private clodSequence = 0;
   private readonly wetGeometry = new THREE.PlaneGeometry(.125, .125);
   private readonly wetMaterial: THREE.MeshBasicMaterial;
   private readonly wetBatches: WetBatch[] = [];
@@ -60,6 +95,9 @@ export class MortarSystem {
   private wasHeld = false;
   private releasedPhase = 0;
   private recoveringThrow = false;
+  private pendingCast: { phase: number; elapsed: number } | null = null;
+  private rearmOnRelease = false;
+  private recoverySkipSeconds = 0;
   private releaseCount = 0;
   private faceSplash = 0;
   private maintenanceTime = 0;
@@ -113,40 +151,62 @@ export class MortarSystem {
     for(let i=0;i<p.count;i++){const sum=sums.get(keys[i])!;n.setXYZ(i,sum.x,sum.y,sum.z);}
   }
   ready(point:InstallationPoint):boolean {this.refreshOpeningGeometry();return this.evaluateCoverage(point,true)>=.68;}
-  cancel(): void { this.wasHeld = false; this.charge = 0; }
-  /** Timing is a learnable game gesture. It modifies a finite scoop, while
-   * substrate moisture, incidence and actual cavity contact still decide adhesion. */
+  cancel(): void {
+    this.wasHeld = false; this.charge = 0;
+    if (this.pendingCast) { this.pendingCast = null; this.releasedPhase = 0; this.recoveringThrow = false; }
+    this.rearmOnRelease = false;
+  }
+  /** Timing controls one finite scoop; the committed wrist motion releases it
+   * later, at the actual blade position rather than at the button-up pose. */
   get throwFeedback() {
     const recovering=this.recovery>0&&this.recoveringThrow;
-    const active=this.wasHeld||recovering,phase=this.wasHeld?this.charge:recovering?this.releasedPhase:0;
+    const casting=Boolean(this.pendingCast)||recovering;
+    const active=this.wasHeld||casting,phase=this.wasHeld?this.charge:this.pendingCast?.phase??(recovering?this.releasedPhase:0);
     const quality:'ready'|'early'|'perfect'|'late'=!active?'ready':phase<.42?'early':phase<=.58?'perfect':'late';
-    const swingDegrees=this.wasHeld?-50+phase*140:recovering?(-50+phase*140)*THREE.MathUtils.smoothstep(this.recovery/.65,0,1):0;
-    return {holding:this.wasHeld,phase,quality,swingDegrees,strength:phase,splash:this.faceSplash,lastRelease:this.releaseCount};
+    const castElapsed=this.pendingCast?.elapsed??(recovering?TROWEL_CAST_SECONDS-this.recovery:null);
+    const motion=sampleTrowelMotion({holding:this.wasHeld,charge:phase,castElapsed});
+    return {holding:this.wasHeld,phase,quality,swingDegrees:motion.rollDegrees,strength:phase,splash:this.faceSplash,lastRelease:this.releaseCount,casting,castElapsed,stage:motion.stage,motion};
   }
-  swing(held: boolean, dt: number, camera: THREE.Camera, origin: THREE.Vector3): void {
-    if (this.recovery > 0) { this.cancel(); return; }
-    if (held) { this.wasHeld = true; this.charge = Math.min(1, this.charge + dt / .95); }
-    else if (this.wasHeld) {
-      const phase=this.charge,late=THREE.MathUtils.clamp((phase-.58)/.42,0,1),backFraction=late*.55;
-      // Reserve the entire scoop atomically; never lose the backward share at
-      // the projectile budget. Explicit launch() retains its original contract.
-      if(this.projectiles.length+(late>0?3:1)<=48){
-        origin=this.releaseOrigin(camera,origin);
-        const mass=.65,bond=phase<.42?.04+.96*(phase/.42)**2:1;
-        this.spawnClod(origin,this.velocity(camera,phase,origin),mass*(1-backFraction),false,bond);
-        if(late>0){
-          const towardFace=camera.getWorldPosition(new THREE.Vector3()).sub(origin);
-          if(towardFace.lengthSq()<1e-6)camera.getWorldDirection(towardFace).negate();
-          towardFace.normalize().multiplyScalar(1.6+late*2.4);
-          const right=new THREE.Vector3(1,0,0).applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion()));
-          for(const side of [-1,1])this.spawnClod(origin,towardFace.clone().addScaledVector(right,side*.35),mass*backFraction/2,true,0);
-        }
-        this.launchedMass+=mass;this.releasedPhase=phase;this.releaseCount++;this.faceSplash=Math.max(this.faceSplash,late);
-        this.lastOutcome=phase<.42?'Early release: weak adhesion; loose mortar will slide down.':late>0?'Late release: mortar splashes back; part of the scoop still reaches the wall.':'Perfect release: good transfer; aim at clean, damp masonry.';
-        this.recovery=.65;this.recoveringThrow=true;
-      }
-      this.cancel();
+  swing(held: boolean, dt: number, camera: THREE.Camera, origin: THREE.Vector3 | (() => THREE.Vector3)): void {
+    dt=Math.max(0,Number.isFinite(dt)?dt:0);
+    if (this.pendingCast) {
+      if(held)this.rearmOnRelease=true;else this.rearmOnRelease=false;
+      this.pendingCast.elapsed=Math.min(TROWEL_CAST_SECONDS,this.pendingCast.elapsed+dt);
+      if(this.pendingCast.elapsed+1e-9<TROWEL_RELEASE_SECONDS)return;
+      const phase=this.pendingCast.phase,elapsed=this.pendingCast.elapsed;
+      // The phase clock is already advanced when the rig samples its pose.
+      const point=typeof origin==='function'?origin():origin;
+      this.releaseScoop(phase,camera,point);
+      this.pendingCast=null;
+      this.recovery=Math.max(0,TROWEL_CAST_SECONDS-elapsed);this.recoveringThrow=true;
+      // Game calls swing and update for the same physics slice. The pending
+      // clock already consumed that slice, so recovery must not consume it twice.
+      this.recoverySkipSeconds=dt;
+      return;
     }
+    if (this.recovery > 0) { if(held)this.rearmOnRelease=true;else this.rearmOnRelease=false; return; }
+    if(this.rearmOnRelease){if(!held)this.rearmOnRelease=false;return;}
+    if (held) { this.wasHeld = true; this.charge = Math.min(1, this.charge + dt / TROWEL_CHARGE_SECONDS); }
+    else if (this.wasHeld) {
+      this.releasedPhase=this.charge;this.pendingCast={phase:this.charge,elapsed:0};
+      this.wasHeld=false;this.charge=0;
+    }
+  }
+  private releaseScoop(phase:number,camera:THREE.Camera,tip:THREE.Vector3):void {
+    const late=THREE.MathUtils.clamp((phase-.58)/.42,0,1),backFraction=late*.55;
+    // Reserve the whole finite scoop atomically, including its backward share.
+    if(this.projectiles.length+(late>0?3:1)>48)return;
+    const origin=this.releaseOrigin(camera,tip),mass=.65,bond=phase<.42?.04+.96*(phase/.42)**2:1;
+    this.spawnClod(origin,this.velocity(camera,phase,origin),mass*(1-backFraction),false,bond);
+    if(late>0){
+      const towardFace=camera.getWorldPosition(new THREE.Vector3()).sub(origin);
+      if(towardFace.lengthSq()<1e-6)camera.getWorldDirection(towardFace).negate();
+      towardFace.normalize().multiplyScalar(1.6+late*2.4);
+      const right=new THREE.Vector3(1,0,0).applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion()));
+      for(const side of [-1,1])this.spawnClod(origin,towardFace.clone().addScaledVector(right,side*.35),mass*backFraction/2,true,0);
+    }
+    this.launchedMass+=mass;this.releasedPhase=phase;this.releaseCount++;this.faceSplash=Math.max(this.faceSplash,late);
+    this.lastOutcome=phase<.42?'Early release: weak adhesion; loose mortar will slide down.':late>0?'Late release: mortar splashes back; part of the scoop still reaches the wall.':'Perfect release: good transfer; aim at clean, damp masonry.';
   }
   velocity(camera: THREE.Camera, power: number, origin?: THREE.Vector3): THREE.Vector3 {
     const direction = camera.getWorldDirection(new THREE.Vector3());
@@ -325,22 +385,21 @@ export class MortarSystem {
     this.spawnClod(origin, velocity, mass); this.launchedMass += mass;
   }
   private spawnClod(origin: THREE.Vector3, velocity: THREE.Vector3, mass: number, slurry = false, bond = 1): void {
-    const mesh = new THREE.Mesh(this.clodGeometry, this.mortarMaterial); mesh.position.copy(origin); mesh.castShadow = true;
-    const scale = Math.cbrt(mass / .65); mesh.scale.set(.046 * scale, .030 * scale, .064 * scale);
-    this.group.add(mesh); this.projectiles.push({ mesh, velocity: velocity.clone(), mass, age: 0, contacts: 0, slurry, bond });
+    const mesh = new THREE.Mesh(this.clodGeometries[this.clodSequence++%this.clodGeometries.length], this.clodMaterial); mesh.position.copy(origin); mesh.castShadow = true;
+    mesh.name='Cohesive wet mortar with ragged edges';
+    const clod={ mesh, velocity: velocity.clone(), mass, age: 0, contacts: 0, slurry, bond };
+    this.updateClodAppearance(clod);
+    this.group.add(mesh); this.projectiles.push(clod);
   }
-  /** Close cohesive packing is available at every real reachable surface or gap. */
-  pack(camera: THREE.Camera): boolean {
-    if (this.recovery > 0) return false;
-    const hit = this.contact(camera.getWorldPosition(new THREE.Vector3()), camera.getWorldDirection(new THREE.Vector3()), .9);
-    if (!hit || hit.box || this.insideBox(hit.point)) return false;
-    const mass = .65, fraction = this.retention(hit.point, hit.normal.clone().multiplyScalar(-2), hit.normal);
-    const held = this.deposit(hit.point, mass * fraction, hit.normal,false,mass);
-    if (!held) return false;
-    this.launchedMass += mass; this.stuckMass += held;
-    this.spawnClod(hit.point.clone().addScaledVector(hit.normal, .015), hit.normal.clone().multiplyScalar(.12).add(new THREE.Vector3(0, -.15, 0)), mass - held);
-    this.recovery = .4; this.recoveringThrow=false;this.releasedPhase=0;this.cancel();this.lastOutcome = held<mass*.25?'The nearby void is full; loose excess slumps off.':'Packed into the exposed cavity; loose excess falls.'; return true;
+  private updateClodAppearance(clod:Clod):void {
+    const scale=Math.cbrt(clod.mass/.65),speed=clod.velocity.length();
+    const stretch=(.3+.7*Math.exp(-clod.age*5))*Math.min(1,speed/4);
+    if(clod.mesh.morphTargetInfluences)clod.mesh.morphTargetInfluences[0]=stretch;
+    clod.mesh.scale.set(.046*scale,.030*scale,.064*scale);
+    if(speed>.01)clod.mesh.quaternion.setFromUnitVectors(Z,this.clodDirection.copy(clod.velocity).multiplyScalar(1/speed));
   }
+  /** Compatibility entry point: material is added only by a released scoop. */
+  pack(_camera: THREE.Camera): boolean { return false; }
 
   /** Earliest current solid, including deposited mortar and actual box casing. */
   private contact(origin: THREE.Vector3, direction: THREE.Vector3, distance: number): Contact | null {
@@ -504,7 +563,10 @@ export class MortarSystem {
   }
 
   update(dt: number): void {
-    dt = Math.min(.12, Math.max(0, dt)); this.simulationTime += dt; this.recovery = Math.max(0, this.recovery - dt); this.faceSplash=Math.max(0,this.faceSplash-dt*.28);
+    dt = Math.min(.12, Math.max(0, dt)); this.simulationTime += dt;
+    const recoveryDt=Math.max(0,dt-this.recoverySkipSeconds);
+    this.recoverySkipSeconds=Math.max(0,this.recoverySkipSeconds-dt);
+    this.recovery = Math.max(0, this.recovery - recoveryDt); this.faceSplash=Math.max(0,this.faceSplash-dt*.28);
     this.refreshOpeningGeometry();
     this.maintenanceTime += dt;
     for (const [key, cell] of this.water) {
@@ -550,7 +612,7 @@ export class MortarSystem {
         // Rejected weak throws cannot become a second, stronger throw when they
         // hit a lower rib. They flow down under the same contact/gravity solver.
         if(clod.bond<.999)clod.slurry=true;
-        this.lastOutcome = held > .07 ? 'Mortar held. Pack all four sides before leveling.' : held > .005 ? 'Some mortar held; excess is falling.' : 'Little free capacity or glancing contact: excess slumps off.';
+        this.lastOutcome = held > .07 ? 'Mortar held. Fill all four sides before leveling.' : held > .005 ? 'Some mortar held; excess is falling.' : 'Little free capacity or glancing contact: excess slumps off.';
         if (clod.mass < .001) { this.floorMass += clod.mass; this.group.remove(clod.mesh); this.projectiles.splice(i, 1); continue; }
         let narrowLedge=false;
         if(!clod.slurry&&hit.normal.y>.4&&clod.contacts>=2){
@@ -580,6 +642,7 @@ export class MortarSystem {
       if (next.y < .012) { this.settle(clod); this.projectiles.splice(i, 1); }
       // No age-based teleport to floor: trajectories continue falling under gravity.
     }
+    for(const clod of this.projectiles)this.updateClodAppearance(clod);
   }
   /** Low-energy residue rests on the ledge it actually hit. It is neither glued
    * mortar nor floor waste, and contributes no installation coverage by itself. */
@@ -588,13 +651,14 @@ export class MortarSystem {
     const radius = Math.max(.009, Math.cbrt(clod.mass / DENSITY) * 1.5);
     clod.mesh.position.copy(hit.point).addScaledVector(hit.normal, .006);
     clod.mesh.quaternion.setFromUnitVectors(Z, hit.normal); clod.mesh.scale.set(radius, radius * .8, .008); clod.mesh.updateMatrixWorld(true);
-    const source = this.clodGeometry.getAttribute('position'), positions: number[] = [], boxes = this.openings();
+    if(clod.mesh.morphTargetInfluences)clod.mesh.morphTargetInfluences[0]=0;
+    const source = clod.mesh.geometry.getAttribute('position'), positions: number[] = [], boxes = this.openings();
     for (let i = 0; i < source.count; i += 3) {
       const triangle = [0, 1, 2].map(j => new THREE.Vector3().fromBufferAttribute(source, i + j).applyMatrix4(clod.mesh.matrixWorld));
       for (const polygon of this.clipOpenings(triangle, boxes)) for (let j = 1; j < polygon.length - 1; j++) for (const v of [polygon[0], polygon[j], polygon[j + 1]]) positions.push(v.x, v.y, v.z);
     }
     const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3)); this.finishGeometry(geometry);
-    clod.mesh.geometry = geometry; clod.mesh.position.set(0, 0, 0); clod.mesh.quaternion.identity(); clod.mesh.scale.set(1, 1, 1); clod.mesh.updateMatrixWorld(true);
+    clod.mesh.geometry = geometry; clod.mesh.material=this.mortarMaterial;clod.mesh.updateMorphTargets();clod.mesh.position.set(0, 0, 0); clod.mesh.quaternion.identity(); clod.mesh.scale.set(1, 1, 1); clod.mesh.updateMatrixWorld(true);
     clod.mesh.name = 'Loose mortar resting on actual masonry ledge'; clod.mesh.receiveShadow = true;
     this.resting.push({ mesh: clod.mesh, mass: clod.mass });
     // Consolidate nearby resting batches without moving material to the floor or
@@ -614,6 +678,8 @@ export class MortarSystem {
   }
   private settle(clod: Clod): void {
     this.floorMass += clod.mass; clod.mesh.position.y = .005;
+    if(clod.mesh.morphTargetInfluences)clod.mesh.morphTargetInfluences[0]=0;
+    clod.mesh.quaternion.identity();
     const radius = Math.max(.008, Math.cbrt(clod.mass / DENSITY) * 1.8); clod.mesh.scale.set(radius, .006, radius * .8); clod.mesh.userData.mass = clod.mass;
     if (this.settled.length < 96) this.settled.push(clod.mesh);
     else {

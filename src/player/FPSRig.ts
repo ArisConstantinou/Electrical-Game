@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { buildToolModel } from './ToolModels';
+import type { TrowelMotion } from './TrowelMotion';
 import { workerHand, workerArm, poseWorkerArm, flexWorkerHand, poseToolGrip, MAX_WRIST_REACH_M, UPPER_ARM_M, FOREARM_M, type WorkerArm } from './WorkerArm';
 import type { BrickWall, ChiselContact } from '../world/BrickWall';
 
@@ -42,6 +43,9 @@ export class FPSRig extends THREE.Group {
   mortarRecovery = 0;
   mortarSwingDegrees = 0;
   mortarHolding = false;
+  private mortarStrain = 0;
+  private mortarStrainVelocity = 0;
+  private readonly trowelElbow = new THREE.Vector3();
   chiselInAir = false;
   workStanceSide = 0;
   /** Actual head lean in the body's right direction; independent of bit yaw. */
@@ -211,6 +215,45 @@ export class FPSRig extends THREE.Group {
     const group=this.tools.get(tool),tip=group?.userData.tipPoint as number[] | undefined;
     return group ? group.localToWorld(tip ? new THREE.Vector3().fromArray(tip) : new THREE.Vector3(.1,.04,-.14)) : camera.localToWorld(new THREE.Vector3(.15,-.18,-.55));
   }
+  /** Pose around the actual grip before querying the moving release edge. */
+  poseTrowel(camera: THREE.Camera, motion: TrowelMotion, dt = 0, wallFrontZ = -2.41): THREE.Vector3 {
+    const tool=this.tools.get('trowel')!;
+    const arm=this.armSets.get('trowel')!.find(candidate=>candidate.side===1)!;
+    const {right,forward}=this.bodyFrame(camera),shoulder=this.shoulder(camera,1);
+    // The forearm and hand share one axis throughout the short stroke. The
+    // elbow moves on the upper-arm sphere; neither arm segment stretches.
+    const axis=new THREE.Vector3(-.82,.20,-.54).normalize().applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion()));
+    const wallDistance=camera.getWorldPosition(new THREE.Vector3()).z-wallFrontZ;
+    const feed=.24+.32*THREE.MathUtils.smoothstep(wallDistance,.55,1)-motion.offset.z;
+    const upper=right.clone().multiplyScalar(.96).addScaledVector(forward,feed).add(new THREE.Vector3(0,.08,0)).normalize();
+    this.trowelElbow.copy(shoulder).addScaledVector(upper,UPPER_ARM_M);
+    const wrist=this.trowelElbow.clone().addScaledVector(axis,FOREARM_M);
+    const orientation=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1),axis)
+      .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),THREE.MathUtils.degToRad(motion.rollDegrees)));
+    tool.quaternion.copy(this.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(orientation));
+    const wristLocal=new THREE.Vector3().fromArray(arm.hand.userData.wristPoint).applyQuaternion(arm.hand.quaternion).add(arm.hand.position);
+    tool.position.copy(this.worldToLocal(wrist)).sub(wristLocal.applyQuaternion(tool.quaternion));
+    tool.userData.motionStage=motion.stage;
+    camera.updateMatrixWorld(true);this.updateWorldMatrix(true,true);
+    const load=tool.getObjectByName('trowel-load') as THREE.Mesh<THREE.BufferGeometry>;
+    load.visible=motion.loadVisible;
+    // A cohesive, yield-resistant mound lags behind acceleration. The contact
+    // layer remains attached while its upper mass shears and stretches forward.
+    const target=motion.stage==='drive'?.35:motion.stage==='flip'?1:motion.stage==='prepare'?.06:0;
+    let remaining=Math.min(Math.max(dt,0),.1);
+    while(remaining>0){const step=Math.min(remaining,1/120);this.mortarStrainVelocity+=(180*(target-this.mortarStrain)-23*this.mortarStrainVelocity)*step;this.mortarStrain+=this.mortarStrainVelocity*step;remaining-=step;}
+    const strain=THREE.MathUtils.clamp(this.mortarStrain,0,1),position=load.geometry.getAttribute('position'),rest=load.geometry.getAttribute('restPosition');
+    for(let i=0;i<position.count;i++){
+      const x=rest.getX(i),y=rest.getY(i),z=rest.getZ(i),weight=THREE.MathUtils.clamp(y/(load.userData.deformationHeight??.045),0,1);
+      const stretch=1+strain*.42*weight,shrink=1/Math.sqrt(stretch);
+      position.setXYZ(i,x*shrink,y*shrink,z*stretch-strain*.027*weight);
+    }
+    position.needsUpdate=true;load.geometry.computeVertexNormals();
+    // The conservative bound contains all deformed poses without reallocating.
+    load.geometry.boundingSphere??=new THREE.Sphere(new THREE.Vector3(),.16);
+    this.poseArms(camera);tool.updateWorldMatrix(true,true);
+    return tool.localToWorld(new THREE.Vector3().fromArray(tool.userData.releasePoint));
+  }
   strike(): void { this.strikeAmount = 1; }
   update(dt: number, moving: boolean, spraying = false): void {
     // Explicit side selection owns the hands. Geometric lean is only a fallback
@@ -237,16 +280,6 @@ export class FPSRig extends THREE.Group {
     if(bubble){if(bubble.userData.restX===undefined)bubble.userData.restX=bubble.position.x;bubble.position.x=bubble.userData.restX+THREE.MathUtils.clamp(this.levelTiltDegrees*.003,-.014,.014);}
     const actuator=this.tools.get('spray')?.getObjectByName('spray-actuator');
     if(actuator)actuator.position.y=spraying?.102:.104;
-    const trowel=this.tools.get('trowel');
-    if(trowel){
-      // The degree readout and the visible wrist/tool use the same stroke.
-      // Keep the gripping hand parented to the tool throughout the swing.
-      const returning = this.mortarRecovery > 0;
-      const degrees = this.mortarHolding || returning ? this.mortarSwingDegrees : 0;
-      trowel.rotation.x = THREE.MathUtils.degToRad(degrees);
-      trowel.position.y = this.mortarHolding ? -.025 * Math.sin(this.mortarCharge * Math.PI) : 0;
-      const load=trowel.getObjectByName('trowel-load');if(load)load.visible=this.mortarRecovery<.2;
-    }
     if (this.sprayMist) {
       this.sprayMist.visible = spraying;
       if (spraying) {
@@ -304,6 +337,10 @@ export class FPSRig extends THREE.Group {
   }
   private shoulder(camera:THREE.Camera,side:number):THREE.Vector3 {
     const {eye,right,forward}=this.bodyFrame(camera);
+    // A small torso offset keeps the neutral two-handed body frame visible in
+    // a narrow portrait view. Eyes remain fixed; arm lengths and wrist axes do not change.
+    if(this.selectedTool==='trowel'&&innerWidth<innerHeight)eye.addScaledVector(right,-.13);
+    if(this.selectedTool==='trowel'&&this.touchViewport.matches&&innerHeight<520)eye.y+=.11;
     // The head peeks past the motor while the shoulders stay over the torso.
     // This is a small neck lean, not extra arm reach or a stretched forearm.
     if(this.selectedTool==='hammer'&&this.workPositionLocked){
@@ -388,12 +425,12 @@ export class FPSRig extends THREE.Group {
       hand.userData.gripRole=emptyFitting?'reaching':'primary';
       if(!emptyFitting){hand.position.fromArray(hand.userData.fittingGripPosition);hand.quaternion.fromArray(hand.userData.fittingGripQuaternion);}
     }
-    if(this.selectedTool!=='hammer'&&!emptyFitting)this.constrainHeldTool(camera);
+    if(this.selectedTool!=='hammer'&&this.selectedTool!=='trowel'&&!emptyFitting)this.constrainHeldTool(camera);
     const {right}=this.bodyFrame(camera);
     for(const arm of this.armSets.get(this.selectedTool)??[]){
       if(arm.hand.userData.gripRole==='resting')this.poseRestingHand(camera,arm);
       else if(emptyFitting)this.poseEmptyFittingHand(camera,arm);
-      poseWorkerArm(arm,this.shoulder(camera,arm.side),this.wrist(arm),right);
+      poseWorkerArm(arm,this.shoulder(camera,arm.side),this.wrist(arm),right,this.selectedTool==='trowel'&&arm.side===1?this.trowelElbow:undefined);
       flexWorkerHand(arm.hand,arm.hand.userData.gripRole==='resting'?0:this.toolAction+this.strikeAmount*.35+(this.hoseActive?.4:0),performance.now()*.001);
       if(arm.hand.userData.gripping)poseToolGrip(arm.hand,this.tools.get(this.selectedTool)!,this.toolAction);
     }
@@ -459,9 +496,6 @@ export class FPSRig extends THREE.Group {
       const hand=this.armSets.get(kind)!.find(arm=>arm.side===1)!.hand;
       hand.userData.fittingGripPosition=hand.position.toArray();
       hand.userData.fittingGripQuaternion=hand.quaternion.toArray();
-    }
-    if(kind==='trowel'){
-      const load=new THREE.Mesh(new THREE.IcosahedronGeometry(.044,2),material(0x857a66,.96));load.name='trowel-load';load.position.set(.01,.06,-.077);load.scale.set(.85,1.5,.22);group.add(load);
     }
     if(kind==='spray'){
       const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(54),3));

@@ -160,7 +160,9 @@ export function workerArm(side:number, hand:THREE.Group, grip:THREE.Vector3):Wor
   mesh(upper,ellipsoid(1,[.058,.045,.058],[0,-.135,0]),cloth,'Rounded shirt shoulder seam');
   const cuff=mesh(upper,new THREE.CylinderGeometry(.050,.051,.018,20,1,true),hem,'Folded sleeve hem');cuff.position.y=.027;
   const stitch=mesh(upper,new THREE.TorusGeometry(.050,.0012,4,24),hem,'Sleeve double stitched edge');stitch.rotation.x=Math.PI/2;stitch.position.y=.035;
-  const lower=mesh(forearm,new THREE.CylinderGeometry(.030,.047,FOREARM_M,20,5),skin,'Tapered bare forearm');
+  const trowelGrip=hand.userData.gripStyle==='trowel';
+  const lower=mesh(forearm,new THREE.CylinderGeometry(trowelGrip?.022:.030,.047,FOREARM_M,20,5),skin,'Tapered bare forearm');
+  if(trowelGrip)mesh(forearm,ellipsoid(1,[.022,.015,.022],[0,FOREARM_M/2-.004,0]),skin,'Rounded trowel wrist transition');
   lower.geometry.computeVertexNormals();
   mesh(forearm,ellipsoid(1,[.041,.037,.041],[0,-FOREARM_M/2+.01,0]),skin,'Rounded elbow');
   group.add(upper,forearm);
@@ -168,13 +170,15 @@ export function workerArm(side:number, hand:THREE.Group, grip:THREE.Vector3):Wor
 }
 
 /** Two-bone IK with a fixed body-space shoulder and outward/downward elbow pole. */
-export function poseWorkerArm(arm:WorkerArm, shoulder:THREE.Vector3, wrist:THREE.Vector3, bodyRight:THREE.Vector3):void {
+export function poseWorkerArm(arm:WorkerArm, shoulder:THREE.Vector3, wrist:THREE.Vector3, bodyRight:THREE.Vector3, elbowOverride?:THREE.Vector3):void {
   const direction=wrist.clone().sub(shoulder), distance=THREE.MathUtils.clamp(direction.length(),.045,MAX_WRIST_REACH_M);direction.normalize();
   const a=(UPPER_ARM_M**2-FOREARM_M**2+distance**2)/(2*distance);
   const height=Math.sqrt(Math.max(0,UPPER_ARM_M**2-a*a));
   const pole=new THREE.Vector3(0,-1,0).addScaledVector(bodyRight,arm.side*.65);
   pole.addScaledVector(direction,-pole.dot(direction)).normalize();
-  const elbow=shoulder.clone().addScaledVector(direction,a).addScaledVector(pole,height);
+  // Authored forward kinematics may supply a real elbow; the caller owns
+  // its fixed segment lengths and this renderer must not solve it again.
+  const elbow=elbowOverride?.clone()??shoulder.clone().addScaledVector(direction,a).addScaledVector(pole,height);
   arm.shoulder.copy(shoulder);arm.elbow.copy(elbow);arm.wrist.copy(wrist);
   const pose=(part:THREE.Group,start:THREE.Vector3,end:THREE.Vector3)=>{
     part.position.copy(arm.group.worldToLocal(start.clone())).add(arm.group.worldToLocal(end.clone())).multiplyScalar(.5);
