@@ -8,18 +8,25 @@ const out = process.argv[3] ?? 'output/hammer-free-look-ui';
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const report = { url, mobileIsEmulation: true, fixture: 'Pointer Lock blocked before page scripts. Fixed starting camera and simulation clock. Native keyboard held hammer and mobile touch drag. Desktop relative look deltas call the production PlayerController because real OS Pointer Lock is forbidden. Contacts and damage are unmodified.', cases: [], errors: [] };
-const step = (page, frames) => page.evaluate(frames => { for (let i = 0; i < frames; i++) window.__freeLookStep(1 / 60); }, frames);
+const step = (page, frames) => page.evaluate(async frames => {
+  for (let i = 0; i < frames; i++) {
+    window.__freeLookStep(1 / 60);
+    // Yield to real geometry workers so subsequent strikes see split children.
+    if ((i + 1) % 12 === 0) await window.__wireTheHouse.chasing.waitForDebrisSplits();
+  }
+  await window.__wireTheHouse.chasing.waitForDebrisSplits();
+}, frames);
 const state = page => page.evaluate(() => {
   const g = window.__wireTheHouse, c = g.renderer.camera, w = g.room.brickWall;
   const ray = c.getWorldDirection(c.position.clone());
-  return { yaw: g.player.yaw, pitch: g.player.pitch, quaternion: c.quaternion.toArray(), position: c.position.toArray(), focus: c.position.clone().addScaledVector(ray, (w.volume.frontZ - c.position.z) / ray.z).toArray(), impacts: w.impactCount, removedCm3: w.volume.removedVolume * 1e6, reachable: g.fpsRig.reachable, reason: g.fpsRig.reachReason, tilt: g.fpsRig.actualTiltDegrees, requestedTilt: w.chiselTiltDegrees, held: g.input.actionHeld, locked: g.player.workPosition.locked, pose: g.fpsRig.debugPose(), overflow: document.documentElement.scrollWidth > innerWidth, renderError: g.renderer.renderError, pointerLock: document.pointerLockElement?.id ?? null };
+  return { yaw: g.player.yaw, pitch: g.player.pitch, quaternion: c.quaternion.toArray(), position: c.position.toArray(), focus: c.position.clone().addScaledVector(ray, (w.volume.frontZ - c.position.z) / ray.z).toArray(), impacts: w.impactCount, debrisStrikes: g.chasing.debrisStrikeCount, removedCm3: w.volume.removedVolume * 1e6, reachable: g.fpsRig.reachable, reason: g.fpsRig.reachReason, tilt: g.fpsRig.actualTiltDegrees, requestedTilt: w.chiselTiltDegrees, held: g.input.actionHeld, locked: g.player.workPosition.locked, pose: g.fpsRig.debugPose(), overflow: document.documentElement.scrollWidth > innerWidth, renderError: g.renderer.renderError, pointerLock: document.pointerLockElement?.id ?? null };
 });
 const unchanged = (before, after, label) => {
   for (const key of ['yaw', 'pitch']) assert(Math.abs(before[key] - after[key]) < 1e-10, `${label}: ${key} recentered`);
   for (const key of ['position', 'quaternion', 'focus']) assert(before[key].every((value, i) => Math.abs(value - after[key][i]) < 1e-8), `${label}: ${key} drifted while input was stationary`);
 };
 async function capture(page, name) {
-  await page.evaluate(async () => { const g = window.__wireTheHouse; await g.room.brickWall.waitForGeometry(); await g.renderer.waitForFrame(); window.__freeLookStep(0); await g.renderer.waitForFrame(); });
+  await page.evaluate(async () => { const g = window.__wireTheHouse; await g.chasing.waitForDebrisSplits(); await g.room.brickWall.waitForGeometry(); await g.renderer.waitForFrame(); window.__freeLookStep(0); await g.renderer.waitForFrame(); });
   await page.screenshot({ path: `${out}/${name}.png` });
 }
 
@@ -82,8 +89,9 @@ try {
       if (mobile) await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); else await page.keyboard.up('KeyE');
       const released = await state(page); await step(page, 90); const settled = await state(page);
       unchanged(released, settled, `${platform}/${angle}: released hammer`);
-      assert.equal(settled.impacts, released.impacts, 'Release must stop strikes');
-      assert(settled.impacts >= initial.impacts+3 && settled.removedCm3 > initial.removedCm3, `${platform}/${angle}: ordinary aiming must retain repeated real tool contact`);
+      assert.equal(settled.impacts, released.impacts, 'Release must stop wall strikes');
+      assert.equal(settled.debrisStrikes, released.debrisStrikes, 'Release must stop loose-piece strikes');
+      assert(settled.impacts+settled.debrisStrikes >= initial.impacts+initial.debrisStrikes+3 && settled.removedCm3 > initial.removedCm3, `${platform}/${angle}: ordinary aiming must retain repeated real tool contact`);
       assert.equal(settled.pointerLock, null); assert.equal(settled.renderError, ''); assert.equal(settled.overflow, false);
       entry.final = settled;
       await capture(page, `${platform}-${angle}-free-aim`);
@@ -92,6 +100,6 @@ try {
     await context.close();
   }
   assert.deepEqual(report.errors, []);
-  console.log(JSON.stringify({ passed: true, cases: report.cases.map(item => ({ platform: item.platform, angle: item.angle, addedImpacts: item.final.impacts - item.initial.impacts, removedCm3: item.final.removedCm3 - item.initial.removedCm3 })), errors: report.errors }, null, 2));
+  console.log(JSON.stringify({ passed: true, cases: report.cases.map(item => ({ platform: item.platform, angle: item.angle, addedImpacts: item.final.impacts - item.initial.impacts, addedDebrisStrikes: item.final.debrisStrikes - item.initial.debrisStrikes, removedCm3: item.final.removedCm3 - item.initial.removedCm3 })), errors: report.errors }, null, 2));
 } catch (error) { report.failure = String(error.stack ?? error); throw error; }
 finally { await writeFile(`${out}/report.json`, JSON.stringify(report, null, 2)); await browser.close(); }

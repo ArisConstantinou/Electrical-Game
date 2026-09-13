@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GAME_CONFIG } from '../data/gameConfig';
 import type { InstallationPoint } from '../electrical/InstallationPoint';
 import type { BrickWall, MasonryImpact } from '../world/BrickWall';
+import { splitDebrisGeometry } from './splitDebrisGeometry';
 
 interface Particle {
   mesh: THREE.Mesh;
@@ -19,6 +20,7 @@ interface Particle {
   collisionProbes: THREE.Vector3[] | null;
   restPose: { x: number; z: number; halfWidth: number; halfHeight: number; halfDepth: number };
 }
+type SplitResult = {pieces:Array<{positions:Float32Array;volume:number}>;originalVolume:number};
 
 const pooledPlaceholder = new THREE.BoxGeometry(1, 1, 1);
 // MaterialId: Air=0, Clay=1, Mortar=2, Render=3, Concrete=4.
@@ -51,6 +53,13 @@ export class ChasingSystem {
   private readonly meshPool: THREE.Mesh[] = [];
   private readonly previousPosition = new THREE.Vector3();
   private readonly probePosition = new THREE.Vector3();
+  private readonly debrisRay = new THREE.Raycaster();
+  private splitWorker: Worker | null = null;
+  private splitWorkerFailed = false;
+  private splitRequest = 0;
+  private readonly pendingSplits = new Map<number,{particle:Particle;impact:MasonryImpact}>();
+  get pendingDebrisSplits():number {return this.pendingSplits.size;}
+  async waitForDebrisSplits():Promise<void>{while(this.pendingSplits.size)await new Promise(resolve=>setTimeout(resolve,4));}
   lastSpawnMs = 0;
   maximumSpawnMs = 0;
   lastUpdateMs = 0;
@@ -59,10 +68,14 @@ export class ChasingSystem {
   totalRetiredVolume = 0;
   budgetRetirements = 0;
   peakActiveFragments = 0;
+  debrisStrikeCount = 0;
+  debrisSplitCount = 0;
+  debrisCrushCount = 0;
 
   constructor(private readonly scene: THREE.Scene, private readonly wall: BrickWall) {}
 
   hit(camera: THREE.Camera, point: InstallationPoint): boolean {
+    if (this.strikeDebris(camera)) return true;
     const impact = this.wall.recessChaseAtAim(camera, point.definition.id);
     if (!impact) return false;
     point.chaseHits += 1;
@@ -92,10 +105,108 @@ export class ChasingSystem {
   }
 
   freeHit(camera: THREE.Camera, continuing = false): MasonryImpact | null {
+    const debris = this.strikeDebris(camera);
+    if (debris) return debris;
     const impact = this.wall.removeAtAim(camera, continuing);
     if (!impact) return null;
     this.spawnDebris(impact);
     return impact;
+  }
+
+  /** Loose clay still occupies space in front of the tool. Resolve it before
+   * drilling the backing behind it, using the same physical shaft as masonry. */
+  private strikeDebris(camera: THREE.Camera): MasonryImpact | null {
+    if (!this.particles.length) return null;
+    const contact = this.wall.contactProvider?.(camera);
+    if (!contact) return null;
+    const direction = contact.direction.clone().normalize();
+    const origin = contact.point.clone().addScaledVector(direction, -.3);
+    this.debrisRay.set(origin, direction);this.debrisRay.near = 0;this.debrisRay.far = .302;
+    const wallHit = this.wall.volume?.raycast(origin, direction, .302);
+    let closest = Math.min(.302, (wallHit?.distance ?? .302) + .002);
+    let target: Particle | null = null, point: THREE.Vector3 | null = null;
+    for (const particle of this.particles) {
+      if (particle.transient || particle.mesh.position.y < .2) continue;
+      particle.mesh.updateWorldMatrix(true, false);
+      const hits: THREE.Intersection[] = [];
+      THREE.Mesh.prototype.raycast.call(particle.mesh, this.debrisRay, hits);
+      for (const hit of hits) if (hit.distance < closest) { closest = hit.distance; target = particle; point = hit.point; }
+    }
+    if (!target || !point) return null;
+    this.debrisStrikeCount++;
+    target.mesh.userData.debrisHits=(target.mesh.userData.debrisHits??0)+1;
+    const seed = Math.imul(target.mesh.id + 1, 2654435761) >>> 0;
+    const impact: MasonryImpact = { points:[point],kind:'demolish-chip',brickSize:new THREE.Vector3(.03,.03,.02),seed,destroyed:false,fragments:[],removedVolume:0,releaseDirection:direction.clone().negate(),releaseEnergyJ:contact.energyJ };
+    // Break along the widest remaining dimension. The children contain the
+    // parent's real triangles and capped fracture plane, never scaled copies.
+    const size = new THREE.Vector3();target.mesh.geometry.computeBoundingBox();target.mesh.geometry.boundingBox!.getSize(size);
+    const axis = size.x >= size.y && size.x >= size.z ? 'x' : size.y >= size.z ? 'y' : 'z';
+    const canSplit=target.ownedGeometry && size[axis]>.035 && Number(target.mesh.userData.volume)>.000008;
+    if(target.mesh.userData.debrisHits>=4 && (target.mesh.userData.splitUnsupported || !canSplit)){
+      this.crushFragment(target,impact);return impact;
+    }
+    if(canSplit && typeof Worker!=='undefined' && !this.splitWorkerFailed && !target.mesh.userData.splitUnsupported){
+      if(!this.splitWorker){
+        this.splitWorker=new Worker(new URL('./debris.worker.ts',import.meta.url),{type:'module'});
+        this.splitWorker.onmessage=event=>{
+          const {id,result}=event.data as {id:number;result:SplitResult|null},pending=this.pendingSplits.get(id);this.pendingSplits.delete(id);
+          if(pending&&this.particles.includes(pending.particle)){
+            if(result)this.replaceFragment(pending.particle,pending.impact,result);
+            else pending.particle.mesh.userData.splitUnsupported=true;
+          }
+        };
+        this.splitWorker.onerror=()=>{this.splitWorkerFailed=true;this.splitWorker?.terminate();this.splitWorker=null;this.pendingSplits.clear();};
+      }
+      if(this.pendingSplits.size<2&&![...this.pendingSplits.values()].some(item=>item.particle===target)){
+        const id=++this.splitRequest,positions=new Float32Array(target.mesh.geometry.getAttribute('position').array);
+        this.pendingSplits.set(id,{particle:target,impact});this.splitWorker.postMessage({id,positions},[positions.buffer]);
+      }
+      return impact;
+    }
+    const split = canSplit
+      ? splitDebrisGeometry(target.mesh.geometry, axis) : null;
+    if (split) {
+      this.replaceFragment(target,impact,{originalVolume:split.originalVolume,pieces:split.pieces.map(piece=>{const positions=new Float32Array(piece.geometry.getAttribute('position').array);piece.geometry.dispose();return{positions,volume:piece.volume}})});
+    } else {
+      this.releaseDependents(target);target.settled=false;target.wallSupported=false;target.support=null;
+      const speed=Math.sqrt(2*Math.max(0,contact.energyJ)*.12/Math.max(.001,Number(target.mesh.userData.massKg)));
+      target.velocity.copy(direction).multiplyScalar(-Math.min(2,speed));target.angularVelocity.set(0,0,0);
+    }
+    return impact;
+  }
+
+  private replaceFragment(target:Particle,impact:MasonryImpact,split:SplitResult):void {
+    this.debrisSplitCount++;
+    const volume=Number(target.mesh.userData.volume),material=materialNames.indexOf(target.mesh.userData.material);
+    const orientation=target.mesh.quaternion.clone();
+    for(const piece of split.pieces){
+      const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.BufferAttribute(piece.positions,3));geometry.computeBoundingBox();
+      const extent=geometry.boundingBox!.getSize(new THREE.Vector3());
+      impact.fragments.push({position:target.mesh.position.clone(),size:extent,material,volume:volume*piece.volume/split.originalVolume,detached:true,positions:new Float32Array(geometry.getAttribute('position').array)});geometry.dispose();
+    }
+    this.retireParticle(this.particles.indexOf(target),false);this.spawnDebris(impact,orientation);
+    // Fragmentation transfers existing debris; it removes no extra wall mass.
+    this.totalEmittedVolume-=volume;
+  }
+
+  /** Repeated blows crush a lodged chip if a safe plate cut is unavailable.
+   * These angular fines represent the existing material, like crushed fines
+   * from the wall core; no ambiguous mesh becomes permanently invulnerable. */
+  private crushFragment(target:Particle,impact:MasonryImpact):void {
+    const volume=Number(target.mesh.userData.volume),material=materialNames.indexOf(target.mesh.userData.material);
+    const count=Math.min(32,Math.max(4,Math.ceil(volume/.0000015))),chipVolume=volume/count,random=seeded(impact.seed);
+    const shape=new THREE.TetrahedronGeometry(1),attribute=shape.getAttribute('position');let unitVolume=0;
+    const a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3();
+    for(let i=0;i<attribute.count;i+=3){a.fromBufferAttribute(attribute,i);b.fromBufferAttribute(attribute,i+1);c.fromBufferAttribute(attribute,i+2);unitVolume+=a.dot(b.cross(c))/6;}
+    const scale=Math.cbrt(chipVolume/Math.abs(unitVolume));shape.scale(scale,scale,scale);shape.computeBoundingBox();
+    const size=shape.boundingBox!.getSize(new THREE.Vector3()),positions=new Float32Array(shape.getAttribute('position').array);
+    for(let i=0;i<count;i++){
+      const probes=target.collisionProbes,local=probes?.length?probes[Math.floor(random()*probes.length)].clone():new THREE.Vector3();
+      const position=local.applyQuaternion(target.mesh.quaternion).add(target.mesh.position);
+      impact.fragments.push({position,size,material,volume:chipVolume,detached:false,positions});
+    }
+    shape.dispose();this.debrisCrushCount++;
+    this.retireParticle(this.particles.indexOf(target),false);this.spawnDebris(impact,undefined,true);this.totalEmittedVolume-=volume;
   }
 
   get insideFragmentCount(): number { return this.particles.filter(p=>p.mesh.position.z < -2.415 && p.mesh.position.z > -2.595).length; }
@@ -136,7 +247,7 @@ export class ChasingSystem {
     return overlaps;
   }
 
-  private spawnDebris(impact: MasonryImpact): void {
+  private spawnDebris(impact: MasonryImpact, orientation?:THREE.Quaternion, crushed = false): void {
     const started = performance.now();
     const random = seeded(impact.seed);
     const firstNewParticle = this.particles.length;
@@ -164,6 +275,9 @@ export class ChasingSystem {
         const size = geometry.boundingBox!.getSize(new THREE.Vector3());
         width = size.x; height = size.y; depth = size.z;
         geometry.translate(-center.x, -center.y, -center.z);
+        // Keep fracture planes in local coordinates between repeated cuts.
+        // Baking every body rotation into Float32 vertices erodes cap topology.
+        if(orientation){center.applyQuaternion(orientation);fragment.quaternion.copy(orientation);}
         fragment.position.add(center);
         geometry.computeVertexNormals();
         geometry.computeBoundingSphere();
@@ -186,7 +300,7 @@ export class ChasingSystem {
       fragment.userData = {
         volume: source.volume, material: materialNames[source.material],
         massKg: source.volume * materialDensities[source.material],
-        detached: source.detached, actualFractureGeometry: actualGeometry,
+        detached: source.detached, actualFractureGeometry: actualGeometry && !crushed, crushed,
       };
       fragment.visible = true;
       fragment.castShadow = true;
@@ -269,9 +383,15 @@ export class ChasingSystem {
           particle.velocity.y = Math.max(-8, particle.velocity.y - 9.81 * step);
           this.advanceAgainstWall(particle, step);
         }
-        particle.mesh.rotation.x += particle.angularVelocity.x * elapsed;
-        particle.mesh.rotation.y += particle.angularVelocity.y * elapsed;
-        particle.mesh.rotation.z += particle.angularVelocity.z * elapsed;
+        // A free rotation may sweep clay into a surviving web. Previously that
+        // penetration trapped every subsequent translation, leaving a floating
+        // piece. Keep only collision-free rotational increments.
+        for (const axis of ['x','y','z'] as const) {
+          if(Math.abs(particle.angularVelocity[axis])<1e-5)continue;
+          const before=particle.mesh.rotation[axis];
+          particle.mesh.rotation[axis]+=particle.angularVelocity[axis]*elapsed;
+          if(this.overlapsWall(particle)){particle.mesh.rotation[axis]=before;particle.angularVelocity[axis]*=-.12;}
+        }
         let contact = this.supportContact(particle, previousY);
         if (!particle.settled && particle.mesh.position.y <= contact.height) {
           // Rubble comes to rest on a broad face. This gives every settled piece a
@@ -407,6 +527,19 @@ export class ChasingSystem {
 
   private hasWallSupport(particle: Particle): boolean {
     const p = particle.mesh.position;
+    if(particle.collisionProbes){
+      const positions=particle.mesh.geometry.getAttribute('position'),normals=particle.mesh.geometry.getAttribute('normal');
+      const triangles=positions.count/3,stride=Math.max(1,Math.ceil(triangles/48));
+      const normal=new THREE.Vector3();
+      for(let triangle=0;triangle<triangles;triangle+=stride){
+        const i=triangle*3;normal.fromBufferAttribute(normals,i).applyQuaternion(particle.mesh.quaternion);
+        if(normal.y>-.45)continue;
+        this.probePosition.set((positions.getX(i)+positions.getX(i+1)+positions.getX(i+2))/3,(positions.getY(i)+positions.getY(i+1)+positions.getY(i+2))/3,(positions.getZ(i)+positions.getZ(i+1)+positions.getZ(i+2))/3).applyQuaternion(particle.mesh.quaternion).add(p);
+        this.probePosition.y-=.004;
+        if(this.wall.isSolidAt(this.probePosition.x,this.probePosition.y,this.probePosition.z))return true;
+      }
+      return false;
+    }
     const y = p.y - particle.halfHeight - 0.004;
     return this.wall.isSolidAt(p.x, y, p.z)
       || this.wall.isSolidAt(p.x - particle.halfWidth * 0.7, y, p.z)
@@ -521,11 +654,11 @@ export class ChasingSystem {
     }
   }
 
-  private retireParticle(index: number): void {
+  private retireParticle(index: number, accountRetirement = true): void {
     const [particle] = this.particles.splice(index, 1);
     this.releaseDependents(particle);
     this.scene.remove(particle.mesh);
-    this.totalRetiredVolume += Number(particle.mesh.userData.volume);
+    if(accountRetirement)this.totalRetiredVolume += Number(particle.mesh.userData.volume);
     if (particle.ownedGeometry) particle.mesh.geometry.dispose();
     particle.mesh.geometry = pooledPlaceholder;
     particle.mesh.visible = false;

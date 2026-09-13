@@ -48,12 +48,23 @@ export class FPSRig extends THREE.Group {
   actualTiltDegrees=15;
   workPositionLocked = false;
   private readonly feedOffset = new THREE.Vector3();
-  private presentedDepthZ: number | null = null;
+  private presentedFeedOffset: THREE.Vector3 | null = null;
+  private contactFeedBudgetM = 0;
+  private lateralFeedBudgetM = Infinity;
+
   private hammerGripBlend = 0;
   private hammerLeftMain=false;
   private readonly hammerFeedOffset = new THREE.Vector3();
   private hammerPostureY=0;
   readonly hammerFit={housingCameraZ:0,wristReachM:[] as number[],feedM:0,postureY:0};
+
+  /** Contact can be queried several times per impact; advance the pose once per frame. */
+  beginFrame(dt: number, wallTravelM: number | null = null): void {
+    this.contactFeedBudgetM = .24 * Math.min(Math.max(dt, 0), .05);
+    // While feeding A/D along the wall, a new shell may retract the shaft, but
+    // must not drag the visible bit backwards against the worker's movement.
+    this.lateralFeedBudgetM = wallTravelM === null ? Infinity : Math.abs(wallTravelM) * .75;
+  }
 
   /** Seat the real visible tip on the first remaining solid, then read it back. */
   contact(camera: THREE.Camera, wall: BrickWall): ChiselContact | null {
@@ -138,10 +149,18 @@ export class FPSRig extends THREE.Group {
     // differs from the shaft centre. Both approximations made the bit retreat.
     if(hit)this.feedOffset.copy(target).sub(entry);
     const surfaceTarget=target.clone();
-    if(this.workPositionLocked&&this.presentedDepthZ!==null){
-      target.z=this.presentedDepthZ+THREE.MathUtils.clamp(target.z-this.presentedDepthZ,-.0025,.004);
-    }
-    this.presentedDepthZ=target.z;
+    // Smooth all three feed axes relative to the moving sightline. Smoothing
+    // world Z alone snapped the tilted bit sideways at each cavity boundary.
+    const desiredFeed=target.clone().sub(entry);
+    if(this.workPositionLocked&&this.presentedFeedOffset!==null){
+      const advance=desiredFeed.clone().sub(this.presentedFeedOffset);
+      advance.clampLength(0,this.contactFeedBudgetM);
+      advance.x=THREE.MathUtils.clamp(advance.x,-this.lateralFeedBudgetM,this.lateralFeedBudgetM);
+      this.contactFeedBudgetM=Math.max(0,this.contactFeedBudgetM-advance.length());
+      this.lateralFeedBudgetM=Math.max(0,this.lateralFeedBudgetM-Math.abs(advance.x));
+      this.presentedFeedOffset.add(advance);
+      target.copy(entry).add(this.presentedFeedOffset);
+    } else this.presentedFeedOffset=desiredFeed;
     const local=this.worldToLocal(target.clone());
     hammer.position.copy(local).sub(this.tipAnchor.clone().applyQuaternion(hammer.quaternion));
     hammer.updateWorldMatrix(true, true);
@@ -344,7 +363,7 @@ export class FPSRig extends THREE.Group {
   }
   private restHammer(camera:THREE.Camera):void {
     this.reachable=false;this.chiselInAir=true;
-    this.presentedDepthZ=null;
+    this.presentedFeedOffset=null;
     this.feedOffset.set(0,0,0);
     this.hammerFeedOffset.set(0,0,0);this.hammerFit.feedM=0;
     const hammer=this.tools.get('hammer')!;
