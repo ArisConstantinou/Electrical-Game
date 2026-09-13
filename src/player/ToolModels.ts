@@ -55,6 +55,11 @@ function metadata(group: THREE.Group, grip: Point, tip: Point, secondaryGrip?: P
   if (secondaryGrip) group.userData.secondaryGripPoint = [...secondaryGrip];
   group.traverse(object => { if (object instanceof THREE.Mesh) { object.renderOrder = 20; object.userData.toolModelPart = true; } }); return group;
 }
+function gripFrame(group:THREE.Group,direction:Point,rotation?:THREE.Quaternion):THREE.Group {
+  group.userData.gripQuaternion=(rotation??new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),vector(direction).normalize())).toArray();
+  group.userData.primaryGripCount=1;
+  return group;
+}
 
 function spray(): THREE.Group {
   const group = new THREE.Group(), can = new THREE.Group(); group.add(can); can.position.set(.16, -.08, -.03); can.rotation.z = -.14;
@@ -75,7 +80,7 @@ function spray(): THREE.Group {
   const info = label('COLOR', '400 ml · MASONRY', .058, .044); if (info) { info.position.set(0, -.005, .034); can.add(info); }
   // Raised bead and metal base remain visible below the glove.
   const front = new THREE.Object3D(); front.name = 'spray-tip'; front.position.set(0, .103, -.020); can.add(front);
-  return metadata(group, [.16, -.10, -.03], [.175, .021, -.050]);
+  return gripFrame(metadata(group, [.16070, -.07505, -.03], [.175, .021, -.050]),[0,1,0],can.quaternion.clone());
 }
 
 function trowel(): THREE.Group {
@@ -91,7 +96,7 @@ function trowel(): THREE.Group {
   const grain = mat(0x8c6031, .9);
   for (let i = 0; i < 4; i++) rod(group, [.149 + i * .002, -.064, .051], [.215 + i * .0015, -.144, .085], .00045, grain, 'Fine longitudinal wood grain');
   const end = part(group, new THREE.SphereGeometry(.0128, 16, 10), mat(0xb98443, .68), handleEnd, 'Rounded handle end'); end.scale.set(1, .7, 1);
-  return metadata(group, [.183, -.108, .059], [-.060, .172, -.112]);
+  return gripFrame(metadata(group, [.183, -.108, .059], [-.060, .172, -.112]),[-.083,.097,-.038]);
 }
 
 function spring(): THREE.Group {
@@ -113,7 +118,8 @@ function spring(): THREE.Group {
   const finishRing = torus(group, coilRadius, wireRadius, metal, [.058, -.150, -.025], 'Open spring insertion end'); finishRing.rotation.x = Math.PI / 2;
   tube(group, [[.151, -.157, .005], [.151, -.174, .005], [.158, -.184, .006]], .0018, metal, 'Retrieval eye stem');
   const eye = torus(group, .009, .002, metal, [.158, -.185, .006], 'Closed retrieval eye'); eye.scale.y = 1.35;
-  return metadata(group, [.160, -.119, .003], [.058, -.150, -.025], [.055, -.11, -.025]);
+  const grip=center.getPointAt(.935),tangent=center.getTangentAt(.935).negate();
+  return gripFrame(metadata(group,grip.toArray() as [number,number,number], [.058, -.150, -.025]),tangent.toArray() as [number,number,number]);
 }
 
 function level(): THREE.Group {
@@ -137,7 +143,7 @@ function level(): THREE.Group {
   }
   vial(0, true); vial(-.19, false); vial(.19, false);
   const badge = label('LEVEL', '3 VIALS', .052, .020, '#ffffff', '#c6282c'); if (badge) { badge.position.set(.142, 0, .014); frame.add(badge); }
-  return metadata(group, [.10, -.02, -.075], [-.255, -.02, -.075], [-.09, -.02, -.075]);
+  return gripFrame(metadata(group, [.10, -.02, -.075], [-.255, -.02, -.075]),[-1,0,0]);
 }
 
 function cutter(): THREE.Group {
@@ -164,7 +170,10 @@ function cutter(): THREE.Group {
   tube(assembly, springPoints, .0011, metal, 'Small opening spring between shear handles');
   const badge = label('PVC', 'Ø 25', .027, .014, '#ffffff', '#b92028'); if (badge) { badge.position.set(.122, -.065, .012); badge.rotation.z = -.45; assembly.add(badge); }
   group.userData.ratcheting = false;
-  return metadata(group, [.164, -.119, -.055], [-.001, .014, -.059]);
+  // The hand spans the two levers, instead of perching on the end of one.
+  const grip=vector([.125,-.067,.005]).applyQuaternion(assembly.quaternion).add(assembly.position);
+  const axis=vector([-.8,.6,0]).applyQuaternion(assembly.quaternion);
+  return gripFrame(metadata(group,grip.toArray() as [number,number,number],[-.001,.014,-.059]),axis.toArray() as [number,number,number]);
 }
 
 function hose(): THREE.Group {
@@ -182,7 +191,7 @@ function hose(): THREE.Group {
   rod(group, [.195, -.149, .020], [.206, -.181, .026], .018, orange, 'Quick connector coupling', .016);
   torus(group, .016, .002, metal, [.205, -.176, .025], 'Connector locking collar', 'y');
   tube(group, [[.207, -.181, .026], [.216, -.237, .046], [.190, -.305, .063], [.245, -.435, .091]], .009, mat(0x3b6170, .83), 'Flexible water supply hose');
-  return metadata(group, [.177, -.101, .010], [.082, .026, -.215]);
+  return gripFrame(metadata(group, [.177, -.101, .010], [.082, .026, -.215]),[-.048,.118,-.033]);
 }
 
 function fitting(): THREE.Group {
@@ -196,7 +205,8 @@ function fitting(): THREE.Group {
     torus(body, .0085, .0008, white, [x, y, -.0175], 'Conduit knockout score ring');
   }
   const screwBar = rod(body, [-.033, .032, .019], [.033, .032, .019], .0011, metal, 'Thin fixing ear'); screwBar.visible = true;
-  return metadata(group, [.137, -.057, -.043], [.095, -.025, -.085]);
+  const grip=vector([.039,-.001,.004]).applyQuaternion(body.quaternion).add(body.position);
+  return gripFrame(metadata(group,grip.toArray() as [number,number,number],[.095,-.025,-.085]),[0,1,0],body.quaternion.clone());
 }
 
 /** Cordless SDS-max silhouette, based on the M18 FHACO745 manufacturer's reference.

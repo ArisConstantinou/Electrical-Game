@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { buildToolModel } from './ToolModels';
-import { workerHand, workerArm, poseWorkerArm, flexWorkerHand, MAX_WRIST_REACH_M, UPPER_ARM_M, FOREARM_M, type WorkerArm } from './WorkerArm';
+import { workerHand, workerArm, poseWorkerArm, flexWorkerHand, poseToolGrip, MAX_WRIST_REACH_M, UPPER_ARM_M, FOREARM_M, type WorkerArm } from './WorkerArm';
 import type { BrickWall, ChiselContact } from '../world/BrickWall';
 
 export type RigTool = 'spray' | 'hammer' | 'fitting' | 'level' | 'spring' | 'cutter' | 'trowel' | 'hose';
@@ -21,6 +21,7 @@ const place = (object: THREE.Object3D, x: number, y: number, z: number): THREE.O
 export class FPSRig extends THREE.Group {
   private readonly tools = new Map<RigTool, THREE.Group>();
   private readonly restingY = -0.12;
+  private readonly touchViewport = window.matchMedia('(pointer: coarse)');
   private sprayCanMaterial: THREE.MeshStandardMaterial | null = null;
   private sprayMist: THREE.Points | null = null;
   private strikeAmount = 0;
@@ -164,13 +165,15 @@ export class FPSRig extends THREE.Group {
     const gripTarget=this.workStanceSide>.12?1:0;
     this.hammerGripBlend+=THREE.MathUtils.clamp(gripTarget-this.hammerGripBlend,-dt*2.8,dt*2.8);
     const bob = moving ? Math.sin(performance.now() * 0.012) * 0.006 : 0;
-    this.position.y = this.restingY + bob;
+    // Keep the working hand above the landscape toolbar and inside a portrait
+    // view. The entire tool moves with the wrist; arm lengths stay physical.
+    const handTool=this.selectedTool!=='hammer';
+    this.position.x=handTool&&innerWidth<innerHeight?-.065:.02;
+    this.position.y=(handTool&&this.touchViewport.matches&&innerHeight<520?.02:this.restingY)+bob;
     this.strikeAmount = Math.max(0, this.strikeAmount - dt * 5.5);
     this.rotation.x = -Math.sin(this.strikeAmount * Math.PI) * 0.16;
     this.toolAction=Math.max(0,this.toolAction-dt*2.5);
     this.tools.forEach((group,key)=>{if(key!=='hammer')group.position.set(0,0,0);});
-    const cutter=this.tools.get('cutter')?.getObjectByName('cutter-moving-handle');
-    if(cutter)cutter.rotation.z=Math.sin(this.toolAction*Math.PI)*.28;
     const trigger=this.tools.get('hose')?.getObjectByName('hose-trigger');
     if(trigger)trigger.scale.x=this.hoseActive?.82:1;
     const bubble=this.tools.get('level')?.getObjectByName('level-bubble');
@@ -233,7 +236,7 @@ export class FPSRig extends THREE.Group {
   }
   private gripsReachable(camera:THREE.Camera,tool:THREE.Group):boolean {
     tool.updateWorldMatrix(true,true);
-    return (this.armSets.get(this.selectedTool)??[]).every(arm=>this.shoulder(camera,arm.side).distanceTo(this.wrist(arm))<=MAX_WRIST_REACH_M);
+    return (this.armSets.get(this.selectedTool)??[]).filter(arm=>arm.hand.userData.gripRole!=='resting').every(arm=>this.shoulder(camera,arm.side).distanceTo(this.wrist(arm))<=MAX_WRIST_REACH_M);
   }
   /** Move the held tool into the intersection of the two finite arm workspaces. */
   private constrainHeldTool(camera:THREE.Camera):void {
@@ -241,6 +244,7 @@ export class FPSRig extends THREE.Group {
     for(let i=0;i<16;i++){
       let moved=false;
       for(const arm of this.armSets.get(this.selectedTool)??[]){
+        if(arm.hand.userData.gripRole==='resting')continue;
         tool.updateWorldMatrix(true,true);
         const shoulder=this.shoulder(camera,arm.side),wrist=this.wrist(arm),delta=wrist.clone().sub(shoulder),distance=delta.length();
         if(distance>MAX_WRIST_REACH_M){
@@ -265,13 +269,27 @@ export class FPSRig extends THREE.Group {
     if(this.selectedTool!=='hammer')this.constrainHeldTool(camera);
     const {right}=this.bodyFrame(camera);
     for(const arm of this.armSets.get(this.selectedTool)??[]){
+      if(arm.hand.userData.gripRole==='resting')this.poseRestingHand(camera,arm);
       poseWorkerArm(arm,this.shoulder(camera,arm.side),this.wrist(arm),right);
-      flexWorkerHand(arm.hand,this.toolAction+this.strikeAmount*.35+(this.hoseActive?.4:0),performance.now()*.001);
+      flexWorkerHand(arm.hand,arm.hand.userData.gripRole==='resting'?0:this.toolAction+this.strikeAmount*.35+(this.hoseActive?.4:0),performance.now()*.001);
+      if(arm.hand.userData.gripping)poseToolGrip(arm.hand,this.tools.get(this.selectedTool)!,this.toolAction);
     }
+  }
+  private poseRestingHand(camera:THREE.Camera,arm:WorkerArm):void {
+    const {right,forward}=this.bodyFrame(camera);
+    // The free wrist hangs beside the hip in BODY space, independent of the
+    // held tool's position, pitch, recoil or trowel swing.
+    const wrist=this.shoulder(camera,arm.side).add(new THREE.Vector3(0,-.55,0)).addScaledVector(right,-.045).addScaledVector(forward,.025);
+    const frame=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(right,new THREE.Vector3(0,1,0),forward.clone().negate()));
+    const rotation=frame.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0,-Math.PI/2,Math.PI)));
+    arm.group.updateWorldMatrix(true,false);
+    arm.hand.quaternion.copy(arm.group.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(rotation));
+    arm.hand.position.copy(arm.group.worldToLocal(wrist)).sub(new THREE.Vector3().fromArray(arm.hand.userData.wristPoint).applyQuaternion(arm.hand.quaternion));
+    arm.hand.updateWorldMatrix(true,true);
   }
   /** Hand tools need a body-space reachable target; a hose or mortar projectile can travel farther. */
   canReachPoint(camera:THREE.Camera,point:THREE.Vector3,extension=.10):boolean {
-    return [-1,1].some(side=>this.shoulder(camera,side).distanceTo(point)<=MAX_WRIST_REACH_M+extension);
+    return (this.selectedTool==='hammer'?[-1,1]:[1]).some(side=>this.shoulder(camera,side).distanceTo(point)<=MAX_WRIST_REACH_M+extension);
   }
   debugPose():object {
     return {tool:this.selectedTool,reachable:this.reachable,arms:(this.armSets.get(this.selectedTool)??[]).map(arm=>({
@@ -284,12 +302,14 @@ export class FPSRig extends THREE.Group {
     const arms:WorkerArm[]=[];
     const primary=new THREE.Vector3().fromArray(group.userData.gripPoint);
     for(const side of [1,-1]){
-      const second=group.userData.secondaryGripPoint as number[]|undefined;
-      // Free hand supports the wrist for small tools; two-hand tools use their authored second grip.
-      const grip=side===1?primary.clone():second?new THREE.Vector3().fromArray(second):primary.clone().add(new THREE.Vector3(-.055,-.06,.06));
-      const style=side<0&&kind==='hammer'?'hammer-support':side<0&&!second?'support':kind;
-      const hand=workerHand(side,style); hand.position.copy(grip);group.add(hand);
+      const resting=side<0&&kind!=='hammer';
+      const grip=side===1?primary.clone():resting?new THREE.Vector3():new THREE.Vector3().fromArray(group.userData.secondaryGripPoint);
+      const style=resting?'relaxed':side<0?'hammer-support':kind;
+      const hand=workerHand(side,style); hand.position.copy(grip);
+      if(!resting&&group.userData.gripQuaternion)hand.quaternion.fromArray(group.userData.gripQuaternion);
+      hand.userData.gripping=!resting;hand.userData.gripRole=resting?'resting':'primary';
       const arm=workerArm(side,hand,grip);arms.push(arm);this.add(arm.group);
+      if(resting)arm.group.add(hand);else group.add(hand);
     }
     this.armSets.set(kind,arms);
   }

@@ -30,6 +30,7 @@ for(const mobile of [false,true]){
    const world=(object,xyz)=>object.localToWorld(g.renderer.camera.position.clone().fromArray(xyz));
    const grips=[];
    for(const arm of g.fpsRig.armSets.get(selected)??[]){
+    if(arm.hand.userData.gripping===false)continue;
     const target=group.localToWorld(arm.grip.clone());
     grips.push(arm.hand.getWorldPosition(g.renderer.camera.position.clone()).distanceTo(target));
    }

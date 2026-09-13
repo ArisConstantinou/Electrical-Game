@@ -26,6 +26,7 @@ function mesh(parent:THREE.Object3D, geometry:THREE.BufferGeometry, material:THR
 
 /** Palm and five separately articulated digits, wrapped around a tool handle. */
 export function workerHand(side:number, style:string):THREE.Group {
+  if(!style.startsWith('hammer'))return singleToolHand(side,style);
   const hand=new THREE.Group(); hand.name=`${side<0?'Left':'Right'} five-finger ${style} grip`;
   hand.userData.wristPoint=[side*.018,-.058,.047];
   const shape=new THREE.Shape();shape.moveTo(-.023,-.037);shape.quadraticCurveTo(.001,-.048,.019,-.036);shape.quadraticCurveTo(.033,-.022,.030,.029);shape.quadraticCurveTo(.011,.042,-.024,.030);shape.quadraticCurveTo(-.034,.003,-.023,-.037);shape.closePath();
@@ -64,6 +65,83 @@ export function workerHand(side:number, style:string):THREE.Group {
   if(style==='trowel')hand.quaternion.setFromUnitVectors(upright,new THREE.Vector3(-.083,.097,-.038).normalize());
   hand.userData.gripStyle=style;
   return hand;
+}
+
+/** Tool-sized grasp sections. Local Y follows the handle; +Z is the hand back. */
+function singleToolHand(side:number,style:string):THREE.Group {
+  const hand=new THREE.Group();hand.name=`${side<0?'Left':'Right'} five-finger ${style} hand`;
+  const relaxed=style==='relaxed',pinch=style==='fitting';
+  const sections:Record<string,[number,number]>={spray:[.0335,.0335],spring:[.0082,.0082],level:[.027,.016],cutter:[.035,.014],trowel:[.0145,.0145],hose:[.022,.022],fitting:[.021,.015],relaxed:[.017,.008]};
+  const [rx,rz]=sections[style]??[.022,.022],backZ=relaxed?.012:rz+.010, palmX=pinch?side*.027:0;
+  hand.userData.wristPoint=[palmX,-.059,backZ];hand.userData.gripStyle=style;
+  hand.userData.gripSection=[rx,rz];
+  const palm=mesh(hand,ellipsoid(1,[.032,.041,.014],[palmX,-.004,backZ]),skin,'Tapered palm and metacarpals');
+  palm.scale.y=.94;
+  mesh(hand,ellipsoid(1,[.019,.023,.015],[palmX-side*.017,-.006,backZ-.008]),skin,'Thenar thumb pad');
+  mesh(hand,ellipsoid(1,[.024,.020,.019],[palmX,-.047,backZ]),skin,'Rounded wrist heel');
+  const names=['index','middle','ring','little'];
+  for(let i=0;i<4;i++){
+    const digit=new THREE.Group();digit.name=names[i];digit.userData.digit=names[i];
+    const y=.026-i*.018, r=.0085-i*.00055;
+    let points:number[][];
+    if(relaxed){
+      // Fingers continue down the hanging hand, with only a loose natural curl.
+      const x=side*(.023-i*.015),length=[.066,.074,.069,.053][i];
+      points=[[x,.025,.012],[x,.025+length*.43,.008],[x,.025+length*.78,-.003],[x,.025+length,-.014]];
+    }else if(pinch){
+      points=[[side*.049,y,.025],[side*.046,y+.001,-.006],[side*.018,y,-.028],[-side*.008,y-.004,-.025]];
+    }else if(style==='spray'&&i===0){
+      points=[[side*.027,.031,backZ],[side*.039,.062,.038],[side*.015,.096,.014],[0,.099,-.002]];
+    }else{
+      points=[[side*.028,y,backZ],[side*(rx+.009),y+.002,.002],[side*(rx*.57),y,-rz-.009],[-side*(rx*.43),y-.003,-rz-.006]];
+    }
+    const joints=points.map(v),geos=joints.slice(1).map((p,j)=>bone(joints[j],p,r*(1-j*.10)));
+    if(style==='cutter'){
+      // Separate rigid phalanges allow a real closing curl around both levers.
+      for(let j=0;j<3;j++){
+        const length=joints[j].distanceTo(joints[j+1]);
+        const segment=mesh(digit,new THREE.CapsuleGeometry(r*(1-j*.10),Math.max(.001,length-2*r*(1-j*.10)),5,12),skin,`${names[i]} rigid phalanx ${j+1}`);
+        segment.userData.phalanx=j;
+        segment.position.copy(joints[j]).add(joints[j+1]).multiplyScalar(.5);
+        segment.quaternion.setFromUnitVectors(upright,joints[j+1].clone().sub(joints[j]).normalize());
+      }
+    }else mesh(digit,mergeGeometries(geos),skin,`${names[i]} three phalanges`);
+    geos.forEach(g=>g.dispose());
+    const tip=joints[3],n=mesh(digit,ellipsoid(1,[.0064,.007,.0013],[tip.x,tip.y,tip.z-.006]),nail,`${names[i]} nail`);n.rotation.y=side*.2;
+    digit.userData.restPoints=points;hand.add(digit);
+  }
+  const thumb=new THREE.Group();thumb.name='thumb';thumb.userData.digit='thumb';
+  const thumbPoints=relaxed?[[-side*.024,.002,.012],[-side*.040,.018,.006],[-side*.045,.038,-.005],[-side*.036,.048,-.009]]:
+    pinch?[[side*.021,.016,.028],[side*.008,.031,.037],[-side*.010,.025,.030],[-side*.016,.018,.019]]:
+      [[-side*.021,.023,backZ],[-side*(rx+.014),.025,.002],[-side*(rx*.6),.020,-rz-.012],[side*.006,.018,-rz-.013]];
+  const points=thumbPoints.map(v),geos=points.slice(1).map((p,i)=>bone(points[i],p,.0105-i*.001));
+  mesh(thumb,mergeGeometries(geos),skin,'Opposed thumb with articulated joints');geos.forEach(g=>g.dispose());
+  const end=points[3];mesh(thumb,ellipsoid(1,[.008,.008,.0015],[end.x,end.y,end.z-.006]),nail,'Thumbnail');hand.add(thumb);
+  return hand;
+}
+
+/** One hand closes the shear: the lower/fixed handle stays against the palm. */
+export function poseToolGrip(hand:THREE.Group,tool:THREE.Group,effort:number):void {
+  if(hand.userData.gripStyle!=='cutter')return;
+  const squeeze=Math.sin(THREE.MathUtils.clamp(effort,0,1)*Math.PI);
+  const moving=tool.getObjectByName('cutter-moving-handle');
+  if(moving)moving.rotation.z=.13-squeeze*.33;
+  hand.userData.squeeze=squeeze;
+  // The fingers follow the lever while the palm remains seated on the fixed grip.
+  for(const digit of hand.children.filter(o=>o.userData.digit&&o.userData.digit!=='thumb')){
+    const points=(digit.userData.restPoints as number[][]).map(v);
+    points[1].x-=squeeze*.024;
+    points[2].x-=squeeze*.025;
+    points[3].x-=squeeze*.018;
+    points[3].z+=squeeze*.006;
+    for(const segment of digit.children.filter(o=>o.userData.phalanx!==undefined)){
+      const index=segment.userData.phalanx as number;
+      segment.position.copy(points[index]).add(points[index+1]).multiplyScalar(.5);
+      segment.quaternion.setFromUnitVectors(upright,points[index+1].clone().sub(points[index]).normalize());
+    }
+    const nail=digit.getObjectByName(`${digit.userData.digit} nail`);
+    if(nail)nail.position.set(points[3].x-(digit.userData.restPoints[3][0]),0,points[3].z-(digit.userData.restPoints[3][2]));
+  }
 }
 
 export interface WorkerArm {
@@ -105,6 +183,7 @@ export function poseWorkerArm(arm:WorkerArm, shoulder:THREE.Vector3, wrist:THREE
 }
 
 export function flexWorkerHand(hand:THREE.Group, effort:number,time:number):void {
+  if(hand.userData.gripStyle==='cutter')return;
   for(const [i,digit]of hand.children.filter(o=>o.userData.digit).entries()){
     digit.rotation.y=Math.sin(time*1.3+i*.6)*.007+effort*.026;
   }
