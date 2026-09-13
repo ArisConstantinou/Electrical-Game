@@ -71,7 +71,7 @@ export class HUD {
               <button id="chisel-tilt" type="button"><span>HAMMER TILT · [ / ]</span><b>15 deg DOWN</b></button>
               <button id="chisel-side" type="button"><span>CHISEL DIRECTION / J K</span><b>0 deg STRAIGHT</b></button>
               <button id="chisel-angle" type="button"><span>EDGE ANGLE · R</span><b>0°</b></button>
-              <label class="hammer-speed-setting" for="hammer-speed"><span>CHISEL SPEED · − / +</span><output id="hammer-speed-value">100%</output><input id="hammer-speed" type="range" min="0" max="250" step="25" value="100" aria-label="Chisel destruction speed"><small>0% stops impacts · slower for control</small></label>
+              <label class="hammer-speed-setting" for="hammer-speed"><span>CHISEL SPEED · − / +</span><output id="hammer-speed-value">250%</output><input id="hammer-speed" type="range" min="0" max="800" step="25" value="250" aria-label="Chisel destruction speed"><small>0% stop · 100% precise · 250% normal · 400–800% fast. Hold use + A / D to cut along the wall.</small></label>
             </div>
             <label class="hammer-speed-setting" for="water-gun-mode"><span>WATER GUN | FLOW</span><select id="water-gun-mode" aria-label="Water gun flow mode">${WATER_GUN_MODES.map(mode=>`<option value="${mode.id}" ${mode.id==='flood'?'selected':''}>${mode.label} | ${mode.flowLitresPerSecond} L/s</option>`).join('')}</select><small>FLOOD fills the room with boosted game flow. Choose MIST for gentle chase wetting.</small></label>
             <details id="mortar-settings"><summary>TROWEL / WATER</summary>

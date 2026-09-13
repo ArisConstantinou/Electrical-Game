@@ -47,12 +47,12 @@ export class FPSRig extends THREE.Group {
   workStanceTiltDegrees:number|null=null;
   actualTiltDegrees=15;
   workPositionLocked = false;
-  private feedDepth = .02;
+  private readonly feedOffset = new THREE.Vector3();
   private presentedDepthZ: number | null = null;
   private hammerGripBlend = 0;
   private hammerLeftMain=false;
-  private hammerFeedLeanM = 0;
-  readonly hammerFit={housingCameraZ:0,wristReachM:[] as number[]};
+  private readonly hammerFeedOffset = new THREE.Vector3();
+  readonly hammerFit={housingCameraZ:0,wristReachM:[] as number[],feedM:0};
 
   /** Seat the real visible tip on the first remaining solid, then read it back. */
   contact(camera: THREE.Camera, wall: BrickWall): ChiselContact | null {
@@ -119,23 +119,22 @@ export class FPSRig extends THREE.Group {
       }
     }
     this.chiselInAir=!hit;
-    if(hit)this.feedDepth=THREE.MathUtils.clamp((wall.volume.frontZ-hit.point.z)/Math.abs(direction.z),0,.24);
     // Losing a shell contact must not throw the entire tool through the cell,
     // then teleport it back to the resting pose on the next pixel of aim.
-    const target=hit?new THREE.Vector3(hit.point.x,hit.point.y,hit.point.z).addScaledVector(edge,-bladeOffsetM):entry.clone().addScaledVector(direction,this.feedDepth);
+    const target=hit?new THREE.Vector3(hit.point.x,hit.point.y,hit.point.z).addScaledVector(edge,-bladeOffsetM):entry.clone().add(this.feedOffset);
+    // Keep the actual blade centre's full offset through air. Wall-normal
+    // depth is not shaft travel, and an off-centre wide blade contact also
+    // differs from the shaft centre. Both approximations made the bit retreat.
+    if(hit)this.feedOffset.copy(target).sub(entry);
     const surfaceTarget=target.clone();
     if(this.workPositionLocked&&this.presentedDepthZ!==null){
       target.z=this.presentedDepthZ+THREE.MathUtils.clamp(target.z-this.presentedDepthZ,-.0025,.004);
     }
     this.presentedDepthZ=target.z;
-    // Feed a long bit into the chase by bringing the torso/shoulders forward
-    // under a steady head. Otherwise a few millimetres of removed material can
-    // exhaust the auxiliary arm and incorrectly stop a held trimming stroke.
-    // This bounded body lean never changes bone lengths or shakes the camera.
-    this.hammerFeedLeanM=this.workPositionLocked?THREE.MathUtils.clamp(wall.volume.frontZ-target.z,0,.10):0;
     const local=this.worldToLocal(target.clone());
     hammer.position.copy(local).sub(this.tipAnchor.clone().applyQuaternion(hammer.quaternion));
     hammer.updateWorldMatrix(true, true);
+    this.seatHammerFeed(camera,direction);
     const housing=camera.worldToLocal(hammer.localToWorld(new THREE.Vector3(.02,-.055,-.1)));
     this.hammerFit.housingCameraZ=housing.z;
     this.hammerFit.wristReachM=(this.armSets.get('hammer')??[]).map(arm=>this.shoulder(camera,arm.side).distanceTo(this.wrist(arm)));
@@ -276,8 +275,29 @@ export class FPSRig extends THREE.Group {
       const swapped=THREE.MathUtils.smoothstep(this.hammerGripBlend,0,1);
       eye.addScaledVector(right,THREE.MathUtils.lerp(.12,-.12,swapped));
     }
-    const shoulderBack=this.selectedTool==='hammer'&&this.workPositionLocked?this.hammerFeedLeanM:-.085;
-    return eye.addScaledVector(right,side*.20).addScaledVector(forward,shoulderBack).add(new THREE.Vector3(0,-.22,0));
+    const hammerWork=this.selectedTool==='hammer'&&this.workPositionLocked;
+    if(hammerWork)eye.add(this.hammerFeedOffset);
+    return eye.addScaledVector(right,side*.20).addScaledVector(forward,hammerWork?0:-.085).add(new THREE.Vector3(0,-.22,0));
+  }
+  /** Find the shared, finite torso feed that keeps BOTH wrists within reach. */
+  private seatHammerFeed(camera:THREE.Camera,axis:THREE.Vector3):void {
+    this.hammerFeedOffset.set(0,0,0);this.hammerFit.feedM=0;
+    if(!this.workPositionLocked)return;
+    // Feed follows the shaft, including its lateral/vertical component. A
+    // 10 cm camera-forward offset exhausted one arm as soon as the shell fell.
+    // Intersect both arm spheres with a bounded 24 cm torso travel segment.
+    let lower=0,upper=.24;
+    const radius=MAX_WRIST_REACH_M-.001;
+    for(const arm of this.armSets.get('hammer')??[]){
+      const delta=this.wrist(arm).sub(this.shoulder(camera,arm.side));
+      const along=delta.dot(axis),discriminant=radius*radius-delta.lengthSq()+along*along;
+      if(discriminant<0)return;
+      const span=Math.sqrt(discriminant);
+      lower=Math.max(lower,along-span);upper=Math.min(upper,along+span);
+    }
+    if(lower>upper)return;
+    this.hammerFit.feedM=lower;
+    this.hammerFeedOffset.copy(axis).multiplyScalar(lower);
   }
   private wrist(arm:WorkerArm):THREE.Vector3 {
     return arm.hand.localToWorld(new THREE.Vector3().fromArray(arm.hand.userData.wristPoint));
@@ -308,7 +328,8 @@ export class FPSRig extends THREE.Group {
   private restHammer(camera:THREE.Camera):void {
     this.reachable=false;this.chiselInAir=true;
     this.presentedDepthZ=null;
-    this.hammerFeedLeanM=0;
+    this.feedOffset.set(0,0,0);
+    this.hammerFeedOffset.set(0,0,0);this.hammerFit.feedM=0;
     const hammer=this.tools.get('hammer')!;
     hammer.position.set(0,-.055,0);hammer.rotation.set(.12,-.08,0);
     this.constrainHeldTool(camera);this.poseArms(camera);

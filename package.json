@@ -28,7 +28,8 @@
     "test:chisel-balanced": "node tests/chisel-balanced-ui.mjs",
     "test:hammer-eyes": "node tests/hammer-eye-input.mjs && node tests/hammer-eye-look-ui.mjs && node tests/renderer-eye-snapshot.mjs",
     "test:tool-view": "node tests/hammer-eye-input.mjs && node tests/shared-tool-view-ui.mjs",
-    "test:tool-contact": "node tests/tool-poses-contact.mjs"
+    "test:tool-contact": "node tests/tool-poses-contact.mjs",
+    "test:continuous-chase": "node tests/chase-feed-input.mjs && node tests/masonry-fragment-size.mjs && node tests/continuous-chase-ui.mjs"
   },
   "dependencies": {
     "three": "0.185.1"

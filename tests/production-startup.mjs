@@ -32,7 +32,8 @@ try {
       c.position.set(.7, g.player.eyeHeight, -1.59); c.lookAt(.7, 1.3, -2.41);
       g.player.yaw = c.rotation.y; g.player.pitch = c.rotation.x; g.step(0);
     });
-    for (let i = 0; i < 4; i++) await page.keyboard.press('Minus');
+    const brakeSteps=await page.evaluate(()=>Math.round(window.__wireTheHouse.hammerSpeed/.25));
+    for (let i = 0; i < brakeSteps; i++) await page.keyboard.press('Minus');
     await page.keyboard.down('KeyE'); await page.evaluate(() => window.advanceTime(600)); await page.keyboard.up('KeyE');
     assert.equal(await page.evaluate(() => window.__wireTheHouse.room.brickWall.impactCount), 0, 'Production brake did not stop impacts');
     await page.keyboard.press('Equal');

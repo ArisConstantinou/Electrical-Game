@@ -482,9 +482,10 @@ export class MasonryVolume {
     }
     if (removed.length) this.detachIslands(removed, result, c, r + 2, trimFloorZ);
     if (removed.length) this.exposeCavities(removed);
-    // A broad flat edge releases wider connected chips. This only partitions
-    // material already removed by the same energy budget; it adds no mass.
-    this.aggregateFragments(removed, result, input.chisel === 'flat' ? Math.round(10 * width / .025) : 10);
+    // A broad flat edge releases connected shell flakes as well as fines. Keep
+    // those flakes together instead of pulverising every strike into 10–20 nodes.
+    // This only partitions material already removed by the same energy budget.
+    this.aggregateFragments(removed, result, input.chisel === 'flat' ? Math.round(64 * width / .025) : 32);
     result.removedNodes = removed.length;
     result.removedVolume = result.fragments.reduce((sum, fragment) => sum + fragment.volume, 0);
     this.totalRemovedVolume += result.removedVolume;
@@ -565,7 +566,7 @@ export class MasonryVolume {
     const max = { x: Math.max(...points.map(p => p.x)), y: Math.max(...points.map(p => p.y)), z: Math.max(...points.map(p => p.z)) };
     return { position: { x: (min.x + max.x) / 2, y: (min.y + max.y) / 2, z: (min.z + max.z) / 2 }, size: { x: max.x - min.x + this.hx, y: max.y - min.y + this.hy, z: max.z - min.z + this.hz }, material: nodes[0].material, volume: nodes.length * this.nodeVolume, detached };
   }
-  private aggregateFragments(removed: Node[], result: MasonryImpactResult, crushedGroupLimit = 10): void {
+  private aggregateFragments(removed: Node[], result: MasonryImpactResult, crushedGroupLimit = 64): void {
     // Clip the exact before-solid minus after-solid in every affected tetrahedron. Meshing only
     // the removed nodes would shrink isolated chips and invent a mismatch between geometry and mass.
     const crushedCount = removed.length - result.stats.detachedNodes;
@@ -576,7 +577,11 @@ export class MasonryVolume {
     while (remaining.size) {
       const start = remaining.values().next().value as Node;
       const group = [start]; remaining.delete(start.id);
-      const isDetached = detached.has(start.id), limit = isDetached ? 500 : crushedGroupLimit;
+      // A large connected flake, then a small edge chip: neither spans air or
+      // crosses a material boundary. Detached islands remain whole as before.
+      const isDetached = detached.has(start.id);
+      const fine = groups.length % 3 === 1;
+      const limit = isDetached ? 500 : fine ? Math.min(6, crushedGroupLimit) : crushedGroupLimit;
       for (let head = 0; head < group.length && group.length < limit; head++) {
         const n = group[head];
         for (const d of NEIGHBORS) {

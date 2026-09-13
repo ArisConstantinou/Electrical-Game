@@ -62,7 +62,7 @@ export class Game {
   sprayMode: 'dots' | 'live' = 'live';
   sprayColorIndex = 0;
   hammerMode: HammerMode = 'chase';
-  hammerSpeed = 1;
+  hammerSpeed = 2.5;
   waterGunModeIndex = 3;
   aimControlMode: AimControlMode = 'auto-use';
   aimProfile: MobileAimProfile = 'normal';
@@ -138,6 +138,9 @@ export class Game {
     this.wasLeveling = leveling;
     const handWork=this.selectedTool==='fitting'||this.selectedTool==='level';
     this.player.wallWorkEnabled=(this.selectedTool==='hammer'||handWork)&&!leveling;
+    const cuttingStep=(this.room.brickWall.chiselType==='flat'?this.room.brickWall.chiselWidthM:.01)*.36;
+    this.player.wallToolTravelSpeedMps=this.selectedTool==='hammer'&&this.input.actionHeld
+      ?Math.min(.6,cuttingStep*this.hammerSpeed/.24):null;
     const workTilt=THREE.MathUtils.degToRad(this.hammerWorkStance.actualTiltDegrees);
     const workSide=THREE.MathUtils.degToRad(this.hammerWorkStance.sideDegrees);
     const wallAxisZ=Math.cos(workTilt)*Math.cos(workSide);
@@ -153,7 +156,7 @@ export class Game {
     this.fpsRig.workHeadLeanM = this.hammerWorkStance.headLeanM;
     this.fpsRig.workStanceTiltDegrees = this.hammerWorkStance.actualTiltDegrees;
     this.fpsRig.workPositionLocked=this.player.workPosition.locked;
-    this.actionCooldown = Math.max(0, this.actionCooldown - dt);
+    this.actionCooldown = this.selectedTool==='hammer'?this.actionCooldown-dt:Math.max(0,this.actionCooldown-dt);
     const requested = this.input.consumeAction();
     // Both hammer modes deliver local repeated percussive strikes while held.
     const continuousTool = this.isContinuousAction();
@@ -163,8 +166,15 @@ export class Game {
     this.wasSpraying = spraying;
     if (this.started && this.selectedTool !== 'trowel' && this.selectedTool !== 'hose' && (this.selectedTool !== 'hammer' || this.hammerSpeed > 0) && (requested || repeatable)) {
       this.performAction(repeatable && !requested);
-      this.actionCooldown = this.selectedTool === 'spray' ? 0.045 : this.selectedTool === 'hammer' ? 0.24 / Math.max(.25, this.hammerSpeed) : 0.18;
+      const interval=this.selectedTool === 'spray' ? 0.045 : this.selectedTool === 'hammer' ? 0.24 / Math.max(.25, this.hammerSpeed) : 0.18;
+      // Carry fractional frame time so 8x is not silently capped to 30 Hz on
+      // slower screens. Bound catch-up to prevent a resume/pause burst.
+      this.actionCooldown=(this.selectedTool==='hammer'&&repeatable&&!requested?Math.max(-.05,this.actionCooldown):0)+interval;
+      if(this.selectedTool==='hammer'&&this.input.actionHeld&&this.actionCooldown<=0){
+        this.performAction(true);this.actionCooldown+=interval;
+      }
     }
+    else if(!this.input.actionHeld)this.actionCooldown=Math.max(0,this.actionCooldown);
     const mortarTool = this.started && !leveling && (this.selectedTool === 'trowel' || this.selectedTool === 'hose');
     // The player's arms hold tools near the body; aiming does not extend them.
     this.fpsRig.position.z=this.selectedTool==='hammer'?-.22:-.42;
@@ -305,7 +315,8 @@ export class Game {
       if(event.code==='Comma'||event.code==='Period'){event.preventDefault();setChiselWidth(this.room.brickWall.chiselWidthM+(event.code==='Period'?.005:-.005));}
     });
     const setHammerSpeed = (value:number) => {
-      this.hammerSpeed = THREE.MathUtils.clamp(Math.round(value * 4) / 4, 0, 2.5);
+      if(!Number.isFinite(value))return;
+      this.hammerSpeed = THREE.MathUtils.clamp(Math.round(value * 4) / 4, 0, 8);
       this.actionCooldown = Math.min(this.actionCooldown, this.hammerSpeed > 0 ? .24 / this.hammerSpeed : 0);
       this.hud.updateHammerSpeed(this.hammerSpeed);
     };

@@ -7,6 +7,8 @@ export type MobileAimProfile = 'precise' | 'normal' | 'fast';
 export class PlayerController {
   wallWorkEnabled = false;
   wallWorkDistance = .76;
+  /** Feed along the wall while the hammer is held; null retains free walking. */
+  wallToolTravelSpeedMps: number | null = null;
   readonly workPosition = { locked: false, distanceM: 0, targetDistanceM: .76, released: false };
   crouched = false;
   handWorkTargetY:number|null=null;
@@ -74,9 +76,15 @@ export class PlayerController {
     if(this.wallWorkEnabled && facingWall && !work.released && !work.locked && wallDistanceNow<(this.handWorkTargetY===null?1.10:.94) && wallDistanceNow>.30)work.locked=true;
     work.targetDistanceM=this.wallWorkDistance;
     if(work.locked){
+      if(this.wallToolTravelSpeedMps!==null && y>=0){
+        // A/D follow the wall tangent at the cutting feed rate, independent of
+        // view yaw. Free walking would jump past several blade widths per hit.
+        this.camera.position.x=previousX+x*this.wallToolTravelSpeedMps*dt;
+        this.velocity.set(x*this.wallToolTravelSpeedMps,0,0);
+      }
       // Bracing absorbs forward input even when looking diagonally along the
       // wall. Only an explicit strafe moves the worker sideways in this stance.
-      if(y>=0){
+      else if(y>=0){
         this.camera.position.x-=forward.x*y*speed*dt;
         this.velocity.copy(right).multiplyScalar(x*speed);
       }
