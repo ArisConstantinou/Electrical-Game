@@ -12,6 +12,17 @@ export class HammerWorkStance {
   // the gameplay camera's transform, so there is nothing to restore each frame.
   restore(_camera: THREE.Camera): void {}
 
+  /** Choose the wall-side shoulder on oblique approaches; retain it across
+   * the front-facing zone so small aim reversals cannot keep swapping hands. */
+  resolveSide(camera: THREE.Camera, requestedSide: number): number {
+    const view=camera.getWorldDirection(new THREE.Vector3());
+    const distance=(GAME_CONFIG.room.wallFrontZ-camera.position.z)/view.z;
+    const focus=camera.position.clone().addScaledVector(view,distance);
+    if(view.z>=-.2 || distance<=0 || camera.position.z-GAME_CONFIG.room.wallFrontZ>1.12 || Math.abs(focus.x)>2.54 || focus.y<0 || focus.y>3)return requestedSide;
+    const viewSide=THREE.MathUtils.radToDeg(Math.atan2(view.x,-view.z));
+    return Math.abs(viewSide)>=30 ? Math.sign(viewSide)*Math.max(15,Math.abs(requestedSide)) : requestedSide;
+  }
+
   update(camera: THREE.Camera, dt: number, requestedSide: number, enabled: boolean, requestedTiltDegrees = 0, tool = 'hammer'): void {
     this.offset.set(0, 0, 0);
     const view = camera.getWorldDirection(new THREE.Vector3());
@@ -24,12 +35,11 @@ export class HammerWorkStance {
     // Keeping it fixed to
     // the wall normal twisted the motor away from the body in oblique views.
     const viewSide=THREE.MathUtils.radToDeg(Math.atan2(view.x,-view.z));
-    let target = hammerWork ? THREE.MathUtils.clamp(requestedSide+viewSide,-65,65) : 0;
-    // At a glancing view the ordinary wall-angle limit must not carry the
-    // motor across the sightline to the opposite shoulder. Retain that side;
-    // the finite wrist/contact checks still decide whether striking is possible.
-    if(hammerWork&&requestedSide>0&&target<=viewSide)target=Math.min(87,viewSide+Math.min(15,requestedSide));
-    if(hammerWork&&requestedSide<0&&target>=viewSide)target=Math.max(-87,viewSide-Math.min(15,-requestedSide));
+    // Open the wall-angle range continuously for glancing approaches. A
+    // crossing-only extension jumped 15 degrees at exactly 65 degrees of view.
+    // Normal poses through 55 degrees retain their established limit.
+    const sideLimit=Math.min(87,65+Math.max(0,Math.abs(viewSide)-55)*1.5);
+    const target = hammerWork ? THREE.MathUtils.clamp(requestedSide+viewSide,-sideLimit,sideLimit) : 0;
     this.sideDegrees = THREE.MathUtils.damp(this.sideDegrees, target, 10, Math.min(dt, .05));
     if (Math.abs(this.sideDegrees - target) < .01) this.sideDegrees = target;
     if (!hammerWork) {

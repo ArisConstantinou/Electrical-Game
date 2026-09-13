@@ -76,6 +76,7 @@ export class HUD {
               <label class="hammer-speed-setting" for="chisel-width"><span>BLADE WIDTH · , / .</span><output id="chisel-width-value">5.0 cm</output><input id="chisel-width" type="range" min="10" max="50" step="5" value="50" aria-label="Flat chisel width in millimetres"><small id="chisel-width-hint">1–5 cm · wider blade, broader chips</small></label>
               <button id="chisel-tilt" type="button"><span>HAMMER TILT · [ / ]</span><b>15 deg DOWN</b></button>
               <button id="hammer-view-toggle" type="button"><span>HAMMER SIDE · Q</span><b>RIGHT</b></button>
+              <button id="hammer-auto-side" type="button" aria-pressed="true"><span>FOLLOW WALL DIRECTION</span><b>AUTO</b></button>
               <button id="chisel-side" type="button"><span>TOOL SIDE / J LEFT · K RIGHT</span><b>15 deg RIGHT</b></button>
               <button id="chisel-angle" type="button"><span>EDGE ANGLE · R</span><b>0°</b></button>
               <label class="hammer-speed-setting" for="hammer-speed"><span>CHISEL SPEED · − / +</span><output id="hammer-speed-value">250%</output><input id="hammer-speed" type="range" min="0" max="800" step="25" value="250" aria-label="Chisel destruction speed"><small>0% stop · 100% precise · 250% normal · 400–800% fast. Hold use + A / D to cut along the wall.</small></label>
@@ -176,9 +177,30 @@ export class HUD {
       </main>`;
     root.querySelector('#chisel-type')!.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:cycle-chisel')));
     root.querySelector('#chisel-side')!.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:side-chisel')));
-    root.querySelector('#hammer-view-left')!.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:hammer-view-side',{detail:1})));
-    root.querySelector('#hammer-view-right')!.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:hammer-view-side',{detail:-1})));
-    root.querySelector('#hammer-view-toggle')!.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:hammer-view-side',{detail:0})));
+    // A completed touch can lack a compatibility click after repeated aim
+    // drags. Activate these stance controls on release, once; retain normal
+    // mouse and keyboard clicks without a timer that could swallow new input.
+    const bindHammerButton=(selector:string,action:()=>void)=>{
+      const button=root.querySelector<HTMLButtonElement>(selector)!;
+      let touchClickPending=false;
+      button.addEventListener('pointerdown',event=>{if(event.pointerType==='mouse')touchClickPending=false;});
+      button.addEventListener('keydown',()=>{touchClickPending=false;});
+      button.addEventListener('pointerup',event=>{
+        if(event.pointerType!=='touch'&&event.pointerType!=='pen')return;
+        const r=button.getBoundingClientRect();
+        touchClickPending=true;
+        if(event.clientX>=r.left&&event.clientX<=r.right&&event.clientY>=r.top&&event.clientY<=r.bottom)action();
+      });
+      button.addEventListener('click',event=>{
+        const alreadyHandled=touchClickPending&&event.detail!==0;
+        touchClickPending=false;
+        if(!alreadyHandled)action();
+      });
+    };
+    bindHammerButton('#hammer-view-left',()=>window.dispatchEvent(new CustomEvent('wirehouse:hammer-view-side',{detail:1})));
+    bindHammerButton('#hammer-view-right',()=>window.dispatchEvent(new CustomEvent('wirehouse:hammer-view-side',{detail:-1})));
+    bindHammerButton('#hammer-view-toggle',()=>window.dispatchEvent(new CustomEvent('wirehouse:hammer-view-side',{detail:0})));
+    bindHammerButton('#hammer-auto-side',()=>window.dispatchEvent(new CustomEvent('wirehouse:hammer-auto-side')));
     root.querySelector('#chisel-tilt')!.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:tilt-chisel')));
     root.querySelector('#chisel-angle')!.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:rotate-chisel')));
     root.querySelector<HTMLInputElement>('#chisel-width')!.addEventListener('input',event=>dispatchEvent(new CustomEvent('wirehouse:chisel-width',{detail:Number((event.target as HTMLInputElement).value)/1000})));
@@ -224,8 +246,8 @@ export class HUD {
       this.shell.classList.toggle('settings-open', open);
       if (open && document.pointerLockElement) void document.exitPointerLock();
     };
-    settingsToggle?.addEventListener('click', () => setSettingsOpen(settingsToggle.getAttribute('aria-expanded') !== 'true'));
-    root.querySelector('#settings-close')?.addEventListener('click', () => setSettingsOpen(false));
+    bindHammerButton('#settings-toggle',()=>setSettingsOpen(settingsToggle?.getAttribute('aria-expanded')!=='true'));
+    bindHammerButton('#settings-close',()=>setSettingsOpen(false));
     root.querySelector('#settings-scrim')?.addEventListener('click', () => setSettingsOpen(false));
     addEventListener('keydown', event => { if (event.key === 'Escape' && settingsToggle?.getAttribute('aria-expanded') === 'true') setSettingsOpen(false); });
   }
@@ -312,12 +334,15 @@ export class HUD {
     this.shell.querySelector<HTMLOutputElement>('#chisel-width-value')!.textContent=`${(widthM*100).toFixed(1)} cm`;
     this.shell.querySelector<HTMLElement>('#chisel-width-hint')!.textContent=flat?'1–5 cm · wider blade, broader chips':'Select FLAT to adjust blade width';
   }
-  updateHammerSide(requestedSideDegrees:number):void {
+  updateHammerSide(requestedSideDegrees:number,automatic=false):void {
     const side=requestedSideDegrees>0?'left':requestedSideDegrees<0?'right':'center';
-    if(!this.displayChanged('hammer-side',side))return;
+    if(!this.displayChanged('hammer-side',`${requestedSideDegrees}:${automatic}`))return;
     this.shell.querySelector('#hammer-view-left')!.setAttribute('aria-pressed',String(side==='left'));
     this.shell.querySelector('#hammer-view-right')!.setAttribute('aria-pressed',String(side==='right'));
-    this.shell.querySelector('#hammer-view-toggle b')!.textContent=side.toUpperCase();
+    this.shell.querySelector('#hammer-view-toggle b')!.textContent=`${automatic?'AUTO · ':''}${side.toUpperCase()}`;
+    this.shell.querySelector('#hammer-auto-side')!.setAttribute('aria-pressed',String(automatic));
+    this.shell.querySelector('#hammer-auto-side b')!.textContent=automatic?'AUTO':'MANUAL';
+    this.shell.querySelector('#chisel-side b')!.textContent=`${Math.abs(requestedSideDegrees)} deg ${side.toUpperCase()}`;
   }
   updateChiselOrientation(edgeDegrees:number,tiltDegrees:number,sideDegrees:number,widthM:number,requestedTiltDegrees=tiltDegrees):void {
     const edge=((edgeDegrees%360)+360)%360;

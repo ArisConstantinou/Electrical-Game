@@ -63,6 +63,7 @@ export class Game {
   sprayColorIndex = 0;
   hammerMode: HammerMode = 'chase';
   hammerSpeed = 2.5;
+  hammerAutoSide = true;
   waterGunModeIndex = 3;
   aimControlMode: AimControlMode = 'auto-use';
   aimProfile: MobileAimProfile = 'normal';
@@ -156,6 +157,9 @@ export class Game {
       ? this.player.velocity.x*Math.min(dt,.05) : null);
     this.renderer.camera.rotation.set(this.player.pitch, this.player.yaw, 0);
     for(const action of this.pendingSceneActions.splice(0))action();
+    if(this.hammerAutoSide&&this.started&&!leveling&&this.selectedTool==='hammer'){
+      this.room.brickWall.chiselSideDegrees=this.hammerWorkStance.resolveSide(this.renderer.camera,this.room.brickWall.chiselSideDegrees);
+    }
     this.hammerWorkStance.update(this.renderer.camera, dt, this.room.brickWall.chiselSideDegrees, this.started && !leveling,this.room.brickWall.chiselTiltDegrees,this.selectedTool);
     this.fpsRig.workStanceSide = this.hammerWorkStance.sideDegrees / 75;
     this.fpsRig.workHeadLeanM = this.hammerWorkStance.headLeanM;
@@ -241,7 +245,7 @@ export class Game {
       this.hud.updateAimInput(this.aimInputMode);
     }
     this.hud.updateChiselOrientation(this.room.brickWall.chiselEdgeAngle*180/Math.PI,this.fpsRig.actualTiltDegrees,this.room.brickWall.chiselSideDegrees,this.room.brickWall.chiselWidthM,this.room.brickWall.chiselTiltDegrees);
-    this.hud.updateHammerSide(this.room.brickWall.chiselSideDegrees);
+    this.hud.updateHammerSide(this.room.brickWall.chiselSideDegrees,this.hammerAutoSide);
     const wet=mortarTool && waterHit ? this.mortar.moistureAt(waterHit.point) : {pore:0,film:0};
     const waterTelemetry=this.roomWater.telemetry;
     this.hud.updateMortar(this.selectedTool,this.mortar.charge,this.mortar.angleDegrees,wet,mortarTool && active ? this.mortar.coverage(active):0,this.mortar.recovery,this.mortar.lastOutcome,waterTelemetry.floorLitres,this.mortar.throwFeedback);
@@ -381,6 +385,7 @@ export class Game {
       this.hud.notify(`Chisel: ${wall.chiselType.toUpperCase()}`);
     });
     addEventListener('wirehouse:side-chisel', event => {
+      this.hammerAutoSide=false;
       const wall=this.room.brickWall, delta=(event as CustomEvent<number>).detail;
       // Requested side is the actual angle relative to the player's aim;
       // zero is a straight stroke and left/right share the same range.
@@ -390,11 +395,16 @@ export class Game {
     });
     addEventListener('wirehouse:hammer-view-side',event=>{
       if(this.selectedTool!=='hammer')return;
+      this.hammerAutoSide=false;
       const wall=this.room.brickWall,requested=(event as CustomEvent<number>).detail;
       const sign=requested?Math.sign(requested):wall.chiselSideDegrees>0?-1:1;
       wall.chiselSideDegrees=sign*Math.max(15,Math.abs(wall.chiselSideDegrees));
       this.hud.updateHammerSide(wall.chiselSideDegrees);
       document.querySelector('#chisel-side b')!.textContent=`${Math.abs(wall.chiselSideDegrees)} deg ${wall.chiselSideDegrees>0?'LEFT':'RIGHT'}`;
+    });
+    addEventListener('wirehouse:hammer-auto-side',()=>{
+      this.hammerAutoSide=!this.hammerAutoSide;
+      this.hud.updateHammerSide(this.room.brickWall.chiselSideDegrees,this.hammerAutoSide);
     });
     addEventListener('wirehouse:tilt-chisel', event => {
       const wall=this.room.brickWall;

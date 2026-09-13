@@ -33,6 +33,7 @@ try {
       return { pos: c.position.toArray(), quaternion:c.quaternion.toArray(), focus: c.position.clone().addScaledVector(d, (-2.41 - c.position.z) / d.z).toArray(), side: g.hammerWorkStance.sideDegrees, offset: g.hammerWorkStance.offset.toArray() };
     });
     const initial = await read(), prefix = mobile ? 'mobile' : 'desktop';
+    assert(Math.abs(initial.side + 15) < .02, 'Default wall-normal view should retain the explicit right-side 15-degree setting');
     await page.evaluate(async()=>{await window.__wireTheHouse.renderer.waitForFrame();});
     await page.screenshot({ path: `${out}/${prefix}-straight.png` });
     const selectSide = async side => {
@@ -45,17 +46,18 @@ try {
         await page.locator('#settings-close').tap();
       } else {
         let current = await page.evaluate(() => window.__wireTheHouse.room.brickWall.chiselSideDegrees);
-        while (current !== side) {
-          await page.keyboard.press(current < side ? 'KeyK' : 'KeyJ');
+        for (let i = 0; current !== side && i < 30; i++) {
+          await page.keyboard.press(current < side ? 'KeyJ' : 'KeyK');
           current = await page.evaluate(() => window.__wireTheHouse.room.brickWall.chiselSideDegrees);
         }
+        assert.equal(current, side, 'Keyboard side selector did not reach its target');
       }
     };
     for (const side of (mobile ? [45, -45, 0] : [45, -45, 0])) {
       await selectSide(side); await page.waitForTimeout(1000);
       await page.evaluate(() => { for(let i=0;i<60;i++)window.__wireTheHouse.step(1/60); });
       const state = await read();
-      assert(Math.abs(state.side - (side+initial.side)) < .02);
+      assert(Math.abs(state.side - side) < .02);
       assert(Math.hypot(...state.focus.map((n, i) => n - initial.focus[i])) < .002, 'Aim moved during stance');
       assert(Math.hypot(...state.offset)<1e-10,'Tool stance must not borrow the camera transform');
       assert(Math.hypot(...state.pos.map((n, i) => n - initial.pos[i])) < .002, 'Tool angle moved the camera');
@@ -81,9 +83,9 @@ try {
       for (let i = 0; i < 60; i++) { g.step(1 / 60); samples.push({ side: g.hammerWorkStance.sideDegrees, pos: g.renderer.camera.position.toArray() }); }
       return samples;
     });
-    assert(transition[0].side > initial.side && transition[0].side < (45+initial.side), 'Transition snapped instead of easing');
-    assert(Math.abs(transition.at(-1).side-initial.side)<.02);
-    assert(transition.every((s, i) => !i || Math.abs(s.side-initial.side) <= Math.abs(transition[i - 1].side-initial.side)), 'Return transition oscillates');
+    assert(transition[0].side > 0 && transition[0].side < 45, 'Transition snapped instead of easing');
+    assert(Math.abs(transition.at(-1).side)<.02);
+    assert(transition.every((s, i) => !i || Math.abs(s.side) <= Math.abs(transition[i - 1].side)), 'Return transition oscillates');
     assert(!await page.evaluate(() => document.documentElement.scrollWidth > innerWidth || document.documentElement.scrollHeight > innerHeight), 'Layout overflow');
     assert.deepEqual(errors, []);
     assert.equal(await page.evaluate(()=>document.pointerLockElement),null);
