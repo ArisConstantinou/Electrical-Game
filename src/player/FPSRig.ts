@@ -46,6 +46,8 @@ export class FPSRig extends THREE.Group {
   workStanceSide = 0;
   /** Actual head lean in the body's right direction; independent of bit yaw. */
   workHeadLeanM:number|null=null;
+  /** The chosen main hand persists when the bit leaves the wall or aim changes. */
+  hammerHandedness:'left'|'right'|null=null;
   workStanceTiltDegrees:number|null=null;
   actualTiltDegrees=15;
   workPositionLocked = false;
@@ -211,10 +213,11 @@ export class FPSRig extends THREE.Group {
   }
   strike(): void { this.strikeAmount = 1; }
   update(dt: number, moving: boolean, spraying = false): void {
-    // Grip roles follow the physical head/body lean, not the opposite-facing
-    // chisel attack. Hysteresis prevents a tiny aim movement from regripping.
+    // Explicit side selection owns the hands. Geometric lean is only a fallback
+    // for callers without a selected side, never a reason to undo that choice.
     const headLean=this.workHeadLeanM??-this.workStanceSide;
-    if(headLean>.04)this.hammerLeftMain=true;
+    if(this.hammerHandedness!==null)this.hammerLeftMain=this.hammerHandedness==='left';
+    else if(headLean>.04)this.hammerLeftMain=true;
     else if(headLean<.015)this.hammerLeftMain=false;
     const gripTarget=this.hammerLeftMain?1:0;
     this.hammerGripBlend+=THREE.MathUtils.clamp(gripTarget-this.hammerGripBlend,-dt*2.8,dt*2.8);
@@ -369,7 +372,10 @@ export class FPSRig extends THREE.Group {
     this.feedOffset.set(0,0,0);
     this.hammerFeedOffset.set(0,0,0);this.hammerFit.feedM=0;
     const hammer=this.tools.get('hammer')!;
-    hammer.position.set(0,-.055,0);hammer.rotation.set(.12,-.08,0);
+    // Keep the chosen hand and screen side even outside a reachable work area.
+    // The established right-handed rest pose is the blend's zero endpoint.
+    hammer.position.set(-.18*this.hammerGripBlend,-.055,0);
+    hammer.rotation.set(.12,THREE.MathUtils.lerp(-.08,.08,this.hammerGripBlend),0);
     this.constrainHeldTool(camera);this.poseArms(camera);
     this.chiselTipWorld.copy(hammer.localToWorld(this.tipAnchor.clone()));
   }

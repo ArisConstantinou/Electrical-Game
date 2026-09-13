@@ -24,7 +24,12 @@ export class HammerWorkStance {
     // Keeping it fixed to
     // the wall normal twisted the motor away from the body in oblique views.
     const viewSide=THREE.MathUtils.radToDeg(Math.atan2(view.x,-view.z));
-    const target = hammerWork ? THREE.MathUtils.clamp(requestedSide+viewSide,-65,65) : 0;
+    let target = hammerWork ? THREE.MathUtils.clamp(requestedSide+viewSide,-65,65) : 0;
+    // At a glancing view the ordinary wall-angle limit must not carry the
+    // motor across the sightline to the opposite shoulder. Retain that side;
+    // the finite wrist/contact checks still decide whether striking is possible.
+    if(hammerWork&&requestedSide>0&&target<=viewSide)target=Math.min(87,viewSide+Math.min(15,requestedSide));
+    if(hammerWork&&requestedSide<0&&target>=viewSide)target=Math.max(-87,viewSide-Math.min(15,-requestedSide));
     this.sideDegrees = THREE.MathUtils.damp(this.sideDegrees, target, 10, Math.min(dt, .05));
     if (Math.abs(this.sideDegrees - target) < .01) this.sideDegrees = target;
     if (!hammerWork) {

@@ -60,7 +60,7 @@ export class HUD {
               <circle id="chisel-point-marker" cx="24" cy="24" r="5" fill="#d8e0df" stroke="#f8be79" stroke-width="2" style="display:none"/>
               <circle class="chisel-dial-pivot" cx="24" cy="24" r="2"/>
             </svg>
-            <div class="chisel-orientation-values"><div><strong><span id="chisel-edge-label">EDGE</span> <output id="chisel-edge-degrees">0°</output></strong><span id="chisel-live-width">50 mm</span></div><div class="chisel-aim-values"><span id="chisel-live-tilt">TILT 15° ↓</span><span id="chisel-requested-tilt" hidden></span><span id="chisel-live-side">SIDE 15° ←</span></div><div class="hammer-view-buttons" role="group" aria-label="Hammer screen side"><button id="hammer-view-left" type="button" aria-label="Hold hammer on the left" aria-pressed="false">TOOL LEFT</button><button id="hammer-view-right" type="button" aria-label="Hold hammer on the right" aria-pressed="true">TOOL RIGHT</button></div></div>
+            <div class="chisel-orientation-values"><div><strong><span id="chisel-edge-label">EDGE</span> <output id="chisel-edge-degrees">0°</output></strong><span id="chisel-live-width">50 mm</span></div><div class="chisel-aim-values"><span id="chisel-live-tilt">TILT 15° ↓</span><span id="chisel-requested-tilt" hidden></span><span id="chisel-live-side">SIDE 15° →</span></div><div class="hammer-view-buttons" role="group" aria-label="Hammer screen side"><button id="hammer-view-left" type="button" aria-label="Hold hammer on the left" aria-pressed="false">TOOL LEFT</button><button id="hammer-view-right" type="button" aria-label="Hold hammer on the right" aria-pressed="true">TOOL RIGHT</button></div></div>
           </aside>
           <button id="settings-toggle" type="button" aria-label="Open settings" aria-expanded="false" aria-controls="settings-panel">
             <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M13.2 3.5h5.6l.8 3.1 2.3 1.3 3-.9 2.8 4.8-2.2 2.2v2.7l2.2 2.2-2.8 4.8-3-.9-2.3 1.3-.8 3.1h-5.6l-.8-3.1-2.3-1.3-3 .9-2.8-4.8 2.2-2.2V14l-2.2-2.2L7.1 7l3 .9 2.3-1.3z"/><circle cx="16" cy="15.4" r="4.2"/></svg>
@@ -76,7 +76,7 @@ export class HUD {
               <label class="hammer-speed-setting" for="chisel-width"><span>BLADE WIDTH · , / .</span><output id="chisel-width-value">5.0 cm</output><input id="chisel-width" type="range" min="10" max="50" step="5" value="50" aria-label="Flat chisel width in millimetres"><small id="chisel-width-hint">1–5 cm · wider blade, broader chips</small></label>
               <button id="chisel-tilt" type="button"><span>HAMMER TILT · [ / ]</span><b>15 deg DOWN</b></button>
               <button id="hammer-view-toggle" type="button"><span>HAMMER SIDE · Q</span><b>RIGHT</b></button>
-              <button id="chisel-side" type="button"><span>CHISEL DIRECTION / J K</span><b>15 deg LEFT</b></button>
+              <button id="chisel-side" type="button"><span>TOOL SIDE / J LEFT · K RIGHT</span><b>15 deg RIGHT</b></button>
               <button id="chisel-angle" type="button"><span>EDGE ANGLE · R</span><b>0°</b></button>
               <label class="hammer-speed-setting" for="hammer-speed"><span>CHISEL SPEED · − / +</span><output id="hammer-speed-value">250%</output><input id="hammer-speed" type="range" min="0" max="800" step="25" value="250" aria-label="Chisel destruction speed"><small>0% stop · 100% precise · 250% normal · 400–800% fast. Hold use + A / D to cut along the wall.</small></label>
             </div>
@@ -342,7 +342,7 @@ export class HUD {
     this.chiselOrientation.querySelector('#chisel-live-tilt')!.textContent=`TILT ${Math.abs(tilt)}°${tilt<0?' ↑':tilt>0?' ↓':''}`;
     const target=this.chiselOrientation.querySelector<HTMLElement>('#chisel-requested-tilt')!;
     target.hidden=!adapted;target.textContent=adapted?`SET ${Math.abs(requested)}°${requested<0?' ↑':requested>0?' ↓':''}`:'';
-    this.chiselOrientation.querySelector('#chisel-live-side')!.textContent=`SIDE ${Math.abs(side)}°${side<0?' ←':side>0?' →':''}`;
+    this.chiselOrientation.querySelector('#chisel-live-side')!.textContent=`SIDE ${Math.abs(side)}°${side>0?' ←':side<0?' →':''}`;
     this.chiselOrientation.setAttribute('aria-label',`${this.chiselFlat?`Flat chisel edge ${Math.round(edge)} degrees, blade ${width} millimetres`:'Pointed chisel'}, tilt ${tilt} degrees${adapted?`, selected tilt ${requested} degrees`:''}, side ${side} degrees`);
   }
   updateMortar(tool:RigTool,power:number,angle:number,wet:{pore:number;film:number},coverage:number,recovery:number,outcome:string,floorLitres=0,feedback?:MortarThrowFeedback):void {

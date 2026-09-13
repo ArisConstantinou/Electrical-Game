@@ -20,7 +20,7 @@ try{for(const mobile of[false,true]){
  // J/K use exact signed angles, including a true wall-normal zero.
  for(const target of[0,-5,5,-25,25,0]){
   if(mobile&&Math.abs(target)===25){await click('#settings-toggle');let current=(await state(p)).requested;for(let i=0;current!==target&&i<20;i++){await click('#chisel-side');current=(await state(p)).requested;}await click('#settings-close');assert.equal(current,target);}
-  else {let current=(await state(p)).requested;while(current!==target){await p.keyboard.press(current<target?'KeyK':'KeyJ');current=(await state(p)).requested;}}
+  else {let current=(await state(p)).requested;while(current!==target){await p.keyboard.press(current<target?'KeyJ':'KeyK');current=(await state(p)).requested;}}
   const before=await state(p);await step(p);const after=await state(p);unchanged(before,after,`${name}/exact${target}`);assert.equal(after.actual,target,`${name}: hidden side bias or deadband`);assert(after.contact,`${name}: ${target} not reachable`);arms(after);cases.push({angle:target,...after});
  }
  await click('#settings-toggle');await click('#hammer-view-toggle');await click('#settings-close');await step(p);assert.equal((await state(p)).requested,15);
