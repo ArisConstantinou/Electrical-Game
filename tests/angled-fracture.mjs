@@ -79,7 +79,9 @@ try {
     const blows = [];
     for (let i = 0; i < 12; i++) {
       let contact = null;
-      for (let frame = 0; frame < 30; frame++) { rig.update(1 / 60, false); contact = rig.contact(camera, wall); }
+      // Match Game's per-frame feed budget. Contact queries alone must not
+      // advance the tool, otherwise multiple queries could feed it faster.
+      for (let frame = 0; frame < 30; frame++) { rig.beginFrame(1 / 60); rig.update(1 / 60, false); contact = rig.contact(camera, wall); }
       check(Boolean(contact), `Upward visible blade lost its valid contact on blow ${i}`);
       if (!contact) continue;
       const result = volume.impact({ ...contact, trim: true });

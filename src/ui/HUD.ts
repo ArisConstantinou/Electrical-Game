@@ -21,6 +21,9 @@ const stageLabel: Record<string, string> = {
 
 const compactStage:Record<string,string>={inspect:'CHOOSE CAVITY',marked:'CHASE',chasing:'CHASE',chased:'FIT BOXES',fitted:'MORTAR',mortared:'LEVEL',leveling:'LEVEL',leveled:'PVC ROUTE',conduit:'INSTALL PVC',complete:'PASSED'};
 
+const quickIcons:Record<string,string>={width:'M5 8h22v7H5zM5 23h22M9 19l-5 4 5 4M23 19l5 4-5 4',tilt:'M5 25h23M8 24 22 7M18 7h5v5M11 24a10 10 0 0 0-1-7',side:'M4 10h24M9 5l-5 5 5 5M28 22H4M23 17l5 5-5 5',speed:'M5 24a13 13 0 1 1 22 0M16 16l7-8M16 4v3M5 13l3 1M24 14l3-1',type:'m6 25 8-17h4l8 17zM14 8V3h4v5',edge:'M7 9a11 11 0 1 1-2 12M7 4v6H2M12 13h8v7h-8z',mode:'M6 10h20l-5-5M26 22H6l5 5',color:'M16 3s-9 11-9 17a9 9 0 0 0 18 0c0-6-9-17-9-17z',aim:'M16 2v6M16 24v6M2 16h6M24 16h6M8 16a8 8 0 1 0 16 0 8 8 0 1 0-16 0',down:'M16 5v22M7 18l9 9 9-9',up:'M16 27V5M7 14l9-9 9 9',crouch:'M19 6a3 3 0 1 0 0 .1M17 12l-5 7h10l-3 9M13 18l-7 7M16 13l7 3 5-4'};
+const quickButton=(id:string,label:string,value:string,icon:string,tools:string,event:string,detail?:number):string=>`<button id="${id}" type="button" class="tool-quick-button" data-quick-tools="${tools}" data-quick-event="${event}" ${detail===undefined?'':`data-quick-detail="${detail}"`} aria-label="${label}"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="${quickIcons[icon]}"/></svg><span>${label}</span><b>${value}</b></button>`;
+
 export class HUD {
   readonly shell: HTMLElement;
   private readonly objective: HTMLElement;
@@ -91,10 +94,10 @@ export class HUD {
             </details>
             <div id="mobile-control-settings" aria-label="Mobile aim settings">
               <button id="aim-input-mode" type="button" aria-label="Change aim input style"><span>AIM INPUT</span><b>DRAG</b></button>
-              <button id="aim-control-mode" type="button" aria-label="Change aim action mode"><span>AIM ACTION</span><b>AUTO USE</b></button>
+
               <button id="aim-speed" type="button" aria-label="Change aim sensitivity"><span>AIM SPEED</span><b>NORMAL</b></button>
               <button id="wall-assist" type="button" aria-label="Toggle automatic wall precision"><span>WALL ASSIST</span><b>AUTO</b></button>
-              <small>DRAG follows your finger directly. AUTO USE sprays or hammers while you aim. WALL ASSIST adds precision near the wall.</small>
+              <small>Touch the right USE + AIM circle to work. Drag the wall to look without using a tool. Choose DRAG for direct aim or STICK for continuous turning.</small>
             </div>
           </section>
           <aside id="desktop-key-guide" class="hud-card" aria-label="Keyboard and mouse controls">
@@ -145,8 +148,26 @@ export class HUD {
             </div>
           </div>
           <div id="mobile-controls" aria-label="Mobile controls">
-            <div id="joystick" aria-label="Movement joystick"><div class="joystick-ring"></div><div id="joystick-thumb"></div></div>
-            <div id="look-joystick" aria-label="Drag aim pad; drag to aim and use spray or hammer"><div class="look-joystick-ring"></div><div id="look-joystick-thumb"><span id="mobile-action" aria-hidden="true">USE</span></div><div id="drag-aim-cue" aria-hidden="true"><span>＋</span><b>DRAG AIM</b></div><small id="aim-control-label">DRAG · AIM + SPRAY</small></div>
+            <div id="mobile-move-zone" aria-label="Touch here to move"></div><div id="joystick" aria-label="Movement joystick"><div class="joystick-ring"></div><div id="joystick-thumb"></div></div>
+            <div id="look-joystick" role="button" tabindex="0" aria-label="Hold to use selected tool; drag to aim"><div class="look-joystick-ring"></div><div id="look-joystick-thumb"><span id="mobile-action" aria-hidden="true">USE</span><small aria-hidden="true">+ AIM</small></div><div id="drag-aim-cue" aria-hidden="true"></div><small id="aim-control-label">HOLD + AIM</small><output id="mobile-use-status">READY</output></div>
+            <nav id="aim-quick-controls" aria-label="Aim controls">
+              ${quickButton('quick-aim-input','AIM','STICK','aim','all','cycle-aim-input')}
+              ${quickButton('quick-aim-speed','LOOK','NORMAL','speed','all','cycle-aim-speed')}
+            </nav>
+            <nav id="tool-quick-controls" aria-label="Selected tool controls">
+              ${quickButton('quick-chisel-width','WIDTH','50 mm','width','hammer','quick-width')}
+              ${quickButton('quick-chisel-tilt','TILT','15° ↓','tilt','hammer','tilt-chisel')}
+              ${quickButton('quick-hammer-side','SIDE','RIGHT','side','hammer','side-chisel')}
+              ${quickButton('quick-hammer-speed','SPEED','250%','speed','hammer','quick-speed')}
+              ${quickButton('quick-chisel-type','CHISEL','FLAT','type','hammer','cycle-chisel')}
+              ${quickButton('quick-chisel-edge','EDGE','0°','edge','hammer','rotate-chisel')}
+              ${quickButton('quick-tool-mode','MODE','DEMOLISH','mode','hammer spray','quick-mode')}
+              ${quickButton('quick-spray-color','COLOR','BLUE','color','spray','cycle-spray-color')}
+              ${quickButton('quick-water-flow','FLOW','FLOOD','color','hose','cycle-water-mode')}
+              ${quickButton('quick-loft-down','LOFT −','12°','down','trowel','mortar-angle',-5)}
+              ${quickButton('quick-loft-up','LOFT +','12°','up','trowel','mortar-angle',5)}
+              ${quickButton('quick-work-height','HEIGHT','CROUCH','crouch','hammer spray trowel hose fitting level','work-height')}
+            </nav>
             <button id="tool-mode-toggle" type="button" aria-label="Change selected tool mode">
               <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 10h15l-3-3m3 3-3 3M25 22H10l3 3m-3-3 3-3"/></svg><span>LIVE</span>
             </button>
@@ -185,12 +206,22 @@ export class HUD {
     const bindHammerButton=(selector:string,action:()=>void)=>{
       const button=root.querySelector<HTMLButtonElement>(selector)!;
       let touchClickPending=false;
-      button.addEventListener('pointerdown',event=>{if(event.pointerType==='mouse')touchClickPending=false;});
+      let touch:{id:number;x:number;y:number;maxTravel:number}|null=null;
+      button.addEventListener('pointerdown',event=>{
+        touchClickPending=false;
+        touch=event.pointerType==='touch'||event.pointerType==='pen'?{id:event.pointerId,x:event.clientX,y:event.clientY,maxTravel:0}:null;
+      });
+      button.addEventListener('pointermove',event=>{
+        if(touch?.id===event.pointerId)touch.maxTravel=Math.max(touch.maxTravel,Math.hypot(event.clientX-touch.x,event.clientY-touch.y));
+      });
+      button.addEventListener('pointercancel',event=>{if(touch?.id===event.pointerId){touch=null;touchClickPending=true;}});
       button.addEventListener('keydown',()=>{touchClickPending=false;});
       button.addEventListener('pointerup',event=>{
         if(event.pointerType!=='touch'&&event.pointerType!=='pen')return;
+        const gesture=touch;touch=null;
         const r=button.getBoundingClientRect();
         touchClickPending=true;
+        if(!gesture||gesture.id!==event.pointerId||Math.max(gesture.maxTravel,Math.hypot(event.clientX-gesture.x,event.clientY-gesture.y))>10)return;
         if(event.clientX>=r.left&&event.clientX<=r.right&&event.clientY>=r.top&&event.clientY<=r.bottom)action();
       });
       button.addEventListener('click',event=>{
@@ -203,6 +234,13 @@ export class HUD {
     bindHammerButton('#hammer-view-right',()=>window.dispatchEvent(new CustomEvent('wirehouse:hammer-view-side',{detail:-1})));
     bindHammerButton('#hammer-view-toggle',()=>window.dispatchEvent(new CustomEvent('wirehouse:hammer-view-side',{detail:0})));
     bindHammerButton('#hammer-auto-side',()=>window.dispatchEvent(new CustomEvent('wirehouse:hammer-auto-side')));
+    root.querySelectorAll<HTMLButtonElement>('[data-quick-event]').forEach(button=>bindHammerButton(`#${button.id}`,()=>{
+      let event=button.dataset.quickEvent!,detail=button.dataset.quickDetail===undefined?undefined:Number(button.dataset.quickDetail);
+      if(event==='quick-width'){event='chisel-width';const current=Number(root.querySelector<HTMLInputElement>('#chisel-width')!.value);detail=(current>=50?10:current+5)/1000;}
+      else if(event==='quick-speed'){event='hammer-speed';const current=Number(root.querySelector<HTMLInputElement>('#hammer-speed')!.value)/100;detail=[0,1,2.5,4,6,8].find(value=>value>current)??0;}
+      else if(event==='quick-mode')event=this.selectedTool==='spray'?'cycle-spray-mode':'cycle-hammer-mode';
+      dispatchEvent(new CustomEvent(`wirehouse:${event}`,{detail}));
+    }));
     root.querySelector('#chisel-tilt')!.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:tilt-chisel')));
     root.querySelector('#chisel-angle')!.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:rotate-chisel')));
     root.querySelector<HTMLInputElement>('#chisel-width')!.addEventListener('input',event=>dispatchEvent(new CustomEvent('wirehouse:chisel-width',{detail:Number((event.target as HTMLInputElement).value)/1000})));
@@ -280,6 +318,7 @@ export class HUD {
     this.selectedTool = selectedTool;
     this.chiselOrientation.hidden = selectedTool !== 'hammer';
     this.shell.dataset.activeTool=selectedTool;
+    if(toolChanged){this.shell.querySelectorAll<HTMLButtonElement>('#tool-quick-controls button').forEach(button=>{button.hidden=!button.dataset.quickTools!.split(' ').includes(selectedTool);});this.shell.querySelector('#tool-quick-controls')!.scrollLeft=0;}
     this.shell.classList.toggle('mortar-tool',selectedTool==='trowel'||selectedTool==='hose');
     this.progress.style.width = `${missionProgress}%`;
     this.reticle.classList.toggle('active', targeted);
@@ -318,6 +357,7 @@ export class HUD {
     const key=[this.selectedTool,setting.id,this.selectedTool==='hose'?Math.round(floorLitres):'',this.selectedTool==='hose'?(depthMm/10).toFixed(1):''].join(':');
     if(!this.displayChanged('water',key))return;
     const select=this.shell.querySelector<HTMLSelectElement>('#water-gun-mode')!;select.value=setting.id;
+    this.shell.querySelector('#quick-water-flow b')!.textContent=setting.label;
     const readout=this.shell.querySelector<HTMLElement>('#water-gun-readout')!;readout.hidden=this.selectedTool!=='hose';
     if(this.selectedTool==='hose')this.shell.querySelector<HTMLElement>('#mortar-readout')!.textContent=setting.id==='flood'?'FLOOD | HOLD TO FILL ROOM':`${setting.label} | ${setting.speedMps} m/s`;
     readout.textContent=`LEVEL ${(depthMm/10).toFixed(1)} cm | ${Math.round(floorLitres).toLocaleString('en')} L | ${setting.flowLitresPerSecond} L/s`;
@@ -327,9 +367,13 @@ export class HUD {
   updateHammerSpeed(speed:number):void {
     this.shell.querySelector<HTMLInputElement>('#hammer-speed')!.value=String(speed*100);
     this.shell.querySelector<HTMLOutputElement>('#hammer-speed-value')!.textContent=speed===0?'STOPPED':`${Math.round(speed*100)}%`;
+    this.shell.querySelector('#quick-hammer-speed b')!.textContent=speed===0?'STOP':`${Math.round(speed*100)}%`;
   }
   updateChiselWidth(widthM:number,flat:boolean):void {
     this.chiselFlat=flat;
+    this.shell.querySelector<HTMLButtonElement>('#quick-chisel-width')!.disabled=!flat;
+    this.shell.querySelector('#quick-chisel-width b')!.textContent=flat?`${Math.round(widthM*1000)} mm`:'POINT';
+    this.shell.querySelector('#quick-chisel-type b')!.textContent=flat?'FLAT':'POINT';
     const slider=this.shell.querySelector<HTMLInputElement>('#chisel-width')!;
     slider.value=String(Math.round(widthM*1000));slider.disabled=!flat;
     this.shell.querySelector<HTMLOutputElement>('#chisel-width-value')!.textContent=`${(widthM*100).toFixed(1)} cm`;
@@ -343,6 +387,7 @@ export class HUD {
     this.shell.querySelector('#hammer-view-toggle b')!.textContent=`${automatic?'AUTO · ':''}${side.toUpperCase()}`;
     this.shell.querySelector('#hammer-auto-side')!.setAttribute('aria-pressed',String(automatic));
     this.shell.querySelector('#hammer-auto-side b')!.textContent=automatic?'AUTO':'MANUAL';
+    this.shell.querySelector('#quick-hammer-side b')!.textContent=`${Math.abs(requestedSideDegrees)}° ${side==='left'?'L':side==='right'?'R':'C'}`;
     this.shell.querySelector('#chisel-side b')!.textContent=`${Math.abs(requestedSideDegrees)} deg ${side.toUpperCase()}`;
   }
   updateChiselOrientation(edgeDegrees:number,tiltDegrees:number,sideDegrees:number,widthM:number,requestedTiltDegrees=tiltDegrees):void {
@@ -352,6 +397,8 @@ export class HUD {
     const key=`${edge.toFixed(2)}:${tilt}:${side}:${width}:${requested}:${adapted}:${this.chiselFlat}`;
     if(key===this.chiselOrientationKey)return;
     this.chiselOrientationKey=key;
+    this.shell.querySelector('#quick-chisel-tilt b')!.textContent=`${Math.abs(requested)}° ${requested<0?'↑':'↓'}`;
+    this.shell.querySelector('#quick-chisel-edge b')!.textContent=`${Math.round(edge)}°`;
     // The real blade rotates around local +Z. SVG Y points down, so its
     // screen rotation must have the opposite sign to the tool geometry.
     const blade=this.chiselOrientation.querySelector<SVGElement>('#chisel-edge-blade')!;
@@ -379,6 +426,7 @@ export class HUD {
     const panel=this.shell.querySelector<HTMLElement>('#mortar-panel')!;panel.hidden=tool!=='trowel'&&tool!=='hose';
     // Water mode owns this shared readout while the hose is selected.
     if(tool!=='hose')this.shell.querySelector<HTMLElement>('#mortar-readout')!.textContent=`LOFT ${angle}° · BED ${Math.round(coverage*100)}%`;
+    for(const id of ['#quick-loft-down b','#quick-loft-up b'])this.shell.querySelector(id)!.textContent=`${Math.round(angle)}°`;
     this.shell.querySelector<HTMLElement>('#swing-power')!.style.width=`${tool==='hose'?wet.pore*100:power*100}%`;
     this.shell.querySelector<HTMLElement>('#mortar-hint')!.textContent=tool==='hose'?`Soak exposed chase surfaces. Excess water washes fresh mortar away. Floor water: ${floorLitres.toFixed(1)} L.`:recovery>0?'Recovering / loading next trowelful…':outcome;
     this.shell.querySelector<HTMLElement>('#mortar-swing')!.textContent=tool==='hose'?'HOLD · MIST':'HOLD · RELEASE';
@@ -428,30 +476,43 @@ export class HUD {
     const colorText = panel.querySelector<HTMLElement>('#spray-color b');
     const swatch = panel.querySelector<HTMLElement>('#spray-color i');
     if (visible && modeText) modeText.textContent = mode.toUpperCase();
+    if(visible)this.shell.querySelector('#quick-tool-mode b')!.textContent=mode.toUpperCase();
     if (colorText) colorText.textContent = colorName;
+    this.shell.querySelector('#quick-spray-color b')!.textContent=colorName;
+    this.shell.querySelector<HTMLElement>('#quick-spray-color svg')!.style.color=colorCss;
     if (swatch) swatch.style.background = colorCss;
   }
 
   updateHammerControls(mode: string, visible: boolean, trimming = false): void {
     const modeText = this.shell.querySelector<HTMLElement>('#tool-mode-toggle span');
     if (visible && modeText) modeText.textContent = mode.toUpperCase();
+    if(visible)this.shell.querySelector('#quick-tool-mode b')!.textContent=mode.toUpperCase();
     if (visible) this.tool.querySelector('em')!.textContent = trimming ? 'UP · EDGE CLEANUP' : 'LEFT CLICK TO USE';
   }
 
-  updateAimControl(mode: 'auto-use' | 'double-tap'): void {
-    const modeText = this.shell.querySelector<HTMLElement>('#aim-control-mode b');
-    const thumbText = this.shell.querySelector<HTMLElement>('#mobile-action');
-    const hint = this.shell.querySelector<HTMLElement>('#aim-control-label');
-    if (modeText) modeText.textContent = mode === 'auto-use' ? 'AUTO USE' : '2× HOLD';
-    if (thumbText) thumbText.textContent = mode === 'auto-use' ? 'USE' : '2×';
-    if (hint) hint.textContent = mode === 'auto-use' ? 'AIM · AUTO TOOL' : 'AIM · 2× HOLD';
-    const look = this.shell.querySelector<HTMLElement>('#look-joystick');
-    look?.setAttribute('aria-label', mode === 'auto-use' ? 'Aim joystick; move it to use spray or hammer' : 'Aim joystick; double tap and hold center to use selected tool');
+  updateAimControl(_mode: 'manual' | 'auto-use' | 'double-tap'): void {
+    if(!this.displayChanged('manual-aim','manual'))return;
+    this.shell.querySelector('#mobile-action')!.textContent='USE';
+    this.shell.querySelector('#aim-control-label')!.textContent='HOLD + AIM';
+    this.shell.querySelector('#look-joystick')!.setAttribute('aria-label','Hold to use selected tool; drag to aim');
+  }
+  updateWorkHeight(crouched:boolean):void {
+    if(!this.displayChanged('work-height',String(crouched)))return;
+    this.shell.querySelector('#work-height')!.textContent=crouched?'STAND UP':'CROUCH · LOW WORK';
+    this.shell.querySelector('#quick-work-height b')!.textContent=crouched?'STAND':'CROUCH';
+  }
+
+  updateMobileUseStatus(message:string,ready:boolean,active:boolean):void {
+    if(!this.displayChanged('mobile-use-status',`${message}:${ready}:${active}`))return;
+    const status=this.shell.querySelector<HTMLElement>('#mobile-use-status')!;
+    status.textContent=message;status.dataset.ready=String(ready);status.dataset.active=String(active);
+    this.shell.querySelector('#look-joystick')!.classList.toggle('using-tool',active);
   }
 
   updateAimSpeed(profile: 'precise' | 'normal' | 'fast'): void {
     const profileText = this.shell.querySelector<HTMLElement>('#aim-speed b');
     if (profileText) profileText.textContent = profile.toUpperCase();
+    this.shell.querySelector('#quick-aim-speed b')!.textContent=profile.toUpperCase();
   }
 
   updateWallAssist(enabled: boolean): void {
@@ -464,10 +525,8 @@ export class HUD {
     if (inputText) inputText.textContent = mode.toUpperCase();
     this.shell.classList.toggle('aim-input-drag', mode === 'drag');
     const look = this.shell.querySelector<HTMLElement>('#look-joystick');
-    look?.setAttribute('aria-label', mode === 'drag' ? 'Drag aim pad; drag to aim and use spray or hammer' : 'Aim joystick; move it to use spray or hammer');
-    const hint = this.shell.querySelector<HTMLElement>('#aim-control-label');
-    const autoUse = this.shell.querySelector<HTMLElement>('#aim-control-mode b')?.textContent === 'AUTO USE';
-    const dragAction = this.selectedTool === 'spray' ? 'AIM + SPRAY' : this.selectedTool === 'hammer' ? 'AIM + HAMMER' : this.selectedTool === 'hose' ? 'AIM + WATER' : this.selectedTool === 'trowel' ? 'HOLD · RELEASE' : 'RELEASE TO USE';
-    if (hint) hint.textContent = mode === 'drag' ? (autoUse ? `DRAG · ${dragAction}` : 'DRAG · AIM') : (autoUse ? 'AIM · AUTO TOOL' : 'AIM · 2× HOLD');
+    look?.setAttribute('aria-label',mode==='drag'?'Hold USE and drag to aim; swipe the wall to look only':'Hold USE and steer to aim; swipe the wall to look only');
+    this.shell.querySelector('#quick-aim-input b')!.textContent=mode.toUpperCase();
+    this.shell.querySelector('#aim-control-label')!.textContent=mode==='drag'?'HOLD + DRAG':'HOLD + STICK';
   }
 }

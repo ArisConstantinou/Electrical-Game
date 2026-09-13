@@ -32,6 +32,7 @@ export class FPSRig extends THREE.Group {
   private readonly armSets = new Map<RigTool, WorkerArm[]>();
   private selectedTool: RigTool = 'spray';
   reachable = false;
+  contactStatus: 'ready'|'feeding'|'regripping'|'no-solid'|'too-close'|'out-of-reach' = 'out-of-reach';
   reachReason = 'Out of reach. Move closer or change your working angle.';
   readonly chiselTipWorld = new THREE.Vector3();
   toolAction = 0;
@@ -77,6 +78,7 @@ export class FPSRig extends THREE.Group {
   /** Seat the real visible tip on the first remaining solid, then read it back. */
   contact(camera: THREE.Camera, wall: BrickWall): ChiselContact | null {
     this.selectedTool='hammer';
+    this.contactStatus='out-of-reach';
     this.reachReason='Out of reach. Move closer, change your stance or crouch.';
     const hammer = this.tools.get('hammer')!;
     this.poseHammerGrips(hammer);
@@ -179,7 +181,22 @@ export class FPSRig extends THREE.Group {
     // A body below or beside the eye can have a small camera Z while leaving
     // the bit fully visible. Reject an actual head collision, not that valid
     // oblique working posture merely because it fails a forward-Z cutoff.
-    if(housing.length()<.19 || !this.gripsReachable(camera,hammer)){
+    if(housing.length()<.19){
+      this.contactStatus='too-close';
+      this.reachReason='Too close. Step back slightly to give the hammer room.';
+      this.reachable=false;this.chiselInAir=true;
+      // The motor is colliding with the head, although the seated blade looks
+      // ready to strike. Withdraw the real tool clear of the wall so the
+      // presentation agrees with the rejected contact. Eyes never move.
+      const withdrawal=Math.max(.055,(wall.volume.frontZ+.045-target.z)/Math.max(.04,-direction.z));
+      const withdrawn=target.clone().addScaledVector(direction,-withdrawal);
+      withdrawn.y-=.06;
+      hammer.position.copy(this.worldToLocal(withdrawn)).sub(this.tipAnchor.clone().applyQuaternion(hammer.quaternion));
+      this.constrainHeldTool(camera);this.poseArms(camera);
+      this.chiselTipWorld.copy(hammer.localToWorld(this.tipAnchor.clone()));
+      return null;
+    }
+    if(!this.gripsReachable(camera,hammer)){
       this.reachable=false;this.chiselInAir=true;
       if(this.workPositionLocked){this.constrainHeldTool(camera);this.poseArms(camera);this.chiselTipWorld.copy(hammer.localToWorld(this.tipAnchor.clone()));}
       else this.restHammer(camera);
@@ -189,7 +206,10 @@ export class FPSRig extends THREE.Group {
     const tip = hammer.localToWorld(this.tipAnchor.clone());
     this.chiselTipWorld.copy(tip);
     this.poseArms(camera);
-    if (!hit || target.distanceTo(surfaceTarget)>.003 || (this.hammerGripBlend>0 && this.hammerGripBlend<1)) return null;
+    if(!hit){this.contactStatus='no-solid';this.reachReason='No solid masonry under the chisel. Aim at an edge or remaining rib.';return null;}
+    if(target.distanceTo(surfaceTarget)>.003){this.contactStatus='feeding';this.reachReason='Feeding the chisel into contact.';return null;}
+    if(this.hammerGripBlend>0&&this.hammerGripBlend<1){this.contactStatus='regripping';this.reachReason='Changing grip. Keep holding to continue.';return null;}
+    this.contactStatus='ready';this.reachReason='Chisel in contact. Hold to hammer.';
     return {point:tip.clone().addScaledVector(edge,bladeOffsetM), direction, edge, chisel:wall.chiselType, energyJ:wall.chiselEnergyJ, widthM:wall.chiselWidthM, bladeOffsetM};
   }
 

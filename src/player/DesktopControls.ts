@@ -39,13 +39,16 @@ export class DesktopControls {
     });
     surface.addEventListener('contextmenu', event => event.preventDefault());
     const releasePrimaryAction = (event: PointerEvent): void => {
+      // A movement finger lifting must not release a different finger's tool.
+      if (event.pointerType && event.pointerType !== 'mouse') return;
       if (event.button === 0) {
         primaryDown = false;
         input.actionHeld = false;
       }
     };
     addEventListener('pointerup', releasePrimaryAction);
-    addEventListener('pointercancel', () => {
+    addEventListener('pointercancel', event => {
+      if (event.pointerType && event.pointerType !== 'mouse') return;
       primaryDown = false;
       input.actionHeld = false;
     });

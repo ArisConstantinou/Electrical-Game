@@ -65,10 +65,10 @@ export class Game {
   hammerSpeed = 2.5;
   hammerAutoSide = true;
   waterGunModeIndex = 3;
-  aimControlMode: AimControlMode = 'auto-use';
+  aimControlMode: AimControlMode = 'manual';
   aimProfile: MobileAimProfile = 'normal';
   wallAssistEnabled = true;
-  aimInputMode: AimInputMode = 'drag';
+  aimInputMode: AimInputMode = 'stick';
   started = false;
   private readonly chasing: ChasingSystem;
   private readonly interaction: InteractionSystem;
@@ -113,6 +113,8 @@ export class Game {
       this.player,
       () => this.isContinuousAction(),
     );
+    this.mobileControls.setAimControlMode(this.aimControlMode);
+    this.mobileControls.setAimInputMode(this.aimInputMode);
     new MobileHUD();
     this.bindEvents();
     this.hud.onStart(() => {
@@ -233,6 +235,17 @@ export class Game {
     const pointAim = this.selectedTool !== 'hammer' && this.selectedTool !== 'spray' && Boolean(this.mission.target(this.renderer.camera));
     const aimed = this.selectedTool === 'hammer' ? this.fpsRig.reachable && !this.fpsRig.chiselInAir : this.selectedTool === 'spray' ? wallAim : pointAim;
     this.hud.update(active, aimed, this.mission.progress, this.selectedTool);
+    this.hud.updateWorkHeight(this.player.crouched||this.input.pressed('ControlLeft')||this.input.pressed('ControlRight'));
+    const useHeld=this.started&&this.input.actionHeld;
+    const hammerReady=this.fpsRig.contactStatus==='ready'&&this.hammerSpeed>0;
+    const hammerStatus:Record<typeof this.fpsRig.contactStatus,string>={
+      ready:useHeld?'CHISELLING':'HOLD TO CHISEL',feeding:'ADVANCING BIT',regripping:'CHANGING GRIP',
+      'no-solid':'AIM AT BRICK','too-close':'STEP BACK SLIGHTLY','out-of-reach':'MOVE INTO REACH',
+    };
+    const useStatus=this.selectedTool==='hammer'?(this.hammerSpeed===0?'SPEED 0 · PAUSED':hammerStatus[this.fpsRig.contactStatus])
+      :this.selectedTool==='trowel'?(this.mortar.recovery>0?'RELOADING':useHeld?'RELEASE TO THROW':'HOLD TO LOAD')
+      :useHeld?'USING TOOL':'HOLD TO USE';
+    this.hud.updateMobileUseStatus(useStatus,this.selectedTool==='hammer'?hammerReady:true,useHeld);
     const sprayColor = SPRAY_COLORS[this.sprayColorIndex];
     const settingsKey=[this.selectedTool,this.sprayMode,this.sprayColorIndex,this.hammerMode,this.room.brickWall.chiselTiltDegrees<0,this.room.brickWall.chiselWidthM,this.room.brickWall.chiselType,this.aimControlMode,this.aimProfile,this.wallAssistEnabled,this.aimInputMode].join(':');
     if(settingsKey!==this.hudSettingsKey){
@@ -267,7 +280,8 @@ export class Game {
       mortar: this.mortar.telemetry,
       boxPlacement:this.boxPlacement.telemetry,
       water: {...this.roomWater.telemetry,gunMode:WATER_GUN_MODES[this.waterGunModeIndex].id,gunLitres:this.mortar.waterGunLitres},
-      hammer: { speedMultiplier: this.hammerSpeed, paused: this.hammerSpeed === 0, impactIntervalSeconds: this.hammerSpeed > 0 ? .24 / this.hammerSpeed : null },
+      hammer: { speedMultiplier: this.hammerSpeed, paused: this.hammerSpeed === 0, impactIntervalSeconds: this.hammerSpeed > 0 ? .24 / this.hammerSpeed : null, contactStatus:this.fpsRig.contactStatus, contactReason:this.fpsRig.reachReason },
+      controls: { actionHeld:this.input.actionHeld, move:this.input.mobileMove, look:this.input.mobileLook, aimInput:this.aimInputMode, manualUse:true },
       body: this.fpsRig.debugPose(),
       view: { mode: 'continuous-shared', viewQuaternion: this.renderer.renderCamera.quaternion.toArray(), workQuaternion: this.renderer.camera.quaternion.toArray() },
       workPosition: this.player.workPosition,
@@ -294,7 +308,7 @@ export class Game {
       }
     }
     if(this.selectedTool==='hammer'&&!this.fpsRig.contact(this.renderer.camera,this.room.brickWall)){
-      if(!continuing&&!this.player.workPosition.locked)this.hud.notify('Approach the wall to settle into the working position.',false);
+      if(!continuing)this.hud.notify(this.fpsRig.reachReason,false,1200);
       return;
     }
     const spatialTool = this.selectedTool === 'spray' || this.selectedTool === 'hammer' || this.selectedTool === 'fitting';
@@ -345,10 +359,12 @@ export class Game {
       if(this.selectedTool !== 'hammer' || event.repeat) return;
       if(event.code === 'Minus' || event.code === 'Equal') {event.preventDefault();setHammerSpeed(this.hammerSpeed + (event.code === 'Equal' ? .25 : -.25));}
     });
-    addEventListener('wirehouse:work-height',()=>{this.player.crouched=!this.player.crouched;document.querySelector('#work-height')!.textContent=this.player.crouched?'STAND UP':'CROUCH · LOW WORK';});
+    addEventListener('wirehouse:work-height',()=>{this.player.crouched=!this.player.crouched;this.hud.updateWorkHeight(this.player.crouched);});
     const cancelSwing=()=>this.mortar.cancel();
     addEventListener('pointerdown',event=>{if(event.button===2)cancelSwing();});
-    addEventListener('blur',cancelSwing);addEventListener('pointercancel',cancelSwing);
+    addEventListener('blur',cancelSwing);
+    addEventListener('pointercancel',event=>{if(!event.pointerType||event.pointerType==='mouse')cancelSwing();});
+    addEventListener('wirehouse:cancel-mobile-action',cancelSwing);
     document.addEventListener('pointerlockchange',()=>{if(!document.pointerLockElement)cancelSwing();});
     addEventListener('wirehouse:mortar-angle',event=>{this.mortar.angleDegrees=THREE.MathUtils.clamp(this.mortar.angleDegrees+(event as CustomEvent<number>).detail,-20,50);});
     const swingButton=document.querySelector<HTMLElement>('#mortar-swing')!;
@@ -419,9 +435,10 @@ export class Game {
       this.hud.notify(`Hammer method: ${this.hammerMode.toUpperCase()}`);
     });
     addEventListener('wirehouse:cycle-aim-control', () => {
-      this.aimControlMode = this.aimControlMode === 'auto-use' ? 'double-tap' : 'auto-use';
+      // Legacy integrations cannot re-enable automatic work from camera input.
+      this.aimControlMode = 'manual';
       this.mobileControls.setAimControlMode(this.aimControlMode);
-      this.hud.notify(this.aimControlMode === 'auto-use' ? 'Aim stick: move to spray or hammer.' : 'Aim stick: double tap and hold to use tool.');
+      this.hud.notify('Hold USE to work. Swipe the view to look without using a tool.');
     });
     addEventListener('wirehouse:cycle-aim-speed', () => {
       const profiles: MobileAimProfile[] = ['precise', 'normal', 'fast'];
@@ -469,7 +486,7 @@ export class Game {
   private selectTool(tool: RigTool): void {
     if (!RIG_TOOLS.includes(tool)) return;
     const changed = this.selectedTool !== tool;
-    if(changed)this.mortar.cancel();
+    if(changed){this.mobileControls.cancelActiveGestures();this.mortar.cancel();}
     this.selectedTool = tool;
     // Keep the established spray -> hammer gesture useful, but queue exactly
     // one hammer strike rather than turning a held pointer into auto-repeat.

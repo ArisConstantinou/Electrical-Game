@@ -17,17 +17,19 @@ try{for(const mobile of [false,true]){
   await select(tool);
   const state=await page.evaluate(()=>({tool:document.querySelector('#tool-status .selected').textContent,selected:document.querySelector('[data-tool].selected')?.dataset.tool,context:document.querySelector('#tool-mode-toggle').dataset.modeKind,hint:document.querySelector('#aim-control-label').textContent,chiselHidden:document.querySelector('#chisel-orientation').hidden,mortarHidden:document.querySelector('#mortar-panel').hidden}));
   assert.equal(state.tool,tool.toUpperCase());assert.equal(state.selected,tool);assert.equal(state.context,['spray','hammer','hose'].includes(tool)?tool:'');assert.equal(state.chiselHidden,tool!=='hammer');assert.equal(state.mortarHidden,!['hose','trowel'].includes(tool));
-  const action={spray:'AIM + SPRAY',hammer:'AIM + HAMMER',hose:'AIM + WATER',trowel:'HOLD · RELEASE'}[tool]??'RELEASE TO USE';assert.ok(state.hint.includes(action),`${platform}/${tool}: stale aim hint ${state.hint}`);cases.push(state);
+  assert.equal(state.hint,'HOLD + STICK',`${platform}/${tool}: explicit hold hint missing`);cases.push(state);
  }
  await click('#settings-toggle');await page.locator('#water-gun-mode').selectOption('mist');await page.waitForFunction(()=>document.querySelector('#mortar-readout').textContent.includes('MIST'));
  if(mobile){
-  for(const [id,stateKey,label] of [['#aim-input-mode','aimInputMode','STICK'],['#aim-control-mode','aimControlMode','2× HOLD'],['#aim-speed','aimProfile','FAST'],['#wall-assist','wallAssistEnabled','OFF']]){
+  for(const [id,stateKey,label] of [['#aim-input-mode','aimInputMode','DRAG'],['#aim-speed','aimProfile','FAST'],['#wall-assist','wallAssistEnabled','OFF']]){
    await click(id);await page.waitForFunction(({id,label})=>document.querySelector(`${id} b`).textContent===label,{id,label});
    cases.push({setting:id,value:await page.evaluate(key=>window.__wireTheHouse[key],stateKey)});
   }
-  assert.equal(await page.locator('#aim-control-label').textContent(),'AIM · 2× HOLD');
-  await click('#aim-input-mode');assert.equal(await page.locator('#aim-control-label').textContent(),'DRAG · AIM');
-  await click('#aim-control-mode');await page.waitForFunction(()=>document.querySelector('#aim-control-label').textContent==='DRAG · AIM + WATER');
+  assert.equal(await page.locator('#aim-control-mode').count(),0,'Automatic use must not be available');
+  assert.equal(await page.locator('#aim-control-label').textContent(),'HOLD + DRAG');
+  await click('#aim-input-mode');await page.waitForFunction(()=>document.querySelector('#aim-control-label').textContent==='HOLD + STICK');
+  await page.evaluate(()=>window.dispatchEvent(new CustomEvent('wirehouse:cycle-aim-control')));
+  assert.equal(await page.evaluate(()=>window.__wireTheHouse.aimControlMode),'manual');
  }
  await page.screenshot({path:`${out}/${platform}-settings.png`,animations:'disabled'});await click('#settings-close');
  await select('hammer');
