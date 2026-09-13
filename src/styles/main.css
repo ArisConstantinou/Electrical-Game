@@ -191,3 +191,75 @@ button {
 
 .result-panel h2 { font-size:clamp(46px,9vw,120px); max-width:100%; line-height:.86; overflow-wrap:anywhere; }
 @media (max-width:480px) { .result-panel {padding:24px;} .result-panel h2 {font-size:clamp(42px,12vw,56px);} }
+
+/* Release timing is driven by the same swing clock as the physical trowel. */
+#mortar-panel { border-radius:10px; border-color:rgba(229,197,151,.36); background:linear-gradient(145deg,rgba(32,35,31,.96),rgba(31,28,23,.88)); }
+#mortar-flow[hidden], #mortar-wet-track[hidden], #trowel-swing-gauge[hidden] {display:none;}
+.throw-flow-heading {display:flex;justify-content:space-between;gap:8px;margin:10px 0 10px;font-size:12px;font-weight:700;line-height:1.3;}
+.throw-flow-heading>span {color:#c7c7b8;letter-spacing:.04em;}
+#throw-quality {color:#f1d5a5;text-align:right;}
+#throw-timing-track {position:relative;height:24px;border-radius:7px;border:1px solid #aa936c;background:linear-gradient(90deg,#a47631 0%,#b98e43 42%,#3b8b66 42%,#3b8b66 58%,#b96838 58%,#ab4238 100%);box-shadow:inset 0 2px 7px #0006;}
+.throw-perfect-zone {position:absolute;left:42%;width:16%;top:-3px;bottom:-3px;border:2px solid #b4efbc;border-radius:4px;background:linear-gradient(90deg,transparent,#befcb22b,transparent);box-shadow:0 0 12px #8dffae33;}
+.throw-flow-sheen {position:absolute;inset:0;overflow:hidden;border-radius:inherit;background:repeating-linear-gradient(115deg,transparent 0 12px,#fff2 13px 15px,transparent 16px 28px);opacity:.15;}
+#mortar-flow[data-holding="true"] .throw-flow-sheen {opacity:.65;animation:throw-flow .65s linear infinite;}
+@keyframes throw-flow {from {background-position:0 0;}to {background-position:28px 0;}}
+#throw-timing-cursor {position:absolute;z-index:2;left:0;top:-6px;bottom:-6px;width:4px;transform:translateX(-50%);border-radius:3px;background:#fffaf0;box-shadow:0 0 0 1px #172d25,0 0 13px #fff7;}
+#throw-timing-cursor::before {content:'';position:absolute;left:50%;top:-5px;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid #fffaf0;transform:translateX(-50%);}
+.throw-zone-labels {display:grid;grid-template-columns:42fr 16fr 42fr;gap:0;margin-top:9px;font-size:12px;font-weight:700;line-height:1.2;white-space:nowrap;color:#e9c88d;}
+.throw-zone-labels b {color:#b4efbc;text-align:center;}
+.throw-zone-labels span:last-child {text-align:right;color:#f5b198;}
+#mortar-flow[data-quality="perfect"] #throw-quality {color:#b4efbc;}
+#mortar-flow[data-quality="perfect"][data-holding="true"] .throw-perfect-zone {box-shadow:0 0 19px #afff9988;background:#d9ffba33;}
+#mortar-flow[data-quality="late"] #throw-quality {color:#ffb298;}
+#mortar-panel:has(#mortar-flow[data-quality="perfect"][data-holding="true"]) #mortar-swing {background:#326f50;border-color:#b4efbc;box-shadow:0 0 15px #86e9a033;}
+#mortar-panel:has(#mortar-flow[data-quality="late"][data-holding="true"]) #mortar-swing {background:#894732;border-color:#f3b095;}
+#mortar-hint {color:#d7d9cb;}
+#swing-power {display:block;height:100%;}
+#trowel-swing-gauge {position:absolute;z-index:5;left:clamp(24px,calc(50% + 160px),calc(100% - 184px));bottom:132px;width:160px;padding:10px 12px;border-radius:12px;pointer-events:none;background:linear-gradient(145deg,rgba(28,35,29,.9),rgba(30,29,24,.79));border-color:#c5b29269;}
+.swing-gauge-title {font-size:12px;line-height:1.2;font-weight:700;letter-spacing:.06em;color:#dbd3bc;text-align:center;}
+.swing-gauge-dial {display:block;width:100%;height:78px;margin-top:3px;overflow:visible;}
+.swing-gauge-rail {fill:none;stroke:#a7966a;stroke-width:5;stroke-linecap:round;opacity:.65;}
+.swing-gauge-sweet {fill:none;stroke:#aee6ac;stroke-width:7;stroke-linecap:round;}
+#trowel-swing-needle {stroke:#fff5d9;stroke-width:3;fill:#fff5d9;}
+.swing-needle-tip {stroke:none;}
+.swing-gauge-pivot {fill:#deaa69;stroke:#fff0cc;stroke-width:2;}
+#trowel-swing-degrees {position:absolute;top:41px;left:0;right:0;text-align:center;font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;text-shadow:0 1px 4px #000;}
+.swing-strength-label {display:flex;justify-content:space-between;gap:8px;font-size:12px;font-weight:700;line-height:1.4;color:#e8d5b3;}
+#trowel-swing-strength {font-size:16px;color:#fff8e6;font-variant-numeric:tabular-nums;}
+.swing-strength-track {height:6px;margin-top:5px;border-radius:3px;background:#fff2;overflow:hidden;}
+#trowel-strength-fill {display:block;width:0;height:100%;background:linear-gradient(90deg,#e1b26b,#e3e5a0 50%,#e28d68);}
+#trowel-swing-gauge[data-quality="perfect"] {border-color:#a5e99b;}
+#trowel-swing-gauge[data-quality="late"] {border-color:#e5a284;}
+#mortar-face-splash {position:absolute;inset:0;z-index:3;pointer-events:none;opacity:0;contain:strict;--splash-scale:.7;}
+#mortar-face-splash i {position:absolute;width:clamp(65px,12vw,190px);height:clamp(45px,9vw,120px);background:radial-gradient(ellipse at 35% 23%,#a09c80,#777762 49%,#545849 95%);border-radius:37% 63% 54% 46% / 47% 28% 72% 53%;box-shadow:inset 1px 3px 5px #d3cbb85c,3px 4px 8px #0005;transform:scale(var(--splash-scale)) rotate(-14deg);}
+#mortar-face-splash i:nth-child(1) {left:-3%;top:34%;}
+#mortar-face-splash i:nth-child(2) {right:-3%;top:28%;transform:scale(var(--splash-scale)) rotate(70deg);}
+#mortar-face-splash i:nth-child(3) {left:15%;bottom:-5%;width:15vw;height:12vh;}
+#mortar-face-splash i:nth-child(4) {right:12%;top:-4%;width:12vw;height:12vh;transform:scale(var(--splash-scale)) rotate(22deg);}
+#mortar-face-splash i:nth-child(5) {right:3%;bottom:14%;width:7vw;height:9vh;}
+#mortar-face-splash i:nth-child(6) {left:8%;top:19%;width:22px;height:32px;}
+#mortar-face-splash i:nth-child(7) {right:15%;bottom:9%;width:27px;height:36px;}
+@media (pointer:coarse), (max-width:760px) {
+  #mortar-panel {top:122px;left:14px;width:calc(100% - 28px);padding:10px;}
+  #trowel-swing-gauge {left:auto;right:16px;bottom:308px;width:142px;padding:9px 10px;}
+}
+@media (max-width:370px) {
+  .throw-flow-heading {font-size:12px;letter-spacing:0;gap:3px;}
+  .throw-zone-labels {font-size:12px;grid-template-columns:40fr 20fr 40fr;}
+  #mortar-panel {left:10px;width:calc(100% - 20px);}
+  #mortar-panel small {font-size:14px;}
+}
+@media (max-height:520px) and (pointer:coarse) {
+  #mortar-panel {left:132px;top:96px;width:290px;padding:8px;}
+  #mortar-panel strong {font-size:12px;}
+  #mortar-panel small {font-size:14px;line-height:1.2;margin-top:5px;}
+  .throw-flow-heading {margin:4px 0 7px;}
+  #throw-timing-track {height:17px;}
+  .throw-zone-labels {margin-top:7px;}
+  #trowel-swing-gauge {right:167px;bottom:81px;width:138px;padding:7px 10px;}
+  .swing-gauge-dial {height:52px;margin:0;}
+  #trowel-swing-degrees {top:30px;font-size:17px;}
+  .swing-strength-track {margin-top:3px;height:5px;}
+  #mortar-hint {max-height:51px;overflow:auto;}
+}
+@media (prefers-reduced-motion:reduce) {#mortar-flow[data-holding="true"] .throw-flow-sheen {animation:none;}}

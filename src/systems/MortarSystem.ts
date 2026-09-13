@@ -4,7 +4,7 @@ import type { BrickWall } from '../world/BrickWall';
 import { MortarField } from './MortarField';
 
 type WaterCell = { pore: number; film: number; mesh: THREE.Mesh; position: THREE.Vector3; normal: THREE.Vector3 };
-type Clod = { mesh: THREE.Mesh; velocity: THREE.Vector3; mass: number; age: number; contacts: number; slurry: boolean };
+type Clod = { mesh: THREE.Mesh; velocity: THREE.Vector3; mass: number; age: number; contacts: number; slurry: boolean; bond: number };
 type Deposit = { fieldKey?: string; position: THREE.Vector3; radius: number; mass: number; mesh: THREE.Mesh; age: number; normal: THREE.Vector3; support: number };
 type Contact = { point: THREE.Vector3; normal: THREE.Vector3; distance: number; box: boolean };
 type Opening = { inverse: THREE.Matrix4; halfWidth: number; halfHeight: number; minZ: number; maxZ: number };
@@ -49,6 +49,10 @@ export class MortarSystem {
   private readonly wetMaterial: THREE.MeshBasicMaterial;
   private readonly ray = new THREE.Raycaster();
   private wasHeld = false;
+  private releasedPhase = 0;
+  private recoveringThrow = false;
+  private releaseCount = 0;
+  private faceSplash = 0;
   private jetTime = 0;
   private maintenanceTime = 0;
   private simulationTime = 0;
@@ -95,10 +99,38 @@ export class MortarSystem {
   }
   ready(point:InstallationPoint):boolean {this.refreshOpeningGeometry();return this.evaluateCoverage(point,true)>=.68;}
   cancel(): void { this.wasHeld = false; this.charge = 0; }
+  /** Timing is a learnable game gesture. It modifies a finite scoop, while
+   * substrate moisture, incidence and actual cavity contact still decide adhesion. */
+  get throwFeedback() {
+    const recovering=this.recovery>0&&this.recoveringThrow;
+    const active=this.wasHeld||recovering,phase=this.wasHeld?this.charge:recovering?this.releasedPhase:0;
+    const quality:'ready'|'early'|'perfect'|'late'=!active?'ready':phase<.42?'early':phase<=.58?'perfect':'late';
+    const swingDegrees=this.wasHeld?-50+phase*140:recovering?(-50+phase*140)*THREE.MathUtils.smoothstep(this.recovery/.65,0,1):0;
+    return {holding:this.wasHeld,phase,quality,swingDegrees,strength:phase,splash:this.faceSplash,lastRelease:this.releaseCount};
+  }
   swing(held: boolean, dt: number, camera: THREE.Camera, origin: THREE.Vector3): void {
     if (this.recovery > 0) { this.cancel(); return; }
     if (held) { this.wasHeld = true; this.charge = Math.min(1, this.charge + dt / .95); }
-    else if (this.wasHeld) { this.launch(origin, this.velocity(camera, this.charge)); this.recovery = .65; this.cancel(); }
+    else if (this.wasHeld) {
+      const phase=this.charge,late=THREE.MathUtils.clamp((phase-.58)/.42,0,1),backFraction=late*.55;
+      // Reserve the entire scoop atomically; never lose the backward share at
+      // the projectile budget. Explicit launch() retains its original contract.
+      if(this.projectiles.length+(late>0?3:1)<=48){
+        const mass=.65,bond=phase<.42?.04+.96*(phase/.42)**2:1;
+        this.spawnClod(origin,this.velocity(camera,phase),mass*(1-backFraction),false,bond);
+        if(late>0){
+          const towardFace=camera.getWorldPosition(new THREE.Vector3()).sub(origin);
+          if(towardFace.lengthSq()<1e-6)camera.getWorldDirection(towardFace).negate();
+          towardFace.normalize().multiplyScalar(1.6+late*2.4);
+          const right=new THREE.Vector3(1,0,0).applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion()));
+          for(const side of [-1,1])this.spawnClod(origin,towardFace.clone().addScaledVector(right,side*.35),mass*backFraction/2,true,0);
+        }
+        this.launchedMass+=mass;this.releasedPhase=phase;this.releaseCount++;this.faceSplash=Math.max(this.faceSplash,late);
+        this.lastOutcome=phase<.42?'Early release: weak adhesion; loose mortar will slide down.':late>0?'Late release: mortar splashes back; part of the scoop still reaches the wall.':'Perfect release: good transfer; aim at clean, damp masonry.';
+        this.recovery=.65;this.recoveringThrow=true;
+      }
+      this.cancel();
+    }
   }
   velocity(camera: THREE.Camera, power: number): THREE.Vector3 {
     const direction = camera.getWorldDirection(new THREE.Vector3());
@@ -177,10 +209,10 @@ export class MortarSystem {
     if (this.projectiles.length >= 48 || !Number.isFinite(mass) || mass <= 0) return;
     this.spawnClod(origin, velocity, mass); this.launchedMass += mass;
   }
-  private spawnClod(origin: THREE.Vector3, velocity: THREE.Vector3, mass: number, slurry = false): void {
+  private spawnClod(origin: THREE.Vector3, velocity: THREE.Vector3, mass: number, slurry = false, bond = 1): void {
     const mesh = new THREE.Mesh(this.clodGeometry, this.mortarMaterial); mesh.position.copy(origin); mesh.castShadow = true;
     const scale = Math.cbrt(mass / .65); mesh.scale.set(.046 * scale, .030 * scale, .064 * scale);
-    this.group.add(mesh); this.projectiles.push({ mesh, velocity: velocity.clone(), mass, age: 0, contacts: 0, slurry });
+    this.group.add(mesh); this.projectiles.push({ mesh, velocity: velocity.clone(), mass, age: 0, contacts: 0, slurry, bond });
   }
   /** Close cohesive packing is available at every real reachable surface or gap. */
   pack(camera: THREE.Camera): boolean {
@@ -192,7 +224,7 @@ export class MortarSystem {
     if (!held) return false;
     this.launchedMass += mass; this.stuckMass += held;
     this.spawnClod(hit.point.clone().addScaledVector(hit.normal, .015), hit.normal.clone().multiplyScalar(.12).add(new THREE.Vector3(0, -.15, 0)), mass - held);
-    this.recovery = .4; this.lastOutcome = held<mass*.25?'The nearby void is full; loose excess slumps off.':'Packed into the exposed cavity; loose excess falls.'; return true;
+    this.recovery = .4; this.recoveringThrow=false;this.releasedPhase=0;this.cancel();this.lastOutcome = held<mass*.25?'The nearby void is full; loose excess slumps off.':'Packed into the exposed cavity; loose excess falls.'; return true;
   }
 
   /** Earliest current solid, including deposited mortar and actual box casing. */
@@ -322,7 +354,7 @@ export class MortarSystem {
   }
 
   update(dt: number): void {
-    dt = Math.min(.12, Math.max(0, dt)); this.simulationTime += dt; this.recovery = Math.max(0, this.recovery - dt); this.jetTime -= dt; this.jet.visible = this.jetTime > 0;
+    dt = Math.min(.12, Math.max(0, dt)); this.simulationTime += dt; this.recovery = Math.max(0, this.recovery - dt); this.faceSplash=Math.max(0,this.faceSplash-dt*.28); this.jetTime -= dt; this.jet.visible = this.jetTime > 0;
     this.refreshOpeningGeometry();
     this.maintenanceTime += dt;
     for (const [key, cell] of this.water) {
@@ -359,8 +391,11 @@ export class MortarSystem {
       const clod = this.projectiles[i], a = clod.mesh.position, next = a.clone().addScaledVector(clod.velocity, h); next.y -= .5 * 9.81 * h * h; clod.velocity.y -= 9.81 * h; clod.age += h;
       const d = next.clone().sub(a), hit = this.contact(a, d.clone().normalize(), d.length());
       if (hit) {
-        const fraction = clod.slurry || hit.box || this.insideBox(hit.point) || clod.contacts > 2 ? 0 : this.retention(hit.point, clod.velocity, hit.normal);
+        const fraction = clod.slurry || hit.box || this.insideBox(hit.point) || clod.contacts > 2 ? 0 : this.retention(hit.point, clod.velocity, hit.normal)*clod.bond;
         const held = this.deposit(hit.point, clod.mass * fraction, hit.normal); this.stuckMass += held; clod.mass -= held; clod.contacts++;
+        // Rejected weak throws cannot become a second, stronger throw when they
+        // hit a lower rib. They flow down under the same contact/gravity solver.
+        if(clod.bond<.999)clod.slurry=true;
         this.lastOutcome = held > .07 ? 'Mortar held. Pack all four sides before leveling.' : held > .005 ? 'Some mortar held; excess is falling.' : 'Little free capacity or glancing contact: excess slumps off.';
         if (clod.mass < .001) { this.floorMass += clod.mass; this.group.remove(clod.mesh); this.projectiles.splice(i, 1); continue; }
         let narrowLedge=false;
@@ -453,5 +488,5 @@ export class MortarSystem {
     const value = Math.min(...counts) / 12;
     this.coverageCache.set(key, { time: this.simulationTime, revision: this.geometryRevision, transform, value }); return value;
   }
-  get telemetry() { return { angleDegrees: this.angleDegrees, power: this.charge, recovery: this.recovery, airborne: this.projectiles.length, launchedKg: this.launchedMass, stuckKg: this.stuckMass, restingKg: this.restingMass, restingBatches: this.resting.length, floorKg: this.floorMass, movingKg: this.pendingWashMass + this.projectiles.reduce((sum, clod) => sum + clod.mass, 0), washedKg: this.washedMass, volumeField: this.field.statistics, wetCells: this.water.size, patches: this.deposits.length, outcome: this.lastOutcome, initialStabilitySeconds: 1.3, freshWorkingSeconds: 3600, geometryLimit: MAX_PATCHES, coverage: this.points.map(point => ({ id: point.definition.id, fraction: this.coverage(point) })) }; }
+  get telemetry() { return { angleDegrees: this.angleDegrees, power: this.charge, throwFeedback:this.throwFeedback, recovery: this.recovery, airborne: this.projectiles.length, launchedKg: this.launchedMass, stuckKg: this.stuckMass, restingKg: this.restingMass, restingBatches: this.resting.length, floorKg: this.floorMass, movingKg: this.pendingWashMass + this.projectiles.reduce((sum, clod) => sum + clod.mass, 0), washedKg: this.washedMass, volumeField: this.field.statistics, wetCells: this.water.size, patches: this.deposits.length, outcome: this.lastOutcome, initialStabilitySeconds: 1.3, freshWorkingSeconds: 3600, geometryLimit: MAX_PATCHES, coverage: this.points.map(point => ({ id: point.definition.id, fraction: this.coverage(point) })) }; }
 }

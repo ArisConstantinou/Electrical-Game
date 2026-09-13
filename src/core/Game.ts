@@ -28,7 +28,7 @@ const TOOL_HINTS: Record<RigTool, string> = {
   level: 'SPIRIT LEVEL · align the box group',
   spring: 'BENDING SPRING · shape the 20 mm PVC',
   cutter: 'PVC CUTTER · single-action cut to length',
-  trowel: 'TROWEL · hold to charge, release to cast · ↑ / ↓ loft angle',
+  trowel: 'TROWEL · hold, release in the green center · ↑ / ↓ loft angle',
   hose: 'WATER HOSE · hold to mist the masonry; avoid saturation',
 };
 
@@ -160,6 +160,8 @@ export class Game {
     this.fpsRig.levelTiltDegrees=active?.boxGroup.tiltDegrees??0;
     this.fpsRig.mortarCharge=this.mortar.charge;
     this.fpsRig.mortarRecovery=this.mortar.recovery;
+    this.fpsRig.mortarHolding=this.mortar.throwFeedback.holding;
+    this.fpsRig.mortarSwingDegrees=this.mortar.throwFeedback.swingDegrees;
     this.chasing.update(dt);
     this.fpsRig.update(dt, this.player.velocity.lengthSq() > 0.02, spraying);
     this.fpsRig.show(this.selectedTool);
@@ -177,7 +179,7 @@ export class Game {
     this.hud.updateAimInput(this.aimInputMode);
     const waterHit=this.room.brickWall.aim(this.renderer.camera);
     const wet=waterHit ? this.mortar.moistureAt(new THREE.Vector3(waterHit.point.x,waterHit.point.y,waterHit.point.z)) : {pore:0,film:0};
-    this.hud.updateMortar(this.selectedTool,this.mortar.charge,this.mortar.angleDegrees,wet,active ? this.mortar.coverage(active):0,this.mortar.recovery,this.mortar.lastOutcome,this.roomWater.telemetry.floorLitres);
+    this.hud.updateMortar(this.selectedTool,this.mortar.charge,this.mortar.angleDegrees,wet,active ? this.mortar.coverage(active):0,this.mortar.recovery,this.mortar.lastOutcome,this.roomWater.telemetry.floorLitres,this.mortar.throwFeedback);
     if (this.shake > 0) {
       this.shake = Math.max(0, this.shake - dt * 3.7);
       this.renderer.camera.rotation.x += (Math.random() - 0.5) * this.shake * 0.025;

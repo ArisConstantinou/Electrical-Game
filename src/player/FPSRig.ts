@@ -34,6 +34,8 @@ export class FPSRig extends THREE.Group {
   levelTiltDegrees = 0;
   mortarCharge = 0;
   mortarRecovery = 0;
+  mortarSwingDegrees = 0;
+  mortarHolding = false;
   chiselInAir = false;
   workStanceSide = 0;
 
@@ -126,7 +128,15 @@ export class FPSRig extends THREE.Group {
     const actuator=this.tools.get('spray')?.getObjectByName('spray-actuator');
     if(actuator)actuator.position.y=spraying?.102:.104;
     const trowel=this.tools.get('trowel');
-    if(trowel){trowel.rotation.x=-this.mortarCharge*.55+Math.sin(this.mortarRecovery/.65*Math.PI)*.65;trowel.position.y=-this.mortarCharge*.05;const load=trowel.getObjectByName('trowel-load');if(load)load.visible=this.mortarRecovery<.2;}
+    if(trowel){
+      // The degree readout and the visible wrist/tool use the same stroke.
+      // Keep the gripping hand parented to the tool throughout the swing.
+      const returning = this.mortarRecovery > 0;
+      const degrees = this.mortarHolding || returning ? this.mortarSwingDegrees : 0;
+      trowel.rotation.x = THREE.MathUtils.degToRad(degrees);
+      trowel.position.y = this.mortarHolding ? -.025 * Math.sin(this.mortarCharge * Math.PI) : 0;
+      const load=trowel.getObjectByName('trowel-load');if(load)load.visible=this.mortarRecovery<.2;
+    }
     if (this.sprayMist) {
       this.sprayMist.visible = spraying;
       if (spraying) {

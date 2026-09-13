@@ -1,6 +1,16 @@
 import type { InstallationPoint } from '../electrical/InstallationPoint';
 import type { RigTool } from '../player/FPSRig';
 
+export interface MortarThrowFeedback {
+  holding: boolean;
+  phase: number;
+  quality: 'ready' | 'early' | 'perfect' | 'late';
+  swingDegrees: number;
+  strength: number;
+  splash: number;
+  lastRelease: number;
+}
+
 const stageLabel: Record<string, string> = {
   inspect: 'CHOOSE A CAVITY · MARKS OPTIONAL', marked: 'CHASE MASONRY', chasing: 'CHASE MASONRY', chased: 'FIT BOXES', fitted: 'APPLY MORTAR',
   mortared: 'LEVEL GROUP', leveling: 'LEVEL + FLUSH', leveled: 'MEASURE PVC ROUTE', conduit: 'INSTALL 20 mm PVC', complete: 'POINT PASSED',
@@ -61,10 +71,31 @@ export class HUD {
             <div><kbd>T / R</kbd><span>CHISEL / ANGLE</span><kbd>F</kbd><span>FULLSCREEN</span><kbd>ESC</kbd><span>RELEASE MOUSE</span></div>
           </aside>
           <div id="mortar-panel" class="hud-card" hidden>
-            <strong id="mortar-readout"></strong><div class="progress-track"><span id="swing-power"></span></div>
+            <strong id="mortar-readout"></strong>
+            <div id="mortar-flow" data-quality="ready" data-holding="false">
+              <div class="throw-flow-heading"><span>RELEASE TIMING</span><b id="throw-quality">HOLD TO SWING</b></div>
+              <div id="throw-timing-track" role="meter" aria-label="Mortar release timing; perfect from 42 to 58 percent" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                <span class="throw-perfect-zone"></span><span class="throw-flow-sheen"></span><i id="throw-timing-cursor"></i>
+              </div>
+              <div class="throw-zone-labels"><span>WEAK BOND</span><b>PERFECT</b><span>SPLASH BACK</span></div>
+            </div>
+            <div id="mortar-wet-track" class="progress-track"><span id="swing-power"></span></div>
             <div class="mortar-buttons"><button type="button" id="mortar-angle-down" aria-label="Lower trowel throw angle">− ANGLE</button><button type="button" id="mortar-swing">HOLD · RELEASE</button><button type="button" id="mortar-angle-up" aria-label="Raise trowel throw angle">+ ANGLE</button></div>
             <button type="button" id="work-height">CROUCH · LOW WORK</button><button type="button" id="mortar-pack">P · PRESS / PACK NEARBY</button><small id="mortar-hint"></small>
           </div>
+          <aside id="trowel-swing-gauge" class="hud-card" aria-label="Live trowel swing and strength" hidden>
+            <div class="swing-gauge-title">TROWEL SWING</div>
+            <svg class="swing-gauge-dial" viewBox="0 0 160 94" aria-hidden="true">
+              <path class="swing-gauge-rail" d="M 24 77 A 60 60 0 1 1 136 77"/>
+              <path class="swing-gauge-sweet" d="M 69 18 A 60 60 0 0 1 91 18"/>
+              <g id="trowel-swing-needle" transform="rotate(-70 80 73)"><path d="M 80 73 L 80 22"/><path class="swing-needle-tip" d="M 76 26 L 80 17 L 84 26 Z"/></g>
+              <circle class="swing-gauge-pivot" cx="80" cy="73" r="5"/>
+            </svg>
+            <output id="trowel-swing-degrees">−50°</output>
+            <div class="swing-strength-label"><span>POWER</span><b id="trowel-swing-strength">0%</b></div>
+            <div class="swing-strength-track"><span id="trowel-strength-fill"></span></div>
+          </aside>
+          <div id="mortar-face-splash" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
           <div id="reticle" aria-hidden="true"><span></span><span></span></div>
           <div id="interaction-prompt" role="status"></div>
           <div id="level-panel" class="hud-card" aria-label="Leveling controls">
@@ -214,14 +245,38 @@ export class HUD {
     this.shell.querySelector<HTMLInputElement>('#hammer-speed')!.value=String(speed*100);
     this.shell.querySelector<HTMLOutputElement>('#hammer-speed-value')!.textContent=speed===0?'STOPPED':`${Math.round(speed*100)}%`;
   }
-  updateMortar(tool:RigTool,power:number,angle:number,wet:{pore:number;film:number},coverage:number,recovery:number,outcome:string,floorLitres=0):void {
+  updateMortar(tool:RigTool,power:number,angle:number,wet:{pore:number;film:number},coverage:number,recovery:number,outcome:string,floorLitres=0,feedback?:MortarThrowFeedback):void {
     const panel=this.shell.querySelector<HTMLElement>('#mortar-panel')!;panel.hidden=tool!=='trowel'&&tool!=='hose';
-    this.shell.querySelector<HTMLElement>('#mortar-readout')!.textContent=tool==='hose'?`CHASE SURFACE · ${wet.film>.3?'TOO WET':wet.pore>.3?'DAMP':'DRY'} · ${Math.round(wet.pore*100)}%`:`SWING ${Math.round(power*100)}% · ${angle}° · BED ${Math.round(coverage*100)}%`;
+    this.shell.querySelector<HTMLElement>('#mortar-readout')!.textContent=tool==='hose'?`CHASE SURFACE · ${wet.film>.3?'TOO WET':wet.pore>.3?'DAMP':'DRY'} · ${Math.round(wet.pore*100)}%`:`LOFT ${angle}° · BED ${Math.round(coverage*100)}%`;
     this.shell.querySelector<HTMLElement>('#swing-power')!.style.width=`${tool==='hose'?wet.pore*100:power*100}%`;
     this.shell.querySelector<HTMLElement>('#mortar-hint')!.textContent=tool==='hose'?`Soak exposed chase surfaces. Excess water washes fresh mortar away. Floor water: ${floorLitres.toFixed(1)} L.`:recovery>0?'Recovering / loading next trowelful…':outcome;
     this.shell.querySelector<HTMLElement>('#mortar-swing')!.textContent=tool==='hose'?'HOLD · MIST':'HOLD · RELEASE';
     this.shell.querySelector<HTMLElement>('#mortar-pack')!.hidden=tool==='hose';
     for(const id of ['#mortar-angle-up','#mortar-angle-down'])this.shell.querySelector<HTMLElement>(id)!.hidden=tool==='hose';
+    const active=tool==='trowel';
+    const flow=this.shell.querySelector<HTMLElement>('#mortar-flow')!;
+    const gauge=this.shell.querySelector<HTMLElement>('#trowel-swing-gauge')!;
+    flow.hidden=!active;gauge.hidden=!active;
+    this.shell.querySelector<HTMLElement>('#mortar-wet-track')!.hidden=tool!=='hose';
+    const state=feedback??{holding:false,phase:power,quality:'ready',swingDegrees:-50+power*140,strength:power,splash:0,lastRelease:0};
+    const phase=Math.max(0,Math.min(1,state.phase));
+    const strength=Math.max(0,Math.min(1,state.strength));
+    flow.dataset.quality=state.quality;flow.dataset.holding=String(state.holding);gauge.dataset.quality=state.quality;
+    this.shell.querySelector<HTMLElement>('#throw-timing-cursor')!.style.left=`${phase*100}%`;
+    this.shell.querySelector<HTMLElement>('#throw-timing-track')!.setAttribute('aria-valuenow',String(Math.round(phase*100)));
+    const qualityText=state.quality==='perfect'?'RELEASE NOW':state.quality==='early'?'BUILD THE SWING':state.quality==='late'?'LATE · SPLASH RISK':'HOLD TO SWING';
+    this.shell.querySelector<HTMLElement>('#throw-quality')!.textContent=state.holding?qualityText:recovery>0?(state.quality==='perfect'?'PERFECT RELEASE':state.quality==='early'?'EARLY RELEASE':state.quality==='late'?'LATE RELEASE':'RELOADING'):'HOLD TO SWING';
+    this.shell.querySelector<HTMLElement>('#trowel-swing-degrees')!.textContent=`${Math.round(state.swingDegrees)}°`;
+    this.shell.querySelector<SVGElement>('#trowel-swing-needle')!.setAttribute('transform',`rotate(${Math.max(-70,Math.min(70,state.swingDegrees-20))} 80 73)`);
+    this.shell.querySelector<HTMLElement>('#trowel-swing-strength')!.textContent=`${Math.round(strength*100)}%`;
+    this.shell.querySelector<HTMLElement>('#trowel-strength-fill')!.style.width=`${strength*100}%`;
+    if(active&&state.holding)this.shell.querySelector<HTMLElement>('#mortar-swing')!.textContent=state.quality==='perfect'?'RELEASE NOW':'SWINGING…';
+    if(active&&state.holding)this.shell.querySelector<HTMLElement>('#mortar-hint')!.textContent=state.quality==='perfect'?'Release now for a clean throw into the chase.':state.quality==='late'?'The swing is late: more power sends more mortar back toward you.':'Keep holding toward the green centre; an early throw can slip and fall.';
+    if(active&&state.quality==='ready'&&!recovery)this.shell.querySelector<HTMLElement>('#mortar-hint')!.textContent='Hold, then release in the green centre. Early throws can fall; late throws splash back.';
+    const splash=this.shell.querySelector<HTMLElement>('#mortar-face-splash')!;
+    const splashAmount=Math.max(0,Math.min(1,state.splash));
+    splash.style.opacity=String(splashAmount*.84);
+    splash.style.setProperty('--splash-scale',String(.7+splashAmount*.3));
   }
   notify(message: string, good = true, duration = 700): void {
     this.prompt.textContent = message;
