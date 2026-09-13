@@ -10,10 +10,13 @@ for (const eventName of ['selectstart', 'dragstart'] as const) {
 }
 
 const game = new Game(root);
-await game.ready;
-window.__wireTheHouse = game;
-window.render_game_to_text = () => game.renderState();
-window.advanceTime = (ms: number) => {
-  const steps = Math.max(1, Math.round(ms / (1000 / 60)));
-  for (let index = 0; index < steps; index += 1) game.step(1 / 60);
-};
+// Complete this entry module before the lazy water chunk imports its shared
+// Three.js exports. Top-level await creates a production-only import deadlock.
+void game.ready.then(() => {
+  window.__wireTheHouse = game;
+  window.render_game_to_text = () => game.renderState();
+  window.advanceTime = (ms: number) => {
+    const steps = Math.max(1, Math.round(ms / (1000 / 60)));
+    for (let index = 0; index < steps; index += 1) game.step(1 / 60);
+  };
+});
