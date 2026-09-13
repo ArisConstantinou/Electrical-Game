@@ -54,7 +54,7 @@ export class BrickWall extends THREE.Group {
   set chiselWidthM(value: number) { if(Number.isFinite(value)) this.widthM = THREE.MathUtils.clamp(value, .01, .05); }
   chiselEdgeAngle = 0;
   chiselTiltDegrees = 15;
-  chiselSideDegrees = 0;
+  chiselSideDegrees = -15;
   contactProvider: ((camera: THREE.Camera) => ChiselContact | null) | null = null;
   private readonly chunks = new Map<string, THREE.Mesh>();
   private readonly pristineRanges = new Map<string, {start: number; count: number}>();

@@ -8,17 +8,17 @@ const out=process.argv[3]??'output/box-placement-ui';
 await mkdir(out,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const report={url,mobileIsEmulation:true,fixture:'Camera and deterministic frame clock are diagnostic fixtures. Selection, approach and placement use real keyboard/touch events. Broad/narrow cavities use real MasonryVolume impacts; the shallow recess restores a saved node layer. Beds use actual MortarField volume, with cured age authored explicitly; acceptance methods are never stubbed.',scenarios:[],errors:[]};
-const state=page=>page.evaluate(()=>{const g=window.__wireTheHouse,p=g.mission.activePoint,m=g.mortar.telemetry;return{camera:g.renderer.camera.position.toArray(),point:p.position.toArray(),visible:p.boxGroup.visible,boxLocal:p.boxGroup.position.toArray(),stage:p.stage,placement:g.boxPlacement.telemetry,pose:g.fpsRig.debugPose(),levelVisible:p.boxGroup.levelBar.visible,mortarMass:g.mortar.field.mass+m.movingKg+m.restingKg+m.floorKg,renderError:g.renderer.renderError};});
+const state=page=>page.evaluate(()=>{const g=window.__wireTheHouse,p=g.mission.activePoint,m=g.mortar.telemetry;return{camera:g.renderer.camera.position.toArray(),point:p.position.toArray(),visible:p.boxGroup.visible,boxLocal:p.boxGroup.position.toArray(),stage:p.stage,placement:g.boxPlacement.telemetry,pose:g.fpsRig.debugPose(),fittingBoxAvailable:g.fpsRig.fittingBoxAvailable,fittingBoxVisible:g.fpsRig.fittingBoxParts.some(part=>part.visible),levelVisible:p.boxGroup.levelBar.visible,mortarMass:g.mortar.field.mass+m.movingKg+m.restingKg+m.floorKg,renderError:g.renderer.renderError};});
 async function steps(page,count=1,dt=1/60){await page.evaluate(({count,dt})=>{for(let i=0;i<count;i++)window.__boxQAStep(dt);},{count,dt});}
 async function aim(page,x,y=1.4,distance=.42){await page.evaluate(({x,y,distance})=>{const g=window.__wireTheHouse,c=g.renderer.camera;g.hammerWorkStance.restore(c);c.position.set(x,g.player.eyeHeight,g.room.brickWall.volume.frontZ+distance);c.lookAt(x,y,g.room.brickWall.volume.frontZ);g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;window.__boxQAStep(0);},{x,y,distance});await steps(page,60);}
-async function shot(page,name){await page.evaluate(async()=>{const g=window.__wireTheHouse;g.renderer.render();await g.renderer.waitForFrame();});await page.screenshot({path:`${out}/${name}.png`});}
+async function shot(page,name){await page.evaluate(async()=>{const g=window.__wireTheHouse;await g.renderer.waitForFrame();g.renderer.render();await g.renderer.waitForFrame();});await page.screenshot({path:`${out}/${name}.png`});}
 async function action(page,mobile){
   if(mobile){const r=await page.locator('#look-joystick').boundingBox();assert(r);const cdp=await page.context().newCDPSession(page);const touch={x:r.x+r.width*.5,y:r.y+r.height*.5,id:18};await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[touch]});await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await cdp.detach();}
   else await page.keyboard.press('KeyE');
   await steps(page,1,0);
 }
 async function select(page,mobile,tool){if(mobile)await page.locator(`[data-tool="${tool}"]`).tap();else await page.keyboard.press(tool==='fitting'?'Digit5':'Digit6');await steps(page,1,0);}
-function oneHand(s,label){assert.equal(s.pose.arms.filter(a=>a.gripping).length,1,`${label}: exactly one gripping hand`);for(const a of s.pose.arms){const distance=(u,v)=>Math.hypot(...u.map((n,i)=>n-v[i]));assert(Math.abs(distance(a.shoulder,a.elbow)-.31)<1e-5,`${label}: upper arm does not stretch`);assert(Math.abs(distance(a.elbow,a.wrist)-.27)<1e-5,`${label}: forearm does not stretch`);assert.equal(a.fingers,5);}const left=s.pose.arms.find(a=>a.side<0);assert.equal(left.gripping,false);if(left.shoulder[1]>.8)assert(left.wrist[1]<left.shoulder[1]-.42,`${label}: free hand hangs at body side`);else assert(left.wrist[1]>.08&&left.grip[1]>.015,`${label}: crouched free hand clears the floor`);}
+function oneHand(s,label){const carrying=s.pose.tool!=='fitting'||!s.visible;assert.equal(s.pose.arms.filter(a=>a.gripping).length,carrying?1:0,`${label}: inventory controls gripping hand`);if(s.pose.tool==='fitting'){assert.equal(s.fittingBoxAvailable,carrying,`${label}: availability follows actual world box`);assert.equal(s.fittingBoxVisible,carrying,`${label}: no duplicate handheld box while placed or fallen`);assert.equal(s.pose.arms.find(a=>a.side===1).gripRole,carrying?'primary':'reaching',`${label}: empty hand reaches instead of gripping a ghost box`);}for(const a of s.pose.arms){const distance=(u,v)=>Math.hypot(...u.map((n,i)=>n-v[i]));assert(Math.abs(distance(a.shoulder,a.elbow)-.31)<1e-5,`${label}: upper arm does not stretch`);assert(Math.abs(distance(a.elbow,a.wrist)-.27)<1e-5,`${label}: forearm does not stretch`);assert.equal(a.fingers,5);}const left=s.pose.arms.find(a=>a.side<0);assert.equal(left.gripping,false);if(left.shoulder[1]>.8)assert(left.wrist[1]<left.shoulder[1]-.42,`${label}: free hand hangs at body side`);else assert(left.wrist[1]>.08&&left.grip[1]>.015,`${label}: crouched free hand clears the floor`);}
 try{
   for(const mobile of [false,true]){
     const name=mobile?'mobile':'desktop';
@@ -46,13 +46,19 @@ try{
     assert(proud.visible,`${name}: normal closest approach permits placement`);
     const placed=proud.placement.find(p=>p.id==='A');assert(placed,`${name}: placement state exists`);assert(placed.protrusionMm>=33,`${name}: intact masonry cannot swallow box depth`);assert.equal(placed.secured,false);oneHand(proud,name);
     await shot(page,`${name}-intact-wall-proud`);
-    await steps(page,180);const fallen=await state(page);const fall=fallen.placement.find(p=>p.id==='A');assert.equal(fall.state,'floor',`${name}: unsupported dry box falls to actual floor`);assert.equal(fall.secured,false);assert(fallen.boxLocal[1]<proud.boxLocal[1]-.5,`${name}: displayed box moves downward`);
+    await steps(page,180);const fallen=await state(page);const fall=fallen.placement.find(p=>p.id==='A');assert.equal(fall.state,'floor',`${name}: unsupported dry box falls to actual floor`);assert.equal(fall.secured,false);assert(fallen.boxLocal[1]<proud.boxLocal[1]-.5,`${name}: displayed box moves downward`);oneHand(fallen,`${name} fallen inventory`);
+    // The player is still looking at the original wall height. Explain where
+    // the existing box went instead of silently blocking a second placement.
+    await action(page,mobile);
+    const floorHint=await page.locator('#interaction-prompt').textContent();
+    assert.match(floorHint,/box.*floor|floor.*box/i,`${name}: missed floor box gives a recovery instruction`);
+    assert((await state(page)).visible,`${name}: aiming elsewhere cannot teleport the fallen box`);
     await aim(page,fallen.point[0],fallen.point[1]+fallen.boxLocal[1],.46);await steps(page,60);
     await shot(page,`${name}-dry-box-fallen`);
     await select(page,mobile,'level');await action(page,mobile);const unsupportedLevel=await state(page);assert.notEqual(unsupportedLevel.stage,'leveled');assert.equal(unsupportedLevel.levelVisible,false);
     // Aim at the actually fallen box, settle into low working height and
     // retrieve with the same native control used to place it.
-    await select(page,mobile,'fitting');await steps(page,45);await action(page,mobile);const retrieved=await state(page);assert.equal(retrieved.visible,false,`${name}: native retrieval of fallen box`);oneHand(retrieved,`${name} crouched retrieval`);
+    await select(page,mobile,'fitting');await steps(page,45);await action(page,mobile);const retrieved=await state(page);assert.equal(retrieved.visible,false,`${name}: native retrieval of fallen box`);oneHand(retrieved,`${name} crouched retrieval`);await shot(page,`${name}-retrieved-in-hand`);
     await aim(page,.7,1.4,.42);await action(page,mobile);const repositioned=await state(page);assert(repositioned.visible);assert(repositioned.point[0]>.5,`${name}: retrieved box moves to new aimed location`);oneHand(repositioned,`${name} repositioned`);
     report.scenarios.push({platform:name,far,proud,fallen,unsupportedLevel,retrieved,repositioned});
     if(!mobile){
@@ -67,7 +73,7 @@ try{
           }
           return{hits,removed:v.removedNodeCount-before,centreDepthMm:(front-v.raycast({x:cx,y:cy,z:front+.08},{x:0,y:0,z:-1},.3).point.z)*1000};
         };
-        const narrow=carve(-1.25,1.2,.014,.10),full=carve(-.25,1.2,.28,.12);
+        const narrow=carve(-1.25,1.2,.014,.10),full=carve(-.25,1.2,.50,.12);
         w.flushGeometry();await w.waitForGeometry();return{narrow,full};
       });
       assert(cavities.narrow.removed>0&&cavities.full.removed>0,'cavity fixtures remove real material');
@@ -76,7 +82,7 @@ try{
       await shot(page,'desktop-narrow-hole-proud');
       await page.evaluate(()=>{const g=window.__wireTheHouse;g.boxPlacement.retrieve(g.mission.activePoint);});
       await aim(page,-.25,1.2,.42);await action(page,false);const full=await state(page);const fullFit=full.placement.find(p=>p.id==='A');
-      assert(full.visible,'actual broad cavity accepts box');assert(fullFit.protrusionMm<narrowFit.protrusionMm-15,'full footprint cavity inserts deeper than centre hole');assert(fullFit.insertionDepthMm>15,'actual cavity depth produces insertion');
+      assert(full.visible,'actual broad horizontal channel accepts box');assert(Math.abs(full.point[0]+.25)<.02&&Math.abs(full.point[1]-1.2)<.02,'native placement follows arbitrary horizontal channel aim, not original mission coordinates');assert(fullFit.protrusionMm<narrowFit.protrusionMm-15,'full footprint cavity inserts deeper than centre hole');assert(fullFit.insertionDepthMm>15,'actual cavity depth produces insertion');
       await shot(page,'desktop-full-cavity-insertion');
       await steps(page,120);const ledge=await state(page),ledgePlacement=ledge.placement.find(p=>p.id==='A');assert.equal(ledgePlacement.state,'supported','dry inserted box settles onto surviving cavity ledge');assert.equal(ledgePlacement.secured,false,'dry ledge support is not a mortar bond');assert.equal(ledgePlacement.contactMaterial,'brick');assert(ledge.point[1]+ledge.boxLocal[1]>1,'ledge prevents box falling to floor');await shot(page,'desktop-dry-cavity-ledge');
       await page.evaluate(()=>{const g=window.__wireTheHouse;g.boxPlacement.retrieve(g.mission.activePoint);});
@@ -125,5 +131,5 @@ try{
     }
     await page.close();
   }
-  assert.deepEqual(report.errors,[]);console.log(JSON.stringify({url,platforms:['desktop','mobile'],checks:['far denial','native close approach','proud dry placement','gravity and floor','native fallen retrieval','reposition','one hand and fixed arms','whole footprint collision','shallow partial insertion','dry ledge support','fresh mortar displacement and mass','cured mortar hard stop','level depth constraint','secured native level confirmation','wash support revocation'],errors:report.errors,report:`${out}/report.json`}));
+  assert.deepEqual(report.errors,[]);console.log(JSON.stringify({url,platforms:['desktop','mobile'],checks:['far denial','native close approach','proud dry placement','gravity and floor','native fallen retrieval','reposition','single box inventory and empty reaching hand','retrieval restores handheld model','fixed arm lengths','whole footprint collision','shallow partial insertion','dry ledge support','fresh mortar displacement and mass','cured mortar hard stop','level depth constraint','secured native level confirmation','wash support revocation'],errors:report.errors,report:`${out}/report.json`}));
 }finally{await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));await browser.close();}

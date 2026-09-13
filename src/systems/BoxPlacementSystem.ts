@@ -19,7 +19,7 @@ export class BoxPlacementSystem {
     if(point.boxGroup.visible){
       point.updateWorldMatrix(true,true);
       const ray=new THREE.Raycaster(camera.getWorldPosition(new THREE.Vector3()),camera.getWorldDirection(new THREE.Vector3()),0,1.25);
-      if(!ray.intersectObjects(point.boxGroup.boxes,true).length)return{success:false,message:'Aim at the placed box and move within reach to pick it up.'};
+      if(!ray.intersectObjects(point.boxGroup.boxes,true).length)return{success:false,message:this.retrievalHint(point)!};
       return this.retrieve(point);
     }
     const origin=camera.getWorldPosition(new THREE.Vector3()),direction=camera.getWorldDirection(new THREE.Vector3());
@@ -35,7 +35,17 @@ export class BoxPlacementSystem {
     const placement:Placement={state:insertion.depth>.003?'proud':'loose',velocityY:0,secured:false,contactMaterial:insertion.material,checkTime:0,...displaced};
     this.placements.set(point,placement);point.boxGroup.userData.placement=placement;point.boxGroup.userData.minimumDepth=insertion.depth;
     point.setStage('fitted');
-    return{success:true,message:insertion.depth>.003?`Box placed ${Math.round(insertion.depth*1000)} mm proud against the remaining material. Loose boxes settle; select BOX again to retrieve it.`:'Box placed. It will settle onto a ledge or mortar bed; pack the sides to secure it.'};
+    const footprint=`${Math.round(point.boxGroup.groupWidth*1000)} × ${Math.round(point.boxGroup.groupHeight*1000)} × ${Math.round(Math.max(...point.boxGroup.boxes.map(box=>box.depth))*1000)} mm`;
+    return{success:true,message:insertion.depth>.003?`Trial fit: ${Math.round(insertion.depth*1000)} mm proud. Remaining ${insertion.material==='mortar'?'hard mortar':'brick'} blocks the ${footprint} casing; unsupported boxes fall.`:'Box inserted. Let it rest on the ledge, then pack fresh mortar behind and around the sides.'};
+  }
+
+  /** Explain inventory state before a generic wall-reach check obscures it. */
+  retrievalHint(point:InstallationPoint):string|null {
+    if(!point.boxGroup.visible)return null;
+    const placement=this.placements.get(point);
+    if(placement?.state==='floor')return 'Your box is on the floor. Look down at it, move close and use BOX to pick it up before placing it elsewhere.';
+    if(placement?.state==='loose')return 'Your box is falling. Follow it to the floor and use BOX to pick it up.';
+    return 'Your box is already placed. Aim at that box and use BOX to pick it up before choosing another position.';
   }
 
   retrieve(point:InstallationPoint):{success:boolean;message:string}{

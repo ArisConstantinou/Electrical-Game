@@ -23,6 +23,8 @@ export class Renderer {
   private readonly gazeEuler=new THREE.Euler(0,0,0,'YXZ');
   private readonly gazeQuaternion=new THREE.Quaternion();
   renderError='';
+  /** Gameplay may advance again once all passes using this scene have finished. */
+  get framePending():boolean{return this.renderTask!==null;}
 
   constructor(container: HTMLElement) {
     this.scene.background = new THREE.Color(0xaab9bd);

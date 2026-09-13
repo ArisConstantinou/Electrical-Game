@@ -35,7 +35,10 @@
     "test:tool-performance": "node tests/room-water-geometry.mjs && node tests/tool-hud-performance.mjs && node tests/tool-hud-state.mjs",
     "test:deep-mortar": "node tests/mortar-deep-fill.mjs && node tests/mortar-deep-native.mjs",
     "test:loose-debris": "node tests/split-debris-geometry.mjs && node tests/debris-restrike.mjs && node tests/debris-plate-visibility.mjs && node tests/debris-restrike-ui.mjs",
-    "test:wall-strafe": "node tests/hammer-strafe-continuity.mjs && node tests/hammer-free-look-ui.mjs"
+    "test:wall-strafe": "node tests/hammer-strafe-continuity.mjs && node tests/hammer-free-look-ui.mjs",
+    "test:hammer-side": "node tests/hammer-bilateral-controls.mjs",
+    "test:render-motion": "node tests/render-motion-coherence.mjs && node tests/queued-work-input.mjs",
+    "test:wet-wall": "node tests/wet-wall-coverage.mjs && node tests/wet-wall-ui.mjs"
   },
   "dependencies": {
     "three": "0.185.1"

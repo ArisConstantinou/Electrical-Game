@@ -33,7 +33,9 @@ export class PlayerController {
   look(deltaX: number, deltaY: number, sensitivity = 0.0023): void {
     this.yaw -= deltaX * sensitivity;
     this.pitch = THREE.MathUtils.clamp(this.pitch - deltaY * sensitivity, -1.18, 1.18);
-    this.camera.rotation.set(this.pitch, this.yaw, 0);
+    // Input remains responsive while an optical pass is pending, but its scene
+    // camera (and child arms) must keep the accepted frame's pose. Game.step
+    // applies the latest angles at the next simulation/render boundary.
   }
 
   update(dt: number): void {
@@ -48,6 +50,7 @@ export class PlayerController {
       const assistedVertical = THREE.MathUtils.lerp(this.mobileVerticalScale, Math.min(this.mobileVerticalScale, 0.5), this.wallAssistAmount);
       this.look(this.input.mobileLook.x * dt, this.input.mobileLook.y * dt * assistedVertical, assistedAimSpeed);
     }
+    this.camera.rotation.set(this.pitch,this.yaw,0);
     const view=this.camera.getWorldDirection(new THREE.Vector3());
     const handFocus=handWork?this.camera.position.clone().addScaledVector(view,(GAME_CONFIG.room.wallFrontZ-this.camera.position.z)/view.z):null;
     const previousX=this.camera.position.x;

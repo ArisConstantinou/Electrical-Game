@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
+import {blockPointerLock} from './browser-safety.mjs';
 
 const url=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/';
 const out=process.argv[3]??'output/renderer-eye-snapshot';
@@ -10,6 +11,7 @@ const report={url,fixture:'Render isolation diagnostic: the real game settles it
 try{
   for(const backend of ['webgpu','webgl']){
     const page=await browser.newPage({viewport:{width:1366,height:768}}),errors=[];
+    await blockPointerLock(page.context());
     page.on('pageerror',error=>errors.push(error.message));
     const target=new URL(url);if(backend==='webgl')target.searchParams.set('renderer','webgl');
     await page.goto(target.href);await page.waitForFunction(()=>window.__wireTheHouse?.roomWater.waterProActive);

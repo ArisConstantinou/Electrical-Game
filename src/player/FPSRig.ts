@@ -35,6 +35,8 @@ export class FPSRig extends THREE.Group {
   readonly chiselTipWorld = new THREE.Vector3();
   toolAction = 0;
   hoseActive = false;
+  fittingBoxAvailable = true;
+  private readonly fittingBoxParts: THREE.Object3D[] = [];
   levelTiltDegrees = 0;
   mortarCharge = 0;
   mortarRecovery = 0;
@@ -372,14 +374,32 @@ export class FPSRig extends THREE.Group {
     this.chiselTipWorld.copy(hammer.localToWorld(this.tipAnchor.clone()));
   }
   poseArms(camera:THREE.Camera):void {
-    if(this.selectedTool!=='hammer')this.constrainHeldTool(camera);
+    const emptyFitting=this.selectedTool==='fitting'&&!this.fittingBoxAvailable;
+    if(this.selectedTool==='fitting'){
+      for(const part of this.fittingBoxParts)part.visible=this.fittingBoxAvailable;
+      const hand=this.armSets.get('fitting')!.find(arm=>arm.side===1)!.hand;
+      hand.userData.gripping=this.fittingBoxAvailable;
+      hand.userData.gripRole=emptyFitting?'reaching':'primary';
+      if(!emptyFitting){hand.position.fromArray(hand.userData.fittingGripPosition);hand.quaternion.fromArray(hand.userData.fittingGripQuaternion);}
+    }
+    if(this.selectedTool!=='hammer'&&!emptyFitting)this.constrainHeldTool(camera);
     const {right}=this.bodyFrame(camera);
     for(const arm of this.armSets.get(this.selectedTool)??[]){
       if(arm.hand.userData.gripRole==='resting')this.poseRestingHand(camera,arm);
+      else if(emptyFitting)this.poseEmptyFittingHand(camera,arm);
       poseWorkerArm(arm,this.shoulder(camera,arm.side),this.wrist(arm),right);
       flexWorkerHand(arm.hand,arm.hand.userData.gripRole==='resting'?0:this.toolAction+this.strikeAmount*.35+(this.hoseActive?.4:0),performance.now()*.001);
       if(arm.hand.userData.gripping)poseToolGrip(arm.hand,this.tools.get(this.selectedTool)!,this.toolAction);
     }
+  }
+  private poseEmptyFittingHand(camera:THREE.Camera,arm:WorkerArm):void {
+    const {right,forward}=this.bodyFrame(camera);
+    const wrist=this.shoulder(camera,arm.side).addScaledVector(forward,.40).add(new THREE.Vector3(0,-.14,0));
+    const orientation=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(right,new THREE.Vector3(0,1,0),forward.clone().negate()));
+    const parent=arm.hand.parent!;parent.updateWorldMatrix(true,false);
+    arm.hand.quaternion.copy(parent.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(orientation));
+    arm.hand.position.copy(parent.worldToLocal(wrist)).sub(new THREE.Vector3().fromArray(arm.hand.userData.wristPoint).applyQuaternion(arm.hand.quaternion));
+    arm.hand.updateWorldMatrix(true,true);
   }
   private poseRestingHand(camera:THREE.Camera,arm:WorkerArm):void {
     const {right,forward}=this.bodyFrame(camera);
@@ -427,7 +447,13 @@ export class FPSRig extends THREE.Group {
   }
   private createDetailedTool(kind: Exclude<RigTool,'hammer'>):THREE.Group {
     const group=buildToolModel(kind);
+    if(kind==='fitting')this.fittingBoxParts.push(...group.children);
     this.attachArms(kind,group);
+    if(kind==='fitting'){
+      const hand=this.armSets.get(kind)!.find(arm=>arm.side===1)!.hand;
+      hand.userData.fittingGripPosition=hand.position.toArray();
+      hand.userData.fittingGripQuaternion=hand.quaternion.toArray();
+    }
     if(kind==='trowel'){
       const load=new THREE.Mesh(new THREE.IcosahedronGeometry(.044,2),material(0x857a66,.96));load.name='trowel-load';load.position.set(.01,.06,-.077);load.scale.set(.85,1.5,.22);group.add(load);
     }

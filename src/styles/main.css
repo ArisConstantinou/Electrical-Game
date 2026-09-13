@@ -317,7 +317,7 @@ button {
 #water-gun-mode { grid-column: 1 / -1; width: 100%; min-height: 42px; font: inherit; font-size: 16px; color: #f3f0e7; background: #263c3a; border: 1px solid #718784; border-radius: 5px; padding: 6px; }
 @media (max-width: 600px) { #water-gun-readout { font-size: 12px; } }
 
-/* One passive orientation dial: no extra tool buttons over the work area. */
+/* Orientation and an explicit, symmetric choice of hammer screen side. */
 #chisel-orientation {top:140px;left:22px;display:flex;align-items:center;gap:9px;width:max-content;max-width:calc(100% - 44px);padding:7px 10px 7px 7px;border-radius:8px;pointer-events:none;}
 #chisel-orientation[hidden],.settings-open #chisel-orientation {display:none;}
 #chisel-orientation svg {width:44px;height:44px;flex:none;}
@@ -331,10 +331,14 @@ button {
 .chisel-orientation-values strong {font-size:14px;line-height:1.2;color:#f4eee6;}
 #chisel-edge-degrees {color:#ffc98e;}
 #chisel-live-width,.chisel-aim-values {font-size:12px;line-height:1.25;color:#e0d8c8;}
+.chisel-orientation-values>.hammer-view-buttons {gap:5px;}
+.hammer-view-buttons button {pointer-events:auto;min-height:44px;flex:1;padding:6px 9px;border:1px solid #8d7b65;border-radius:4px;background:#28241f;color:#e9e2d8;font-size:12px;font-weight:700;cursor:pointer;}
+.hammer-view-buttons button[aria-pressed="true"] {border-color:#ffc58b;background:#64452f;color:#fff;}
+.hammer-view-buttons button:focus-visible {outline:2px solid #ffc58b;outline-offset:2px;}
 @media (pointer:coarse), (max-width:760px) {
   #chisel-orientation {top:max(66px,calc(env(safe-area-inset-top) + 60px));left:10px;padding:5px 8px 5px 5px;gap:7px;max-width:calc(100% - 20px);}
   #chisel-orientation svg {width:38px;height:38px;}
   .chisel-orientation-values {gap:4px;}
   .chisel-orientation-values>div {gap:9px;}
-  #game-shell[data-active-tool="hammer"] #interaction-prompt {top:max(122px,calc(env(safe-area-inset-top) + 116px));}
+  #game-shell[data-active-tool="hammer"] #interaction-prompt {top:max(172px,calc(env(safe-area-inset-top) + 166px));}
 }

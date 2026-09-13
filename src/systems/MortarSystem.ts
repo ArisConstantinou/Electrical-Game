@@ -4,7 +4,9 @@ import type { BrickWall } from '../world/BrickWall';
 import { MortarField } from './MortarField';
 import { WATER_GUN_MODES, type WaterGunSetting } from './WaterGun';
 
-type WaterCell = { pore: number; film: number; mesh: THREE.Mesh; position: THREE.Vector3; normal: THREE.Vector3 };
+type WetBatch = { mesh: THREE.Mesh; used: number; live: number; free: Array<{ start: number; count: number }> };
+type WetPatch = { batch: WetBatch; start: number; count: number; alpha: number };
+type WaterCell = { pore: number; film: number; patch: WetPatch; position: THREE.Vector3; normal: THREE.Vector3 };
 type Clod = { mesh: THREE.Mesh; velocity: THREE.Vector3; mass: number; age: number; contacts: number; slurry: boolean; bond: number };
 type Deposit = { fieldKey?: string; position: THREE.Vector3; radius: number; mass: number; mesh: THREE.Mesh; age: number; normal: THREE.Vector3; support: number };
 type Contact = { point: THREE.Vector3; normal: THREE.Vector3; distance: number; box: boolean };
@@ -12,7 +14,10 @@ type Opening = { inverse: THREE.Matrix4; halfWidth: number; halfHeight: number; 
 const Z = new THREE.Vector3(0, 0, 1);
 const DENSITY = 1900;
 const MAX_PATCHES = 256;
-const MAX_WATER = 240;
+// Bound each GPU buffer, rather than silently rejecting new wet wall areas.
+const WET_BATCH_VERTICES = 12288;
+// Overlap the 8 cm moisture lattice, so a swept wet surface has no dry pinholes.
+const WET_FOOTPRINT_SIZE = .16;
 
 
 /** Qualitative wet mortar: finite mass, real surface contact and separate fresh-mortar stability.
@@ -49,6 +54,8 @@ export class MortarSystem {
   private readonly clodGeometry = new THREE.SphereGeometry(1, 18, 12).toNonIndexed();
   private readonly wetGeometry = new THREE.PlaneGeometry(.125, .125);
   private readonly wetMaterial: THREE.MeshBasicMaterial;
+  private readonly wetBatches: WetBatch[] = [];
+  private readonly wetBatchMaterial: THREE.MeshBasicMaterial;
   private readonly ray = new THREE.Raycaster();
   private wasHeld = false;
   private releasedPhase = 0;
@@ -71,17 +78,20 @@ export class MortarSystem {
     this.group.userData.studioEntityId = 'mortar-application';
     scene.add(this.group); this.group.add(this.target);
     this.target.visible = false; this.target.renderOrder = 8;
-    // Soft, irregular alpha footprint; individual water samples never draw square tiles.
+    // A separable feather sums to even coverage on the 8 cm lattice. Optical
+    // absorption composes smoothly where saturated neighbours overlap, instead
+    // of stamping dark radial dots into an otherwise dry-looking brick face.
     const size = 64, data = new Uint8Array(size * size * 4);
     for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
-      const u = (x + .5) / size * 2 - 1, v = (y + .5) / size * 2 - 1;
-      const theta = Math.atan2(v, u), radius = Math.hypot(u, v);
-      const edge = .78 + .09 * Math.sin(theta * 5) + .045 * Math.sin(theta * 11);
-      const alpha = THREE.MathUtils.clamp((edge - radius) * 4, 0, 1);
+      const u = x / (size-1) * 2 - 1, v = y / (size-1) * 2 - 1;
+      const weight = (1-Math.abs(u)) * (1-Math.abs(v));
+      const alpha = 1-Math.exp(-.55*weight);
       const i = (y * size + x) * 4; data[i] = data[i + 1] = data[i + 2] = 255; data[i + 3] = Math.round(alpha * 255);
     }
-    const texture = new THREE.DataTexture(data, size, size); texture.needsUpdate = true;
+    const texture = new THREE.DataTexture(data, size, size);texture.magFilter=THREE.LinearFilter;texture.minFilter=THREE.LinearMipmapLinearFilter;texture.generateMipmaps=true;texture.needsUpdate = true;
     this.wetMaterial = new THREE.MeshBasicMaterial({ color: 0x302d22, map: texture, transparent: true, opacity: .2, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, side: THREE.DoubleSide });
+    this.wetBatchMaterial = this.wetMaterial.clone();
+    this.wetBatchMaterial.vertexColors = true; this.wetBatchMaterial.opacity = 1;
     this.mortarMaterial.onBeforeCompile = shader => {
       shader.vertexShader = 'varying vec3 mortarWorld;\n' + shader.vertexShader;
       shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n mortarWorld = (modelMatrix * vec4(position, 1.0)).xyz;');
@@ -224,7 +234,7 @@ export class MortarSystem {
     const rotation = new THREE.Quaternion().setFromUnitVectors(Z, normal), inverse = rotation.clone().invert();
     const samples: Array<THREE.Vector3 | null> = [], size = 4, positions: number[] = [], uvs: number[] = [];
     for (let y = 0; y <= size; y++) for (let x = 0; x <= size; x++) {
-      const target = new THREE.Vector3((x / size - .5) * .125, (y / size - .5) * .125, 0).applyQuaternion(rotation).add(point);
+      const target = new THREE.Vector3((x / size - .5) * WET_FOOTPRINT_SIZE, (y / size - .5) * WET_FOOTPRINT_SIZE, 0).applyQuaternion(rotation).add(point);
       const delta = target.clone().sub(origin), hit = this.contact(origin, delta.clone().normalize(), delta.length() + .035);
       samples.push(hit && !hit.box && hit.normal.dot(normal) > .25 && hit.point.distanceTo(target) < .022 ? hit.point : null);
     }
@@ -236,11 +246,57 @@ export class MortarSystem {
       if (!support || support.box || support.point.distanceTo(center) > .012) return;
       for (const piece of this.clipOpenings([aa, bb, cc], openings)) for (let i = 1; i < piece.length - 1; i++) for (const p of [piece[0], piece[i], piece[i + 1]]) {
         const local = p.clone().sub(point).applyQuaternion(inverse);
-        positions.push(local.x, local.y, local.z); uvs.push(local.x / .125 + .5, local.y / .125 + .5);
+        positions.push(local.x, local.y, local.z); uvs.push(local.x / WET_FOOTPRINT_SIZE + .5, local.y / WET_FOOTPRINT_SIZE + .5);
       }
     };
     for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) { const a = y * (size + 1) + x; add(a, a + 1, a + size + 2); add(a, a + size + 2, a + size + 1); }
     const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3)); geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2)); geometry.computeVertexNormals(); return geometry;
+  }
+  /** Keep all contacted moisture cells; several hundred clipped footprints share
+   * one draw call. A render-object budget must never become an absorption limit. */
+  private addWetPatch(point: THREE.Vector3, normal: THREE.Vector3): WetPatch {
+    // Centre the visual footprint on its moisture lattice rather than the first
+    // random ray inside it; neighbouring hits then produce an even soaked area.
+    const rotation=new THREE.Quaternion().setFromUnitVectors(Z,normal),center=point.clone().applyQuaternion(rotation.clone().invert());
+    center.x=Math.round(center.x/.08)*.08;center.y=Math.round(center.y/.08)*.08;center.applyQuaternion(rotation);
+    const receiving=this.contact(center.clone().addScaledVector(normal,.18),normal.clone().negate(),.20);
+    if(receiving&&!receiving.box&&receiving.normal.dot(normal)>.95&&receiving.point.distanceTo(center)<.008)center.copy(receiving.point);
+    else center.copy(point);
+    const geometry=this.waterFootprint(center,normal,center.clone().addScaledVector(normal,.18));
+    const source=geometry.getAttribute('position'),uv=geometry.getAttribute('uv'),count=source.count;
+    let batch:WetBatch|undefined,start=0;
+    for(const candidate of this.wetBatches){
+      const index=candidate.free.findIndex(slot=>slot.count>=count);
+      if(index>=0){batch=candidate;const slot=candidate.free[index];start=slot.start;slot.start+=count;slot.count-=count;if(!slot.count)candidate.free.splice(index,1);break;}
+      if(candidate.used+count<=candidate.mesh.geometry.getAttribute('position').count){batch=candidate;start=candidate.used;candidate.used+=count;break;}
+    }
+    if(!batch){
+      const capacity=Math.max(WET_BATCH_VERTICES,count),buffer=new THREE.BufferGeometry();
+      buffer.setAttribute('position',new THREE.BufferAttribute(new Float32Array(capacity*3),3).setUsage(THREE.DynamicDrawUsage));
+      buffer.setAttribute('uv',new THREE.BufferAttribute(new Float32Array(capacity*2),2).setUsage(THREE.DynamicDrawUsage));
+      const colors=new Uint8Array(capacity*4);colors.fill(255);
+      buffer.setAttribute('color',new THREE.BufferAttribute(colors,4,true).setUsage(THREE.DynamicDrawUsage));
+      const mesh=new THREE.Mesh(buffer,this.wetBatchMaterial);mesh.name='Batched absorbed masonry moisture';mesh.frustumCulled=false;
+      batch={mesh,used:count,live:0,free:[]};this.wetBatches.push(batch);this.group.add(mesh);
+    }
+    batch.live++;
+    const positions=batch.mesh.geometry.getAttribute('position') as THREE.BufferAttribute,uvs=batch.mesh.geometry.getAttribute('uv') as THREE.BufferAttribute;
+    const offset=center.clone().addScaledVector(normal,.0015),p=new THREE.Vector3();
+    for(let i=0;i<count;i++){p.fromBufferAttribute(source,i).applyQuaternion(rotation).add(offset);positions.setXYZ(start+i,p.x,p.y,p.z);uvs.setXY(start+i,uv.getX(i),uv.getY(i));}
+    positions.addUpdateRange(start*3,count*3);positions.needsUpdate=true;uvs.addUpdateRange(start*2,count*2);uvs.needsUpdate=true;
+    batch.mesh.geometry.setDrawRange(0,batch.used);geometry.dispose();
+    const patch={batch,start,count,alpha:-1};this.setWetAlpha(patch,0);return patch;
+  }
+  private setWetAlpha(patch:WetPatch,opacity:number):void {
+    const alpha=Math.round(THREE.MathUtils.clamp(opacity,0,1)*255);if(alpha===patch.alpha)return;patch.alpha=alpha;
+    const colors=patch.batch.mesh.geometry.getAttribute('color') as THREE.BufferAttribute;
+    for(let i=patch.start;i<patch.start+patch.count;i++)colors.array[i*4+3]=alpha;
+    colors.addUpdateRange(patch.start*4,patch.count*4);colors.needsUpdate=true;
+  }
+  private removeWetPatch(patch:WetPatch):void {
+    this.setWetAlpha(patch,0);const batch=patch.batch;
+    batch.free.push({start:patch.start,count:patch.count});batch.live--;
+    if(!batch.live){this.group.remove(batch.mesh);batch.mesh.geometry.dispose();this.wetBatches.splice(this.wetBatches.indexOf(batch),1);}
   }
   moistureAt(p: THREE.Vector3): { pore: number; film: number } {
     const exact = this.water.get(this.waterKey(p)); if (exact) return exact;
@@ -427,7 +483,7 @@ export class MortarSystem {
    * diluted/washed away; substrate prewetting is a separate state. */
   applyWater(point:THREE.Vector3,normal:THREE.Vector3,litres:number):{absorbedLitres:number;runoffLitres:number;washedMortarKg:number} {
     litres=Math.max(0,litres);let cell=this.water.get(this.waterKey(point));
-    if(!cell&&this.water.size<MAX_WATER){const geometry=this.waterFootprint(point,normal,point.clone().addScaledVector(normal,.18));const mesh=new THREE.Mesh(geometry,this.wetMaterial.clone());mesh.position.copy(point).addScaledVector(normal,.0015);mesh.quaternion.setFromUnitVectors(Z,normal);this.group.add(mesh);cell={pore:0,film:0,mesh,position:point.clone(),normal:normal.clone()};this.water.set(this.waterKey(point),cell);}
+    if(!cell){cell={pore:0,film:0,patch:this.addWetPatch(point,normal),position:point.clone(),normal:normal.clone()};this.water.set(this.waterKey(point),cell);}
     const washed=this.field.wash(point,litres);
     let restingWash=0;
     for(let i=this.resting.length-1;i>=0;i--){
@@ -453,10 +509,10 @@ export class MortarSystem {
     this.maintenanceTime += dt;
     for (const [key, cell] of this.water) {
       cell.pore = Math.max(0, cell.pore - dt * .0008); cell.film = Math.max(0, cell.film - dt * .045);
-      (cell.mesh.material as THREE.MeshBasicMaterial).opacity = .25 * cell.pore + .15 * cell.film;
-      if (cell.pore < .002 && cell.film < .002) { this.group.remove(cell.mesh); cell.mesh.geometry.dispose(); (cell.mesh.material as THREE.Material).dispose(); this.water.delete(key); }
+      this.setWetAlpha(cell.patch,.65 * cell.pore + .35 * cell.film);
+      if (cell.pore < .002 && cell.film < .002) { this.removeWetPatch(cell.patch); this.water.delete(key); continue; }
       if (this.maintenanceTime > .4 && cell.film > .55 && this.streams.length < 30) {
-        const mesh = new THREE.Mesh(this.wetGeometry, this.wetMaterial.clone()); mesh.scale.set(.14, .65, 1); mesh.position.copy(cell.position).addScaledVector(cell.normal, .003); mesh.quaternion.copy(cell.mesh.quaternion); this.group.add(mesh);
+        const mesh = new THREE.Mesh(this.wetGeometry, this.wetMaterial.clone()); mesh.scale.set(.14, .65, 1); mesh.position.copy(cell.position).addScaledVector(cell.normal, .003); mesh.quaternion.setFromUnitVectors(Z,cell.normal); this.group.add(mesh);
         this.streams.push({ mesh, speed: .04 + cell.film * .1, life: 1.6 }); cell.film -= .025;
       }
     }
@@ -586,5 +642,5 @@ export class MortarSystem {
     const value = Math.min(...counts) / 12;
     this.coverageCache.set(key, { time: this.simulationTime, revision: this.geometryRevision, transform, value }); return value;
   }
-  get telemetry() { return { angleDegrees: this.angleDegrees, power: this.charge, throwFeedback:this.throwFeedback, recovery: this.recovery, airborne: this.projectiles.length, launchedKg: this.launchedMass, stuckKg: this.stuckMass, restingKg: this.restingMass, restingBatches: this.resting.length, floorKg: this.floorMass, movingKg: this.pendingWashMass + this.projectiles.reduce((sum, clod) => sum + clod.mass, 0), washedKg: this.washedMass, volumeField: this.field.statistics, wetCells: this.water.size, patches: this.deposits.length, outcome: this.lastOutcome, initialStabilitySeconds: 1.3, freshWorkingSeconds: 3600, geometryLimit: MAX_PATCHES, coverage: this.points.map(point => ({ id: point.definition.id, fraction: this.coverage(point) })) }; }
+  get telemetry() { return { angleDegrees: this.angleDegrees, power: this.charge, throwFeedback:this.throwFeedback, recovery: this.recovery, airborne: this.projectiles.length, launchedKg: this.launchedMass, stuckKg: this.stuckMass, restingKg: this.restingMass, restingBatches: this.resting.length, floorKg: this.floorMass, movingKg: this.pendingWashMass + this.projectiles.reduce((sum, clod) => sum + clod.mass, 0), washedKg: this.washedMass, volumeField: this.field.statistics, wetCells: this.water.size, wetDrawCalls: this.wetBatches.length, patches: this.deposits.length, outcome: this.lastOutcome, initialStabilitySeconds: 1.3, freshWorkingSeconds: 3600, geometryLimit: MAX_PATCHES, coverage: this.points.map(point => ({ id: point.definition.id, fraction: this.coverage(point) })) }; }
 }

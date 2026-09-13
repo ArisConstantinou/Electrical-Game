@@ -77,6 +77,7 @@ export class Game {
   private wasSpraying = false;
   private wasLeveling = false;
   private hudSettingsKey = '';
+  private readonly pendingSceneActions:Array<()=>void>=[];
   private readonly mobileControls: MobileControls;
   private readonly desktopControls: DesktopControls;
 
@@ -131,7 +132,7 @@ export class Game {
     });
   }
 
-  step(dt: number, waterDt = dt): void {
+  step(dt: number, waterDt = dt, present = true): void {
     this.hammerWorkStance.restore(this.renderer.camera);
     const active = this.mission.activePoint;
     const leveling = active?.stage === 'leveling';
@@ -154,6 +155,7 @@ export class Game {
     this.fpsRig.beginFrame(dt, this.selectedTool==='hammer' && this.input.actionHeld && Math.abs(this.player.velocity.x)>1e-6
       ? this.player.velocity.x*Math.min(dt,.05) : null);
     this.renderer.camera.rotation.set(this.player.pitch, this.player.yaw, 0);
+    for(const action of this.pendingSceneActions.splice(0))action();
     this.hammerWorkStance.update(this.renderer.camera, dt, this.room.brickWall.chiselSideDegrees, this.started && !leveling,this.room.brickWall.chiselTiltDegrees,this.selectedTool);
     this.fpsRig.workStanceSide = this.hammerWorkStance.sideDegrees / 75;
     this.fpsRig.workHeadLeanM = this.hammerWorkStance.headLeanM;
@@ -209,6 +211,7 @@ export class Game {
     this.mortar.preview(this.renderer.camera,releaseOrigin,mortarTool && this.selectedTool === 'trowel');
     this.fpsRig.hoseActive=this.selectedTool==='hose'&&this.input.actionHeld;
     this.fpsRig.levelTiltDegrees=active?.boxGroup.tiltDegrees??0;
+    this.fpsRig.fittingBoxAvailable=!active?.boxGroup.visible;
     this.fpsRig.mortarCharge=this.mortar.charge;
     this.fpsRig.mortarRecovery=this.mortar.recovery;
     this.fpsRig.mortarHolding=this.mortar.throwFeedback.holding;
@@ -236,6 +239,7 @@ export class Game {
       this.hud.updateAimInput(this.aimInputMode);
     }
     this.hud.updateChiselOrientation(this.room.brickWall.chiselEdgeAngle*180/Math.PI,this.fpsRig.actualTiltDegrees,this.hammerWorkStance.sideDegrees,this.room.brickWall.chiselWidthM,this.room.brickWall.chiselTiltDegrees);
+    this.hud.updateHammerSide(this.room.brickWall.chiselSideDegrees);
     const wet=mortarTool && waterHit ? this.mortar.moistureAt(waterHit.point) : {pore:0,film:0};
     const waterTelemetry=this.roomWater.telemetry;
     this.hud.updateMortar(this.selectedTool,this.mortar.charge,this.mortar.angleDegrees,wet,mortarTool && active ? this.mortar.coverage(active):0,this.mortar.recovery,this.mortar.lastOutcome,waterTelemetry.floorLitres,this.mortar.throwFeedback);
@@ -243,7 +247,7 @@ export class Game {
     if (this.mission.complete && !this.resultShown) { this.resultShown = true; this.hud.showResult(); if (document.pointerLockElement) void document.exitPointerLock(); }
     this.renderer.eyeYaw = 0;
     this.renderer.eyePitch = 0;
-    if (this.renderer.render()) {
+    if (present && this.renderer.render()) {
       const workReticle = this.selectedTool === 'hammer' && this.fpsRig.reachable
         ? this.fpsRig.chiselTipWorld.clone().project(this.renderer.renderCamera) : null;
       this.hud.updateWorkReticle(workReticle);
@@ -278,7 +282,8 @@ export class Game {
       // backing brick deep inside the cavity behind it.
       const point=this.selectedTool==='fitting'?this.boxWorkAim():active.boxGroup.getWorldPosition(new THREE.Vector3());
       if(!point||!this.fpsRig.canReachPoint(this.renderer.camera,point)){
-        this.hud.notify('Out of reach. Move closer or crouch for low work.',false);return;
+        const retrieval=this.selectedTool==='fitting'?this.boxPlacement.retrievalHint(active):null;
+        this.hud.notify(retrieval??'Out of reach. Move closer or crouch for low work.',false,3500);return;
       }
     }
     if(this.selectedTool==='hammer'&&!this.fpsRig.contact(this.renderer.camera,this.room.brickWall)){
@@ -292,7 +297,7 @@ export class Game {
     const result = this.interaction.action(target, this.selectedTool, this.renderer.camera, continuing);
     if(result.success)this.fpsRig.toolAction=1;
     if (hammering && result.success) this.fpsRig.strike();
-    if (result.message) this.hud.notify(result.message, result.success);
+    if (result.message) this.hud.notify(result.message, result.success, this.selectedTool==='fitting'||this.selectedTool==='level'?4500:700);
   }
 
   private boxWorkAim():THREE.Vector3|null {
@@ -334,14 +339,15 @@ export class Game {
       if(event.code === 'Minus' || event.code === 'Equal') {event.preventDefault();setHammerSpeed(this.hammerSpeed + (event.code === 'Equal' ? .25 : -.25));}
     });
     addEventListener('wirehouse:work-height',()=>{this.player.crouched=!this.player.crouched;document.querySelector('#work-height')!.textContent=this.player.crouched?'STAND UP':'CROUCH · LOW WORK';});
-    const pack=()=>{if(this.started&&this.selectedTool==='trowel'){
+    const pack=()=>{if(this.started&&this.selectedTool==='trowel')this.pendingSceneActions.push(()=>{
+      if(this.selectedTool!=='trowel')return;
       this.mortar.cancel();this.input.actionHeld=false;
       const hit=this.room.brickWall.aim(this.renderer.camera);
       const reachable=hit&&this.fpsRig.canReachPoint(this.renderer.camera,new THREE.Vector3(hit.point.x,hit.point.y,hit.point.z),.18);
       const success=Boolean(reachable)&&this.mortar.pack(this.renderer.camera);
       this.mortar.lastOutcome=success?'Pressed into the gap. Excess mortar falls away.':'Move closer and aim at exposed material in the gap.';
       if(success)this.fpsRig.toolAction=1;
-    }};
+    });};
     addEventListener('wirehouse:mortar-pack',pack);
     addEventListener('keydown',event=>{if(event.code==='KeyP'&&!event.repeat)pack();});
     const cancelSwing=()=>this.mortar.cancel();
@@ -374,11 +380,19 @@ export class Game {
     });
     addEventListener('wirehouse:side-chisel', event => {
       const wall=this.room.brickWall, delta=(event as CustomEvent<number>).detail;
-      // +15 degrees cancels the natural shoulder-side approach, so a physical
-      // straight-on attack remains available through touch as well as keys.
+      // Requested side is the actual angle relative to the player's aim;
+      // zero is a straight stroke and left/right share the same range.
       const angles=[0,15,25,45,55,-15,-25,-45,-55];
       wall.chiselSideDegrees=delta ? Math.max(-55,Math.min(55,wall.chiselSideDegrees+delta)) : angles[(angles.indexOf(wall.chiselSideDegrees)+1)%angles.length];
       document.querySelector('#chisel-side b')!.textContent=`${Math.abs(wall.chiselSideDegrees)} deg ${wall.chiselSideDegrees<0 ? 'LEFT' : wall.chiselSideDegrees>0 ? 'RIGHT' : 'NEUTRAL'}`;
+    });
+    addEventListener('wirehouse:hammer-view-side',event=>{
+      if(this.selectedTool!=='hammer')return;
+      const wall=this.room.brickWall,requested=(event as CustomEvent<number>).detail;
+      const sign=requested?Math.sign(requested):wall.chiselSideDegrees>0?-1:1;
+      wall.chiselSideDegrees=sign*Math.max(15,Math.abs(wall.chiselSideDegrees));
+      this.hud.updateHammerSide(wall.chiselSideDegrees);
+      document.querySelector('#chisel-side b')!.textContent=`${Math.abs(wall.chiselSideDegrees)} deg ${wall.chiselSideDegrees<0?'LEFT':'RIGHT'}`;
     });
     addEventListener('wirehouse:tilt-chisel', event => {
       const wall=this.room.brickWall;
@@ -425,24 +439,28 @@ export class Game {
     });
     addEventListener('wirehouse:level', event => {
       const detail = (event as CustomEvent<LevelDirection | 'confirm' | 'cancel'>).detail;
+      this.pendingSceneActions.push(()=>{
       const point = this.mission.activePoint;
       if (!point || point.stage !== 'leveling') return;
       if (detail === 'cancel') { this.leveling.cancel(point); this.hud.notify('Leveling exited. Select the spirit level to resume.'); return; }
       if (detail === 'confirm') { this.input.actionRequested = true; return; }
       this.leveling.adjust(point, detail);
+      });
     });
     addEventListener('wirehouse:exit-leveling', () => {
+      this.pendingSceneActions.push(()=>{
       const point = this.mission.activePoint;
       if (!point || point.stage !== 'leveling') return;
       this.leveling.cancel(point);
       this.hud.notify('Leveling exited. Select the spirit level to resume.');
+      });
     });
     addEventListener('keydown', event => {
       const point = this.mission.activePoint;
       if (!point || point.stage !== 'leveling' || event.repeat) return;
       const mapping: Partial<Record<string, LevelDirection>> = { KeyA: 'left', KeyD: 'right', KeyW: 'in', KeyS: 'out' };
       const direction = mapping[event.code];
-      if (direction) { event.preventDefault(); this.leveling.adjust(point, direction); }
+      if (direction) { event.preventDefault(); this.pendingSceneActions.push(()=>{if(point.stage==='leveling')this.leveling.adjust(point, direction);}); }
     });
   }
 
@@ -473,10 +491,20 @@ export class Game {
   private isContinuousAction(): boolean { return this.selectedTool === 'spray' || this.selectedTool === 'hammer' || this.selectedTool === 'hose'; }
 
   private loop = (time: number): void => {
+    // Water's depth, reflection and final colour passes share the live scene.
+    // Moving its camera/arms between those passes caused alternating tool
+    // positions and shadows. Keep elapsed time until the next accepted frame;
+    // keyboard/touch intent and mouse angles continue to accumulate meanwhile.
+    if(this.renderer.framePending){requestAnimationFrame(this.loop);return;}
     const elapsed = Math.max(0,Math.min((time - this.lastTime) / 1000,.25));
-    const dt = Math.min(elapsed, 0.05);
     this.lastTime = time;
-    this.step(dt,elapsed);
+    // Preserve simulation time on slow GPUs using bounded physics steps, with
+    // one image after the last step. Water and movement advance the same time.
+    if(elapsed===0)this.step(0);
+    for(let remaining=elapsed;remaining>1e-8;){
+      const dt=Math.min(remaining,.05);remaining-=dt;
+      this.step(dt,dt,remaining<=1e-8);
+    }
     requestAnimationFrame(this.loop);
   };
 }

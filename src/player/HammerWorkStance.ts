@@ -3,8 +3,6 @@ import { GAME_CONFIG } from '../data/gameConfig';
 
 /** Physical tool orientation relative to the player's freely aimed view. */
 export class HammerWorkStance {
-  /** A small shoulder-side approach keeps the rigid motor beside the sightline. */
-  readonly shoulderSideDegrees = -15;
   sideDegrees = 0;
   actualTiltDegrees = 15;
   headLeanM = 0;
@@ -21,10 +19,12 @@ export class HammerWorkStance {
     const focus = camera.position.clone().addScaledVector(view, distance);
     const workingAtWall = view.z < -.15 && distance > 0 && camera.position.z-GAME_CONFIG.room.wallFrontZ <= 1.12 && Math.abs(focus.x) <= 2.54 && focus.y >= 0 && focus.y <= 3;
     const hammerWork = enabled && workingAtWall && tool === 'hammer';
-    // Side adjustment is relative to the worker's aim. Keeping it fixed to
+    // Side adjustment is exact and symmetric about the worker's aim. The
+    // default shoulder angle lives in the selected setting, never a hidden bias.
+    // Keeping it fixed to
     // the wall normal twisted the motor away from the body in oblique views.
     const viewSide=THREE.MathUtils.radToDeg(Math.atan2(view.x,-view.z));
-    const target = hammerWork ? THREE.MathUtils.clamp(requestedSide+viewSide+this.shoulderSideDegrees,-65,65) : 0;
+    const target = hammerWork ? THREE.MathUtils.clamp(requestedSide+viewSide,-65,65) : 0;
     this.sideDegrees = THREE.MathUtils.damp(this.sideDegrees, target, 10, Math.min(dt, .05));
     if (Math.abs(this.sideDegrees - target) < .01) this.sideDegrees = target;
     if (!hammerWork) {
