@@ -80,6 +80,8 @@ button {
 .level-buttons .cancel { grid-column: 1 / -1; background: #292621; border-color: #756a5c; }
 #mobile-controls { display: none; position: absolute; z-index: 6; inset: 0; pointer-events: none; }
 #joystick, #look-joystick { position: absolute; bottom: calc(max(12px, env(safe-area-inset-bottom)) + 126px); width: 124px; height: 124px; pointer-events: auto; touch-action: none; }
+#joystick, #look-joystick, #joystick *, #look-joystick * { -webkit-tap-highlight-color: transparent; }
+#joystick *, #look-joystick * { pointer-events: none; }
 #joystick { left: max(16px, env(safe-area-inset-left)); }
 #look-joystick { right: max(16px, env(safe-area-inset-right)); width: 140px; height: 140px; }
 .joystick-ring, .look-joystick-ring { position: absolute; inset: 0; border: 2px solid rgba(255,255,255,.34); border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.08), rgba(20,18,15,.38)); box-shadow: inset 0 0 0 13px rgba(255,255,255,.025), 0 8px 24px rgba(0,0,0,.2); }

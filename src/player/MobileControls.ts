@@ -27,6 +27,15 @@ export class MobileControls {
     surface.addEventListener('lostpointercapture', this.onLostCapture);
     surface.addEventListener('selectstart', event => event.preventDefault());
     surface.addEventListener('dragstart', event => event.preventDefault());
+    // iOS can show its text magnifier even with user-select:none. Cancel the
+    // native touch gesture on our continuous pads; Pointer Events still drive
+    // gameplay. Keep ordinary buttons, sliders and settings scrolling native.
+    // https://bugs.webkit.org/show_bug.cgi?id=231161
+    surface.querySelectorAll<HTMLElement>('#joystick, #look-joystick').forEach(pad => {
+      for (const type of ['touchstart', 'touchmove'] as const) {
+        pad.addEventListener(type, event => { if (event.cancelable) event.preventDefault(); }, { passive: false });
+      }
+    });
     addEventListener('pointerup', this.onPointerUp, { passive: false });
     addEventListener('pointercancel', this.onPointerUp, { passive: false });
     document.querySelectorAll<HTMLButtonElement>('[data-tool]').forEach(button => button.addEventListener('pointerdown', event => {
