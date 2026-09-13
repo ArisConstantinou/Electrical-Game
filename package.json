@@ -24,7 +24,8 @@
     "test:room-water-field": "node tests/room-water-field.mjs",
     "test:room-water": "node tests/room-water-smoke.mjs",
     "test:room-water-performance": "node tests/room-water-performance.mjs",
-    "test:chisel-balanced": "node tests/chisel-balanced-ui.mjs"
+    "test:chisel-balanced": "node tests/chisel-balanced-ui.mjs",
+    "test:hammer-eyes": "node tests/hammer-eye-input.mjs && node tests/hammer-eye-look-ui.mjs && node tests/renderer-eye-snapshot.mjs"
   },
   "dependencies": {
     "three": "0.185.1"

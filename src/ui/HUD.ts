@@ -220,6 +220,12 @@ export class HUD {
     addEventListener('keydown', event => { if (event.key === 'Escape' && settingsToggle?.getAttribute('aria-expanded') === 'true') setSettingsOpen(false); });
   }
 
+  updateWorkReticle(point: { x: number; y: number; z: number } | null): void {
+    this.reticle.style.left = point ? `${(point.x + 1) * 50}%` : '50%';
+    this.reticle.style.top = point ? `${(1 - point.y) * 50}%` : '50%';
+    this.reticle.hidden = !!point && (Math.abs(point.x) > 1 || Math.abs(point.y) > 1 || point.z < -1 || point.z > 1);
+  }
+
   onStart(callback: () => void): void {
     document.querySelector('#start-button')?.addEventListener('click', () => {
       document.querySelector('#start-screen')?.classList.add('hidden');

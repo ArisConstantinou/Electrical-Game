@@ -55,7 +55,7 @@ button {
 #desktop-key-guide div { display: flex; align-items: center; gap: 6px; }
 #desktop-key-guide kbd { min-width: 30px; padding: 4px 6px; border: 1px solid #827563; border-bottom-width: 2px; border-radius: 3px; color: #fff; background: #302b25; font: 800 12px/1 'Barlow Condensed', sans-serif; text-align: center; }
 #desktop-key-guide span { margin-right: 6px; color: #bdb6ad; white-space: nowrap; }
-#reticle { position: absolute; z-index: 3; left: 50%; top: 50%; width: 24px; height: 24px; transform: translate(-50%,-50%); opacity: .72; transition: .15s ease; }
+#reticle { position: absolute; z-index: 3; left: 50%; top: 50%; width: 24px; height: 24px; transform: translate(-50%,-50%); opacity: .72; transition: opacity .15s ease, transform .15s ease; }
 #reticle span { position: absolute; left: 50%; top: 50%; width: 14px; height: 2px; background: #f6f0e7; transform: translate(-50%,-50%); box-shadow: 0 1px 3px #000; }
 #reticle span:last-child { transform: translate(-50%,-50%) rotate(90deg); }
 #reticle.active { transform: translate(-50%,-50%) scale(1.25); opacity: 1; }

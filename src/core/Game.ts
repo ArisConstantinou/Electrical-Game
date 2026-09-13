@@ -137,11 +137,14 @@ export class Game {
     if (leveling && !this.wasLeveling && document.pointerLockElement) void document.exitPointerLock();
     this.wasLeveling = leveling;
     const handWork=this.selectedTool==='fitting'||this.selectedTool==='level';
+    const eyeWork = this.started && this.selectedTool === 'hammer' && !leveling;
+    this.player.setEyeLookEnabled(eyeWork && this.player.workPosition.locked);
     this.player.wallWorkEnabled=(this.selectedTool==='hammer'||handWork)&&!leveling;
     const wallAxisZ=Math.cos(THREE.MathUtils.degToRad(this.room.brickWall.chiselTiltDegrees))*Math.cos(THREE.MathUtils.degToRad(this.room.brickWall.chiselSideDegrees));
     this.player.wallWorkDistance=handWork?.46:.38+.55*Math.abs(wallAxisZ);
     this.player.handWorkTargetY=handWork?this.boxWorkAim()?.y??null:null;
     if (this.started && !leveling) this.player.update(Math.min(dt, 0.05));
+    this.player.setEyeLookEnabled(eyeWork && this.player.workPosition.locked);
     this.renderer.camera.rotation.set(this.player.pitch, this.player.yaw, 0);
     this.hammerWorkStance.update(this.renderer.camera, dt, this.room.brickWall.chiselSideDegrees, this.started && this.selectedTool === 'hammer' && !leveling,this.room.brickWall.chiselTiltDegrees);
     this.fpsRig.workStanceSide = this.hammerWorkStance.sideDegrees / 75;
@@ -217,7 +220,13 @@ export class Game {
     this.hud.updateMortar(this.selectedTool,this.mortar.charge,this.mortar.angleDegrees,wet,active ? this.mortar.coverage(active):0,this.mortar.recovery,this.mortar.lastOutcome,this.roomWater.telemetry.floorLitres,this.mortar.throwFeedback);
     this.hud.updateWaterGun(waterSetting,this.roomWater.telemetry.floorLitres,this.roomWater.telemetry.meanDepthMm);
     if (this.mission.complete && !this.resultShown) { this.resultShown = true; this.hud.showResult(); if (document.pointerLockElement) void document.exitPointerLock(); }
-    this.renderer.render();
+    this.renderer.eyeYaw = this.player.gaze.yaw;
+    this.renderer.eyePitch = this.player.gaze.pitch;
+    if (this.renderer.render()) {
+      const workReticle = this.player.gaze.enabled
+        ? this.fpsRig.chiselTipWorld.clone().project(this.renderer.renderCamera) : null;
+      this.hud.updateWorkReticle(workReticle);
+    }
   }
 
   renderState(): string {
@@ -228,6 +237,7 @@ export class Game {
       water: {...this.roomWater.telemetry,gunMode:WATER_GUN_MODES[this.waterGunModeIndex].id,gunLitres:this.mortar.waterGunLitres},
       hammer: { speedMultiplier: this.hammerSpeed, paused: this.hammerSpeed === 0, impactIntervalSeconds: this.hammerSpeed > 0 ? .24 / this.hammerSpeed : null },
       body: this.fpsRig.debugPose(),
+      gaze: { ...this.player.gaze, viewQuaternion: this.renderer.renderCamera.quaternion.toArray(), workQuaternion: this.renderer.camera.quaternion.toArray() },
       workPosition: this.player.workPosition,
       coordinateSystem: 'metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall',
       mode: !this.started ? 'start' : this.mission.complete ? 'mission-complete' : point?.stage === 'leveling' ? 'leveling' : 'playing',

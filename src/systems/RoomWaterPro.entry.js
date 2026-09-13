@@ -11,8 +11,11 @@ export async function createRoomWater(renderer,scene,camera,room){
   // indoors. Supply a real room capture through its documented provider seam.
   const reflectionTarget=new CubeRenderTarget(128,{generateMipmaps:true,minFilter:LinearMipmapLinearFilter});
   const reflectionCamera=new CubeCamera(.04,20,reflectionTarget);reflectionCamera.position.set(0,1.4,0);
-  const cameraVisible=camera.visible;camera.visible=false;
-  reflectionCamera.update(renderer,scene);camera.visible=cameraVisible;
+  // The render camera is detached from the logical head. Hide the actual
+  // viewmodel root, otherwise the permanent room cubemap captures its tools.
+  const viewmodels=[];
+  scene.traverse(object=>{if(object.userData.studioEntityId==='fps-rig'){viewmodels.push([object,object.visible]);object.visible=false;}});
+  try{reflectionCamera.update(renderer,scene);}finally{for(const [object,visible]of viewmodels)object.visible=visible;}
   const roomReflections={
     createFogSampler:()=>direction=>cubeTexture(reflectionTarget.texture,direction).rgb,
     createReflectionSampler:()=>(direction,roughness)=>cubeTexture(reflectionTarget.texture,direction).level(roughness.mul(4)).rgb,

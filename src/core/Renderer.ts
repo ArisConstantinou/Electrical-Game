@@ -8,13 +8,20 @@ import type { RoomWaterRuntime } from '../generated/room-water-runtime';
 export class Renderer {
   readonly scene = new THREE.Scene();
   readonly camera = new THREE.PerspectiveCamera(72, 1, 0.025, 60);
+  /** Logical camera owns the body/rig; this detached camera owns only the image. */
+  readonly renderCamera = new THREE.PerspectiveCamera(72, 1, 0.025, 60);
+  eyeYaw = 0;
+  eyePitch = 0;
   readonly webgl: WebGPURenderer;
   readonly ready:Promise<void>;
   private readonly gpu:WebGPURenderer;
   private water:RoomWaterRuntime|null=null;
   private renderTask:Promise<void>|null=null;
+  private pendingSize:{width:number;height:number}|null=null;
   private lastRenderTime=performance.now();
   private readonly materialCache=new WeakMap<THREE.Material,THREE.Material>();
+  private readonly gazeEuler=new THREE.Euler(0,0,0,'YXZ');
+  private readonly gazeQuaternion=new THREE.Quaternion();
   renderError='';
 
   constructor(container: HTMLElement) {
@@ -55,15 +62,18 @@ export class Renderer {
     // This changes the lens, never the physical size or reach of the body.
     this.camera.fov = Math.max(72, THREE.MathUtils.radToDeg(2*Math.atan(Math.tan(THREE.MathUtils.degToRad(60)/2)/this.camera.aspect)));
     this.camera.updateProjectionMatrix();
-    this.webgl.setSize(width, height, false);
-    this.water?.resize(width,height);
+    // Water Pro.resize mutates its camera projection and depth targets.
+    // Defer it with the accepted frame, rather than midway through a GPU pass.
+    if(this.water)this.pendingSize={width,height};
+    else this.webgl.setSize(width,height,false);
   };
 
   async attachRoomWater(room:RoomWaterSystem):Promise<void>{
     await this.ready;
     if(new URLSearchParams(location.search).get('waterPro')==='0'){room.waterProBackend='diagnostic-disabled';return;}
     const {createRoomWater}=await import('../generated/room-water-runtime.js');
-    this.water=await createRoomWater(this.gpu,this.scene,this.camera,room);
+    this.snapshotRenderCamera();
+    this.water=await createRoomWater(this.gpu,this.scene,this.renderCamera,room);
   }
   private prepareMaterials():void{
     this.scene.traverse(object=>{
@@ -89,12 +99,36 @@ export class Renderer {
       mesh.material=material;
     });
   }
-  render():void{
-    if(this.renderTask)return;
+  private snapshotRenderCamera():void{
+    this.camera.updateWorldMatrix(true,true);
+    // Copy projection too, so resizing and Studio lens changes are reflected
+    // at the same accepted-frame boundary as the gaze and world pose.
+    this.renderCamera.copy(this.camera,false);
+    this.renderCamera.name='Independent eye view camera';
+    this.renderCamera.userData={renderOnly:true};
+    this.camera.getWorldPosition(this.renderCamera.position);
+    this.camera.getWorldQuaternion(this.renderCamera.quaternion);
+    this.camera.getWorldScale(this.renderCamera.scale);
+    this.gazeEuler.set(Number.isFinite(this.eyePitch)?this.eyePitch:0,Number.isFinite(this.eyeYaw)?this.eyeYaw:0,0,'YXZ');
+    this.renderCamera.quaternion.multiply(this.gazeQuaternion.setFromEuler(this.gazeEuler));
+    this.renderCamera.updateMatrixWorld(true);
+  }
+  /** True means renderCamera now contains the accepted frame's exact view. */
+  render():boolean{
+    if(this.renderTask)return false;
+    if(this.pendingSize){
+      const {width,height}=this.pendingSize;this.pendingSize=null;
+      if(this.water)this.water.resize(width,height);
+      else this.webgl.setSize(width,height,false);
+    }
+    // Never mutate this snapshot while Water Pro's asynchronous depth/optical
+    // passes are pending. Gameplay and input may keep using the logical camera.
+    this.snapshotRenderCamera();
     this.prepareMaterials();
     const now=performance.now(),dt=Math.min(.05,(now-this.lastRenderTime)/1000);this.lastRenderTime=now;
-    if(!this.water){this.gpu.render(this.scene,this.camera);return;}
-    this.renderTask=this.water.update(dt).then(()=>{this.gpu.render(this.scene,this.camera);}).catch(error=>{this.renderError=String(error);console.error('Room Water Pro rendering failed',error);}).finally(()=>{this.renderTask=null;});
+    if(!this.water){this.gpu.render(this.scene,this.renderCamera);return true;}
+    this.renderTask=this.water.update(dt).then(()=>{this.gpu.render(this.scene,this.renderCamera);}).catch(error=>{this.renderError=String(error);console.error('Room Water Pro rendering failed',error);}).finally(()=>{this.renderTask=null;});
+    return true;
   }
   async waitForFrame():Promise<void>{await this.ready;await this.renderTask;}
 }
