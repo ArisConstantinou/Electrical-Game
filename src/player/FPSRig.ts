@@ -42,12 +42,15 @@ export class FPSRig extends THREE.Group {
   mortarHolding = false;
   chiselInAir = false;
   workStanceSide = 0;
+  /** Actual head lean in the body's right direction; independent of bit yaw. */
+  workHeadLeanM:number|null=null;
   workStanceTiltDegrees:number|null=null;
   actualTiltDegrees=15;
   workPositionLocked = false;
   private feedDepth = .02;
   private presentedDepthZ: number | null = null;
   private hammerGripBlend = 0;
+  private hammerLeftMain=false;
   private hammerFeedLeanM = 0;
   readonly hammerFit={housingCameraZ:0,wristReachM:[] as number[]};
 
@@ -90,7 +93,9 @@ export class FPSRig extends THREE.Group {
     const view = camera.getWorldDirection(new THREE.Vector3());
     const eye = camera.getWorldPosition(new THREE.Vector3());
     const distance = (wall.volume.frontZ-eye.z)/view.z;
-    if (distance < 0 || distance > 1.45 || direction.z >= -.04) { this.restHammer(camera); return null; }
+    // A slanted sight line can exceed 1.45 m while the bit is beside the body.
+    // The actual wrist spheres below decide reach, rather than ray length.
+    if (!Number.isFinite(distance) || distance < 0 || direction.z >= -.04) { this.restHammer(camera); return null; }
     const entry = eye.clone().addScaledVector(view,distance);
     if (Math.abs(entry.x)>2.54 || entry.y<0 || entry.y>3) { this.restHammer(camera); return null; }
     // Follow the CHISEL axis through the aperture. Empty chambers consume no
@@ -101,7 +106,7 @@ export class FPSRig extends THREE.Group {
     // Ordinary excavation still follows the shaft through the front aperture.
     const upward=wall.chiselTiltDegrees<0;
     const rayOrigin=upward?eye:origin,rayDirection=upward?view:direction;
-    const reach=upward?1.45:Math.min(.38,.24/Math.abs(direction.z));
+    const reach=upward?distance+.28/Math.max(.08,Math.abs(view.z)):Math.min(.38,.24/Math.abs(direction.z));
     let hit=wall.volume.raycast(rayOrigin,rayDirection,reach),bladeOffsetM=0;
     if(wall.chiselType==='flat'){
       // A wide edge cannot pass through a hole merely because its centre is air.
@@ -175,9 +180,12 @@ export class FPSRig extends THREE.Group {
   }
   strike(): void { this.strikeAmount = 1; }
   update(dt: number, moving: boolean, spraying = false): void {
-    // Positive chisel attack puts the rear handle on the body's LEFT. Swap
-    // grips with that torso lean; returning to straight restores the right hand.
-    const gripTarget=this.workStanceSide>.12?1:0;
+    // Grip roles follow the physical head/body lean, not the opposite-facing
+    // chisel attack. Hysteresis prevents a tiny aim movement from regripping.
+    const headLean=this.workHeadLeanM??-this.workStanceSide;
+    if(headLean>.04)this.hammerLeftMain=true;
+    else if(headLean<.015)this.hammerLeftMain=false;
+    const gripTarget=this.hammerLeftMain?1:0;
     this.hammerGripBlend+=THREE.MathUtils.clamp(gripTarget-this.hammerGripBlend,-dt*2.8,dt*2.8);
     const bob = moving ? Math.sin(performance.now() * 0.012) * 0.006 : 0;
     // Keep the working hand above the landscape toolbar and inside a portrait
@@ -233,6 +241,7 @@ export class FPSRig extends THREE.Group {
       const t=THREE.MathUtils.smoothstep(this.hammerGripBlend,arm.side<0?0:.5,arm.side<0?.5:1);
       arm.hand.position.lerpVectors(arm.side<0?front:rear,arm.side<0?rear:front,t);
       arm.hand.position.y-=Math.sin(t*Math.PI)*.09;
+      arm.grip.copy(arm.hand.position);
       const supporting=arm.side<0?1-t:t;
       arm.hand.rotation.set(0,0,arm.side*supporting*Math.PI/4);
       arm.hand.userData.gripRole=supporting>.99?'auxiliary':supporting<.01?'rear':'regripping';
@@ -264,10 +273,10 @@ export class FPSRig extends THREE.Group {
     // The head peeks past the motor while the shoulders stay over the torso.
     // This is a small neck lean, not extra arm reach or a stretched forearm.
     if(this.selectedTool==='hammer'&&this.workPositionLocked){
-      const swapped=THREE.MathUtils.smoothstep(this.workStanceSide*75,0,20);
+      const swapped=THREE.MathUtils.smoothstep(this.hammerGripBlend,0,1);
       eye.addScaledVector(right,THREE.MathUtils.lerp(.12,-.12,swapped));
     }
-    const shoulderBack=this.selectedTool==='hammer'&&this.workPositionLocked?this.hammerFeedLeanM:-.03;
+    const shoulderBack=this.selectedTool==='hammer'&&this.workPositionLocked?this.hammerFeedLeanM:-.085;
     return eye.addScaledVector(right,side*.20).addScaledVector(forward,shoulderBack).add(new THREE.Vector3(0,-.22,0));
   }
   private wrist(arm:WorkerArm):THREE.Vector3 {

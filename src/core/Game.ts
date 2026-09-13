@@ -137,17 +137,20 @@ export class Game {
     if (leveling && !this.wasLeveling && document.pointerLockElement) void document.exitPointerLock();
     this.wasLeveling = leveling;
     const handWork=this.selectedTool==='fitting'||this.selectedTool==='level';
-    const eyeWork = this.started && this.selectedTool === 'hammer' && !leveling;
-    this.player.setEyeLookEnabled(eyeWork && this.player.workPosition.locked);
     this.player.wallWorkEnabled=(this.selectedTool==='hammer'||handWork)&&!leveling;
-    const wallAxisZ=Math.cos(THREE.MathUtils.degToRad(this.room.brickWall.chiselTiltDegrees))*Math.cos(THREE.MathUtils.degToRad(this.room.brickWall.chiselSideDegrees));
-    this.player.wallWorkDistance=handWork?.46:.38+.55*Math.abs(wallAxisZ);
+    const workTilt=THREE.MathUtils.degToRad(this.hammerWorkStance.actualTiltDegrees);
+    const workSide=THREE.MathUtils.degToRad(this.hammerWorkStance.sideDegrees);
+    const wallAxisZ=Math.cos(workTilt)*Math.cos(workSide);
+    // Use the angle the hands actually hold, including an upward side stroke's
+    // shorter reach. Requested tilt can differ substantially near floor/ceiling.
+    const upwardSideFeed=.20*Math.max(0,-Math.sin(workTilt))*Math.abs(Math.sin(workSide));
+    this.player.wallWorkDistance=handWork?.46:Math.max(.46,(.38+.55*Math.abs(wallAxisZ)-upwardSideFeed)*Math.max(.2,Math.cos(this.player.yaw)));
     this.player.handWorkTargetY=handWork?this.boxWorkAim()?.y??null:null;
     if (this.started && !leveling) this.player.update(Math.min(dt, 0.05));
-    this.player.setEyeLookEnabled(eyeWork && this.player.workPosition.locked);
     this.renderer.camera.rotation.set(this.player.pitch, this.player.yaw, 0);
-    this.hammerWorkStance.update(this.renderer.camera, dt, this.room.brickWall.chiselSideDegrees, this.started && this.selectedTool === 'hammer' && !leveling,this.room.brickWall.chiselTiltDegrees);
+    this.hammerWorkStance.update(this.renderer.camera, dt, this.room.brickWall.chiselSideDegrees, this.started && !leveling,this.room.brickWall.chiselTiltDegrees,this.selectedTool);
     this.fpsRig.workStanceSide = this.hammerWorkStance.sideDegrees / 75;
+    this.fpsRig.workHeadLeanM = this.hammerWorkStance.headLeanM;
     this.fpsRig.workStanceTiltDegrees = this.hammerWorkStance.actualTiltDegrees;
     this.fpsRig.workPositionLocked=this.player.workPosition.locked;
     this.actionCooldown = Math.max(0, this.actionCooldown - dt);
@@ -220,10 +223,10 @@ export class Game {
     this.hud.updateMortar(this.selectedTool,this.mortar.charge,this.mortar.angleDegrees,wet,active ? this.mortar.coverage(active):0,this.mortar.recovery,this.mortar.lastOutcome,this.roomWater.telemetry.floorLitres,this.mortar.throwFeedback);
     this.hud.updateWaterGun(waterSetting,this.roomWater.telemetry.floorLitres,this.roomWater.telemetry.meanDepthMm);
     if (this.mission.complete && !this.resultShown) { this.resultShown = true; this.hud.showResult(); if (document.pointerLockElement) void document.exitPointerLock(); }
-    this.renderer.eyeYaw = this.player.gaze.yaw;
-    this.renderer.eyePitch = this.player.gaze.pitch;
+    this.renderer.eyeYaw = 0;
+    this.renderer.eyePitch = 0;
     if (this.renderer.render()) {
-      const workReticle = this.player.gaze.enabled
+      const workReticle = this.selectedTool === 'hammer' && this.fpsRig.reachable
         ? this.fpsRig.chiselTipWorld.clone().project(this.renderer.renderCamera) : null;
       this.hud.updateWorkReticle(workReticle);
     }
@@ -237,7 +240,7 @@ export class Game {
       water: {...this.roomWater.telemetry,gunMode:WATER_GUN_MODES[this.waterGunModeIndex].id,gunLitres:this.mortar.waterGunLitres},
       hammer: { speedMultiplier: this.hammerSpeed, paused: this.hammerSpeed === 0, impactIntervalSeconds: this.hammerSpeed > 0 ? .24 / this.hammerSpeed : null },
       body: this.fpsRig.debugPose(),
-      gaze: { ...this.player.gaze, viewQuaternion: this.renderer.renderCamera.quaternion.toArray(), workQuaternion: this.renderer.camera.quaternion.toArray() },
+      view: { mode: 'continuous-shared', viewQuaternion: this.renderer.renderCamera.quaternion.toArray(), workQuaternion: this.renderer.camera.quaternion.toArray() },
       workPosition: this.player.workPosition,
       coordinateSystem: 'metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall',
       mode: !this.started ? 'start' : this.mission.complete ? 'mission-complete' : point?.stage === 'leveling' ? 'leveling' : 'playing',

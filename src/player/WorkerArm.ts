@@ -153,14 +153,16 @@ export function workerArm(side:number, hand:THREE.Group, grip:THREE.Vector3):Wor
   group.name=`${side<0?'Left':'Right'} fixed-length work arm`;
   // Authored at metre scale; these segments rotate but never stretch.
   mesh(upper,new THREE.CapsuleGeometry(.047,UPPER_ARM_M-.094,6,16),skin,'Upper arm skin');
-  const sleeve=mesh(upper,new THREE.CylinderGeometry(.076,.061,.19,20,3,true),cloth,'Short work shirt sleeve');sleeve.position.y=-.075;
-  const cuff=mesh(upper,new THREE.CylinderGeometry(.063,.062,.025,20,1,true),hem,'Folded sleeve hem');cuff.position.y=.022;
-  const stitch=mesh(upper,new THREE.TorusGeometry(.062,.0012,4,24),hem,'Sleeve double stitched edge');stitch.rotation.x=Math.PI/2;stitch.position.y=.033;
+  // +Y points from shoulder towards elbow. A shirt is broadest at the
+  // shoulder, then narrows to its open hem; the old reversed 15 cm cylinder
+  // and second forearm cuff read as trouser legs when looking down.
+  const sleeve=mesh(upper,new THREE.CylinderGeometry(.049,.058,.175,20,4,true),cloth,'Short work shirt sleeve');sleeve.position.y=-.056;
+  mesh(upper,ellipsoid(1,[.058,.045,.058],[0,-.135,0]),cloth,'Rounded shirt shoulder seam');
+  const cuff=mesh(upper,new THREE.CylinderGeometry(.050,.051,.018,20,1,true),hem,'Folded sleeve hem');cuff.position.y=.027;
+  const stitch=mesh(upper,new THREE.TorusGeometry(.050,.0012,4,24),hem,'Sleeve double stitched edge');stitch.rotation.x=Math.PI/2;stitch.position.y=.035;
   const lower=mesh(forearm,new THREE.CylinderGeometry(.030,.047,FOREARM_M,20,5),skin,'Tapered bare forearm');
   lower.geometry.computeVertexNormals();
   mesh(forearm,ellipsoid(1,[.041,.037,.041],[0,-FOREARM_M/2+.01,0]),skin,'Rounded elbow');
-  const rolled=mesh(forearm,new THREE.CylinderGeometry(.046,.054,.065,20,2,true),cloth,'Rolled work sleeve ending below elbow');rolled.position.y=-.111;
-  for(const y of [-.085,-.079]){const seam=mesh(forearm,new THREE.TorusGeometry(.047,.0025,5,24),hem,'Rolled cuff seam');seam.rotation.x=Math.PI/2;seam.position.y=y;}
   group.add(upper,forearm);
   return {group,upper,forearm,hand,side,grip,shoulder:new THREE.Vector3(),elbow:new THREE.Vector3(),wrist:new THREE.Vector3()};
 }

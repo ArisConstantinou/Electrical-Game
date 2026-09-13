@@ -14,9 +14,6 @@ export class PlayerController {
   get eyeHeight(): number { return this.crouched || this.input.pressed('ControlLeft') || this.input.pressed('ControlRight') ? .95 : this.handWorkEyeHeight ?? GAME_CONFIG.player.eyeHeight; }
   yaw = 0;
   pitch = -0.62;
-  // A small, bounded eye movement precedes a change of working direction.
-  // These angles belong to the rendered view, never the collision ray.
-  readonly gaze = { enabled: false, yaw: 0, pitch: 0, maxYaw: THREE.MathUtils.degToRad(10), maxPitch: THREE.MathUtils.degToRad(7) };
   readonly velocity = new THREE.Vector3();
   wallAssistAmount = 0;
   private mobileAimSpeed = 1.55;
@@ -29,35 +26,12 @@ export class PlayerController {
     camera.rotation.set(this.pitch, this.yaw, 0);
   }
 
+  // All tools share direct aiming. A hard eye-only window prevents precise
+  // placement of the work point and introduces a dead zone on every reversal.
   look(deltaX: number, deltaY: number, sensitivity = 0.0023): void {
-    let yaw = -deltaX * sensitivity, pitch = -deltaY * sensitivity;
-    if (this.gaze.enabled) {
-      const nextYaw = THREE.MathUtils.clamp(this.gaze.yaw + yaw, -this.gaze.maxYaw, this.gaze.maxYaw);
-      const nextPitch = THREE.MathUtils.clamp(this.gaze.pitch + pitch, -this.gaze.maxPitch, this.gaze.maxPitch);
-      yaw -= nextYaw - this.gaze.yaw;
-      pitch -= nextPitch - this.gaze.pitch;
-      this.gaze.yaw = nextYaw;
-      this.gaze.pitch = nextPitch;
-    }
-    this.yaw += yaw;
-    this.pitch = THREE.MathUtils.clamp(this.pitch + pitch, -1.18, 1.18);
-    if (Math.abs(yaw) + Math.abs(pitch) > 1e-12) this.camera.rotation.set(this.pitch, this.yaw, 0);
-  }
-
-  setEyeLookEnabled(enabled: boolean): void {
-    if (this.gaze.enabled === enabled) return;
-    if (!enabled) {
-      // Carry the gaze into normal looking when leaving the working stance.
-      // Dropping these offsets would snap the view back on a tool change.
-      const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(this.pitch, this.yaw, 0, 'YXZ'));
-      rotation.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(this.gaze.pitch, this.gaze.yaw, 0, 'YXZ')));
-      const view = new THREE.Euler().setFromQuaternion(rotation, 'YXZ');
-      this.yaw = view.y;
-      this.pitch = THREE.MathUtils.clamp(view.x, -1.18, 1.18);
-      this.gaze.yaw = this.gaze.pitch = 0;
-      this.camera.rotation.set(this.pitch, this.yaw, 0);
-    }
-    this.gaze.enabled = enabled;
+    this.yaw -= deltaX * sensitivity;
+    this.pitch = THREE.MathUtils.clamp(this.pitch - deltaY * sensitivity, -1.18, 1.18);
+    this.camera.rotation.set(this.pitch, this.yaw, 0);
   }
 
   update(dt: number): void {
@@ -91,7 +65,7 @@ export class PlayerController {
     this.camera.position.addScaledVector(this.velocity, dt);
     const work=this.workPosition;
     const wallDistanceNow=this.camera.position.z-GAME_CONFIG.room.wallFrontZ;
-    const facingWall=Math.cos(this.yaw)>.65;
+    const facingWall=Math.cos(this.yaw)>.2;
     if(!this.wallWorkEnabled || !facingWall){work.locked=false;}
     // Backward intent explicitly releases the stance. Do not immediately snap
     // back while the player is standing inside the entry zone after release.
@@ -100,6 +74,12 @@ export class PlayerController {
     if(this.wallWorkEnabled && facingWall && !work.released && !work.locked && wallDistanceNow<(this.handWorkTargetY===null?1.10:.94) && wallDistanceNow>.30)work.locked=true;
     work.targetDistanceM=this.wallWorkDistance;
     if(work.locked){
+      // Bracing absorbs forward input even when looking diagonally along the
+      // wall. Only an explicit strafe moves the worker sideways in this stance.
+      if(y>=0){
+        this.camera.position.x-=forward.x*y*speed*dt;
+        this.velocity.copy(right).multiplyScalar(x*speed);
+      }
       // Preserve the aimed wall point while the body settles to its standoff.
       // Lateral walking still advances the work point along the wall.
       const view=new THREE.Vector3(0,0,-1).applyEuler(new THREE.Euler(this.pitch,this.yaw,0,this.camera.rotation.order));
