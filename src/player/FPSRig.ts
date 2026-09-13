@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { buildToolModel, addHammerDetails } from './ToolModels';
+import { buildToolModel } from './ToolModels';
+import { workerHand, workerArm, poseWorkerArm, flexWorkerHand, MAX_WRIST_REACH_M, UPPER_ARM_M, FOREARM_M, type WorkerArm } from './WorkerArm';
 import type { BrickWall, ChiselContact } from '../world/BrickWall';
 
 export type RigTool = 'spray' | 'hammer' | 'fitting' | 'level' | 'spring' | 'cutter' | 'trowel' | 'hose';
@@ -19,15 +20,17 @@ const place = (object: THREE.Object3D, x: number, y: number, z: number): THREE.O
 
 export class FPSRig extends THREE.Group {
   private readonly tools = new Map<RigTool, THREE.Group>();
-  private readonly restingY = -0.24;
+  private readonly restingY = -0.12;
   private sprayCanMaterial: THREE.MeshStandardMaterial | null = null;
   private sprayMist: THREE.Points | null = null;
   private strikeAmount = 0;
   private flatTip: THREE.Mesh | null = null;
   private pointedTip: THREE.Mesh | null = null;
-  private readonly tipAnchor = new THREE.Vector3(.02, .005, -.74);
-  private readonly hammerArms = new THREE.Group();
-  private readonly hammerArmParts: Array<{ upper: THREE.Mesh; forearm: THREE.Mesh; cuff: THREE.Mesh; glove: THREE.Mesh; grip: THREE.Vector3; side: number }> = [];
+  private readonly tipAnchor = new THREE.Vector3(.02, .005, -.60);
+  private readonly armSets = new Map<RigTool, WorkerArm[]>();
+  private selectedTool: RigTool = 'spray';
+  reachable = false;
+  reachReason = 'Out of reach. Move closer or change your working angle.';
   readonly chiselTipWorld = new THREE.Vector3();
   toolAction = 0;
   hoseActive = false;
@@ -41,6 +44,8 @@ export class FPSRig extends THREE.Group {
 
   /** Seat the real visible tip on the first remaining solid, then read it back. */
   contact(camera: THREE.Camera, wall: BrickWall): ChiselContact | null {
+    this.selectedTool='hammer';
+    this.reachReason='Out of reach. Move closer, change your stance or crouch.';
     const hammer = this.tools.get('hammer')!;
     if (this.flatTip) {
       this.flatTip.visible = wall.chiselType === 'flat'; this.flatTip.rotation.z = wall.chiselEdgeAngle;
@@ -74,9 +79,9 @@ export class FPSRig extends THREE.Group {
     const view = camera.getWorldDirection(new THREE.Vector3());
     const eye = camera.getWorldPosition(new THREE.Vector3());
     const distance = (wall.volume.frontZ-eye.z)/view.z;
-    if (distance < 0 || distance > 2.35 || direction.z >= -.04) { hammer.position.set(0,0,0); this.hammerArms.visible=false; this.chiselInAir=true; return null; }
+    if (distance < 0 || distance > 1.45 || direction.z >= -.04) { this.restHammer(camera); return null; }
     const entry = eye.clone().addScaledVector(view,distance);
-    if (Math.abs(entry.x)>2.54 || entry.y<0 || entry.y>3) { hammer.position.set(0,0,0);this.hammerArms.visible=false;this.chiselInAir=true;return null; }
+    if (Math.abs(entry.x)>2.54 || entry.y<0 || entry.y>3) { this.restHammer(camera); return null; }
     // Follow the CHISEL axis through the aperture. Empty chambers consume no
     // impact and no energy: the next contact is a surviving rib or rear shell.
     const origin=entry.clone().addScaledVector(direction,-.02);
@@ -85,7 +90,7 @@ export class FPSRig extends THREE.Group {
     // Ordinary excavation still follows the shaft through the front aperture.
     const upward=wall.chiselTiltDegrees<0;
     const rayOrigin=upward?eye:origin,rayDirection=upward?view:direction;
-    const reach=upward?2.35:Math.min(.38,.24/Math.abs(direction.z));
+    const reach=upward?1.45:Math.min(.38,.24/Math.abs(direction.z));
     let hit=wall.volume.raycast(rayOrigin,rayDirection,reach),bladeOffsetM=0;
     if(wall.chiselType==='flat'){
       // A wide edge cannot pass through a hole merely because its centre is air.
@@ -102,9 +107,13 @@ export class FPSRig extends THREE.Group {
     const local=this.worldToLocal(target.clone());
     hammer.position.copy(local).sub(this.tipAnchor.clone().applyQuaternion(hammer.quaternion));
     hammer.updateWorldMatrix(true, true);
+    const housing=camera.worldToLocal(hammer.localToWorld(new THREE.Vector3(.02,-.055,-.1)));
+    if(housing.z>-.32){this.reachReason='Too close to the hammer. Step back or adjust its angle.';this.restHammer(camera);return null;}
+    if (!this.gripsReachable(camera, hammer)) { this.restHammer(camera); return null; }
+    this.reachable = true;
     const tip = hammer.localToWorld(this.tipAnchor.clone());
     this.chiselTipWorld.copy(tip);
-    this.poseHammerArms(camera, hammer);
+    this.poseArms(camera);
     if (!hit) return null;
     return {point:tip.clone().addScaledVector(edge,bladeOffsetM), direction, edge, chisel:wall.chiselType, energyJ:wall.chiselEnergyJ, widthM:wall.chiselWidthM, bladeOffsetM};
   }
@@ -113,16 +122,14 @@ export class FPSRig extends THREE.Group {
     super();
     this.name = 'Modular FPS hands and tools';
     this.userData.studioEntityId = 'fps-rig';
-    this.position.set(0.08, this.restingY, -0.88);
-    this.scale.setScalar(0.74);
+    this.position.set(0.02, this.restingY, -0.22);
     this.addTool('spray', this.createDetailedTool('spray'));
-    const hammer=this.createHammer();addHammerDetails(hammer);this.addTool('hammer', hammer);
-    this.add(this.hammerArms);
+    this.addTool('hammer', this.createHammer());
     for(const tool of ['fitting','level','spring','cutter','trowel','hose'] as const)this.addTool(tool,this.createDetailedTool(tool));
     this.show('spray');
   }
 
-  show(tool: RigTool): void { this.tools.forEach((group, key) => { group.visible = key === tool; }); this.hammerArms.visible=tool==='hammer'; }
+  show(tool: RigTool): void { this.selectedTool=tool; this.tools.forEach((group, key) => { group.visible = key === tool; }); this.armSets.forEach((arms,key)=>arms.forEach(arm=>arm.group.visible=key===tool)); }
   setSprayColor(color: number): void {
     this.sprayCanMaterial?.color.setHex(color);
     this.tools.get('spray')?.traverse(object=>{if(object instanceof THREE.Mesh && object.userData.sprayColor)(object.material as THREE.MeshStandardMaterial).color.setHex(color);});
@@ -140,6 +147,7 @@ export class FPSRig extends THREE.Group {
     this.strikeAmount = Math.max(0, this.strikeAmount - dt * 5.5);
     this.rotation.x = -Math.sin(this.strikeAmount * Math.PI) * 0.16;
     this.toolAction=Math.max(0,this.toolAction-dt*2.5);
+    this.tools.forEach((group,key)=>{if(key!=='hammer')group.position.set(0,0,0);});
     const cutter=this.tools.get('cutter')?.getObjectByName('cutter-moving-handle');
     if(cutter)cutter.rotation.z=Math.sin(this.toolAction*Math.PI)*.28;
     const trigger=this.tools.get('hose')?.getObjectByName('hose-trigger');
@@ -172,72 +180,82 @@ export class FPSRig extends THREE.Group {
   }
 
   private addTool(key: RigTool, group: THREE.Group): void { group.name = `FPS ${key} tool`; group.userData.studioEntityId = `fps-rig:${key}`; this.tools.set(key, group); this.add(group); }
-  private poseHammerArms(camera: THREE.Camera, hammer: THREE.Group): void {
-    this.hammerArms.visible=hammer.visible;
-    const upright=new THREE.Vector3(0,1,0);
-    const segment=(mesh: THREE.Mesh, a: THREE.Vector3, b: THREE.Vector3): void=>{
-      const delta=b.clone().sub(a);
-      mesh.position.copy(a).add(b).multiplyScalar(.5);
-      mesh.quaternion.setFromUnitVectors(upright,delta.clone().normalize());
-      mesh.scale.y=delta.length();
-    };
-    for(const arm of this.hammerArmParts){
-      const wrist=this.worldToLocal(hammer.localToWorld(arm.grip.clone()));
-      const wristCamera=camera.worldToLocal(this.localToWorld(wrist.clone()));
-      // Shoulders enter from below the viewport. Elbows stay on their own side
-      // of the picture instead of inheriting the motor's pitched orientation.
-      const stance=THREE.MathUtils.clamp(this.workStanceSide,-1,1), blend=Math.abs(stance);
-      const shoulder=this.worldToLocal(camera.localToWorld(new THREE.Vector3(arm.side*(.38-.07*blend)-stance*.06,-.66, -.36+arm.side*stance*.08)));
-      // Route the forearm up underneath its wrist. When the tool leans left,
-      // the right upper arm crosses below the work area, never across the tip.
-      const elbow=this.worldToLocal(camera.localToWorld(new THREE.Vector3(THREE.MathUtils.lerp(wristCamera.x+arm.side*.10,wristCamera.x+(Math.sign(wristCamera.x)||arm.side)*.25,blend),Math.min(-.34,wristCamera.y-.32+.07*blend),Math.min(-.52+.07*blend,wristCamera.z*(.80-.08*blend)))));
-      segment(arm.upper,shoulder,elbow); segment(arm.forearm,elbow,wrist);
-      const axis=wrist.clone().sub(elbow).normalize();
-      arm.cuff.position.copy(wrist).addScaledVector(axis,-.05);
-      arm.cuff.quaternion.setFromUnitVectors(upright,axis);
-      arm.glove.position.copy(wrist);
-      arm.glove.quaternion.copy(hammer.quaternion);
-    }
+  private bodyFrame(camera:THREE.Camera): { eye:THREE.Vector3; right:THREE.Vector3; forward:THREE.Vector3 } {
+    const eye=camera.getWorldPosition(new THREE.Vector3()),forward=camera.getWorldDirection(new THREE.Vector3());
+    forward.y=0;forward.normalize();
+    return {eye,forward,right:forward.clone().cross(new THREE.Vector3(0,1,0)).normalize()};
   }
-  private createHammerArms(): void {
-    this.hammerArms.name='Hammer arms with independent shoulder and grip anchors';
-    for(const side of [-1,1]){
-      const sleeveMaterial=material(0x263e35,.95);
-      const upper=new THREE.Mesh(new THREE.CylinderGeometry(.062,.072,1,10),sleeveMaterial);
-      const forearm=new THREE.Mesh(new THREE.CylinderGeometry(.049,.062,1,10),sleeveMaterial);
-      const cuff=new THREE.Mesh(new THREE.CylinderGeometry(.05,.055,.04,10),material(0x1d3129,.94));
-      const glove=new THREE.Mesh(new THREE.SphereGeometry(.062,12,9),material(0x494842,.92));
-      glove.scale.set(1.08,.72,.92);
-      const grip=side<0?new THREE.Vector3(-.13,-.005,-.30):new THREE.Vector3(.19,-.12,.015);
-      this.hammerArmParts.push({upper,forearm,cuff,glove,grip,side});
-      for(const mesh of [upper,forearm,cuff,glove]){
-        const m=mesh.material as THREE.MeshStandardMaterial;m.depthTest=true;m.depthWrite=true;m.transparent=false;
-        mesh.renderOrder=20;this.hammerArms.add(mesh);
+  private shoulder(camera:THREE.Camera,side:number):THREE.Vector3 {
+    const {eye,right,forward}=this.bodyFrame(camera);
+    return eye.addScaledVector(right,side*.20).addScaledVector(forward,-.03).add(new THREE.Vector3(0,-.22,0));
+  }
+  private wrist(arm:WorkerArm):THREE.Vector3 {
+    return arm.hand.localToWorld(new THREE.Vector3().fromArray(arm.hand.userData.wristPoint));
+  }
+  private gripsReachable(camera:THREE.Camera,tool:THREE.Group):boolean {
+    tool.updateWorldMatrix(true,true);
+    return (this.armSets.get(this.selectedTool)??[]).every(arm=>this.shoulder(camera,arm.side).distanceTo(this.wrist(arm))<=MAX_WRIST_REACH_M);
+  }
+  /** Move the held tool into the intersection of the two finite arm workspaces. */
+  private constrainHeldTool(camera:THREE.Camera):void {
+    const tool=this.tools.get(this.selectedTool)!;
+    for(let i=0;i<16;i++){
+      let moved=false;
+      for(const arm of this.armSets.get(this.selectedTool)??[]){
+        tool.updateWorldMatrix(true,true);
+        const shoulder=this.shoulder(camera,arm.side),wrist=this.wrist(arm),delta=wrist.clone().sub(shoulder),distance=delta.length();
+        if(distance>MAX_WRIST_REACH_M){
+          const correction=delta.multiplyScalar((MAX_WRIST_REACH_M-.0005-distance)/distance);
+          const world=tool.getWorldPosition(new THREE.Vector3()).add(correction);
+          tool.position.copy(this.worldToLocal(world)); moved=true;
+        }
       }
+      if(!moved)break;
+    }
+    tool.updateWorldMatrix(true,true);
+  }
+  private restHammer(camera:THREE.Camera):void {
+    this.reachable=false;this.chiselInAir=true;
+    const hammer=this.tools.get('hammer')!;
+    hammer.position.set(0,-.055,0);hammer.rotation.set(.12,-.08,0);
+    this.constrainHeldTool(camera);this.poseArms(camera);
+    this.chiselTipWorld.copy(hammer.localToWorld(this.tipAnchor.clone()));
+  }
+  poseArms(camera:THREE.Camera):void {
+    if(this.selectedTool!=='hammer')this.constrainHeldTool(camera);
+    const {right}=this.bodyFrame(camera);
+    for(const arm of this.armSets.get(this.selectedTool)??[]){
+      poseWorkerArm(arm,this.shoulder(camera,arm.side),this.wrist(arm),right);
+      flexWorkerHand(arm.hand,this.toolAction+this.strikeAmount*.35+(this.hoseActive?.4:0),performance.now()*.001);
     }
   }
-  private hand(x: number, y: number, z: number, rotation = 0): THREE.Group {
-    const hand = new THREE.Group();
-    // Keep the authored hand/tool scale, but extend the forearm beyond the
-    // lower viewport edge. The body is then implied by an off-screen shoulder
-    // instead of a visibly capped, floating arm.
-    const sleeve = new THREE.Mesh(new THREE.CapsuleGeometry(0.062, 0.5, 6, 12), material(0x263e35, 0.95));
-    sleeve.position.y = -0.19;
-    const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.058, 0.062, 0.04, 12), material(0x1d3129, 0.94));
-    cuff.position.y = 0.115;
-    const glove = new THREE.Mesh(new THREE.SphereGeometry(0.062, 12, 9), material(0x494842, 0.92));
-    glove.scale.set(1.08, 0.72, 0.92);
-    glove.position.y = 0.155;
-    hand.rotation.z = rotation;
-    hand.add(sleeve, cuff, glove);
-    place(hand, x, y, z);
-    return hand;
+  /** Hand tools need a body-space reachable target; a hose or mortar projectile can travel farther. */
+  canReachPoint(camera:THREE.Camera,point:THREE.Vector3,extension=.10):boolean {
+    return [-1,1].some(side=>this.shoulder(camera,side).distanceTo(point)<=MAX_WRIST_REACH_M+extension);
+  }
+  debugPose():object {
+    return {tool:this.selectedTool,reachable:this.reachable,arms:(this.armSets.get(this.selectedTool)??[]).map(arm=>({
+      side:arm.side,upperLengthM:UPPER_ARM_M,forearmLengthM:FOREARM_M,
+      shoulder:arm.shoulder.toArray(),elbow:arm.elbow.toArray(),wrist:arm.wrist.toArray(),
+      grip:arm.hand.getWorldPosition(new THREE.Vector3()).toArray(),fingers:arm.hand.children.filter(o=>o.userData.digit).length,gripping:true,
+    }))};
+  }
+  private attachArms(kind:RigTool,group:THREE.Group):void {
+    const arms:WorkerArm[]=[];
+    const primary=new THREE.Vector3().fromArray(group.userData.gripPoint);
+    for(const side of [1,-1]){
+      const second=group.userData.secondaryGripPoint as number[]|undefined;
+      // Free hand supports the wrist for small tools; two-hand tools use their authored second grip.
+      const grip=side===1?primary.clone():second?new THREE.Vector3().fromArray(second):primary.clone().add(new THREE.Vector3(-.055,-.06,.06));
+      const style=side<0&&kind==='hammer'?'hammer-support':side<0&&!second?'support':kind;
+      const hand=workerHand(side,style); hand.position.copy(grip);group.add(hand);
+      const arm=workerArm(side,hand,grip);arms.push(arm);this.add(arm.group);
+    }
+    this.armSets.set(kind,arms);
   }
   private createDetailedTool(kind: Exclude<RigTool,'hammer'>):THREE.Group {
-    const group=buildToolModel(kind),grip=new THREE.Vector3().fromArray(group.userData.gripPoint);
-    group.add(this.hand(grip.x+.06,grip.y-.14,grip.z+.01,.4));
-    const second=group.userData.secondaryGripPoint as number[] | undefined;
-    if(second)group.add(this.hand(second[0]-.055,second[1]-.14,second[2]+.01,-.4));
+    const group=buildToolModel(kind);
+    this.attachArms(kind,group);
     if(kind==='trowel'){
       const load=new THREE.Mesh(new THREE.IcosahedronGeometry(.044,2),material(0x857a66,.96));load.name='trowel-load';load.position.set(.01,.06,-.077);load.scale.set(.85,1.5,.22);group.add(load);
     }
@@ -246,37 +264,25 @@ export class FPSRig extends THREE.Group {
       this.sprayMist=new THREE.Points(geometry,new THREE.PointsMaterial({color:0x168cdb,size:.009,transparent:true,opacity:.4,depthTest:false}));this.sprayMist.visible=false;this.sprayMist.renderOrder=21;group.add(this.sprayMist);
     }
     // Shared builders also serve world props; only viewmodels use this overlay pass.
-    group.traverse(object=>{if(object instanceof THREE.Mesh){for(const m of Array.isArray(object.material)?object.material:[object.material]){m.transparent=true;m.depthTest=false;m.depthWrite=false;}object.renderOrder=20;object.castShadow=false;}});
+    group.traverse(object=>{if(object instanceof THREE.Mesh){for(const m of Array.isArray(object.material)?object.material:[object.material]){m.transparent=false;m.depthTest=true;m.depthWrite=true;}object.renderOrder=20;object.castShadow=false;}});
     return group;
   }
   private createHammer(): THREE.Group {
-    const group = new THREE.Group();
-    this.createHammerArms();
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.14, 0.28), material(0xa42d23, 0.48, 0.25));
-    body.rotation.x = -0.25; place(body, 0.02, -0.06, -0.1);
-    const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.036, 0.25, 10), material(0x282b29, 0.84));
-    place(grip, 0.19, -0.12, 0.015);
-    const gripBridge=new THREE.Mesh(new THREE.BoxGeometry(.13,.035,.045),material(0x282b29,.84));
-    place(gripBridge,.135,.005,.015);
-    const chuck = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.037, 0.12, 12), material(0x555b5a, 0.35, 0.65));
-    chuck.rotation.x = Math.PI / 2; place(chuck, 0.02, 0.005, -0.29);
-    const sideGrip=new THREE.Mesh(new THREE.CylinderGeometry(.022,.026,.22,10),material(0x282b29,.84));
-    sideGrip.rotation.z=Math.PI/2;place(sideGrip,-.08,-.005,-.30);
-    const chisel = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.018, 0.35, 8), material(0x6d7370, 0.3, 0.75));
-    chisel.rotation.x = Math.PI / 2; place(chisel, 0.02, 0.005, -0.51);
-    const top = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.04, 0.2), material(0x252827, 0.82));
-    top.rotation.x = -0.25; place(top, 0.02, 0.025, -0.1);
+    const group = buildToolModel('hammer');
+    this.attachArms('hammer',group);
+    const chisel = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.018, 0.23, 12), material(0x6d7370, 0.3, 0.75));
+    chisel.rotation.x = Math.PI / 2; place(chisel, 0.02, 0.005, -0.45);
     const wedge = new THREE.BufferGeometry();
     wedge.setAttribute('position', new THREE.Float32BufferAttribute([-.0225,-.006,.035, .0225,-.006,.035, .0225,.006,.035, -.0225,.006,.035, -.0225,0,-.035, .0225,0,-.035], 3));
     wedge.setIndex([0,2,1,0,3,2,0,1,5,0,5,4,3,4,5,3,5,2,0,4,3,1,2,5]);
     wedge.computeVertexNormals();
     const chiselTip = new THREE.Mesh(wedge, material(0x7b807c, 0.28, 0.8));
-    place(chiselTip, 0.02, 0.005, -0.705);
+    place(chiselTip, 0.02, 0.005, -0.565);
     this.flatTip = chiselTip;
     this.pointedTip = new THREE.Mesh(new THREE.ConeGeometry(.012,.07,6), material(0x7b807c,.28,.8));
     this.pointedTip.rotation.x = -Math.PI/2;
-    place(this.pointedTip,.02,.005,-.705); this.pointedTip.visible=false;
-    group.add(body, top, grip, gripBridge, sideGrip, chuck, chisel, chiselTip, this.pointedTip);
+    place(this.pointedTip,.02,.005,-.565); this.pointedTip.visible=false;
+    group.add(chisel, chiselTip, this.pointedTip);
     // The wall must occlude parts of the bit inside solid shell/ribs. The other
     // handheld tools retain their established overlay rendering.
     group.traverse(object=>{ if(object instanceof THREE.Mesh) for(const m of Array.isArray(object.material)?object.material:[object.material]) {m.depthTest=true;m.depthWrite=true;m.transparent=false;} });

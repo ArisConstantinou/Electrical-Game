@@ -19,7 +19,7 @@ for(const mobile of [false,true]){
   if(mobile){await page.locator(`[data-tool="${tool}"]`).tap();}
   await page.evaluate(()=>{
    const g=window.__wireTheHouse,c=g.renderer.camera;
-   c.position.set(-.55,1.65,-.88);c.lookAt(-.48,1.50,-2.41);g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;g.step(1/60);
+   c.position.set(-.55,1.65,-1.59);c.lookAt(-.55,1.30,-2.41);g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;g.step(1/60);
   });
   await page.waitForTimeout(90);
   await page.evaluate(async()=>{const g=window.__wireTheHouse;await g.room.brickWall.waitForGeometry();g.renderer.render();await g.renderer.waitForFrame();});
@@ -29,15 +29,9 @@ for(const mobile of [false,true]){
    const models=[];group.traverse(o=>{if(o.isMesh&&o.visible)models.push({name:o.name,type:o.geometry.type,vertices:o.geometry.attributes.position?.count??0});});
    const world=(object,xyz)=>object.localToWorld(g.renderer.camera.position.clone().fromArray(xyz));
    const grips=[];
-   if(group.userData.gripPoint){
-    const targets=[group.userData.gripPoint,...(group.userData.secondaryGripPoint?[group.userData.secondaryGripPoint]:[])];
-    const hands=group.children.filter(child=>child.type==='Group'&&child.children.some(mesh=>mesh.geometry?.type==='SphereGeometry'));
-    for(let i=0;i<targets.length;i++){
-     const glove=hands[i]?.children.find(mesh=>mesh.geometry?.type==='SphereGeometry');
-     if(glove)grips.push(glove.getWorldPosition(g.renderer.camera.position.clone()).distanceTo(world(group,targets[i])));
-    }
-   }else if(selected==='hammer'){
-    for(const arm of g.fpsRig.hammerArmParts){const target=group.localToWorld(arm.grip.clone()),actual=g.fpsRig.localToWorld(arm.glove.position.clone());grips.push(target.distanceTo(actual));}
+   for(const arm of g.fpsRig.armSets.get(selected)??[]){
+    const target=group.localToWorld(arm.grip.clone());
+    grips.push(arm.hand.getWorldPosition(g.renderer.camera.position.clone()).distanceTo(target));
    }
    const visible=e=>{const r=e.getBoundingClientRect(),s=getComputedStyle(e);return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none';};
    const labels=[...document.querySelectorAll('button,[data-tool] span,#aim-control-label,#mortar-panel strong,#mortar-panel small')].filter(visible);

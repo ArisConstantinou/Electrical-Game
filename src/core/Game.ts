@@ -145,9 +145,8 @@ export class Game {
       this.actionCooldown = this.selectedTool === 'spray' ? 0.045 : this.selectedTool === 'hammer' ? 0.24 / Math.max(.25, this.hammerSpeed) : 0.18;
     }
     const mortarTool = this.started && !leveling && (this.selectedTool === 'trowel' || this.selectedTool === 'hose');
-    const nearbySurface=this.room.brickWall.aim(this.renderer.camera);
-    const reach=nearbySurface ? nearbySurface.point.distanceTo(this.renderer.camera.position) : 2;
-    this.fpsRig.position.z=this.selectedTool==='hammer'?-.88:-Math.min(.88,Math.max(.12,reach-.23));
+    // The player's arms hold tools near the body; aiming does not extend them.
+    this.fpsRig.position.z=this.selectedTool==='hammer'?-.22:-.42;
     const releaseOrigin = this.fpsRig.toolTipWorld(this.renderer.camera, this.selectedTool);
     if (mortarTool && this.selectedTool === 'trowel') this.mortar.swing(this.input.actionHeld,dt,this.renderer.camera,releaseOrigin);
     else this.mortar.cancel();
@@ -165,9 +164,10 @@ export class Game {
     this.fpsRig.update(dt, this.player.velocity.lengthSq() > 0.02, spraying);
     this.fpsRig.show(this.selectedTool);
     if (this.selectedTool === 'hammer') this.fpsRig.contact(this.renderer.camera, this.room.brickWall);
+    else this.fpsRig.poseArms(this.renderer.camera);
     const wallAim = Boolean(this.room.brickWall.aim(this.renderer.camera));
     const pointAim = Boolean(this.mission.target(this.renderer.camera));
-    const aimed = this.selectedTool === 'spray' || this.selectedTool === 'hammer' ? wallAim : pointAim;
+    const aimed = this.selectedTool === 'hammer' ? this.fpsRig.reachable && !this.fpsRig.chiselInAir : this.selectedTool === 'spray' ? wallAim : pointAim;
     this.hud.update(active, aimed, this.mission.progress, this.selectedTool);
     const sprayColor = SPRAY_COLORS[this.sprayColorIndex];
     this.hud.updateSprayControls(this.sprayMode, sprayColor.name, sprayColor.css, this.selectedTool === 'spray');
@@ -190,6 +190,7 @@ export class Game {
       mortar: this.mortar.telemetry,
       water: this.roomWater.telemetry,
       hammer: { speedMultiplier: this.hammerSpeed, paused: this.hammerSpeed === 0, impactIntervalSeconds: this.hammerSpeed > 0 ? .24 / this.hammerSpeed : null },
+      body: this.fpsRig.debugPose(),
       coordinateSystem: 'metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall',
       mode: !this.started ? 'start' : this.mission.complete ? 'mission-complete' : point?.stage === 'leveling' ? 'leveling' : 'playing',
       player: { crouched:this.player.eyeHeight<1.1, x: Number(this.renderer.camera.position.x.toFixed(3)), y: Number(this.renderer.camera.position.y.toFixed(3)), z: Number(this.renderer.camera.position.z.toFixed(3)), yaw: Number(this.player.yaw.toFixed(3)), pitch: Number(this.player.pitch.toFixed(3)) },
@@ -203,6 +204,17 @@ export class Game {
   private performAction(continuing = false): void {
     const active = this.mission.activePoint;
     if (!active) return;
+    if (['fitting','level','spring','cutter'].includes(this.selectedTool)) {
+      const freeBox=this.selectedTool==='fitting'&&!active.boxGroup.visible;
+      const hit=freeBox?this.room.brickWall.aim(this.renderer.camera):null;
+      const point=freeBox?(hit?new THREE.Vector3(hit.point.x,hit.point.y,hit.point.z):null):active.getWorldPosition(new THREE.Vector3());
+      if(!point||!this.fpsRig.canReachPoint(this.renderer.camera,point)){
+        this.hud.notify('Out of reach. Move closer or crouch for low work.',false);return;
+      }
+    }
+    if(this.selectedTool==='hammer'&&!this.fpsRig.contact(this.renderer.camera,this.room.brickWall)){
+      this.hud.notify(this.fpsRig.reachable?'Place the chisel against remaining masonry.':this.fpsRig.reachReason,false);return;
+    }
     const spatialTool = this.selectedTool === 'spray' || this.selectedTool === 'hammer' || (this.selectedTool === 'fitting' && !active.boxGroup.visible);
     const target = active.stage === 'leveling' ? active : spatialTool ? active : this.mission.target(this.renderer.camera);
     if (!target) { this.hud.notify('Aim at the work area you chose.', false); return; }
@@ -236,7 +248,14 @@ export class Game {
       if(event.code === 'Minus' || event.code === 'Equal') {event.preventDefault();setHammerSpeed(this.hammerSpeed + (event.code === 'Equal' ? .25 : -.25));}
     });
     addEventListener('wirehouse:work-height',()=>{this.player.crouched=!this.player.crouched;document.querySelector('#work-height')!.textContent=this.player.crouched?'STAND UP':'CROUCH · LOW WORK';});
-    const pack=()=>{if(this.started&&this.selectedTool==='trowel'){this.mortar.cancel();this.input.actionHeld=false;const success=this.mortar.pack(this.renderer.camera);this.mortar.lastOutcome=success?'Pressed into the gap. Excess mortar falls away.':'Move closer and aim at exposed material in the gap.';if(success)this.fpsRig.toolAction=1;}};
+    const pack=()=>{if(this.started&&this.selectedTool==='trowel'){
+      this.mortar.cancel();this.input.actionHeld=false;
+      const hit=this.room.brickWall.aim(this.renderer.camera);
+      const reachable=hit&&this.fpsRig.canReachPoint(this.renderer.camera,new THREE.Vector3(hit.point.x,hit.point.y,hit.point.z),.18);
+      const success=Boolean(reachable)&&this.mortar.pack(this.renderer.camera);
+      this.mortar.lastOutcome=success?'Pressed into the gap. Excess mortar falls away.':'Move closer and aim at exposed material in the gap.';
+      if(success)this.fpsRig.toolAction=1;
+    }};
     addEventListener('wirehouse:mortar-pack',pack);
     addEventListener('keydown',event=>{if(event.code==='KeyP'&&!event.repeat)pack();});
     const cancelSwing=()=>this.mortar.cancel();

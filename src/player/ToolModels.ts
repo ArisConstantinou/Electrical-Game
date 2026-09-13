@@ -199,30 +199,92 @@ function fitting(): THREE.Group {
   return metadata(group, [.137, -.057, -.043], [.095, -.025, -.085]);
 }
 
-/** Adds housing details without changing the existing hammer tip, shaft or grip transforms. */
-export function addHammerDetails(group: THREE.Group): THREE.Group {
-  if (group.getObjectByName('Hammer manufactured housing details')) return group;
-  const details = new THREE.Group(); details.name = 'Hammer manufactured housing details'; group.add(details);
-  const red = mat(0xb72826, .4, .12), dark = rubber(), metal = steel();
-  const panelShape = outline([[-.083, .014], [-.067, .044], [.053, .044], [.083, .014], [.074, -.107], [.040, -.143], [-.054, -.137], [-.079, -.094]]);
-  const housing = part(details, extrude(panelShape, .242, .005), red, [.02, -.016, -.108], 'Contoured motor housing'); housing.rotation.x = -.25;
-  const cap = part(details, extrude(roundedRectangle(.123, .042, .015), .174, .003), dark, [.02, .040, -.101], 'Rounded upper impact resistant shroud'); cap.rotation.x = -.25;
-  for (const side of [-1, 1]) {
-    const panel = part(details, new THREE.BoxGeometry(.003, .056, .106), mat(0x393c39, .77), [.109 * side + .02, -.038, -.079], 'Recessed side ventilation grille');
-    panel.rotation.x = -.25;
-    for (let i = 0; i < 7; i++) part(details, new THREE.BoxGeometry(.004, .004, .085), dark, [.111 * side + .02, -.015 - i * .006, -.080], 'Motor cooling vent slot');
-    for (const z of [-.027, -.184]) { const bolt = part(details, new THREE.CylinderGeometry(.004, .004, .003, 8), metal, [.110 * side + .02, -.074, z], 'Housing assembly screw'); bolt.rotation.z = Math.PI / 2; }
+/** Cordless SDS-max silhouette, based on the M18 FHACO745 manufacturer's reference.
+ * The rig supplies the interchangeable steel shaft and chisel beyond the chuck.
+ * Grip coordinates are deliberately unchanged so every hand stays on its handle.
+ * https://www.milwaukeetool.eu/en-eu/m18-fuel-45-mm-sds-max-drilling-and-breaking-hammer-with-one-key/m18-fhaco745/
+ */
+function hammer(): THREE.Group {
+  const group = new THREE.Group();
+  const red = mat(0xbf2428, .38, .08), redEdge = mat(0x8a1c22, .53), dark = rubber();
+  const graphite = mat(0x343b3d, .56, .18), alloy = mat(0x727d80, .34, .72), metal = steel();
+  const seam = mat(0x141b1e, .82), inset = mat(0x454e50, .64), light = mat(0xd1d5ca, .34);
+  // The motor is a moulded, bevelled shell, with a raised spine and separate
+  // front cast gearbox. It replaces the old rectangular red placeholder.
+  const shellProfile = outline([[-.080,.067],[-.053,.092],[.036,.088],[.075,.053],[.084,-.055],[.053,-.146],[-.014,-.169],[-.070,-.133],[-.088,-.048]]);
+  part(group, extrude(shellProfile, .223, .010), red, [.020,-.014,-.116], 'Cordless contoured brushless motor housing');
+  const spine = part(group, extrude(roundedRectangle(.108,.041,.018), .216, .005), graphite, [.020,.073,-.135], 'Impact resistant upper spine'); spine.rotation.x=-.11;
+  const lowerBumper=part(group,extrude(roundedRectangle(.104,.046,.011),.140,.004),dark,[.016,-.162,-.098],'Motor base rubber bumper'); lowerBumper.rotation.x=.13;
+  // Split-shell seam follows the rear silhouette and makes the housing feel assembled.
+  const split = part(group, extrude(shellProfile,.003,.0105), redEdge,[.020,-.014,-.116],'Motor casing mould split'); split.position.z=-.116;
+  const gearboxProfile = [[.052,-.090],[.063,-.076],[.075,-.040],[.074,.008],[.062,.044],[.046,.076]].map(p=>new THREE.Vector2(p[0],p[1]));
+  const gearbox=part(group,new THREE.LatheGeometry(gearboxProfile,32),graphite,[.020,.009,-.232],'Cast tapered SDS max impact gearbox'); gearbox.rotation.x=Math.PI/2;
+  torus(group,.063,.004,alloy,[.020,.009,-.215],'Gearbox bolted joint');
+  for(const x of [-.034,.074]) rod(group,[x,-.029,-.213],[x,-.021,-.268],.0055,inset,'Gearbox strengthening rib');
+  // Rubber quick-change sleeve, clamp and steel dust seal at the shaft entry.
+  rod(group,[.020,.005,-.280],[.020,.005,-.343],.036,dark,'SDS max quick change chuck sleeve',.039);
+  for(const z of [-.285,-.300,-.316,-.332]) torus(group,.038,.0025,seam,[.020,.005,z],'Chuck sleeve circumferential grip');
+  for(let i=0;i<10;i++) {
+    const a=i*Math.PI/5;
+    rod(group,[.020+Math.cos(a)*.038,.005+Math.sin(a)*.038,-.292],[.020+Math.cos(a)*.038,.005+Math.sin(a)*.038,-.327],.0025,graphite,'Chuck longitudinal grip flute');
   }
-  const selector = part(details, new THREE.CylinderGeometry(.020, .020, .011, 24), dark, [.02, .067, -.171], 'Chisel indexing selector');
-  selector.rotation.z = .1; part(details, new THREE.BoxGeometry(.022, .005, .008), mat(0xd2c79c, .49), [.02, .074, -.174], 'Selector position pointer');
-  for (const z of [-.261, -.283, -.315, -.338]) torus(details, .043, .0033, dark, [.02, .005, z], 'SDS chuck grip ring');
-  for (let i = 0; i < 6; i++) torus(details, .029, .002, dark, [.19, -.041 - i * .029, .015], 'Rear grip rubber rib', 'y');
-  for (let i = 0; i < 5; i++) torus(details, .024, .002, dark, [-.045 - i * .025, -.005, -.30], 'Auxiliary grip rubber rib', 'x');
-  rod(details, [.19, -.245, .015], [.194, -.298, .031], .010, dark, 'Flexible power cord strain relief', .0065);
-  tube(details, [[.194, -.298, .031], [.226, -.359, .065], [.205, -.451, .084], [.237, -.566, .11]], .0045, dark, 'Trailing demolition hammer power cable');
-  const badge = label('DEMOLITION', 'SDS MAX', .084, .035, '#eeeeea', '#b72826'); if (badge) { badge.position.set(.02, -.051, .021); details.add(badge); }
-  details.traverse(object => { if (object instanceof THREE.Mesh) { object.renderOrder = 20; object.userData.toolModelPart = true; } });
-  return group;
+  torus(group,.022,.005,alloy,[.020,.005,-.345],'Steel SDS max collar');
+  torus(group,.016,.003,dark,[.020,.005,-.349],'Chisel dust seal');
+  // Open rear D-frame. Both bridges connect the grip to the shell; the hand
+  // wraps the rubber member at the published grip point, not through a box.
+  tube(group,[[.075,.031,-.033],[.147,.040,-.002],[.190,.005,.015],[.190,-.065,.015],[.190,-.173,.015],[.165,-.198,.002],[.070,-.159,-.035]],.017,red,'Open rear D handle structural frame');
+  rod(group,[.190,-.046,.015],[.190,-.180,.015],.022,dark,'Rear D handle rubber grip',.0235);
+  const trigger=part(group,extrude(roundedRectangle(.022,.051,.005),.012,.002),graphite,[.167,-.068,.024],'hammer-trigger'); trigger.rotation.z=-.06;
+  for(let i=0;i<7;i++) torus(group,.0228,.0012,graphite,[.19,-.066-i*.014,.015],'Rear handle textured rubber ring','y');
+  part(group,extrude(roundedRectangle(.045,.027,.005),.058,.002),graphite,[.123,.021,-.005],'Upper handle vibration isolation joint');
+  // Front clamp holds an actual perpendicular support grip with end flange.
+  torus(group,.046,.006,alloy,[.020,.005,-.275],'Adjustable auxiliary handle clamp');
+  rod(group,[.018,-.005,-.30],[-.060,-.005,-.30],.014,alloy,'Auxiliary handle clamp spindle');
+  rod(group,[-.066,-.005,-.30],[-.190,-.005,-.30],.022,dark,'Auxiliary rubber hand grip',.024);
+  for(let i=0;i<8;i++) torus(group,.023,.0012,graphite,[-.073-i*.015,-.005,-.30],'Auxiliary hand grip texture','x');
+  torus(group,.027,.0035,dark,[-.192,-.005,-.30],'Auxiliary handle end stop','x');
+  // A removable high-output pack makes cordless power visible from the player
+  // view as well as from the side. No cable or strain relief exists on this model.
+  part(group,extrude(roundedRectangle(.143,.029,.006),.100,.003),red,[.143,-.219,.006],'Battery slide rail shoe');
+  part(group,extrude(roundedRectangle(.170,.078,.010),.115,.006),dark,[.136,-.268,.006],'Removable high output battery pack');
+  part(group,extrude(roundedRectangle(.171,.015,.004),.115,.003),graphite,[.136,-.302,.006],'Battery impact bumper');
+  part(group,extrude(roundedRectangle(.157,.013,.004),.108,.002),redEdge,[.136,-.235,.006],'Battery casing red upper seam');
+  for(const x of [.054,.218]) {
+    part(group,extrude(roundedRectangle(.008,.026,.003),.036,.001),red,[x,-.25,.010],'Battery release latch');
+    for(let i=0;i<3;i++) part(group,new THREE.BoxGeometry(.002,.002,.026),graphite,[x,-.243-i*.006,.010],'Battery release latch ribs');
+  }
+  for(let i=0;i<4;i++) part(group,new THREE.BoxGeometry(.022,.012,.002),inset,[.078+i*.039,-.279,.073],'Battery protective cell ribs');
+  const powerBadge=label('18V · 12.0 Ah','HIGH OUTPUT',.127,.034,'#f1f2ec','#252b2c');
+  if(powerBadge){powerBadge.position.set(.136,-.262,.0735);group.add(powerBadge);}
+  part(group,new THREE.BoxGeometry(.012,.007,.002),graphite,[.186,-.290,.074],'Battery charge check button');
+  for(let i=0;i<4;i++) part(group,new THREE.BoxGeometry(.007,.004,.002),mat(i<3?0x72b369:0x283a30,.4),[.087+i*.012,-.290,.074],'Battery charge indicator');
+  // Cooling louvres, fasteners and selector are individually readable when close.
+  for(const side of [-1,1]) {
+    const x=.020+side*.087;
+    part(group,new THREE.BoxGeometry(.004,.066,.113),graphite,[x,-.032,-.093],'Inset motor ventilation panel');
+    for(let i=0;i<7;i++) part(group,new THREE.BoxGeometry(.005,.0035,.093),seam,[x+side*.002,-.008-i*.008,-.092],'Recessed motor cooling slot');
+    for(const z of [-.041,-.186]) {
+      const bolt=part(group,new THREE.CylinderGeometry(.004,.004,.003,10),metal,[x+side*.003,-.091,z],'Torx motor housing screw'); bolt.rotation.z=Math.PI/2;
+    }
+    const sideBadge=label('SDS MAX','BRUSHLESS',.081,.027,'#f7f1e7','#ae2025');
+    if(sideBadge){sideBadge.position.set(.020+side*.095,-.111,-.105);sideBadge.rotation.y=side*Math.PI/2;group.add(sideBadge);}
+  }
+  const selector=part(group,new THREE.CylinderGeometry(.021,.021,.009,24),graphite,[.020,.078,-.167],'Hammer and rotary mode selector');
+  part(group,extrude(roundedRectangle(.025,.007,.003),.008),red,[.020,.084,-.166],'Mode selector raised lever').rotation.x=Math.PI/2;
+  part(group,new THREE.BoxGeometry(.004,.002,.009),light,[.020,.085,-.186],'Mode selector index');
+  selector.userData.rotaryHammerMode=true;
+  const rearBadge=label('SDS MAX','CORDLESS · BRUSHLESS',.087,.035,'#fff8ed','#b32127');
+  if(rearBadge){rearBadge.position.set(.011,-.044,.007);group.add(rearBadge);}
+  group.userData.housingOnly=true;
+  group.userData.cordless=true;
+  group.userData.referenceModel='M18 FHACO745 silhouette';
+  return metadata(group,[.19,-.12,.015],[.02,.005,-.60],[-.13,-.005,-.30]);
+}
+
+/** Backwards-compatible caller: attach the complete replacement housing once. */
+export function addHammerDetails(group: THREE.Group): THREE.Group {
+  if(group.getObjectByName('Cordless SDS max housing')) return group;
+  const housing=hammer(); housing.name='Cordless SDS max housing'; group.add(housing); return group;
 }
 
 export function buildToolModel(kind: ToolModelKind): THREE.Group {
@@ -235,7 +297,7 @@ export function buildToolModel(kind: ToolModelKind): THREE.Group {
     case 'cutter': group = cutter(); break;
     case 'hose': group = hose(); break;
     case 'fitting': group = fitting(); break;
-    case 'hammer': group = addHammerDetails(new THREE.Group()); metadata(group, [.19, -.12, .015], [.02, .005, -.74], [-.13, -.005, -.30]); group.userData.decorationsOnly = true; break;
+    case 'hammer': group = hammer(); break;
   }
   group.name = `Reference model: ${kind}`; group.userData.modelKind = kind;
   return group;

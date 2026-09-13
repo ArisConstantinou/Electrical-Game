@@ -29,7 +29,7 @@ try {
     await page.keyboard.press('Digit4');
     await page.evaluate(() => {
       const g = window.__wireTheHouse, c = g.renderer.camera;
-      c.position.set(.7, g.player.eyeHeight, -1.2); c.lookAt(.7, 1.4, -2.41);
+      c.position.set(.7, g.player.eyeHeight, -1.59); c.lookAt(.7, 1.3, -2.41);
       g.player.yaw = c.rotation.y; g.player.pitch = c.rotation.x; g.step(0);
     });
     for (let i = 0; i < 4; i++) await page.keyboard.press('Minus');

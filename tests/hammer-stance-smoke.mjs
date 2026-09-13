@@ -20,8 +20,8 @@ try {
     // Position/aim only; stance selection uses the real keyboard or touch UI.
     await page.evaluate(() => {
       const g = window.__wireTheHouse;
-      g.renderer.camera.position.set(0, 1.65, -1.25);
-      g.player.yaw = 0; g.player.pitch = -.1; g.step(1 / 60);
+      g.renderer.camera.position.set(0, 1.65, -1.59);
+      g.player.yaw = 0; g.player.pitch = -.4; g.step(1 / 60);
     });
     await page.waitForTimeout(200);
     const read = () => page.evaluate(() => {
@@ -54,7 +54,7 @@ try {
       assert(Math.hypot(...state.focus.map((n, i) => n - initial.focus[i])) < .002, 'Aim moved during stance');
       if (side) {
         assert(Math.sign(state.offset[0]) === -Math.sign(side));
-        assert(Math.abs(state.offset[0]) > .35, 'Camera never moved to handle side');
+        assert(Math.abs(state.offset[0]) > .1, 'Camera never leaned to handle side');
       } else assert(Math.hypot(...state.pos.map((n, i) => n - initial.pos[i])) < .002, 'Stance accumulated walking drift');
       await page.evaluate(async()=>{await window.__wireTheHouse.renderer.waitForFrame();});
       await page.screenshot({ path: `${out}/${prefix}-${side}.png` });
@@ -65,11 +65,11 @@ try {
     if (mobile) await page.locator('[data-tool="spray"]').tap();
     else await page.keyboard.press('Digit3');
     await page.waitForTimeout(1000);
-    assert(Math.hypot(...(await read()).pos.map((n, i) => n - initial.pos[i])) < .002, 'Tool switch did not restore normal camera');
+    assert(Math.hypot(...(await read()).pos.map((n, i) => n - (initial.pos[i]-initial.offset[i]))) < .002, 'Tool switch did not restore normal camera');
     if (mobile) await page.locator('[data-tool="hammer"]').tap();
     else await page.keyboard.press('Digit4');
     await page.waitForTimeout(1000);
-    assert(Math.abs((await read()).offset[0]) > .35, 'Hammer did not restore its working stance');
+    assert(Math.abs((await read()).offset[0]) > .1, 'Hammer did not restore its working stance');
     const transition = await page.evaluate(() => {
       const g = window.__wireTheHouse, samples = [];
       window.dispatchEvent(new CustomEvent('wirehouse:side-chisel', { detail: -g.room.brickWall.chiselSideDegrees }));

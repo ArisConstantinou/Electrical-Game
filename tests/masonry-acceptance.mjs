@@ -37,19 +37,19 @@ const checks=await page.evaluate(async()=>{
 });
 await writeFile(`${out}/logic.json`,JSON.stringify(checks,null,2));console.log(JSON.stringify({failures:checks.failures,boundaryRemoved:checks.boundaryRemoved,materialResponse:checks.materialResponse,randomSeeds:checks.randomSeeds}));
 await page.click('#start-button');await page.keyboard.press('Digit4');
-await page.evaluate(()=>{const g=window.__wireTheHouse;g.renderer.camera.position.set(.8,1.65,-1.25);g.renderer.camera.lookAt(.8,1.55,-2.41);g.player.yaw=g.renderer.camera.rotation.y;g.player.pitch=g.renderer.camera.rotation.x;g.step(1/60);});
+await page.evaluate(()=>{const g=window.__wireTheHouse;g.renderer.camera.position.set(.8,1.65,-1.59);g.renderer.camera.lookAt(.8,1.3,-2.41);g.player.yaw=g.renderer.camera.rotation.y;g.player.pitch=g.renderer.camera.rotation.x;g.step(1/60);});
 for(let i=0;i<12;i++){await page.keyboard.press('KeyE');await page.waitForTimeout(100);if([0,3,7,11].includes(i))await page.screenshot({path:`${out}/center-${i+1}.png`});}
 // A chisel-controlled vertical/horizontal chase: camera aiming is a fixture,
 // every strike is a keyboard action consumed by the normal gameplay Input.
 for(let pass=0;pass<5;pass++)for(let i=0;i<24;i++){
- await page.evaluate(({i,pass})=>{const g=window.__wireTheHouse;const x=-.7+(pass%2)*.018,y=.7+i*.025;g.renderer.camera.position.set(x,1.65,-1.25);g.renderer.camera.lookAt(x,y,-2.41);g.player.yaw=g.renderer.camera.rotation.y;g.player.pitch=g.renderer.camera.rotation.x;g.step(1/60);},{i,pass});
+ await page.evaluate(({i,pass})=>{const g=window.__wireTheHouse;const x=-.7+(pass%2)*.018,y=.7+i*.025;g.player.crouched=y<1.05;g.renderer.camera.position.set(x,g.player.eyeHeight,-1.59);g.renderer.camera.lookAt(x,y,-2.41);g.player.yaw=g.renderer.camera.rotation.y;g.player.pitch=g.renderer.camera.rotation.x;g.step(1/60);},{i,pass});
  await page.keyboard.press('KeyE'); await page.waitForTimeout(20);
 }
 for(let pass=0;pass<4;pass++)for(let i=0;i<20;i++){
- await page.evaluate(({i,pass})=>{const g=window.__wireTheHouse;const x=-.6+i*.025,y=1.15+(pass%2)*.016;g.renderer.camera.position.set(x,1.65,-1.25);g.renderer.camera.lookAt(x,y,-2.41);g.player.yaw=g.renderer.camera.rotation.y;g.player.pitch=g.renderer.camera.rotation.x;g.step(1/60);},{i,pass});
+ await page.evaluate(({i,pass})=>{const g=window.__wireTheHouse;const x=-.6+i*.025,y=1.15+(pass%2)*.016;g.player.crouched=y<1.05;g.renderer.camera.position.set(x,g.player.eyeHeight,-1.59);g.renderer.camera.lookAt(x,y,-2.41);g.player.yaw=g.renderer.camera.rotation.y;g.player.pitch=g.renderer.camera.rotation.x;g.step(1/60);},{i,pass});
  await page.keyboard.press('KeyE');await page.waitForTimeout(20);
 }
-await page.evaluate(()=>{const g=window.__wireTheHouse;g.renderer.camera.position.set(-.3,1.65,-1.15);g.renderer.camera.lookAt(-.3,1.1,-2.41);g.player.yaw=g.renderer.camera.rotation.y;g.player.pitch=g.renderer.camera.rotation.x;g.step(1/60);});
+await page.evaluate(()=>{const g=window.__wireTheHouse;g.renderer.camera.position.set(-.3,1.65,-1.59);g.renderer.camera.lookAt(-.3,1.1,-2.41);g.player.yaw=g.renderer.camera.rotation.y;g.player.pitch=g.renderer.camera.rotation.x;g.step(1/60);});
 await page.evaluate(async()=>{await window.__wireTheHouse.room.brickWall.waitForGeometry();});
 await page.screenshot({path:`${out}/chase-tool.png`});
 await page.evaluate(()=>{const g=window.__wireTheHouse;g.fpsRig.visible=false;g.renderer.render();});await page.screenshot({path:`${out}/chase-clear.png`});

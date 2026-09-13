@@ -37,14 +37,11 @@ try {
     if (mobile) await click(page, mobile, '[data-tool="hammer"]'); else await page.keyboard.press('Digit4');
     await page.evaluate(() => {
       const g = window.__wireTheHouse, camera = g.renderer.camera;
-      camera.position.set(.8, g.player.eyeHeight, -1.3); camera.lookAt(.8, 1.55, g.room.brickWall.volume.frontZ);
+      camera.position.set(.8, g.player.eyeHeight, -1.59); camera.lookAt(.8, 1.30, g.room.brickWall.volume.frontZ);
       g.player.yaw = camera.rotation.y; g.player.pitch = camera.rotation.x; camera.updateMatrixWorld(true); g.step(0);
     });
-    // Present the cutting edge obliquely instead of hiding it behind the body
-    // in a straight-on view. Tilt remains a real user-selected tool setting.
-    await click(page, mobile, '#settings-toggle');
-    await click(page, mobile, '#chisel-tilt'); await click(page, mobile, '#chisel-tilt');
-    await click(page, mobile, '#settings-close');
+    // A body-limited grip needs the ordinary 25-degree working pose here.
+    // Width must never require stretching the arms to a steep 70-degree grip.
     assert.equal((await read(page)).workSurface.chiselWidthMm, 25, 'Flat blade must default to 2.5cm');
     const widths = [];
     async function settingsWidth(mm) {

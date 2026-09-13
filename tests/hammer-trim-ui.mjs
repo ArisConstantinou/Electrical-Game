@@ -44,7 +44,7 @@ try {
       window.__trimQA = {
         aim(x, y) {
           const camera = g.renderer.camera;
-          camera.position.set(x, g.player.eyeHeight, -1.3); camera.lookAt(x, y, v.frontZ);
+          camera.position.set(x, g.player.eyeHeight, -1.65); camera.lookAt(x, y, v.frontZ);
           g.player.yaw = camera.rotation.y; g.player.pitch = camera.rotation.x;
           camera.updateMatrixWorld(true); g.step(0);
         },
@@ -104,10 +104,19 @@ try {
     const after = await page.evaluate(floor => ({ ...window.__trimQA.sample(), protected: window.__trimQA.protected(floor), telemetry: window.__wireTheHouse.room.brickWall.telemetry }), target.floorZ);
     const maxCameraDelta = Math.max(...samples.flatMap(s => s.camera.map((n, i) => Math.abs(n - samples[0].camera[i]))));
     const recoilRange = Math.max(...samples.map(s => s.rigRotation)) - Math.min(...samples.map(s => s.rigRotation));
-    const ridgeRecession = before.contact && after.contact ? before.contact.z - after.contact.z : 0;
+    // A removed rib can expose a backing face beyond the fixed arm workspace.
+    // Measure material recession along the original contact line independently
+    // of whether the player can still seat the tool on that newly exposed face.
+    const materialBehindRidge = await page.evaluate(({ camera, contact }) => {
+      if (!contact) return null;
+      const g = window.__wireTheHouse, origin = g.renderer.camera.position.clone().fromArray(camera);
+      const direction = origin.clone().set(contact.x, contact.y, contact.z).sub(origin).normalize();
+      return g.room.brickWall.volume.raycast(origin, direction, 2.35)?.point ?? null;
+    }, { camera: before.camera.slice(0, 3), contact: before.contact });
+    const ridgeRecession = before.contact ? before.contact.z - (materialBehindRidge?.z ?? target.floorZ) : 0;
     await page.screenshot({ path: `${out}/${name}-after.png` });
     await inspect(page, `${out}/${name}-inspection-after.png`, target);
-    const scenario = { mobile, fixture, target, removedNodes: after.nodes - before.nodes, ridgeRecession, maxCameraDelta, recoilRange, before, after, errors };
+    const scenario = { mobile, fixture, target, removedNodes: after.nodes - before.nodes, ridgeRecession, materialBehindRidge, maxCameraDelta, recoilRange, before, after, errors };
     report.scenarios.push(scenario); await writeFile(`${out}/report.json`, JSON.stringify(report, null, 2));
     assert(after.nodes > before.nodes + 3, `${name}: upward native strokes did not shave the protrusion`);
     assert(ridgeRecession >= fixture.cellDepth - 1e-9, `${name}: targeted ridge did not recede by at least one material cell (${ridgeRecession}m)`);

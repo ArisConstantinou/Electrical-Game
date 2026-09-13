@@ -51,6 +51,9 @@ export class Renderer {
     const width = parent?.clientWidth ?? innerWidth;
     const height = parent?.clientHeight ?? innerHeight;
     this.camera.aspect = Math.max(1, width) / Math.max(1, height);
+    // Portrait must retain enough horizontal vision for two hands and a tool.
+    // This changes the lens, never the physical size or reach of the body.
+    this.camera.fov = Math.max(72, THREE.MathUtils.radToDeg(2*Math.atan(Math.tan(THREE.MathUtils.degToRad(60)/2)/this.camera.aspect)));
     this.camera.updateProjectionMatrix();
     this.webgl.setSize(width, height, false);
     this.water?.resize(width,height);
