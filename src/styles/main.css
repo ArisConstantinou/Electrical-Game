@@ -160,6 +160,10 @@ button {
 .hammer-speed-setting input { min-height:28px; accent-color:#e6995e; }
 .hammer-speed-setting small { font-size:12px; line-height:1.3; }
 #settings-panel { max-height: calc(100dvh - 100px); overflow-y: auto; }
+#game-shell.settings-open #settings-scrim {z-index:13;}
+#game-shell.settings-open #settings-panel {z-index:14;background:linear-gradient(145deg,rgba(28,26,22,.97),rgba(28,26,22,.94));}
+#game-shell.settings-open #settings-toggle {z-index:15;}
+#chisel-width-hint {font-size:14px;}
 #mobile-control-settings small { font-size: 14px; }
 
 /* Mortar casting stays reachable independently of the mobile look pad. */

@@ -51,6 +51,7 @@ export class HUD {
             </div>
             <div id="chisel-settings" aria-label="Demolition chisel settings">
               <button id="chisel-type" type="button"><span>CHISEL · T</span><b>FLAT</b></button>
+              <label class="hammer-speed-setting" for="chisel-width"><span>BLADE WIDTH · , / .</span><output id="chisel-width-value">2.5 cm</output><input id="chisel-width" type="range" min="10" max="50" step="5" value="25" aria-label="Flat chisel width in millimetres"><small id="chisel-width-hint">1–5 cm · wider blade, broader chips</small></label>
               <button id="chisel-tilt" type="button"><span>HAMMER TILT · [ / ]</span><b>25 deg DOWN</b></button>
               <button id="chisel-side" type="button"><span>SIDE LEAN / J K</span><b>0 deg STRAIGHT</b></button>
               <button id="chisel-angle" type="button"><span>EDGE ANGLE · R</span><b>0°</b></button>
@@ -149,6 +150,7 @@ export class HUD {
     root.querySelector('#chisel-side')!.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:side-chisel')));
     root.querySelector('#chisel-tilt')!.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:tilt-chisel')));
     root.querySelector('#chisel-angle')!.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:rotate-chisel')));
+    root.querySelector<HTMLInputElement>('#chisel-width')!.addEventListener('input',event=>dispatchEvent(new CustomEvent('wirehouse:chisel-width',{detail:Number((event.target as HTMLInputElement).value)/1000})));
     root.querySelector<HTMLInputElement>('#hammer-speed')!.addEventListener('input',event=>dispatchEvent(new CustomEvent('wirehouse:hammer-speed',{detail:Number((event.target as HTMLInputElement).value)/100})));
     root.querySelector('#work-height')!.addEventListener('click',()=>dispatchEvent(new CustomEvent('wirehouse:work-height')));
     root.querySelector('#mortar-pack')!.addEventListener('click',()=>dispatchEvent(new CustomEvent('wirehouse:mortar-pack')));
@@ -244,6 +246,12 @@ export class HUD {
   updateHammerSpeed(speed:number):void {
     this.shell.querySelector<HTMLInputElement>('#hammer-speed')!.value=String(speed*100);
     this.shell.querySelector<HTMLOutputElement>('#hammer-speed-value')!.textContent=speed===0?'STOPPED':`${Math.round(speed*100)}%`;
+  }
+  updateChiselWidth(widthM:number,flat:boolean):void {
+    const slider=this.shell.querySelector<HTMLInputElement>('#chisel-width')!;
+    slider.value=String(Math.round(widthM*1000));slider.disabled=!flat;
+    this.shell.querySelector<HTMLOutputElement>('#chisel-width-value')!.textContent=`${(widthM*100).toFixed(1)} cm`;
+    this.shell.querySelector<HTMLElement>('#chisel-width-hint')!.textContent=flat?'1–5 cm · wider blade, broader chips':'Select FLAT to adjust blade width';
   }
   updateMortar(tool:RigTool,power:number,angle:number,wet:{pore:number;film:number},coverage:number,recovery:number,outcome:string,floorLitres=0,feedback?:MortarThrowFeedback):void {
     const panel=this.shell.querySelector<HTMLElement>('#mortar-panel')!;panel.hidden=tool!=='trowel'&&tool!=='hose';

@@ -71,7 +71,7 @@ try{
       const hammer=rig.tools.get('hammer');
       const shaftBack=hammer.localToWorld(rig.tipAnchor.clone().add(tip.clone().set(0,0,.35)));
       const actualAxis=tip.clone().sub(shaftBack).normalize();
-      const item={point:{...contact.point},direction:{...contact.direction},edge:{...contact.edge},actualEdge:{...actualEdge},actualAxis:{...actualAxis},edgeError:actualEdge.distanceTo(contact.edge),axisError:actualAxis.distanceTo(contact.direction),tipError:tip.distanceTo(contact.point),depthMm:(wall.volume.frontZ-contact.point.z)*1000,camera:{yaw:g.player.yaw,pitch:g.player.pitch}};
+      const item={point:{...contact.point},direction:{...contact.direction},edge:{...contact.edge},actualEdge:{...actualEdge},actualAxis:{...actualAxis},edgeError:actualEdge.distanceTo(contact.edge),axisError:actualAxis.distanceTo(contact.direction),tipError:tip.clone().addScaledVector(actualEdge,contact.bladeOffsetM??0).distanceTo(contact.point),depthMm:(wall.volume.frontZ-contact.point.z)*1000,camera:{yaw:g.player.yaw,pitch:g.player.pitch}};
       window.__contactQA.last=item;window.__contactQA.contacts.push(item);
       return contact;
     };

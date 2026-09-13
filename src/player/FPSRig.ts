@@ -42,7 +42,12 @@ export class FPSRig extends THREE.Group {
   /** Seat the real visible tip on the first remaining solid, then read it back. */
   contact(camera: THREE.Camera, wall: BrickWall): ChiselContact | null {
     const hammer = this.tools.get('hammer')!;
-    if (this.flatTip) { this.flatTip.visible = wall.chiselType === 'flat'; this.flatTip.rotation.z = wall.chiselEdgeAngle; }
+    if (this.flatTip) {
+      this.flatTip.visible = wall.chiselType === 'flat'; this.flatTip.rotation.z = wall.chiselEdgeAngle;
+      // Match metres in the world despite the camera rig's presentation scale.
+      const scale=hammer.getWorldScale(new THREE.Vector3()).x;
+      this.flatTip.scale.x=wall.chiselWidthM/(.045*scale);
+    }
     if (this.pointedTip) this.pointedTip.visible = wall.chiselType === 'pointed';
     camera.updateMatrixWorld(true);
     this.updateWorldMatrix(true, false);
@@ -65,6 +70,7 @@ export class FPSRig extends THREE.Group {
     hammer.updateWorldMatrix(true, false);
     const orientation = hammer.getWorldQuaternion(new THREE.Quaternion());
     const direction = new THREE.Vector3(0,0,-1).applyQuaternion(orientation);
+    const edge = new THREE.Vector3(Math.cos(wall.chiselEdgeAngle), Math.sin(wall.chiselEdgeAngle), 0).applyQuaternion(orientation).normalize();
     const view = camera.getWorldDirection(new THREE.Vector3());
     const eye = camera.getWorldPosition(new THREE.Vector3());
     const distance = (wall.volume.frontZ-eye.z)/view.z;
@@ -77,11 +83,22 @@ export class FPSRig extends THREE.Group {
     // Finishing starts at the rib under the crosshair inside the open chase.
     // Tilting upward changes the blade attack, not the selected depth/target.
     // Ordinary excavation still follows the shaft through the front aperture.
-    const hit=wall.chiselTiltDegrees < 0
-      ? wall.volume.raycast(eye,view,2.35)
-      : wall.volume.raycast(origin,direction,Math.min(.38,.24/Math.abs(direction.z)));
+    const upward=wall.chiselTiltDegrees<0;
+    const rayOrigin=upward?eye:origin,rayDirection=upward?view:direction;
+    const reach=upward?2.35:Math.min(.38,.24/Math.abs(direction.z));
+    let hit=wall.volume.raycast(rayOrigin,rayDirection,reach),bladeOffsetM=0;
+    if(wall.chiselType==='flat'){
+      // A wide edge cannot pass through a hole merely because its centre is air.
+      // At most nine rays, spaced no farther apart than the material lattice.
+      const half=wall.chiselWidthM/2,steps=Math.ceil(half/.007);
+      for(let i=1;i<=steps;i++)for(const sign of [-1,1]){
+        const offset=sign*half*i/steps;
+        const candidate=wall.volume.raycast(rayOrigin.clone().addScaledVector(edge,offset),rayDirection,reach);
+        if(candidate&&(!hit||candidate.distance<hit.distance-1e-6)){hit=candidate;bladeOffsetM=offset;}
+      }
+    }
     this.chiselInAir=!hit;
-    const target=hit?new THREE.Vector3(hit.point.x,hit.point.y,hit.point.z):entry.clone().addScaledVector(direction,Math.min(.34,.19/Math.abs(direction.z)));
+    const target=hit?new THREE.Vector3(hit.point.x,hit.point.y,hit.point.z).addScaledVector(edge,-bladeOffsetM):entry.clone().addScaledVector(direction,Math.min(.34,.19/Math.abs(direction.z)));
     const local=this.worldToLocal(target.clone());
     hammer.position.copy(local).sub(this.tipAnchor.clone().applyQuaternion(hammer.quaternion));
     hammer.updateWorldMatrix(true, true);
@@ -89,8 +106,7 @@ export class FPSRig extends THREE.Group {
     this.chiselTipWorld.copy(tip);
     this.poseHammerArms(camera, hammer);
     if (!hit) return null;
-    const edge = new THREE.Vector3(Math.cos(wall.chiselEdgeAngle), Math.sin(wall.chiselEdgeAngle), 0).applyQuaternion(orientation).normalize();
-    return {point:tip, direction, edge, chisel:wall.chiselType, energyJ:wall.chiselEnergyJ};
+    return {point:tip.clone().addScaledVector(edge,bladeOffsetM), direction, edge, chisel:wall.chiselType, energyJ:wall.chiselEnergyJ, widthM:wall.chiselWidthM, bladeOffsetM};
   }
 
   constructor() {

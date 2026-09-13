@@ -6,7 +6,7 @@ import { MasonryVolume, type MasonryFragment, type MasonryVolumeOptions } from '
 
 export type SprayMode = 'dots' | 'live';
 export type MasonryImpactKind = 'chase-chip' | 'demolish-chip' | 'demolish-crack' | 'demolish-spall' | 'demolish-split' | 'demolish-break';
-export interface ChiselContact { point: THREE.Vector3; direction: THREE.Vector3; edge: THREE.Vector3; energyJ: number; chisel: 'flat' | 'pointed' }
+export interface ChiselContact { point: THREE.Vector3; direction: THREE.Vector3; edge: THREE.Vector3; energyJ: number; chisel: 'flat' | 'pointed'; widthM?: number; bladeOffsetM?: number }
 export interface MasonryImpact {
   points: THREE.Vector3[]; kind: MasonryImpactKind; brickSize: THREE.Vector3; seed: number; destroyed: boolean;
   fragments: MasonryFragment[]; removedVolume: number;
@@ -41,6 +41,9 @@ export class BrickWall extends THREE.Group {
   private workerError = '';
   chiselType: 'flat' | 'pointed' = 'flat';
   chiselEnergyJ = 4;
+  private widthM = .025;
+  get chiselWidthM(): number { return this.widthM; }
+  set chiselWidthM(value: number) { if(Number.isFinite(value)) this.widthM = THREE.MathUtils.clamp(value, .01, .05); }
   chiselEdgeAngle = 0;
   chiselTiltDegrees = 25;
   chiselSideDegrees = 0;
@@ -159,7 +162,7 @@ export class BrickWall extends THREE.Group {
       if (hit) contact = {point: hit.point, direction: camera.getWorldDirection(new THREE.Vector3()), edge: new THREE.Vector3(Math.cos(this.chiselEdgeAngle), Math.sin(this.chiselEdgeAngle), 0), energyJ: this.chiselEnergyJ, chisel: this.chiselType};
     }
     if (!contact) return null;
-    const result = this.volume.impact({ ...contact, trim: this.chiselTiltDegrees < 0 });
+    const result = this.volume.impact({ ...contact, widthM: this.chiselWidthM, trim: this.chiselTiltDegrees < 0 });
     if (!result.contact) return null;
     this.lastResult = result;
     this.impactCount++;

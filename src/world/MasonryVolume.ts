@@ -16,7 +16,7 @@ export interface MasonryVolumeOptions {
   solidMaterial?: MaterialId;
   maxConnectivityNodes?: number;
 }
-export interface MasonryImpactInput { point: Vec3; direction: Vec3; edge?: Vec3; energyJ?: number; chisel: 'pointed' | 'flat'; seed?: number; /** Upward finishing stroke: preserve the locally established cavity backing. */ trim?: boolean }
+export interface MasonryImpactInput { point: Vec3; direction: Vec3; edge?: Vec3; energyJ?: number; chisel: 'pointed' | 'flat'; /** Flat cutting-edge width in metres, 10–50 mm. Pointed chisels ignore it. */ widthM?: number; seed?: number; /** Upward finishing stroke: preserve the locally established cavity backing. */ trim?: boolean }
 export interface MasonryRayHit { point: Vec3; normal: Vec3; distance: number; material: MaterialId }
 export interface MasonryImpactResult {
   contact: MasonryRayHit | null; removedNodes: number; removedVolume: number;
@@ -388,8 +388,13 @@ export class MasonryVolume {
     const shear = 1 - incidence;
     const radius = input.chisel === 'flat' ? .046 : .038;
     const crackRadius = radius * 1.75;
+    const width = clamp(Number.isFinite(input.widthM) ? input.widthM! : .025, .01, .05);
+    // Extend the finite cutting edge only along its own axis. The 25 mm reference
+    // retains its established stress field; a wider blade shares that field over
+    // a longer edge, without extending the penetration slab or adding blow energy.
+    const edgeExtension = input.chisel === 'flat' ? (width - .025) * .5 : 0;
     const depthLimit = input.chisel === 'flat' ? .013 : .019;
-    const c = this.coordinates(contact.point), r = Math.ceil(crackRadius / Math.min(this.hx, this.hy, this.hz)) + 1;
+    const c = this.coordinates(contact.point), r = Math.ceil((crackRadius + Math.max(0, edgeExtension)) / Math.min(this.hx, this.hy, this.hz)) + 1;
     const candidates: Array<{ node: Node; gain: number; crushing: boolean; fissure: boolean; distance: number }> = [];
     const removed: Node[] = [];
     // Persistent grain directions are tied to the material region, not a newly drawn
@@ -410,7 +415,8 @@ export class MasonryVolume {
       const u = delta.x * edge.x + delta.y * edge.y + delta.z * edge.z;
       const v = delta.x * across.x + delta.y * across.y + delta.z * across.z;
       const stretch = input.chisel === 'flat' ? 1.55 : 1;
-      const radial = Math.hypot(u / stretch, v);
+      const edgeDistance = Math.sign(u) * Math.max(0, Math.abs(u) - edgeExtension);
+      const radial = Math.hypot(edgeDistance / stretch, v);
       if (radial > crackRadius) continue;
       const angular = Math.atan2(v, u), anisotropy = 1 + .18 * Math.sin(angular * 3 + (seed % 97)) + .12 * Math.cos(angular * 5 - (seed % 71));
       const effectiveRadius = radius * anisotropy;
@@ -418,8 +424,8 @@ export class MasonryVolume {
       let corridor = false;
       for (let branch = 0; branch < 3; branch++) {
         const angle = grainAngle + branch * 2.094 + .22 * Math.sin(radial * 85 + branch);
-        const forward = u / stretch * Math.cos(angle) + v * Math.sin(angle);
-        const sideways = Math.abs(u / stretch * Math.sin(angle) - v * Math.cos(angle));
+        const forward = edgeDistance / stretch * Math.cos(angle) + v * Math.sin(angle);
+        const sideways = Math.abs(edgeDistance / stretch * Math.sin(angle) - v * Math.cos(angle));
         if (forward > 0 && sideways < this.cellSize * .62) corridor = true;
       }
       const fissure = !core && corridor;
@@ -476,7 +482,9 @@ export class MasonryVolume {
     }
     if (removed.length) this.detachIslands(removed, result, c, r + 2, trimFloorZ);
     if (removed.length) this.exposeCavities(removed);
-    this.aggregateFragments(removed, result);
+    // A broad flat edge releases wider connected chips. This only partitions
+    // material already removed by the same energy budget; it adds no mass.
+    this.aggregateFragments(removed, result, input.chisel === 'flat' ? Math.round(10 * width / .025) : 10);
     result.removedNodes = removed.length;
     result.removedVolume = result.fragments.reduce((sum, fragment) => sum + fragment.volume, 0);
     this.totalRemovedVolume += result.removedVolume;
@@ -557,7 +565,7 @@ export class MasonryVolume {
     const max = { x: Math.max(...points.map(p => p.x)), y: Math.max(...points.map(p => p.y)), z: Math.max(...points.map(p => p.z)) };
     return { position: { x: (min.x + max.x) / 2, y: (min.y + max.y) / 2, z: (min.z + max.z) / 2 }, size: { x: max.x - min.x + this.hx, y: max.y - min.y + this.hy, z: max.z - min.z + this.hz }, material: nodes[0].material, volume: nodes.length * this.nodeVolume, detached };
   }
-  private aggregateFragments(removed: Node[], result: MasonryImpactResult): void {
+  private aggregateFragments(removed: Node[], result: MasonryImpactResult, crushedGroupLimit = 10): void {
     // Clip the exact before-solid minus after-solid in every affected tetrahedron. Meshing only
     // the removed nodes would shrink isolated chips and invent a mismatch between geometry and mass.
     const crushedCount = removed.length - result.stats.detachedNodes;
@@ -568,7 +576,7 @@ export class MasonryVolume {
     while (remaining.size) {
       const start = remaining.values().next().value as Node;
       const group = [start]; remaining.delete(start.id);
-      const isDetached = detached.has(start.id), limit = isDetached ? 500 : 10;
+      const isDetached = detached.has(start.id), limit = isDetached ? 500 : crushedGroupLimit;
       for (let head = 0; head < group.length && group.length < limit; head++) {
         const n = group[head];
         for (const d of NEIGHBORS) {
