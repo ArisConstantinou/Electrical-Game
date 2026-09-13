@@ -59,6 +59,10 @@ export class MortarSystem {
   private simulationTime = 0;
   private geometryRevision = 0;
   private openingSignature = '';
+  private supportRevision = '';
+  private supportCacheTime = -Infinity;
+  private supportVolume: unknown;
+  private readonly supportColumns = new Map<string,number|null>();
   private readonly coverageCache = new Map<string, { time: number; revision: number; transform: string; value: number }>();
   private readonly streams: Array<{ mesh: THREE.Mesh; speed: number; life: number }> = [];
 
@@ -247,8 +251,18 @@ export class MortarSystem {
   retention(p: THREE.Vector3, v: THREE.Vector3, normal: THREE.Vector3): number {
     const wet = this.moistureAt(p), speed = v.length(), incidence = Math.max(0, -v.clone().normalize().dot(normal));
     const receiver=this.field.stateAt(p.clone().addScaledVector(normal,-.006));
-    const prepared=receiver.value>.35&&receiver.age<3600?.90*(1-Math.min(.65,receiver.dilution*.3)):(.35+.65*Math.min(1,wet.pore/.45));
-    return THREE.MathUtils.clamp(prepared * (1 - .8 * wet.film) * Math.min(1, speed / 2) * incidence ** 1.3 / (1 + Math.max(0, speed - 6) * .12), 0, .93);
+    let prepared=receiver.value>.35&&receiver.age<3600?.90*(1-Math.min(.65,receiver.dilution*.3)):(.35+.65*Math.min(1,wet.pore/.45));
+    const volume=this.wall.volume,depth=volume.frontZ-p.z,incoming=speed>0?Math.max(0,-v.z/speed):0;
+    // A scoop driven into a real backed recess keys between its exposed ribs.
+    // A tiny grazing facet cannot reject the entire scoop as if it struck an
+    // open flat wall. Called only after contact with an actual receiver;
+    // deposition still requires backed, unblocked columns. Outward residue
+    // receives no confinement boost and open-air rays never reach this path.
+    const confined=incoming>.2&&depth>.012&&depth<(volume.depth??.2)+.008
+      ? THREE.MathUtils.smoothstep(depth,.012,.035) : 0;
+    if(confined>0)prepared=Math.max(prepared,.76*confined);
+    const effectiveIncidence=Math.max(incidence,confined*(.65+.25*incoming));
+    return THREE.MathUtils.clamp(prepared * (1 - .8 * wet.film) * Math.min(1, speed / 2) * effectiveIncidence ** 1.3 / (1 + Math.max(0, speed - 6) * .12), 0, .93);
   }
   launch(origin: THREE.Vector3, velocity: THREE.Vector3, mass = .65): void {
     if (this.projectiles.length >= 48 || !Number.isFinite(mass) || mass <= 0) return;
@@ -265,7 +279,7 @@ export class MortarSystem {
     const hit = this.contact(camera.getWorldPosition(new THREE.Vector3()), camera.getWorldDirection(new THREE.Vector3()), .9);
     if (!hit || hit.box || this.insideBox(hit.point)) return false;
     const mass = .65, fraction = this.retention(hit.point, hit.normal.clone().multiplyScalar(-2), hit.normal);
-    const held = this.deposit(hit.point, mass * fraction, hit.normal,true,mass);
+    const held = this.deposit(hit.point, mass * fraction, hit.normal,false,mass);
     if (!held) return false;
     this.launchedMass += mass; this.stuckMass += held;
     this.spawnClod(hit.point.clone().addScaledVector(hit.normal, .015), hit.normal.clone().multiplyScalar(.12).add(new THREE.Vector3(0, -.15, 0)), mass - held);
@@ -341,22 +355,29 @@ export class MortarSystem {
       return boxes.some(box => { const local=q.clone().applyMatrix4(box.inverse); return Math.abs(local.x)<box.halfWidth && Math.abs(local.y)<box.halfHeight && local.z>box.minZ && local.z<box.maxZ; });
     };
     const frontZ=typeof volume.frontZ==='number'?volume.frontZ:(normal.z>.5?0:undefined);
+    const cacheSupport=typeof volume.removedNodeCount==='number';
+    const supportRevision=`${volume.removedNodeCount}:${volume.impactCount}`;
+    if(supportRevision!==this.supportRevision||this.supportVolume!==volume||this.simulationTime-this.supportCacheTime>.2||this.supportColumns.size>4096){
+      this.supportRevision=supportRevision;this.supportVolume=volume;this.supportCacheTime=this.simulationTime;this.supportColumns.clear();
+    }
     const profile=frontZ===undefined?undefined:{frontZ,supportZ:(x:number,y:number):number|null=>{
+      const key=`${Math.round(x/this.field.spacing)},${Math.round(y/this.field.spacing)}`;
+      if(cacheSupport&&this.supportColumns.has(key))return this.supportColumns.get(key)!;
       const origin=new THREE.Vector3(x,y,frontZ+.016),hit=volume.raycast(origin,new THREE.Vector3(0,0,-1),.22);
-      return hit?hit.point.z:null;
+      const support=hit?hit.point.z:null;if(cacheSupport)this.supportColumns.set(key,support);return support;
     }};
     // Adhesion changes quantity, not the width of a scoop spreading across an
     // existing bed. Shrinking both trapped casts on full lips above empty gaps.
     const receiver=this.field.stateAt(p);
-    const spread=receiver.value>=.35?footprintMass:mass;
+    const spread=receiver.value>=.35||(frontZ!==undefined&&frontZ-p.z>.012)?footprintMass:mass;
     const held = this.field.add(p, growth, mass, blocked,profile,spread);
     if (held > 0) { if(sync)this.syncFieldGeometry(); this.geometryRevision++; }
     return held;
   }
 
-  private syncFieldGeometry(): void {
+  private syncFieldGeometry(maxChunks=Infinity): void {
     const boxes=this.openings();
-    for(const chunk of this.field.remesh(triangle=>this.clipOpenings(triangle,boxes))){
+    for(const chunk of this.field.remesh(triangle=>this.clipOpenings(triangle,boxes),maxChunks)){
       const index=this.deposits.findIndex(d=>d.fieldKey===chunk.key),old=index<0?undefined:this.deposits[index];
       if(!chunk.geometry.getAttribute('position').count){chunk.geometry.dispose();if(old){this.group.remove(old.mesh);old.mesh.geometry.dispose();this.deposits.splice(index,1);}continue;}
       const sphere=chunk.geometry.boundingSphere!;
@@ -365,6 +386,8 @@ export class MortarSystem {
     }
     this.fieldMeshTime=0;
   }
+  get pendingGeometryChunks():number {return this.field.dirty.size;}
+  async waitForGeometry():Promise<void> {while(this.field.dirty.size){this.syncFieldGeometry(1);await new Promise(resolve=>setTimeout(resolve,0));}}
 
   /** A pressed box extrudes fresh mortar out of its occupied envelope. Backing
    * behind the actual casing stays in place; excess remains counted as slurry. */
@@ -384,7 +407,7 @@ export class MortarSystem {
     this.stuckMass+=held;
     const loose=Math.max(0,removed-held);
     if(loose)this.queueSlurry(point.boxGroup.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0,0,.015)),Z,loose);
-    this.openingSignature='';this.field.invalidateGeometry();this.syncFieldGeometry();this.geometryRevision++;
+    this.openingSignature='';this.field.invalidateGeometry();this.geometryRevision++;
     return{displacedKg:removed,repackedKg:held,looseKg:loose};
   }
 
@@ -393,7 +416,7 @@ export class MortarSystem {
     if(signature===this.openingSignature)return;this.openingSignature=signature;
     const removed=this.field.removeWhere(q=>boxes.some(box=>{const local=q.clone().applyMatrix4(box.inverse);return Math.abs(local.x)<box.halfWidth&&Math.abs(local.y)<box.halfHeight && local.z>box.minZ && local.z<box.maxZ;}));
     if(removed>0){this.stuckMass=Math.max(0,this.stuckMass-removed);const point=this.deposits[0]?.position??new THREE.Vector3(0,1,0);this.queueSlurry(point,Z,removed);}
-    this.field.invalidateGeometry();this.syncFieldGeometry();this.geometryRevision++;
+    this.field.invalidateGeometry();this.geometryRevision++;
   }
 
   private queueSlurry(point:THREE.Vector3,normal:THREE.Vector3,mass:number):void {
@@ -454,7 +477,10 @@ export class MortarSystem {
       }
     }
     for(const deposit of this.deposits)deposit.age+=dt;
-    if(this.field.dirty.size&&this.fieldMeshTime>=.10)this.syncFieldGeometry();
+    // Field collision changes immediately. Only the visible skin is rebuilt
+    // one spatial chunk per frame, so a scoop cannot pause every tool for a
+    // full-cavity synchronous remesh.
+    if(this.field.dirty.size)this.syncFieldGeometry(1);
     if(this.pendingWashMass>.002&&this.projectiles.length<48){this.spawnClod(this.pendingWashPoint.clone().addScaledVector(this.pendingWashNormal,.025),new THREE.Vector3(0,-.25,.08),this.pendingWashMass,true);this.pendingWashMass=0;}
     if (this.maintenanceTime > .4) { this.maintenanceTime = 0; this.updateStages(); }
     const steps = Math.max(1, Math.ceil(dt / .012)), h = dt / steps;
@@ -463,7 +489,7 @@ export class MortarSystem {
       const d = next.clone().sub(a), hit = this.contact(a, d.clone().normalize(), d.length());
       if (hit) {
         const fraction = clod.slurry || hit.box || this.insideBox(hit.point) || clod.contacts > 2 ? 0 : this.retention(hit.point, clod.velocity, hit.normal)*clod.bond;
-        const held = this.deposit(hit.point, clod.mass * fraction, hit.normal,true,clod.mass); this.stuckMass += held; clod.contacts++;
+        const held = this.deposit(hit.point, clod.mass * fraction, hit.normal,false,clod.mass); this.stuckMass += held; clod.contacts++;
         clod.mass -= held;
         // Rejected weak throws cannot become a second, stronger throw when they
         // hit a lower rib. They flow down under the same contact/gravity solver.

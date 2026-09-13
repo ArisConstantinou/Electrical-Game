@@ -1,4 +1,5 @@
 import {chromium} from 'playwright';
+import {blockPointerLock} from './browser-safety.mjs';
 import {mkdir,writeFile} from 'node:fs/promises';
 import assert from 'node:assert/strict';
 
@@ -14,6 +15,7 @@ const browser=await chromium.launch({channel:'chrome',headless:true});
 try{
 for(const requestedBackend of ['webgpu','webgl']){
  const page=await browser.newPage({viewport:report.viewport}),errors=[];
+ await blockPointerLock(page.context());
  page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
  await page.goto(`${report.url}${requestedBackend==='webgl'?'?renderer=webgl':''}`,{waitUntil:'networkidle'});
  await page.waitForFunction(()=>window.__wireTheHouse,undefined,{timeout:120000});

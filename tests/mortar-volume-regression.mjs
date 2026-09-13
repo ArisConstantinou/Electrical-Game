@@ -191,4 +191,41 @@ function components(system){
  report.checks.push({name:'Small retained portions form a visible supported seed',acceptedKg:accepted});
 }
 
+// Microfacets inside a backed recess capture an incoming scoop, while moisture,
+// outward momentum and a real through-opening remain physically significant.
+{
+ const flat=cavity(0,0,0),m=new MortarSystem(new THREE.Scene(),flat,[]),p=new THREE.Vector3(.2,1,0),v=new THREE.Vector3(0,0,-3),grazing=new THREE.Vector3(.98,0,.2).normalize();
+ const dry=m.retention(p,v,Z),glancing=m.retention(p,v,grazing);
+ m.applyWater(p,Z,.025);const damp=m.retention(p,v,Z);
+ for(let i=0;i<20;i++)m.applyWater(p,Z,.1);const flooded=m.retention(p,v,Z);
+ assert(glancing<dry*.2);assert(damp>dry);assert(flooded<damp*.5);
+ const recess=new MortarSystem(new THREE.Scene(),cavity(),[]),back=new THREE.Vector3(0,1,-.06),capture=recess.retention(back,v,grazing);
+ assert(capture>.4&&capture>glancing*3,'Backed recess still rejects a whole scoop because of one tiny facet');
+ assert.equal(recess.retention(back,new THREE.Vector3(0,0,3),grazing),0,'Outward residue gained confinement adhesion');
+ for(const halfWidth of [Infinity,.3]){
+   const wall={volume:{frontZ:0,depth:.2,isOccupied:(x,y,z)=>Math.abs(x)>halfWidth&&z<0&&z>-.2,raycast:()=>null}};
+   const air=new MortarSystem(new THREE.Scene(),wall,[]);
+   air.launch(new THREE.Vector3(0,1,.2),v);advance(air,2);
+   assert.equal(air.field.mass,0,'Scoop adhered in an unbacked through-opening');
+   assert.equal(air.deposit(back,.65,grazing),0,'Unsupported deposition created floating fill');
+   massBalance(air);
+ }
+ report.checks.push({name:'Confined capture preserves flat moisture, glancing, outward and open-air behavior',dry,glancing,damp,flooded,capture});
+}
+
+// Deferred rendering changes no collision or mass and eventually produces the
+// exact same surface as the synchronous diagnostic path.
+{
+ const {MortarField}=load(fileURLToPath(new URL('../src/systems/MortarField.ts',import.meta.url)));
+ const full=new MortarField(),queued=new MortarField(),profile={frontZ:0,supportZ:()=>-.08},p=new THREE.Vector3(0,1,-.08),solid=q=>q.z<-.08;
+ for(const field of [full,queued])for(let i=0;i<4;i++)field.add(p,Z,.65,solid,profile);
+ const origin=new THREE.Vector3(0,1,.1),direction=Z.clone().negate();
+ assert.deepEqual(queued.raycast(origin,direction,.3),full.raycast(origin,direction,.3));
+ const expected=full.remesh(triangle=>[triangle]),actual=[];let calls=0;
+ while(queued.dirty.size){const before=queued.dirty.size,chunks=queued.remesh(triangle=>[triangle],1);assert.equal(chunks.length,1);assert.equal(queued.dirty.size,before-1);actual.push(...chunks);calls++;}
+ const surface=chunks=>chunks.map(({key,mass,age,dilution,geometry})=>({key,mass,age,dilution,positions:Array.from(geometry.getAttribute('position').array),normals:Array.from(geometry.getAttribute('normal').array)}));
+ assert.deepEqual(surface(actual),surface(expected));assert.equal(queued.mass,full.mass);assert(calls>1);
+ report.checks.push({name:'Budgeted remesh preserves exact geometry, authoritative collision and mass',chunks:calls,massKg:queued.mass});
+}
+
 console.log(JSON.stringify({...report,passed:true},null,2));

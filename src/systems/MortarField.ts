@@ -21,6 +21,8 @@ export class MortarField {
   readonly maxNodes = 180000;
   revision = 0;
   private readonly chunkNodes = new Map<string, Set<string>>();
+  private readonly occupiedMin = new THREE.Vector3(Infinity, Infinity, Infinity);
+  private readonly occupiedMax = new THREE.Vector3(-Infinity, -Infinity, -Infinity);
   private key(x: number, y: number, z: number): string { return `${x},${y},${z}`; }
   private chunkKey(x: number, y: number, z: number): string { return this.key(Math.floor(x / CHUNK), Math.floor(y / CHUNK), Math.floor(z / CHUNK)); }
   get nodeMass(): number { return this.spacing ** 3 * this.density; }
@@ -31,21 +33,28 @@ export class MortarField {
   }
   private set(x: number,y: number,z: number,value: number,age: number,dilution=0): void {
     const key=this.key(x,y,z), old=this.nodes.get(key);
-    if(value<1e-7){ if(old){this.changed(old);this.nodes.delete(key);this.chunkNodes.get(this.chunkKey(x,y,z))?.delete(key);} return; }
+    if(value<1e-7){ if(old){this.changed(old);this.nodes.delete(key);this.chunkNodes.get(this.chunkKey(x,y,z))?.delete(key);if(!this.nodes.size){this.occupiedMin.set(Infinity,Infinity,Infinity);this.occupiedMax.set(-Infinity,-Infinity,-Infinity);}} return; }
     const node:Node={x,y,z,value:Math.min(1,value),age,dilution}; this.nodes.set(key,node);this.changed(node);
+    const h=this.spacing;
+    this.occupiedMin.x=Math.min(this.occupiedMin.x,(x-1)*h);this.occupiedMin.y=Math.min(this.occupiedMin.y,(y-1)*h);this.occupiedMin.z=Math.min(this.occupiedMin.z,(z-1)*h);
+    this.occupiedMax.x=Math.max(this.occupiedMax.x,(x+1)*h);this.occupiedMax.y=Math.max(this.occupiedMax.y,(y+1)*h);this.occupiedMax.z=Math.max(this.occupiedMax.z,(z+1)*h);
     const chunk=this.chunkKey(x,y,z);let entries=this.chunkNodes.get(chunk);if(!entries){entries=new Set();this.chunkNodes.set(chunk,entries);}entries.add(key);
   }
   sample(point: THREE.Vector3): number {
-    const h=this.spacing,x=point.x/h,y=point.y/h,z=point.z/h,ix=Math.floor(x),iy=Math.floor(y),iz=Math.floor(z),tx=x-ix,ty=y-iy,tz=z-iz;
+    return this.sampleXYZ(point.x,point.y,point.z);
+  }
+  private sampleXYZ(px:number,py:number,pz:number):number {
+    const h=this.spacing,x=px/h,y=py/h,z=pz/h,ix=Math.floor(x),iy=Math.floor(y),iz=Math.floor(z),tx=x-ix,ty=y-iy,tz=z-iz;
     // Use the same six linear tetrahedra as the mesh, so field collision cannot
     // occupy a curved trilinear surface that the visible skin does not contain.
-    const axes=[{v:tx,dx:1,dy:0,dz:0},{v:ty,dx:0,dy:1,dz:0},{v:tz,dx:0,dy:0,dz:1}].sort((a,b)=>b.v-a.v);
-    const [a,b,c]=axes;
-    return this.at(ix,iy,iz)*(1-a.v)+this.at(ix+a.dx,iy+a.dy,iz+a.dz)*(a.v-b.v)+this.at(ix+a.dx+b.dx,iy+a.dy+b.dy,iz+a.dz+b.dz)*(b.v-c.v)+this.at(ix+1,iy+1,iz+1)*c.v;
+    let maximum:number,middle:number,minimum:number,ax:number,ay:number,az:number,bx:number,by:number,bz:number;
+    if(tx>=ty&&tx>=tz){maximum=tx;ax=1;ay=az=0;if(ty>=tz){middle=ty;minimum=tz;bx=by=1;bz=0;}else{middle=tz;minimum=ty;bx=bz=1;by=0;}}
+    else if(ty>=tz){maximum=ty;ay=1;ax=az=0;if(tx>=tz){middle=tx;minimum=tz;bx=by=1;bz=0;}else{middle=tz;minimum=tx;by=bz=1;bx=0;}}
+    else {maximum=tz;az=1;ax=ay=0;if(tx>=ty){middle=tx;minimum=ty;bx=bz=1;by=0;}else{middle=ty;minimum=tx;by=bz=1;bx=0;}}
+    return this.at(ix,iy,iz)*(1-maximum)+this.at(ix+ax,iy+ay,iz+az)*(maximum-middle)+this.at(ix+bx,iy+by,iz+bz)*(middle-minimum)+this.at(ix+1,iy+1,iz+1)*minimum;
   }
   normal(point: THREE.Vector3): THREE.Vector3 {
-    const h=this.spacing*.6,d=new THREE.Vector3();
-    for(const axis of ['x','y','z'] as const){const a=point.clone(),b=point.clone();a[axis]-=h;b[axis]+=h;d[axis]=this.sample(a)-this.sample(b);}
+    const h=this.spacing*.6,{x,y,z}=point,d=new THREE.Vector3(this.sampleXYZ(x-h,y,z)-this.sampleXYZ(x+h,y,z),this.sampleXYZ(x,y-h,z)-this.sampleXYZ(x,y+h,z),this.sampleXYZ(x,y,z-h)-this.sampleXYZ(x,y,z+h));
     return d.lengthSq()>1e-12?d.normalize():new THREE.Vector3(0,0,1);
   }
   stateAt(point:THREE.Vector3):{age:number;dilution:number;value:number} {
@@ -59,8 +68,18 @@ export class MortarField {
   }
   raycast(origin:THREE.Vector3,direction:THREE.Vector3,maxDistance:number):FieldContact|null {
     if(!this.nodes.size)return null;
+    // Conservative support bounds include every interpolation cell touching a
+    // node. Rays through the rest of the room need no 4 mm field sampling.
+    let enter=0,leave=maxDistance;
+    for(const axis of ['x','y','z'] as const){
+      if(Math.abs(direction[axis])<1e-12){if(origin[axis]<this.occupiedMin[axis]||origin[axis]>this.occupiedMax[axis])return null;continue;}
+      const a=(this.occupiedMin[axis]-origin[axis])/direction[axis],b=(this.occupiedMax[axis]-origin[axis])/direction[axis];
+      enter=Math.max(enter,Math.min(a,b));leave=Math.min(leave,Math.max(a,b));if(leave<enter)return null;
+    }
     const step=this.spacing*.5,point=new THREE.Vector3();let previous=0;
-    for(let index=0;index<=Math.ceil(maxDistance/step);index++){
+    // Preserve the original sample lattice and binary-search precision.
+    const first=Math.max(0,Math.floor(enter/step));previous=Math.max(0,(first-1)*step);
+    for(let index=first;index<=Math.ceil(Math.min(maxDistance,leave)/step);index++){
       const distance=Math.min(index*step,maxDistance);point.copy(origin).addScaledVector(direction,distance);
       if(this.sample(point)>=LEVEL){let a=previous,b=distance;for(let i=0;i<7;i++){const middle=(a+b)*.5;if(this.sample(point.copy(origin).addScaledVector(direction,middle))>=LEVEL)b=middle;else a=middle;}point.copy(origin).addScaledVector(direction,b);return{point:point.clone(),normal:this.normal(point),distance:b};}
       previous=distance;
@@ -183,9 +202,15 @@ export class MortarField {
     if(mass>0){center.multiplyScalar(1/mass);this.revision++;}return{mass,point:center};
   }
 
-  remesh(clip:(triangle:THREE.Vector3[])=>THREE.Vector3[][]):MortarFieldChunk[] {
+  remesh(clip:(triangle:THREE.Vector3[])=>THREE.Vector3[][],maxChunks=Infinity):MortarFieldChunk[] {
     const results:MortarFieldChunk[]=[];
+    const normalCache=new Map<string,THREE.Vector3>();
+    const vertexNormal=(p:THREE.Vector3):THREE.Vector3=>{
+      const key=`${Math.round(p.x*1e8)},${Math.round(p.y*1e8)},${Math.round(p.z*1e8)}`;
+      let normal=normalCache.get(key);if(!normal){normal=this.normal(p);normalCache.set(key,normal);}return normal;
+    };
     for(const key of this.dirty){
+      if(results.length>=maxChunks)break;
       const [cx,cy,cz]=key.split(',').map(Number),x0=cx*CHUNK,y0=cy*CHUNK,z0=cz*CHUNK,positions:number[]=[],normals:number[]=[];
       const cubes=new Set<string>();
       for(let dx=0;dx<=1;dx++)for(let dy=0;dy<=1;dy++)for(let dz=0;dz<=1;dz++){
@@ -195,27 +220,28 @@ export class MortarField {
         }
       }
       const edge=(a:number,b:number,points:THREE.Vector3[],values:number[]):THREE.Vector3=>points[a].clone().lerp(points[b],(LEVEL-values[a])/(values[b]-values[a]));
-      const emit=(a:THREE.Vector3,b:THREE.Vector3,c:THREE.Vector3):void=>{
-        const center=a.clone().add(b).add(c).multiplyScalar(1/3),outward=this.normal(center);
+      const emit=(a:THREE.Vector3,b:THREE.Vector3,c:THREE.Vector3,outward:THREE.Vector3):void=>{
         if(new THREE.Vector3().crossVectors(b.clone().sub(a),c.clone().sub(a)).dot(outward)<0)[b,c]=[c,b];
         for(const polygon of clip([a,b,c]))for(let i=1;i<polygon.length-1;i++){
           const aa=polygon[0],bb=polygon[i],cc=polygon[i+1];if(new THREE.Vector3().crossVectors(bb.clone().sub(aa),cc.clone().sub(aa)).lengthSq()<1e-18)continue;
-          for(const p of [aa,bb,cc]){positions.push(p.x,p.y,p.z);const n=this.normal(p);normals.push(n.x,n.y,n.z);}
+          for(const p of [aa,bb,cc]){positions.push(p.x,p.y,p.z);const n=vertexNormal(p);normals.push(n.x,n.y,n.z);}
         }
       };
       for(const cube of cubes){const[x,y,z]=cube.split(',').map(Number),values=CORNERS.map(([dx,dy,dz])=>this.at(x+dx,y+dy,z+dz));if(values.every(v=>v<LEVEL)||values.every(v=>v>=LEVEL))continue;
         const points=CORNERS.map(([dx,dy,dz])=>new THREE.Vector3((x+dx)*this.spacing,(y+dy)*this.spacing,(z+dz)*this.spacing));
         for(const tetra of TETRA){const inside=tetra.filter(i=>values[i]>=LEVEL),outside=tetra.filter(i=>values[i]<LEVEL);if(!inside.length||!outside.length)continue;
-          if(inside.length===1){const a=inside[0];emit(edge(a,outside[0],points,values),edge(a,outside[1],points,values),edge(a,outside[2],points,values));}
-          else if(outside.length===1){const a=outside[0];emit(edge(a,inside[0],points,values),edge(a,inside[1],points,values),edge(a,inside[2],points,values));}
-          else {const[a,b]=inside,[c,d]=outside,ac=edge(a,c,points,values),ad=edge(a,d,points,values),bc=edge(b,c,points,values),bd=edge(b,d,points,values);emit(ac,bc,bd);emit(ac,bd,ad);}
+          const outward=points[outside[0]].clone().sub(points[inside[0]]);
+          if(inside.length===1){const a=inside[0];emit(edge(a,outside[0],points,values),edge(a,outside[1],points,values),edge(a,outside[2],points,values),outward);}
+          else if(outside.length===1){const a=outside[0];emit(edge(a,inside[0],points,values),edge(a,inside[1],points,values),edge(a,inside[2],points,values),outward);}
+          else {const[a,b]=inside,[c,d]=outside,ac=edge(a,c,points,values),ad=edge(a,d,points,values),bc=edge(b,c,points,values),bd=edge(b,d,points,values);emit(ac,bc,bd,outward);emit(ac,bd,ad,outward);}
         }
       }
       const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.setAttribute('normal',new THREE.Float32BufferAttribute(normals,3));geometry.computeBoundingSphere();
       let mass=0,age=Infinity,dilution=0;for(const nodeKey of this.chunkNodes.get(key)??[]){const node=this.nodes.get(nodeKey)!;mass+=node.value*this.nodeMass;age=Math.min(age,node.age);dilution=Math.max(dilution,node.dilution);}
       results.push({key,geometry,mass,age:Number.isFinite(age)?age:0,dilution});
+      this.dirty.delete(key);
     }
-    this.dirty.clear();return results;
+    return results;
   }
 
   get statistics(){return{nodes:this.nodes.size,chunks:this.chunkNodes.size,massKg:this.mass,resolutionMm:this.spacing*1000,freshWorkingSeconds:FRESH_SECONDS,revision:this.revision};}

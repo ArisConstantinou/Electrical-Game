@@ -34,6 +34,12 @@ export class HUD {
   private chiselFlat = true;
   private messageUntil = 0;
   private selectedTool: RigTool = 'spray';
+  private readonly displayKeys = new Map<string, string>();
+
+  private displayChanged(name:string,key:string):boolean {
+    if(this.displayKeys.get(name)===key)return false;
+    this.displayKeys.set(name,key);return true;
+  }
 
   constructor(root: HTMLElement) {
     root.innerHTML = `
@@ -221,6 +227,7 @@ export class HUD {
   }
 
   updateWorkReticle(point: { x: number; y: number; z: number } | null): void {
+    if(!this.displayChanged('reticle',point?`${point.x}:${point.y}:${point.z}`:'center'))return;
     this.reticle.style.left = point ? `${(point.x + 1) * 50}%` : '50%';
     this.reticle.style.top = point ? `${(1 - point.y) * 50}%` : '50%';
     this.reticle.hidden = !!point && (Math.abs(point.x) > 1 || Math.abs(point.y) > 1 || point.z < -1 || point.z > 1);
@@ -234,25 +241,27 @@ export class HUD {
   }
 
   update(point: InstallationPoint | null, targeted: boolean, missionProgress: number, selectedTool: RigTool): void {
-    const toolChanged=this.selectedTool!==selectedTool;
+    if (this.messageUntil > 0 && performance.now() > this.messageUntil) {
+      this.prompt.textContent = '';this.prompt.classList.remove('visible', 'warning');this.messageUntil=0;
+    }
+    const placement=point?.boxGroup.userData.placement;
+    const loose=placement&&!placement.secured;
+    const floor=loose&&placement.state==='floor';
+    const key=[selectedTool,targeted,missionProgress,point?.definition.id,point?.definition.label,point?.stage,!!loose,!!floor,point?.stage==='leveling'?point.boxGroup.tiltDegrees:'',point?.stage==='leveling'?point.boxGroup.depthError:''].join(':');
+    if(!this.displayChanged('objective',key))return;
+    const toolChanged=this.displayChanged('tool',selectedTool);
     this.selectedTool = selectedTool;
     this.chiselOrientation.hidden = selectedTool !== 'hammer';
     this.shell.dataset.activeTool=selectedTool;
     this.shell.classList.toggle('mortar-tool',selectedTool==='trowel'||selectedTool==='hose');
     this.progress.style.width = `${missionProgress}%`;
     this.reticle.classList.toggle('active', targeted);
-    if (performance.now() > this.messageUntil) {
-      this.prompt.textContent = '';
-      this.prompt.classList.remove('visible', 'warning');
-    }
+    if(toolChanged)this.tool.innerHTML = `<span>SELECTED TOOL</span><b class="selected">${selectedTool.toUpperCase()}</b><em>${selectedTool==='trowel'?'HOLD · RELEASE':selectedTool==='hose'?'HOLD TO SPRAY':'LEFT CLICK TO USE'}</em>`;
     if (!point) {
       this.objective.textContent = 'Site ready for inspection';
       this.shell.querySelector('#objective-compact')!.textContent = 'SITE / INSPECTION';
       return;
     }
-    const placement=point.boxGroup.userData.placement;
-    const loose=placement&&!placement.secured;
-    const floor=loose&&placement.state==='floor';
     this.objective.textContent = `${point.definition.label} · ${floor?'RETRIEVE BOX WITH BOX TOOL':loose?'TRIAL FIT · CHECK DEPTH AND SUPPORT':stageLabel[point.stage]}`;
     this.shell.querySelector('#objective-compact')!.textContent = `${point.definition.label.split(' · ')[0]} · ${floor?'RETRIEVE BOX':loose?'TRIAL FIT':compactStage[point.stage]??'WORK'}`;
     this.levelPanel.classList.toggle('visible', point.stage === 'leveling');
@@ -265,7 +274,6 @@ export class HUD {
       if (bubble) bubble.style.transform = `translate(calc(-50% + ${Math.max(-76, Math.min(76, -tilt * 24))}px), -50%)`;
       if (depthMarker) depthMarker.style.left = `${50 + Math.max(-42, Math.min(42, depth * 2.5))}%`;
     }
-    this.tool.innerHTML = `<span>SELECTED TOOL</span><b class="selected">${selectedTool.toUpperCase()}</b><em>${selectedTool==='trowel'?'HOLD · RELEASE':selectedTool==='hose'?'HOLD TO SPRAY':'LEFT CLICK TO USE'}</em>`;
     this.shell.querySelectorAll<HTMLButtonElement>('button[data-tool]').forEach(button => {
       const selected = button.dataset.tool === selectedTool;
       button.classList.toggle('selected', selected);
@@ -280,6 +288,8 @@ export class HUD {
   }
 
   updateWaterGun(setting:WaterGunSetting,floorLitres:number,depthMm:number):void {
+    const key=[this.selectedTool,setting.id,this.selectedTool==='hose'?Math.round(floorLitres):'',this.selectedTool==='hose'?(depthMm/10).toFixed(1):''].join(':');
+    if(!this.displayChanged('water',key))return;
     const select=this.shell.querySelector<HTMLSelectElement>('#water-gun-mode')!;select.value=setting.id;
     const readout=this.shell.querySelector<HTMLElement>('#water-gun-readout')!;readout.hidden=this.selectedTool!=='hose';
     if(this.selectedTool==='hose')this.shell.querySelector<HTMLElement>('#mortar-readout')!.textContent=setting.id==='flood'?'FLOOD | HOLD TO FILL ROOM':`${setting.label} | ${setting.speedMps} m/s`;
@@ -325,8 +335,13 @@ export class HUD {
     this.chiselOrientation.setAttribute('aria-label',`${this.chiselFlat?`Flat chisel edge ${Math.round(edge)} degrees, blade ${width} millimetres`:'Pointed chisel'}, tilt ${tilt} degrees${adapted?`, selected tilt ${requested} degrees`:''}, side ${side} degrees`);
   }
   updateMortar(tool:RigTool,power:number,angle:number,wet:{pore:number;film:number},coverage:number,recovery:number,outcome:string,floorLitres=0,feedback?:MortarThrowFeedback):void {
+    const key=tool==='trowel'||tool==='hose'
+      ? JSON.stringify([tool,power,angle,Math.round(wet.pore*100),wet.film>.3,wet.pore>.3,Math.round(coverage*100),recovery>0,outcome,floorLitres.toFixed(1),feedback])
+      : `${tool}:${feedback?.splash??0}`;
+    if(!this.displayChanged('mortar',key))return;
     const panel=this.shell.querySelector<HTMLElement>('#mortar-panel')!;panel.hidden=tool!=='trowel'&&tool!=='hose';
-    this.shell.querySelector<HTMLElement>('#mortar-readout')!.textContent=tool==='hose'?`CHASE SURFACE · ${wet.film>.3?'TOO WET':wet.pore>.3?'DAMP':'DRY'} · ${Math.round(wet.pore*100)}%`:`LOFT ${angle}° · BED ${Math.round(coverage*100)}%`;
+    // Water mode owns this shared readout while the hose is selected.
+    if(tool!=='hose')this.shell.querySelector<HTMLElement>('#mortar-readout')!.textContent=`LOFT ${angle}° · BED ${Math.round(coverage*100)}%`;
     this.shell.querySelector<HTMLElement>('#swing-power')!.style.width=`${tool==='hose'?wet.pore*100:power*100}%`;
     this.shell.querySelector<HTMLElement>('#mortar-hint')!.textContent=tool==='hose'?`Soak exposed chase surfaces. Excess water washes fresh mortar away. Floor water: ${floorLitres.toFixed(1)} L.`:recovery>0?'Recovering / loading next trowelful…':outcome;
     this.shell.querySelector<HTMLElement>('#mortar-swing')!.textContent=tool==='hose'?'HOLD · MIST':'HOLD · RELEASE';
@@ -383,7 +398,7 @@ export class HUD {
   updateHammerControls(mode: string, visible: boolean, trimming = false): void {
     const modeText = this.shell.querySelector<HTMLElement>('#tool-mode-toggle span');
     if (visible && modeText) modeText.textContent = mode.toUpperCase();
-    if (visible && trimming) this.tool.querySelector('em')!.textContent = 'UP · EDGE CLEANUP';
+    if (visible) this.tool.querySelector('em')!.textContent = trimming ? 'UP · EDGE CLEANUP' : 'LEFT CLICK TO USE';
   }
 
   updateAimControl(mode: 'auto-use' | 'double-tap'): void {

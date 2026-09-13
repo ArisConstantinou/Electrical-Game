@@ -76,6 +76,7 @@ export class Game {
   private actionCooldown = 0;
   private wasSpraying = false;
   private wasLeveling = false;
+  private hudSettingsKey = '';
   private readonly mobileControls: MobileControls;
   private readonly desktopControls: DesktopControls;
 
@@ -215,23 +216,28 @@ export class Game {
     this.fpsRig.show(this.selectedTool);
     if (this.selectedTool === 'hammer') this.fpsRig.contact(this.renderer.camera, this.room.brickWall);
     else this.fpsRig.poseArms(this.renderer.camera);
-    const wallAim = Boolean(this.room.brickWall.aim(this.renderer.camera));
-    const pointAim = Boolean(this.mission.target(this.renderer.camera));
+    const waterHit = this.selectedTool === 'spray' || mortarTool ? this.room.brickWall.aim(this.renderer.camera) : null;
+    const wallAim = Boolean(waterHit);
+    const pointAim = this.selectedTool !== 'hammer' && this.selectedTool !== 'spray' && Boolean(this.mission.target(this.renderer.camera));
     const aimed = this.selectedTool === 'hammer' ? this.fpsRig.reachable && !this.fpsRig.chiselInAir : this.selectedTool === 'spray' ? wallAim : pointAim;
     this.hud.update(active, aimed, this.mission.progress, this.selectedTool);
     const sprayColor = SPRAY_COLORS[this.sprayColorIndex];
-    this.hud.updateSprayControls(this.sprayMode, sprayColor.name, sprayColor.css, this.selectedTool === 'spray');
-    this.hud.updateHammerControls(this.hammerMode, this.selectedTool === 'hammer', this.room.brickWall.chiselTiltDegrees < 0);
-    this.hud.updateChiselWidth(this.room.brickWall.chiselWidthM,this.room.brickWall.chiselType==='flat');
+    const settingsKey=[this.selectedTool,this.sprayMode,this.sprayColorIndex,this.hammerMode,this.room.brickWall.chiselTiltDegrees<0,this.room.brickWall.chiselWidthM,this.room.brickWall.chiselType,this.aimControlMode,this.aimProfile,this.wallAssistEnabled,this.aimInputMode].join(':');
+    if(settingsKey!==this.hudSettingsKey){
+      this.hudSettingsKey=settingsKey;
+      this.hud.updateSprayControls(this.sprayMode, sprayColor.name, sprayColor.css, this.selectedTool === 'spray');
+      this.hud.updateHammerControls(this.hammerMode, this.selectedTool === 'hammer', this.room.brickWall.chiselTiltDegrees < 0);
+      this.hud.updateChiselWidth(this.room.brickWall.chiselWidthM,this.room.brickWall.chiselType==='flat');
+      this.hud.updateAimControl(this.aimControlMode);
+      this.hud.updateAimSpeed(this.aimProfile);
+      this.hud.updateWallAssist(this.wallAssistEnabled);
+      this.hud.updateAimInput(this.aimInputMode);
+    }
     this.hud.updateChiselOrientation(this.room.brickWall.chiselEdgeAngle*180/Math.PI,this.fpsRig.actualTiltDegrees,this.hammerWorkStance.sideDegrees,this.room.brickWall.chiselWidthM,this.room.brickWall.chiselTiltDegrees);
-    this.hud.updateAimControl(this.aimControlMode);
-    this.hud.updateAimSpeed(this.aimProfile);
-    this.hud.updateWallAssist(this.wallAssistEnabled);
-    this.hud.updateAimInput(this.aimInputMode);
-    const waterHit=this.room.brickWall.aim(this.renderer.camera);
-    const wet=waterHit ? this.mortar.moistureAt(new THREE.Vector3(waterHit.point.x,waterHit.point.y,waterHit.point.z)) : {pore:0,film:0};
-    this.hud.updateMortar(this.selectedTool,this.mortar.charge,this.mortar.angleDegrees,wet,active ? this.mortar.coverage(active):0,this.mortar.recovery,this.mortar.lastOutcome,this.roomWater.telemetry.floorLitres,this.mortar.throwFeedback);
-    this.hud.updateWaterGun(waterSetting,this.roomWater.telemetry.floorLitres,this.roomWater.telemetry.meanDepthMm);
+    const wet=mortarTool && waterHit ? this.mortar.moistureAt(waterHit.point) : {pore:0,film:0};
+    const waterTelemetry=this.roomWater.telemetry;
+    this.hud.updateMortar(this.selectedTool,this.mortar.charge,this.mortar.angleDegrees,wet,mortarTool && active ? this.mortar.coverage(active):0,this.mortar.recovery,this.mortar.lastOutcome,waterTelemetry.floorLitres,this.mortar.throwFeedback);
+    this.hud.updateWaterGun(waterSetting,waterTelemetry.floorLitres,waterTelemetry.meanDepthMm);
     if (this.mission.complete && !this.resultShown) { this.resultShown = true; this.hud.showResult(); if (document.pointerLockElement) void document.exitPointerLock(); }
     this.renderer.eyeYaw = 0;
     this.renderer.eyePitch = 0;

@@ -139,7 +139,8 @@ export class BrickWall extends THREE.Group {
 
   registerInstallations(points: InstallationPoint[]): void { for (const point of points) this.installations.set(point.definition.id, point); }
   aim(camera: THREE.Camera, maxDistance = GAME_CONFIG.interaction.maxDistance): { point: THREE.Vector3 } | null {
-    camera.updateMatrixWorld(true);
+    // This ray needs only the camera transform, not every finger/tool child.
+    camera.updateWorldMatrix(true, false);
     this.raycaster.setFromCamera(new THREE.Vector2(), camera);
     const hit = this.volume.raycast(this.raycaster.ray.origin, this.raycaster.ray.direction, maxDistance);
     if (!hit) return null;

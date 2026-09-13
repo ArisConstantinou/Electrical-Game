@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
+import {blockPointerLock} from './browser-safety.mjs';
 
 const url=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/';
 const out=process.argv[3]??'output/box-placement-ui';
@@ -22,6 +23,7 @@ try{
   for(const mobile of [false,true]){
     const name=mobile?'mobile':'desktop';
     const page=await browser.newPage({viewport:mobile?{width:390,height:844}:{width:1366,height:768},isMobile:mobile,hasTouch:mobile});
+    await blockPointerLock(page.context());
     // Keep each navigation on one coherent source revision while independent
     // implementation work is still running; this does not intercept game code.
     if(process.env.QA_FREEZE_HMR==='1')await page.addInitScript(()=>{const Original=window.WebSocket;window.WebSocket=class extends Original{addEventListener(type,callback,options){if(type!=='message')return super.addEventListener(type,callback,options);return super.addEventListener(type,event=>{try{if(['update','full-reload'].includes(JSON.parse(event.data).type))return;}catch{}if(typeof callback==='function')callback.call(this,event);else callback?.handleEvent(event);},options);}};});

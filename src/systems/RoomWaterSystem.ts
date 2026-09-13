@@ -33,6 +33,11 @@ export class RoomWaterSystem {
   private readonly positions:Float32Array;
   private readonly thickness:Float32Array;
   private readonly indices:Uint32Array;
+  private readonly heightCells:Int32Array;
+  private readonly heightCounts:Uint8Array;
+  private readonly opticalCells:Int32Array;
+  private readonly opticalWeights:Float64Array;
+  private readonly opticalWeightSums:Float64Array;
   private readonly streakPositions=new Float32Array(128*6);
   private time=0;
   private geometryTime=0;
@@ -48,10 +53,27 @@ export class RoomWaterSystem {
     const n=(this.field.columns+1)*(this.field.rows+1);
     this.positions=new Float32Array(n*3);this.thickness=new Float32Array(n);
     this.indices=new Uint32Array(this.field.columns*this.field.rows*6);
+    this.heightCells=new Int32Array(n*4).fill(-1);this.heightCounts=new Uint8Array(n);
+    this.opticalCells=new Int32Array(n*16).fill(-1);this.opticalWeights=new Float64Array(n*16);this.opticalWeightSums=new Float64Array(n);
+    // The floor lattice and optical reconstruction stencil never move. Cache
+    // their topology once; only physical height, optical depth and normals vary.
+    const f=this.field,stride=f.columns+1;
+    for(let z=0;z<=f.rows;z++)for(let x=0;x<=f.columns;x++){
+      const v=z*stride+x;this.positions[v*3]=f.minX+x*f.dx;this.positions[v*3+2]=f.minZ+z*f.dz;
+      let slot=0;
+      for(let dz=-1;dz<=0;dz++)for(let dx=-1;dx<=0;dx++)if(x+dx>=0&&x+dx<f.columns&&z+dz>=0&&z+dz<f.rows)this.heightCells[v*4+slot++]=(z+dz)*f.columns+x+dx;
+      this.heightCounts[v]=slot;slot=0;
+      for(let dz=-2;dz<=1;dz++)for(let dx=-2;dx<=1;dx++)if(x+dx>=0&&x+dx<f.columns&&z+dz>=0&&z+dz<f.rows){
+        const weight=Math.exp(-((dx+.5)**2+(dz+.5)**2)/1.1),at=v*16+slot++;
+        this.opticalCells[at]=(z+dz)*f.columns+x+dx;this.opticalWeights[at]=weight;this.opticalWeightSums[v]+=weight;
+      }
+    }
+    let index=0;
+    for(let z=0;z<f.rows;z++)for(let x=0;x<f.columns;x++){const a=z*stride+x;this.indices.set([a,a+stride,a+1,a+1,a+stride,a+stride+1],index);index+=6;}
     this.surfaceGeometry.setAttribute('position',new THREE.BufferAttribute(this.positions,3).setUsage(THREE.DynamicDrawUsage));
     this.surfaceGeometry.setAttribute('waterDepth',new THREE.BufferAttribute(this.thickness,1).setUsage(THREE.DynamicDrawUsage));
     this.surfaceGeometry.setAttribute('normal',new THREE.BufferAttribute(new Float32Array(n*3),3));
-    this.surfaceGeometry.setIndex(new THREE.BufferAttribute(this.indices,1).setUsage(THREE.DynamicDrawUsage));
+    this.surfaceGeometry.setIndex(new THREE.BufferAttribute(this.indices,1));
     this.surfaceGeometry.setDrawRange(0,0);this.surface.visible=false;
     this.droplets.instanceMatrix.setUsage(THREE.DynamicDrawUsage);this.droplets.count=0;this.droplets.frustumCulled=false;
     this.streaks.geometry.setAttribute('position',new THREE.BufferAttribute(this.streakPositions,3).setUsage(THREE.DynamicDrawUsage));
@@ -127,7 +149,7 @@ export class RoomWaterSystem {
     this.droplets.count=this.drops.length;this.droplets.instanceMatrix.needsUpdate=true;
     this.streaks.geometry.setDrawRange(0,this.drops.length*2);this.streaks.geometry.getAttribute('position').needsUpdate=true;
     if(this.jetState.active&&this.jetGeometryTime>=1/30){this.jetGeometryTime=0;this.updateJetVisuals();}
-    if(this.geometryTime>=1/20){this.geometryTime=0;this.rebuildGeometry();}
+    if(this.geometryTime>=1/20){this.geometryTime=0;if(this.field.receivedLitres>0)this.rebuildGeometry();}
   }
   /** A fixed visual budget samples the ballistic nozzle sheet. Water accounting
    * remains exclusively in emission/runoff batches: these are never extra litres. */
@@ -221,28 +243,26 @@ export class RoomWaterSystem {
     this.jetCore.geometry.getAttribute('position').needsUpdate=true;this.jetCore.geometry.computeVertexNormals();
   }
   private rebuildGeometry():void{
-    const f=this.field,stride=f.columns+1;
+    const f=this.field;
     let hasWater=false;
-    for(let z=0;z<=f.rows;z++)for(let x=0;x<=f.columns;x++){
-      let height=0,depth=0,count=0;
-      for(const dz of [-1,0])for(const dx of [-1,0])if(x+dx>=0&&x+dx<f.columns&&z+dz>=0&&z+dz<f.rows){const i=(z+dz)*f.columns+x+dx;height+=f.bed[i]+f.depths[i];depth+=f.depths[i];count++;}
+    for(let v=0;v<this.thickness.length;v++){
+      let height=0,depth=0;const count=this.heightCounts[v];
+      for(let slot=0;slot<count;slot++){const i=this.heightCells[v*4+slot];height+=f.bed[i]+f.depths[i];depth+=f.depths[i];}
       // The optical shoreline spans neighbouring dry cells. A compact Gaussian
       // reconstruction prevents square cell cut-outs without moving physical
       // water or changing the conservative field's surface heights/volume.
-      let opticalDepth=0,weight=0;
-      for(let dz=-2;dz<=1;dz++)for(let dx=-2;dx<=1;dx++)if(x+dx>=0&&x+dx<f.columns&&z+dz>=0&&z+dz<f.rows){
-        const w=Math.exp(-((dx+.5)**2+(dz+.5)**2)/1.1),i=(z+dz)*f.columns+x+dx;
-        opticalDepth+=f.depths[i]*w;weight+=w;
+      let opticalDepth=0;
+      for(let slot=0;slot<16;slot++){
+        const at=v*16+slot,i=this.opticalCells[at];if(i<0)break;
+        opticalDepth+=f.depths[i]*this.opticalWeights[at];
       }
-      const v=z*stride+x;this.positions[v*3]=f.minX+x*f.dx;this.positions[v*3+1]=Math.max(.0002,height/count);this.positions[v*3+2]=f.minZ+z*f.dz;this.thickness[v]=opticalDepth/weight;
+      this.positions[v*3+1]=Math.max(.0002,height/count);this.thickness[v]=opticalDepth/this.opticalWeightSums[v];
       hasWater ||= depth>0.000003;
     }
-    let count=0;
     // Keep dry perimeter triangles: their zero waterDepth lets the Water Pro
     // alpha fade finish continuously rather than clipping at a wet-cell edge.
-    for(let z=0;z<f.rows;z++)for(let x=0;x<f.columns;x++){const a=z*stride+x;this.indices.set([a,a+stride,a+1,a+1,a+stride,a+stride+1],count);count+=6;}
-    this.surfaceGeometry.getAttribute('position').needsUpdate=true;this.surfaceGeometry.getAttribute('waterDepth').needsUpdate=true;this.surfaceGeometry.index!.needsUpdate=true;
-    this.surfaceGeometry.setDrawRange(0,hasWater?count:0);this.surfaceGeometry.computeVertexNormals();this.surface.visible=hasWater;
+    this.surfaceGeometry.getAttribute('position').needsUpdate=true;this.surfaceGeometry.getAttribute('waterDepth').needsUpdate=true;
+    this.surfaceGeometry.setDrawRange(0,hasWater?this.indices.length:0);this.surfaceGeometry.computeVertexNormals();this.surface.visible=hasWater;
   }
   get telemetry(){const airborne=this.drops.reduce((sum,drop)=>sum+drop.litres,0),floor=this.field.volumeLitres;return{vendor:'Water Pro 3.5.1',active:this.waterProActive,backend:this.waterProBackend,receivedLitres:this.receivedLitres,runoffLitres:this.runoffLitres,emissionLitres:this.emissionLitres,airborneLitres:airborne,floorLitres:floor,conservationErrorLitres:this.receivedLitres-airborne-floor,wetAreaM2:this.field.wetArea,meanDepthMm:floor/(this.field.width*this.field.depth),maxDepthMm:this.field.maxDepth*1000,activeDrops:this.drops.length,dropBudget:128,flowCells:this.field.depths.length,jetActive:this.jetState.active,jetFlowLitresPerSecond:this.jetState.flowLitresPerSecond,jetSpeedMps:this.jetState.speedMps,jetStreamSegments:this.jetSegments,jetStreamBudget:this.streamCount*this.streamSteps,sprayDrops:this.sprayCount,sprayBudget:160,jetImpact:this.jetState.impactPoint?.toArray(),sedimentKg:this.sedimentKg,seconds:this.time};}
 }

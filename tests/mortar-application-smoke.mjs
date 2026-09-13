@@ -1,12 +1,14 @@
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
+import { blockPointerLock } from './browser-safety.mjs';
 const url=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/';
 const out=process.argv[3]??'output/mortar';await mkdir(out,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const errors=[];const results={url,checks:[],errors};
 try {
  const page=await browser.newPage({viewport:{width:1366,height:768}});page.on('pageerror',e=>errors.push(e.message));
+ await blockPointerLock(page.context());
  await page.goto(url,{waitUntil:'networkidle'});await page.locator('#start-button').click();await page.evaluate(()=>document.exitPointerLock());await page.waitForTimeout(100);
  const physical=await page.evaluate(async()=>{
   const g=window.__wireTheHouse,MortarSystem=g.mortar.constructor;

@@ -1,4 +1,5 @@
 import {chromium} from 'playwright';
+import {blockPointerLock} from './browser-safety.mjs';
 import {mkdir,writeFile} from 'node:fs/promises';
 import assert from 'node:assert/strict';
 const output='output/room-water';await mkdir(output,{recursive:true});
@@ -7,6 +8,7 @@ const report=[];
 try{
 for(const backend of process.argv.includes('--gpu-only')?['webgpu']:['webgpu','webgl']){
  const page=await browser.newPage({viewport:{width:1366,height:768}}),errors=[];
+ await blockPointerLock(page.context());
  if(process.env.QA_FREEZE_HMR==='1')await page.addInitScript(()=>{const Original=window.WebSocket;window.WebSocket=class extends Original{addEventListener(type,callback,options){if(type!=='message')return super.addEventListener(type,callback,options);return super.addEventListener(type,event=>{try{if(['update','full-reload'].includes(JSON.parse(event.data).type))return;}catch{}if(typeof callback==='function')callback.call(this,event);else callback?.handleEvent(event);},options);}};});
  page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
  await page.goto(`http://127.0.0.1:5362/Electrical-Game/${backend==='webgl'?'?renderer=webgl':''}`,{waitUntil:'networkidle'});

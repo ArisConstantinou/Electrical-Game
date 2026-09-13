@@ -145,11 +145,15 @@ function openingIntrusion(system, box) {
   assert.equal(tilted.intersectingTriangles, 0, 'Triangle crosses tilted box opening');
   group.rotation.z = 0; group.position.x = .004; group.position.z = .003;
   system.update(.01);
+  assert([...system.field.nodes.values()].every(n=>!system.insideBox(new THREE.Vector3(n.x*system.field.spacing,n.y*system.field.spacing,n.z*system.field.spacing))), 'Moved opening still contains authoritative mortar before rendering completes');
+  assertMass(system, 'immediate opening displacement');
+  await system.waitForGeometry();
   const moved = openingIntrusion(system, box);
   assert.equal(moved.intersectingTriangles, 0, 'Old mortar crosses the newly moved/leveled opening');
   assert(system.telemetry.movingKg > 0, 'Reclipped material vanished instead of becoming detached mass');
   const beforeRepeated=vertexCount(system);
   for(let i=0;i<24;i++){group.rotation.z=(i%2?1:-1)*.012;group.position.z=i%2?.003:.005;system.update(.02);}
+  await system.waitForGeometry();
   const afterRepeated=vertexCount(system);
   assert(afterRepeated<beforeRepeated*8,'Repeated leveling caused runaway retriangulation');
   assert.equal(openingIntrusion(system,box).intersectingTriangles,0,'Repeated leveling covered an opening');
