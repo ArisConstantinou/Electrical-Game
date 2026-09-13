@@ -13,7 +13,9 @@ try{
   const result=await page.evaluate(()=>{
     const g=window.__wireTheHouse,w=g.room.brickWall,v=w.volume,c=g.renderer.camera;
     const original=v.raycast;w.chiselTiltDegrees=0;w.chiselSideDegrees=0;
-    c.position.set(.8,1.5,-1.4);c.lookAt(.8,1.5,v.frontZ);c.updateMatrixWorld(true);
+    c.position.set(.8,1.65,-1.4);c.lookAt(.8,1.5,v.frontZ);c.updateMatrixWorld(true);
+    g.started=true;g.selectTool('hammer');g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;
+    for(let i=0;i<150;i++)g.step(1/60);
     // An analytical 16 mm opening with surviving backing 60 mm behind it.
     // Production rig, blade vertices, edge sweep and chosen contacts are untouched.
     v.raycast=(origin,direction,max)=>{
@@ -26,10 +28,11 @@ try{
     };
     const read=(width,roll=0,type='flat')=>{
       w.chiselWidthM=width;w.chiselEdgeAngle=roll;w.chiselType=type;
-      const hit=g.fpsRig.contact(c,w),tip=g.fpsRig.chiselTipWorld.clone();
+      let hit;for(let i=0;i<60;i++)hit=g.fpsRig.contact(c,w);const tip=g.fpsRig.chiselTipWorld.clone();
+      if(!hit)throw new Error(`Analytical contact ${width}/${roll}: ${JSON.stringify(g.fpsRig.hammerFit)}`);
       const blade=g.fpsRig.flatTip;
-      const left=blade.localToWorld(tip.clone().set(-.0225,0,-.035));
-      const right=blade.localToWorld(tip.clone().set(.0225,0,-.035));
+      const left=blade.localToWorld(tip.clone().set(-.025,0,-.05));
+      const right=blade.localToWorld(tip.clone().set(.025,0,-.05));
       return{width,roll,type,point:hit.point.toArray(),center:tip.toArray(),offset:hit.bladeOffsetM,depth:v.frontZ-hit.point.z,measuredWidth:left.distanceTo(right),contactError:tip.addScaledVector(hit.edge,hit.bladeOffsetM).distanceTo(hit.point)};
     };
     try{return{narrow:read(.01),wide:read(.05),rotated:read(.05,Math.PI/2),pointed:read(.05,0,'pointed')};}

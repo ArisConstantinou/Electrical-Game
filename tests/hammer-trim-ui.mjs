@@ -53,20 +53,20 @@ try {
           // displayed depth counter. Missing edits mean pristine material.
           return v.serialize().chunks.flatMap(c => c.edits.filter(e => v.nodePosition(0, 0, e[0] % (v.nz + 2)).z <= floorZ + v.hz + 1e-9).map(e => [c.key, ...e])).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
         },
-        sample() { const contact = w.contactProvider(g.renderer.camera); return { camera: [...g.renderer.camera.position.toArray(), ...g.renderer.camera.quaternion.toArray()], contact: contact ? { ...contact.point } : null, recoil: g.fpsRig.strikeAmount, rigRotation: g.fpsRig.rotation.x, nodes: v.removedNodeCount, trimming: v.trimmingState }; }
+        sample() { const contact = w.contactProvider(g.renderer.camera); return { camera: [...g.renderer.camera.position.toArray(), ...g.renderer.camera.quaternion.toArray()], contact: contact ? { ...contact.point } : null, recoil: g.fpsRig.strikeAmount, rigRotation: g.fpsRig.rotation.x, nodes: v.removedNodeCount, fit:g.fpsRig.hammerFit, tip:g.fpsRig.chiselTipWorld.toArray(), inAir:g.fpsRig.chiselInAir, trimming: v.trimmingState }; }
       };
       return { strikes, removedNodes: v.removedNodeCount, cellDepth: v.hz };
     });
     if (mobile) {
       await page.locator('#settings-toggle').tap();
-      for (let i = 0; i < 9 && await page.evaluate(() => window.__wireTheHouse.room.brickWall.chiselTiltDegrees) !== -25; i++) await page.locator('#chisel-tilt').tap();
-      assert.equal(await page.locator('#chisel-tilt b').textContent(), '25 deg UP');
+      for (let i = 0; i < 9 && await page.evaluate(() => window.__wireTheHouse.room.brickWall.chiselTiltDegrees) !== -30; i++) await page.locator('#chisel-tilt').tap();
+      assert.equal(await page.locator('#chisel-tilt b').textContent(), '30 deg UP');
       // Select the supported stationary double-tap hold so camera stability is
       // measured without user drag input or a corrective camera reset.
       await page.locator('#aim-control-mode').tap();
       await page.locator('#settings-close').tap();
-    } else for (let i = 0; i < 10; i++) await page.keyboard.press('BracketLeft');
-    assert.equal(await page.evaluate(() => window.__wireTheHouse.room.brickWall.chiselTiltDegrees), -25);
+    } else for (let i = 0; i < 9; i++) await page.keyboard.press('BracketLeft');
+    assert.equal(await page.evaluate(() => window.__wireTheHouse.room.brickWall.chiselTiltDegrees), -30);
     const target = await page.evaluate(() => {
       const g = window.__wireTheHouse, w = g.room.brickWall, v = w.volume;
       const candidates = [];
@@ -76,9 +76,20 @@ try {
         if (floorZ !== null && c.point.z < v.frontZ - .020 && c.point.z > floorZ + v.hz * 3) candidates.push({ x, y, point: { ...c.point }, floorZ, protrusion: c.point.z - floorZ });
       }
       candidates.sort((a, b) => b.protrusion - a.protrusion);
-      const target = candidates[0]; if (target) window.__trimQA.aim(target.x, target.y); return target ?? null;
+      // Validate the exposed rib from the settled eye position; the new body
+      // stance changes the sight line inside a hollow cell during its approach.
+      for(const candidate of candidates){
+        window.__trimQA.aim(candidate.x,candidate.y);
+        for(let i=0;i<120;i++)g.step(1/60);
+        const c=w.contactProvider(g.renderer.camera);if(!c)continue;
+        const floorZ=v.establishTrimPlane(c.point);
+        if(floorZ!==null&&c.point.z<v.frontZ-.020&&c.point.z>floorZ+v.hz*3)return {...candidate,point:{...c.point},floorZ,protrusion:c.point.z-floorZ};
+      }
+      return null;
     });
     assert(target, `${name}: no actual exposed inner rib candidate`);
+    // Settle the new ergonomic stance before isolating percussion camera movement.
+    await page.evaluate(()=>{for(let i=0;i<150;i++)window.__wireTheHouse.step(1/60);});
     await page.waitForTimeout(450);
     await page.evaluate(async () => { await window.__wireTheHouse.renderer.waitForFrame(); });
     await page.screenshot({ path: `${out}/${name}-before.png` });

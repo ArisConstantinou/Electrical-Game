@@ -69,7 +69,7 @@ export class PlayerController {
     // back while the player is standing inside the entry zone after release.
     if(work.locked && y<-.12){work.locked=false;work.released=true;}
     if(wallDistanceNow>1.15 || y>.2)work.released=false;
-    if(this.wallWorkEnabled && facingWall && !work.released && !work.locked && wallDistanceNow<.94 && wallDistanceNow>.30)work.locked=true;
+    if(this.wallWorkEnabled && facingWall && !work.released && !work.locked && wallDistanceNow<(this.handWorkTargetY===null?1.10:.94) && wallDistanceNow>.30)work.locked=true;
     work.targetDistanceM=this.wallWorkDistance;
     if(work.locked){
       // Preserve the aimed wall point while the body settles to its standoff.

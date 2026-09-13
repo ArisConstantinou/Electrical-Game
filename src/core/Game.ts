@@ -139,12 +139,13 @@ export class Game {
     const handWork=this.selectedTool==='fitting'||this.selectedTool==='level';
     this.player.wallWorkEnabled=(this.selectedTool==='hammer'||handWork)&&!leveling;
     const wallAxisZ=Math.cos(THREE.MathUtils.degToRad(this.room.brickWall.chiselTiltDegrees))*Math.cos(THREE.MathUtils.degToRad(this.room.brickWall.chiselSideDegrees));
-    this.player.wallWorkDistance=handWork?.46:.38+.39*Math.abs(wallAxisZ);
+    this.player.wallWorkDistance=handWork?.46:.38+.55*Math.abs(wallAxisZ);
     this.player.handWorkTargetY=handWork?this.boxWorkAim()?.y??null:null;
     if (this.started && !leveling) this.player.update(Math.min(dt, 0.05));
     this.renderer.camera.rotation.set(this.player.pitch, this.player.yaw, 0);
-    this.hammerWorkStance.update(this.renderer.camera, dt, this.room.brickWall.chiselSideDegrees, this.started && this.selectedTool === 'hammer' && !leveling);
+    this.hammerWorkStance.update(this.renderer.camera, dt, this.room.brickWall.chiselSideDegrees, this.started && this.selectedTool === 'hammer' && !leveling,this.room.brickWall.chiselTiltDegrees);
     this.fpsRig.workStanceSide = this.hammerWorkStance.sideDegrees / 75;
+    this.fpsRig.workStanceTiltDegrees = this.hammerWorkStance.actualTiltDegrees;
     this.fpsRig.workPositionLocked=this.player.workPosition.locked;
     this.actionCooldown = Math.max(0, this.actionCooldown - dt);
     const requested = this.input.consumeAction();
@@ -206,6 +207,7 @@ export class Game {
     this.hud.updateSprayControls(this.sprayMode, sprayColor.name, sprayColor.css, this.selectedTool === 'spray');
     this.hud.updateHammerControls(this.hammerMode, this.selectedTool === 'hammer', this.room.brickWall.chiselTiltDegrees < 0);
     this.hud.updateChiselWidth(this.room.brickWall.chiselWidthM,this.room.brickWall.chiselType==='flat');
+    this.hud.updateChiselOrientation(this.room.brickWall.chiselEdgeAngle*180/Math.PI,this.fpsRig.actualTiltDegrees,this.hammerWorkStance.sideDegrees,this.room.brickWall.chiselWidthM,this.room.brickWall.chiselTiltDegrees);
     this.hud.updateAimControl(this.aimControlMode);
     this.hud.updateAimSpeed(this.aimProfile);
     this.hud.updateWallAssist(this.wallAssistEnabled);
@@ -231,7 +233,7 @@ export class Game {
       mode: !this.started ? 'start' : this.mission.complete ? 'mission-complete' : point?.stage === 'leveling' ? 'leveling' : 'playing',
       player: { crouched:this.player.eyeHeight<1.1, x: Number(this.renderer.camera.position.x.toFixed(3)), y: Number(this.renderer.camera.position.y.toFixed(3)), z: Number(this.renderer.camera.position.z.toFixed(3)), yaw: Number(this.player.yaw.toFixed(3)), pitch: Number(this.player.pitch.toFixed(3)) },
       mission: { name: 'Living Room First Fix', progressPercent: this.mission.progress, selectedTool: this.selectedTool, complete: this.mission.complete },
-      workSurface: { ...this.room.brickWall.telemetry, stanceSideDegrees:this.hammerWorkStance.sideDegrees, stanceCameraOffset:this.hammerWorkStance.offset.toArray(), freeSprayMarks: this.room.brickWall.freeMarkCount, activeFragments: this.chasing.activeFragmentCount, insideFragments: this.chasing.insideFragmentCount, inwardFragments: this.chasing.inwardFragmentCount, physicsMs:this.chasing.lastUpdateMs, peakPhysicsMs:this.chasing.maximumUpdateMs, fragmentBudget:this.chasing.fragmentBudget, chiselTip:{x:this.fpsRig.chiselTipWorld.x,y:this.fpsRig.chiselTipWorld.y,z:this.fpsRig.chiselTipWorld.z,inAir:this.fpsRig.chiselInAir}, airborneFragments: this.chasing.airborneFragmentCount, settledFragments: this.chasing.settledFragmentCount, sprayMode: this.sprayMode, sprayColor: SPRAY_COLORS[this.sprayColorIndex].name, hammerMode: this.hammerMode, chisel: this.room.brickWall.chiselType, chiselEnergyJ: this.room.brickWall.chiselEnergyJ, chiselWidthMm: this.room.brickWall.chiselWidthM*1000, chiselTiltDegrees:this.room.brickWall.chiselTiltDegrees, chiselSideDegrees:this.room.brickWall.chiselSideDegrees, chiselEdgeDegrees: this.room.brickWall.chiselEdgeAngle*180/Math.PI, aimControlMode:this.aimControlMode, aimInputMode:this.aimInputMode, aimProfile:this.aimProfile, wallAssist:this.wallAssistEnabled, proximityPrecision:Number(this.player.wallAssistAmount.toFixed(3)) },
+      workSurface: { ...this.room.brickWall.telemetry, stanceSideDegrees:this.hammerWorkStance.sideDegrees, stanceCameraOffset:this.hammerWorkStance.offset.toArray(), freeSprayMarks: this.room.brickWall.freeMarkCount, activeFragments: this.chasing.activeFragmentCount, insideFragments: this.chasing.insideFragmentCount, inwardFragments: this.chasing.inwardFragmentCount, physicsMs:this.chasing.lastUpdateMs, peakPhysicsMs:this.chasing.maximumUpdateMs, fragmentBudget:this.chasing.fragmentBudget, chiselTip:{x:this.fpsRig.chiselTipWorld.x,y:this.fpsRig.chiselTipWorld.y,z:this.fpsRig.chiselTipWorld.z,inAir:this.fpsRig.chiselInAir}, airborneFragments: this.chasing.airborneFragmentCount, settledFragments: this.chasing.settledFragmentCount, sprayMode: this.sprayMode, sprayColor: SPRAY_COLORS[this.sprayColorIndex].name, hammerMode: this.hammerMode, chisel: this.room.brickWall.chiselType, chiselEnergyJ: this.room.brickWall.chiselEnergyJ, chiselWidthMm: this.room.brickWall.chiselWidthM*1000, chiselTiltDegrees:this.room.brickWall.chiselTiltDegrees, actualTiltDegrees:this.fpsRig.actualTiltDegrees, chiselSideDegrees:this.room.brickWall.chiselSideDegrees, chiselEdgeDegrees: this.room.brickWall.chiselEdgeAngle*180/Math.PI, aimControlMode:this.aimControlMode, aimInputMode:this.aimInputMode, aimProfile:this.aimProfile, wallAssist:this.wallAssistEnabled, proximityPrecision:Number(this.player.wallAssistAmount.toFixed(3)) },
       activePoint: point ? { id: point.definition.id, kind: point.definition.kind, bottomHeightM: point.definition.bottom, boxes: point.definition.boxes, stage: point.stage, chaseHits: point.chaseHits, chaseCoverage: Number(this.room.brickWall.getChaseCoverage(point.definition.id).toFixed(3)), pipeStep: point.pipeStep, targeted: this.mission.target(this.renderer.camera) === point, tiltDegrees: Number(point.boxGroup.tiltDegrees.toFixed(2)), depthErrorMm: Number((point.boxGroup.depthError * 1000).toFixed(1)), levelPass: point.boxGroup.isLevel, flushPass: point.boxGroup.isFlush } : null,
       points: this.mission.points.map(item => ({ id: item.definition.id, stage: item.stage, conduitVisible: Boolean(item.conduit) })),
     });
@@ -340,15 +342,15 @@ export class Game {
     });
     addEventListener('wirehouse:side-chisel', event => {
       const wall=this.room.brickWall, delta=(event as CustomEvent<number>).detail;
-      const angles=[0,35,65,-35,-65];
-      wall.chiselSideDegrees=delta ? Math.max(-75,Math.min(75,wall.chiselSideDegrees+delta)) : angles[(angles.indexOf(wall.chiselSideDegrees)+1)%angles.length];
+      const angles=[0,25,45,55,-25,-45,-55];
+      wall.chiselSideDegrees=delta ? Math.max(-55,Math.min(55,wall.chiselSideDegrees+delta)) : angles[(angles.indexOf(wall.chiselSideDegrees)+1)%angles.length];
       document.querySelector('#chisel-side b')!.textContent=`${Math.abs(wall.chiselSideDegrees)} deg ${wall.chiselSideDegrees<0 ? 'LEFT' : wall.chiselSideDegrees>0 ? 'RIGHT' : 'STRAIGHT'}`;
     });
     addEventListener('wirehouse:tilt-chisel', event => {
       const wall=this.room.brickWall;
       const delta=(event as CustomEvent<number>).detail;
-      const angles=[25,50,70,85,0,-25,-50,-70,-85];
-      wall.chiselTiltDegrees=delta ? Math.max(-85,Math.min(85,wall.chiselTiltDegrees+delta)) : angles[(angles.indexOf(wall.chiselTiltDegrees)+1)%angles.length];
+      const angles=[15,30,45,55,0,-15,-30,-45,-55];
+      wall.chiselTiltDegrees=delta ? Math.max(-55,Math.min(55,wall.chiselTiltDegrees+delta)) : angles[(angles.indexOf(wall.chiselTiltDegrees)+1)%angles.length];
       document.querySelector('#chisel-tilt b')!.textContent=`${Math.abs(wall.chiselTiltDegrees)} deg ${wall.chiselTiltDegrees<0 ? "UP" : "DOWN"}`;
       this.hud.notify(wall.chiselTiltDegrees<0 ? `Upward ${Math.abs(wall.chiselTiltDegrees)}° · trim exposed ribs at the existing cavity depth` : `Hammer tilt: ${wall.chiselTiltDegrees}° downward`);
     });

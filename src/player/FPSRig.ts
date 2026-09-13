@@ -27,7 +27,7 @@ export class FPSRig extends THREE.Group {
   private strikeAmount = 0;
   private flatTip: THREE.Mesh | null = null;
   private pointedTip: THREE.Mesh | null = null;
-  private readonly tipAnchor = new THREE.Vector3(.02, .005, -.60);
+  private readonly tipAnchor = new THREE.Vector3(.02, .005, -.749);
   private readonly armSets = new Map<RigTool, WorkerArm[]>();
   private selectedTool: RigTool = 'spray';
   reachable = false;
@@ -42,10 +42,14 @@ export class FPSRig extends THREE.Group {
   mortarHolding = false;
   chiselInAir = false;
   workStanceSide = 0;
+  workStanceTiltDegrees:number|null=null;
+  actualTiltDegrees=15;
   workPositionLocked = false;
   private feedDepth = .02;
   private presentedDepthZ: number | null = null;
   private hammerGripBlend = 0;
+  private hammerFeedLeanM = 0;
+  readonly hammerFit={housingCameraZ:0,wristReachM:[] as number[]};
 
   /** Seat the real visible tip on the first remaining solid, then read it back. */
   contact(camera: THREE.Camera, wall: BrickWall): ChiselContact | null {
@@ -57,14 +61,15 @@ export class FPSRig extends THREE.Group {
       this.flatTip.visible = wall.chiselType === 'flat'; this.flatTip.rotation.z = wall.chiselEdgeAngle;
       // Match metres in the world despite the camera rig's presentation scale.
       const scale=hammer.getWorldScale(new THREE.Vector3()).x;
-      this.flatTip.scale.x=wall.chiselWidthM/(.045*scale);
+      this.flatTip.scale.x=wall.chiselWidthM/(.05*scale);
     }
     if (this.pointedTip) this.pointedTip.visible = wall.chiselType === 'pointed';
     camera.updateMatrixWorld(true);
     this.updateWorldMatrix(true, false);
     // Blade roll and hammer pitch are independent. Positive pitch is the
     // electrician's top-to-bottom stroke: handle above the engaged cutting edge.
-    const tilt=THREE.MathUtils.degToRad(wall.chiselTiltDegrees);
+    this.actualTiltDegrees=this.workStanceTiltDegrees??wall.chiselTiltDegrees;
+    const tilt=THREE.MathUtils.degToRad(this.actualTiltDegrees);
     // The working wall supplies world up and its normal. Looking around must
     // not silently change the independently chosen vertical/lateral attack.
     const side=THREE.MathUtils.degToRad(this.workStanceSide*75);
@@ -118,11 +123,21 @@ export class FPSRig extends THREE.Group {
       target.z=this.presentedDepthZ+THREE.MathUtils.clamp(target.z-this.presentedDepthZ,-.0025,.004);
     }
     this.presentedDepthZ=target.z;
+    // Feed a long bit into the chase by bringing the torso/shoulders forward
+    // under a steady head. Otherwise a few millimetres of removed material can
+    // exhaust the auxiliary arm and incorrectly stop a held trimming stroke.
+    // This bounded body lean never changes bone lengths or shakes the camera.
+    this.hammerFeedLeanM=this.workPositionLocked?THREE.MathUtils.clamp(wall.volume.frontZ-target.z,0,.10):0;
     const local=this.worldToLocal(target.clone());
     hammer.position.copy(local).sub(this.tipAnchor.clone().applyQuaternion(hammer.quaternion));
     hammer.updateWorldMatrix(true, true);
     const housing=camera.worldToLocal(hammer.localToWorld(new THREE.Vector3(.02,-.055,-.1)));
-    if(housing.z>-.26 || !this.gripsReachable(camera,hammer)){
+    this.hammerFit.housingCameraZ=housing.z;
+    this.hammerFit.wristReachM=(this.armSets.get('hammer')??[]).map(arm=>this.shoulder(camera,arm.side).distanceTo(this.wrist(arm)));
+    // A body below or beside the eye can have a small camera Z while leaving
+    // the bit fully visible. Reject an actual head collision, not that valid
+    // oblique working posture merely because it fails a forward-Z cutoff.
+    if(housing.length()<.19 || !this.gripsReachable(camera,hammer)){
       this.reachable=false;this.chiselInAir=true;
       if(this.workPositionLocked){this.constrainHeldTool(camera);this.poseArms(camera);this.chiselTipWorld.copy(hammer.localToWorld(this.tipAnchor.clone()));}
       else this.restHammer(camera);
@@ -207,7 +222,9 @@ export class FPSRig extends THREE.Group {
   private poseHammerGrips(hammer:THREE.Group):void {
     const rear=new THREE.Vector3().fromArray(hammer.userData.gripPoint);
     const auxiliary=hammer.getObjectByName('Rotatable auxiliary handle')!;
-    auxiliary.rotation.z=this.hammerGripBlend*Math.PI;
+    // Cant the rotatable support grip below the barrel. A purely horizontal
+    // handle puts the supporting palm over the cutting edge in portrait view.
+    auxiliary.rotation.z=Math.PI/4+this.hammerGripBlend*Math.PI/2;
     const front=new THREE.Vector3().fromArray(auxiliary.userData.gripPoint).applyQuaternion(auxiliary.quaternion).add(auxiliary.position);
     hammer.userData.secondaryGripPoint=front.toArray();
     // Regrip in sequence: one hand stays on the rear handle while the other
@@ -217,7 +234,7 @@ export class FPSRig extends THREE.Group {
       arm.hand.position.lerpVectors(arm.side<0?front:rear,arm.side<0?rear:front,t);
       arm.hand.position.y-=Math.sin(t*Math.PI)*.09;
       const supporting=arm.side<0?1-t:t;
-      arm.hand.rotation.set(0,0,arm.side*supporting*Math.PI/2);
+      arm.hand.rotation.set(0,0,arm.side*supporting*Math.PI/4);
       arm.hand.userData.gripRole=supporting>.99?'auxiliary':supporting<.01?'rear':'regripping';
       arm.hand.userData.gripping=t===0||t===1;
     }
@@ -244,7 +261,14 @@ export class FPSRig extends THREE.Group {
   }
   private shoulder(camera:THREE.Camera,side:number):THREE.Vector3 {
     const {eye,right,forward}=this.bodyFrame(camera);
-    return eye.addScaledVector(right,side*.20).addScaledVector(forward,-.03).add(new THREE.Vector3(0,-.22,0));
+    // The head peeks past the motor while the shoulders stay over the torso.
+    // This is a small neck lean, not extra arm reach or a stretched forearm.
+    if(this.selectedTool==='hammer'&&this.workPositionLocked){
+      const swapped=THREE.MathUtils.smoothstep(this.workStanceSide*75,0,20);
+      eye.addScaledVector(right,THREE.MathUtils.lerp(.12,-.12,swapped));
+    }
+    const shoulderBack=this.selectedTool==='hammer'&&this.workPositionLocked?this.hammerFeedLeanM:-.03;
+    return eye.addScaledVector(right,side*.20).addScaledVector(forward,shoulderBack).add(new THREE.Vector3(0,-.22,0));
   }
   private wrist(arm:WorkerArm):THREE.Vector3 {
     return arm.hand.localToWorld(new THREE.Vector3().fromArray(arm.hand.userData.wristPoint));
@@ -275,6 +299,7 @@ export class FPSRig extends THREE.Group {
   private restHammer(camera:THREE.Camera):void {
     this.reachable=false;this.chiselInAir=true;
     this.presentedDepthZ=null;
+    this.hammerFeedLeanM=0;
     const hammer=this.tools.get('hammer')!;
     hammer.position.set(0,-.055,0);hammer.rotation.set(.12,-.08,0);
     this.constrainHeldTool(camera);this.poseArms(camera);
@@ -351,18 +376,39 @@ export class FPSRig extends THREE.Group {
   private createHammer(): THREE.Group {
     const group = buildToolModel('hammer');
     this.attachArms('hammer',group);
-    const chisel = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.018, 0.23, 12), material(0x6d7370, 0.3, 0.75));
-    chisel.rotation.x = Math.PI / 2; place(chisel, 0.02, 0.005, -0.45);
+    // Exactly 400 mm of exposed steel from the dust seal (-.349) to the
+    // cutting edge (-.749). Keep the contact anchor and visual mesh identical.
+    group.userData.tipPoint=this.tipAnchor.toArray();
+    group.userData.chiselStartPoint=[.02,.005,-.349];
+    group.userData.exposedChiselLengthM=.40;
+    group.userData.nominalBladeWidthM=.05;
+    // Moderately metallic brushed steel remains readable under indoor fill
+    // lighting even when the room has no environment map for chrome reflections.
+    const chisel = new THREE.Mesh(new THREE.CylinderGeometry(.009, .009, .31, 16), material(0x969e9d, .48, .30));
+    chisel.name='400 mm exposed chisel shaft';
+    chisel.rotation.x = Math.PI / 2; place(chisel, 0.02, 0.005, -.504);
     const wedge = new THREE.BufferGeometry();
-    wedge.setAttribute('position', new THREE.Float32BufferAttribute([-.0225,-.006,.035, .0225,-.006,.035, .0225,.006,.035, -.0225,.006,.035, -.0225,0,-.035, .0225,0,-.035], 3));
-    wedge.setIndex([0,2,1,0,3,2,0,1,5,0,5,4,3,4,5,3,5,2,0,4,3,1,2,5]);
-    wedge.computeVertexNormals();
-    const chiselTip = new THREE.Mesh(wedge, material(0x7b807c, 0.28, 0.8));
-    place(chiselTip, 0.02, 0.005, -0.565);
+    // Forged narrow neck, 50 mm flared blade, and a separate bright ground
+    // bevel. Flat face normals make the actual blade roll easy to read.
+    const stations=[[.009,.007,.05],[.025,.0045,-.02],[.025,.0006,-.05]];
+    const vertices:number[]=[],indices:number[]=[];
+    for(const [halfWidth,halfThickness,z] of stations)vertices.push(-halfWidth,-halfThickness,z,halfWidth,-halfThickness,z,halfWidth,halfThickness,z,-halfWidth,halfThickness,z);
+    for(let station=0;station<2;station++)for(let edge=0;edge<4;edge++){
+      const a=station*4+edge,b=station*4+(edge+1)%4,c=b+4,d=a+4;
+      indices.push(a,c,b,a,d,c);
+    }
+    indices.push(0,2,3,0,1,2,8,10,9,8,11,10);
+    wedge.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));wedge.setIndex(indices);
+    const bladeGeometry=wedge.toNonIndexed();wedge.dispose();bladeGeometry.computeVertexNormals();
+    bladeGeometry.addGroup(0,24,0);bladeGeometry.addGroup(24,24,1);bladeGeometry.addGroup(48,12,0);
+    const chiselTip = new THREE.Mesh(bladeGeometry,[material(0x9ba6a7,.45,.30),material(0xe1e8e5,.27,.35)]);
+    chiselTip.name='50 mm flat chisel with ground cutting bevel';
+    place(chiselTip, 0.02, 0.005, -.699);
     this.flatTip = chiselTip;
-    this.pointedTip = new THREE.Mesh(new THREE.ConeGeometry(.012,.07,6), material(0x7b807c,.28,.8));
+    this.pointedTip = new THREE.Mesh(new THREE.ConeGeometry(.009,.10,8), material(0xb6c2be,.38,.30));
+    this.pointedTip.name='Interchangeable pointed chisel';
     this.pointedTip.rotation.x = -Math.PI/2;
-    place(this.pointedTip,.02,.005,-.565); this.pointedTip.visible=false;
+    place(this.pointedTip,.02,.005,-.699); this.pointedTip.visible=false;
     group.add(chisel, chiselTip, this.pointedTip);
     // The wall must occlude parts of the bit inside solid shell/ribs. The other
     // handheld tools retain their established overlay rendering.

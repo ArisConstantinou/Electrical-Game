@@ -48,7 +48,7 @@ try {
         }
       }
     };
-    for (const side of (mobile ? [65, -65, 0] : [70, -70, 0])) {
+    for (const side of (mobile ? [45, -45, 0] : [45, -45, 0])) {
       await selectSide(side); await page.waitForTimeout(1000);
       await page.evaluate(() => { for(let i=0;i<60;i++)window.__wireTheHouse.step(1/60); });
       const state = await read();
@@ -62,7 +62,7 @@ try {
       await page.screenshot({ path: `${out}/${prefix}-${side}.png` });
       results.push({ mobile, ...state });
     }
-    await selectSide(mobile ? 65 : 70); await page.waitForTimeout(700);
+    await selectSide(45); await page.waitForTimeout(700);
     const beforeSwitch = await read();
     // Changing tool releases the stance while retaining the selected side for later.
     if (mobile) await page.locator('[data-tool="spray"]').tap();
@@ -79,7 +79,7 @@ try {
       for (let i = 0; i < 60; i++) { g.step(1 / 60); samples.push({ side: g.hammerWorkStance.sideDegrees, pos: g.renderer.camera.position.toArray() }); }
       return samples;
     });
-    assert(transition[0].side > 1 && transition[0].side < (mobile ? 65 : 70), 'Transition snapped instead of easing');
+    assert(transition[0].side > 1 && transition[0].side < (45), 'Transition snapped instead of easing');
     assert(transition.at(-1).side === 0);
     assert(transition.every((s, i) => !i || Math.abs(s.side) <= Math.abs(transition[i - 1].side)), 'Return transition oscillates');
     assert(!await page.evaluate(() => document.documentElement.scrollWidth > innerWidth || document.documentElement.scrollHeight > innerHeight), 'Layout overflow');

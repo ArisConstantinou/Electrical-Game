@@ -29,6 +29,9 @@ export class HUD {
   private readonly levelPanel: HTMLElement;
   private readonly levelReadout: HTMLElement;
   private readonly result: HTMLElement;
+  private readonly chiselOrientation: HTMLElement;
+  private chiselOrientationKey = '';
+  private chiselFlat = true;
   private messageUntil = 0;
   private selectedTool: RigTool = 'spray';
 
@@ -43,6 +46,16 @@ export class HUD {
             <div class="progress-track"><span id="mission-progress"></span></div>
           </div>
           <div id="tool-status" class="hud-card"></div>
+          <aside id="chisel-orientation" class="hud-card" aria-label="Chisel orientation" hidden>
+            <svg viewBox="0 0 48 48" aria-hidden="true">
+              <circle class="chisel-dial-ring" cx="24" cy="24" r="19"/>
+              <path class="chisel-dial-axes" d="M24 2v8M24 38v8M2 24h8M38 24h8"/>
+              <g id="chisel-edge-blade" transform="rotate(0 24 24)"><rect id="chisel-edge-shape" x="9" y="20" width="30" height="8" rx="1"/><path id="chisel-edge-bevel" d="M9 21h30"/></g>
+              <circle id="chisel-point-marker" cx="24" cy="24" r="5" fill="#d8e0df" stroke="#f8be79" stroke-width="2" style="display:none"/>
+              <circle class="chisel-dial-pivot" cx="24" cy="24" r="2"/>
+            </svg>
+            <div class="chisel-orientation-values"><div><strong><span id="chisel-edge-label">EDGE</span> <output id="chisel-edge-degrees">0°</output></strong><span id="chisel-live-width">50 mm</span></div><div class="chisel-aim-values"><span id="chisel-live-tilt">TILT 15° ↓</span><span id="chisel-requested-tilt" hidden></span><span id="chisel-live-side">SIDE 0°</span></div></div>
+          </aside>
           <button id="settings-toggle" type="button" aria-label="Open settings" aria-expanded="false" aria-controls="settings-panel">
             <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M13.2 3.5h5.6l.8 3.1 2.3 1.3 3-.9 2.8 4.8-2.2 2.2v2.7l2.2 2.2-2.8 4.8-3-.9-2.3 1.3-.8 3.1h-5.6l-.8-3.1-2.3-1.3-3 .9-2.8-4.8 2.2-2.2V14l-2.2-2.2L7.1 7l3 .9 2.3-1.3z"/><circle cx="16" cy="15.4" r="4.2"/></svg>
           </button>
@@ -54,8 +67,8 @@ export class HUD {
             </div>
             <div id="chisel-settings" aria-label="Demolition chisel settings">
               <button id="chisel-type" type="button"><span>CHISEL · T</span><b>FLAT</b></button>
-              <label class="hammer-speed-setting" for="chisel-width"><span>BLADE WIDTH · , / .</span><output id="chisel-width-value">2.5 cm</output><input id="chisel-width" type="range" min="10" max="50" step="5" value="25" aria-label="Flat chisel width in millimetres"><small id="chisel-width-hint">1–5 cm · wider blade, broader chips</small></label>
-              <button id="chisel-tilt" type="button"><span>HAMMER TILT · [ / ]</span><b>25 deg DOWN</b></button>
+              <label class="hammer-speed-setting" for="chisel-width"><span>BLADE WIDTH · , / .</span><output id="chisel-width-value">5.0 cm</output><input id="chisel-width" type="range" min="10" max="50" step="5" value="50" aria-label="Flat chisel width in millimetres"><small id="chisel-width-hint">1–5 cm · wider blade, broader chips</small></label>
+              <button id="chisel-tilt" type="button"><span>HAMMER TILT · [ / ]</span><b>15 deg DOWN</b></button>
               <button id="chisel-side" type="button"><span>CHISEL DIRECTION / J K</span><b>0 deg STRAIGHT</b></button>
               <button id="chisel-angle" type="button"><span>EDGE ANGLE · R</span><b>0°</b></button>
               <label class="hammer-speed-setting" for="hammer-speed"><span>CHISEL SPEED · − / +</span><output id="hammer-speed-value">100%</output><input id="hammer-speed" type="range" min="0" max="250" step="25" value="100" aria-label="Chisel destruction speed"><small>0% stops impacts · slower for control</small></label>
@@ -173,6 +186,7 @@ export class HUD {
     this.levelPanel = root.querySelector('#level-panel')!;
     this.levelReadout = root.querySelector('#level-readout')!;
     this.result = root.querySelector('#result-panel')!;
+    this.chiselOrientation = root.querySelector('#chisel-orientation')!;
     // Native click completes before confirm/cancel hides the panel, and also
     // supports keyboard activation without a pointer-down UI race.
     root.querySelectorAll<HTMLButtonElement>('[data-level]').forEach(button => button.addEventListener('click', event => {
@@ -216,6 +230,7 @@ export class HUD {
   update(point: InstallationPoint | null, targeted: boolean, missionProgress: number, selectedTool: RigTool): void {
     const toolChanged=this.selectedTool!==selectedTool;
     this.selectedTool = selectedTool;
+    this.chiselOrientation.hidden = selectedTool !== 'hammer';
     this.shell.dataset.activeTool=selectedTool;
     this.shell.classList.toggle('mortar-tool',selectedTool==='trowel'||selectedTool==='hose');
     this.progress.style.width = `${missionProgress}%`;
@@ -271,10 +286,37 @@ export class HUD {
     this.shell.querySelector<HTMLOutputElement>('#hammer-speed-value')!.textContent=speed===0?'STOPPED':`${Math.round(speed*100)}%`;
   }
   updateChiselWidth(widthM:number,flat:boolean):void {
+    this.chiselFlat=flat;
     const slider=this.shell.querySelector<HTMLInputElement>('#chisel-width')!;
     slider.value=String(Math.round(widthM*1000));slider.disabled=!flat;
     this.shell.querySelector<HTMLOutputElement>('#chisel-width-value')!.textContent=`${(widthM*100).toFixed(1)} cm`;
     this.shell.querySelector<HTMLElement>('#chisel-width-hint')!.textContent=flat?'1–5 cm · wider blade, broader chips':'Select FLAT to adjust blade width';
+  }
+  updateChiselOrientation(edgeDegrees:number,tiltDegrees:number,sideDegrees:number,widthM:number,requestedTiltDegrees=tiltDegrees):void {
+    const edge=((edgeDegrees%360)+360)%360;
+    const width=Math.round(widthM*1000),tilt=Math.round(tiltDegrees),side=Math.round(sideDegrees);
+    const requested=Math.round(requestedTiltDegrees),adapted=Math.abs(requestedTiltDegrees-tiltDegrees)>1;
+    const key=`${edge.toFixed(2)}:${tilt}:${side}:${width}:${requested}:${adapted}:${this.chiselFlat}`;
+    if(key===this.chiselOrientationKey)return;
+    this.chiselOrientationKey=key;
+    // The real blade rotates around local +Z. SVG Y points down, so its
+    // screen rotation must have the opposite sign to the tool geometry.
+    const blade=this.chiselOrientation.querySelector<SVGElement>('#chisel-edge-blade')!;
+    blade.setAttribute('transform',`rotate(${-edge} 24 24)`);blade.style.display=this.chiselFlat?'':'none';
+    this.chiselOrientation.querySelector<SVGElement>('#chisel-point-marker')!.style.display=this.chiselFlat?'none':'';
+    const bladeWidth=Math.max(8,Math.min(30,width/50*30)),left=24-bladeWidth/2;
+    const shape=this.chiselOrientation.querySelector('#chisel-edge-shape')!;
+    shape.setAttribute('x',String(left));shape.setAttribute('width',String(bladeWidth));
+    this.chiselOrientation.querySelector('#chisel-edge-bevel')!.setAttribute('d',`M${left} 21h${bladeWidth}`);
+    const edgeOutput=this.chiselOrientation.querySelector<HTMLOutputElement>('#chisel-edge-degrees')!;
+    edgeOutput.textContent=`${Math.round(edge)}°`;edgeOutput.hidden=!this.chiselFlat;
+    this.chiselOrientation.querySelector('#chisel-edge-label')!.textContent=this.chiselFlat?'EDGE':'CHISEL';
+    this.chiselOrientation.querySelector('#chisel-live-width')!.textContent=this.chiselFlat?`${width} mm`:'POINT';
+    this.chiselOrientation.querySelector('#chisel-live-tilt')!.textContent=`TILT ${Math.abs(tilt)}°${tilt<0?' ↑':tilt>0?' ↓':''}`;
+    const target=this.chiselOrientation.querySelector<HTMLElement>('#chisel-requested-tilt')!;
+    target.hidden=!adapted;target.textContent=adapted?`SET ${Math.abs(requested)}°${requested<0?' ↑':requested>0?' ↓':''}`:'';
+    this.chiselOrientation.querySelector('#chisel-live-side')!.textContent=`SIDE ${Math.abs(side)}°${side<0?' ←':side>0?' →':''}`;
+    this.chiselOrientation.setAttribute('aria-label',`${this.chiselFlat?`Flat chisel edge ${Math.round(edge)} degrees, blade ${width} millimetres`:'Pointed chisel'}, tilt ${tilt} degrees${adapted?`, selected tilt ${requested} degrees`:''}, side ${side} degrees`);
   }
   updateMortar(tool:RigTool,power:number,angle:number,wet:{pore:number;film:number},coverage:number,recovery:number,outcome:string,floorLitres=0,feedback?:MortarThrowFeedback):void {
     const panel=this.shell.querySelector<HTMLElement>('#mortar-panel')!;panel.hidden=tool!=='trowel'&&tool!=='hose';

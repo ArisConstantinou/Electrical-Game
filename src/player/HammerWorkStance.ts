@@ -4,9 +4,11 @@ import { GAME_CONFIG } from '../data/gameConfig';
 /** Presentation stance around the aimed wall point; never accumulates into walking. */
 export class HammerWorkStance {
   sideDegrees = 0;
+  actualTiltDegrees = 15;
   private applied = false;
   private readonly base = new THREE.Vector3();
   private readonly presented = new THREE.Vector3();
+  private readonly settledOffset = new THREE.Vector3();
   readonly offset = new THREE.Vector3();
 
   restore(camera: THREE.Camera): void {
@@ -15,26 +17,45 @@ export class HammerWorkStance {
     this.applied = false;
   }
 
-  update(camera: THREE.Camera, dt: number, requestedSide: number, enabled: boolean): void {
+  update(camera: THREE.Camera, dt: number, requestedSide: number, enabled: boolean, requestedTiltDegrees = 0): void {
     this.base.copy(camera.position);
     this.offset.set(0, 0, 0);
     const view = camera.getWorldDirection(new THREE.Vector3());
     const distance = (GAME_CONFIG.room.wallFrontZ - this.base.z) / view.z;
     const focus = this.base.clone().addScaledVector(view, distance);
-    const workingAtWall = view.z < -.15 && distance > 0 && distance <= 1.4 && Math.abs(focus.x) <= 2.54 && focus.y >= 0 && focus.y <= 3;
+    const workingAtWall = view.z < -.15 && distance > 0 && this.base.z-GAME_CONFIG.room.wallFrontZ <= 1.12 && Math.abs(focus.x) <= 2.54 && focus.y >= 0 && focus.y <= 3;
     const target = enabled && workingAtWall ? requestedSide : 0;
     this.sideDegrees = THREE.MathUtils.damp(this.sideDegrees, target, 10, Math.min(dt, .05));
     if (Math.abs(this.sideDegrees - target) < .01) this.sideDegrees = target;
-    if (!workingAtWall || !enabled) return;
+    if (!workingAtWall || !enabled) {this.settledOffset.set(0,0,0);return;}
     // Move the eye to the handle side and turn toward the SAME work point.
     // Keep the horizon level. The torso/arms follow this shared view in FPSRig.
     // A small torso lean, never an orbit that walks the player around the room.
-    const blend=this.sideDegrees/75;
-    // Peek along the left of the motor in a straight stroke; reverse with a leftward stroke.
-    // The fixed head offset keeps the housing away from the line of sight to the bit.
-    const lean=.24+.22*Math.sin(Math.abs(this.sideDegrees)*Math.PI/180);
-    const peek=-lean*(1-2*THREE.MathUtils.smoothstep(-blend,0,.5));
-    camera.position.copy(this.base).add(new THREE.Vector3(peek,.12,0));
+    // At floor/overhead targets a steep attack can put the rear grip below
+    // the floor or above the worker. Ease to the nearest achievable angle,
+    // retaining its sign so upward trimming never becomes deeper excavation.
+    const lower=THREE.MathUtils.radToDeg(Math.asin(THREE.MathUtils.clamp((.50-focus.y-.22)/.68,-1,0)));
+    const upper=THREE.MathUtils.radToDeg(Math.asin(THREE.MathUtils.clamp((2.03-focus.y-.22)/.68,0,1)));
+    const attainable=THREE.MathUtils.clamp(requestedTiltDegrees,lower,upper);
+    this.actualTiltDegrees=THREE.MathUtils.damp(this.actualTiltDegrees,attainable,12,Math.min(dt,.05));
+    if(Math.abs(this.actualTiltDegrees-attainable)<.01)this.actualTiltDegrees=attainable;
+    const side=THREE.MathUtils.degToRad(this.sideDegrees),tilt=THREE.MathUtils.degToRad(this.actualTiltDegrees);
+    const attack=new THREE.Vector3(Math.sin(side)*Math.cos(tilt),-Math.sin(tilt),-Math.cos(side)*Math.cos(tilt));
+    const right=attack.clone().cross(new THREE.Vector3(0,1,0)).normalize();
+    // Follow the rear handle with the torso instead of asking fixed shoulders
+    // to reach an overhead/sideways motor. Look past its side at the SAME bit.
+    // PlayerController owns the physical distance from the wall; this stance
+    // only leans and bends the body within its finite working posture.
+    const swapped=THREE.MathUtils.smoothstep(this.sideDegrees,0,20);
+    const peek=THREE.MathUtils.lerp(-.34,.34,swapped);
+    const desired=focus.clone().addScaledVector(attack,-.68).addScaledVector(right,peek);
+    desired.y=THREE.MathUtils.clamp(desired.y+.22,.68,1.85);
+    desired.x=THREE.MathUtils.clamp(desired.x,this.base.x-.55,this.base.x+.55);
+    desired.z=this.base.z;
+    const targetOffset=desired.sub(this.base);
+    this.settledOffset.lerp(targetOffset,1-Math.exp(-12*Math.min(dt,.05)));
+    if(this.settledOffset.distanceToSquared(targetOffset)<1e-10)this.settledOffset.copy(targetOffset);
+    camera.position.copy(this.base).add(this.settledOffset);
     const radius = GAME_CONFIG.player.radius;
     camera.position.x = THREE.MathUtils.clamp(camera.position.x, -GAME_CONFIG.room.width / 2 + radius, GAME_CONFIG.room.width / 2 - radius);
     camera.position.z = THREE.MathUtils.clamp(camera.position.z, GAME_CONFIG.room.wallFrontZ + .32, GAME_CONFIG.room.depth / 2 - radius);

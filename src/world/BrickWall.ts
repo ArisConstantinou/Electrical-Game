@@ -41,11 +41,11 @@ export class BrickWall extends THREE.Group {
   private workerError = '';
   chiselType: 'flat' | 'pointed' = 'flat';
   chiselEnergyJ = 4;
-  private widthM = .025;
+  private widthM = .05;
   get chiselWidthM(): number { return this.widthM; }
   set chiselWidthM(value: number) { if(Number.isFinite(value)) this.widthM = THREE.MathUtils.clamp(value, .01, .05); }
   chiselEdgeAngle = 0;
-  chiselTiltDegrees = 25;
+  chiselTiltDegrees = 15;
   chiselSideDegrees = 0;
   contactProvider: ((camera: THREE.Camera) => ChiselContact | null) | null = null;
   private readonly chunks = new Map<string, THREE.Mesh>();

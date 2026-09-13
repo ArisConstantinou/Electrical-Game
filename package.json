@@ -23,7 +23,8 @@
     "test:tools-visual": "node tests/tools-visual-smoke.mjs",
     "test:room-water-field": "node tests/room-water-field.mjs",
     "test:room-water": "node tests/room-water-smoke.mjs",
-    "test:room-water-performance": "node tests/room-water-performance.mjs"
+    "test:room-water-performance": "node tests/room-water-performance.mjs",
+    "test:chisel-balanced": "node tests/chisel-balanced-ui.mjs"
   },
   "dependencies": {
     "three": "0.185.1"
