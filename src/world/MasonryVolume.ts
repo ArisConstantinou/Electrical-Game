@@ -21,6 +21,7 @@ export interface MasonryVolumeOptions {
 export interface MasonryImpactInput { point: Vec3; direction: Vec3; edge?: Vec3; energyJ?: number; chisel: 'pointed' | 'flat'; /** Flat cutting-edge width in metres, 10–50 mm. Pointed chisels ignore it. */ widthM?: number; seed?: number; /** Upward finishing stroke: preserve the locally established cavity backing. */ trim?: boolean }
 export interface MasonryRayHit { point: Vec3; normal: Vec3; distance: number; material: MaterialId }
 export interface MasonryImpactResult {
+  releaseDirection?: Vec3; releaseEnergyJ?: number;
   contact: MasonryRayHit | null; removedNodes: number; removedVolume: number;
   removedByMaterial: Record<string, number>; fragments: MasonryFragment[]; cracks: MasonryCrack[];
   changedChunks: string[]; seed: number; bounds: { min: Vec3; max: Vec3 } | null;
@@ -367,6 +368,7 @@ export class MasonryVolume {
     const origin = { x: input.point.x - direction.x * .012, y: input.point.y - direction.y * .012, z: input.point.z - direction.z * .012 };
     const contact = this.raycast(origin, direction, .028);
     const result: MasonryImpactResult = {
+      releaseDirection: { x: -direction.x, y: -direction.y, z: -direction.z }, releaseEnergyJ: energy,
       contact, removedNodes: 0, removedVolume: 0, removedByMaterial: {}, fragments: [], cracks: [], changedChunks: [], seed, bounds: null,
       stats: { milliseconds: 0, affectedNodes: 0, weakenedNodes: 0, connectivityVisited: 0, detachedNodes: 0, activeChunks: this.chunks.size },
     };
@@ -412,7 +414,7 @@ export class MasonryVolume {
     const edgeExtension = input.chisel === 'flat' ? (width - .025) * .5 : 0;
     const depthLimit = input.chisel === 'flat' ? .013 : .019;
     const c = this.coordinates(contact.point), r = Math.ceil((crackRadius + Math.max(0, edgeExtension)) / Math.min(this.hx, this.hy, this.hz)) + 1;
-    const candidates: Array<{ node: Node; gain: number; crushing: boolean; fissure: boolean; distance: number }> = [];
+    const candidates: Array<{ node: Node; gain: number; crushing: boolean; fissure: boolean; plate: boolean; distance: number }> = [];
     const removed: Node[] = [];
     // Persistent grain directions are tied to the material region, not a newly drawn
     // random line per hit. Narrow tensile corridors concentrate damage outside the
@@ -435,11 +437,11 @@ export class MasonryVolume {
       const sideways = delta.x * -tangent.y + delta.y * tangent.x;
       // Asymmetric shallow flake ahead of the blade, with a rough perimeter.
       // It cannot reach the next chamber wall just because the shaft is tilted.
-      const plateLength = .025 + pry * .040;
-      const plateWidth = .022 + width * .42;
+      const plateLength = .045 + pry * .055;
+      const plateWidth = .030 + width * .65;
       const plateRadius = Math.hypot((lateral - pry * .018) / plateLength, sideways / plateWidth);
       const plateEdge = 1 + .12 * Math.sin(Math.atan2(sideways, lateral) * 5 + grainAngle);
-      const plate = pry > 0 && material === MaterialId.Clay && wallDepth >= -.010 && wallDepth <= .024 && plateRadius < plateEdge;
+      const plate = pry > .12 && width >= .025 && material === MaterialId.Clay && wallDepth >= -.032 && wallDepth <= .024 && plateRadius < plateEdge;
       if (!plate && (along < -.045 || along > depthLimit)) continue;
       const u = delta.x * edge.x + delta.y * edge.y + delta.z * edge.z;
       const v = delta.x * across.x + delta.y * across.y + delta.z * across.z;
@@ -468,10 +470,10 @@ export class MasonryVolume {
       const crushingGain = energy * 25 * falloff * materialScale * backwardCoupling * angleCoupling * (.75 + (hash(x, y, z, seed) % 1000) / 2000) * Math.max(0, 1 - Math.max(0, along) / (depthLimit * 1.7));
       // Weakening accumulates across blows; existing cracks improve purchase.
       // Wedge efficiency releases a larger area at the same input blow energy.
-      const plateGain = plate ? energy * 43 * pry * Math.pow(Math.max(0, 1 - plateRadius / plateEdge), .38) * (1 + Math.min(1, weakness) * .35) : 0;
+      const plateGain = plate ? energy * (20 + 45 * pry) * Math.pow(Math.max(0, 1 - plateRadius / plateEdge), .30) * (1 + Math.min(1, weakness) * .35) : 0;
       const gain = Math.max(crushingGain, plateGain);
       if (gain < 1) continue;
-      candidates.push({ node: { x, y, z, id: this.index(x, y, z), material }, gain, crushing: core || plate, fissure, distance: plate ? plateRadius * radius : radial + Math.max(0, along) * 1.5 });
+      candidates.push({ node: { x, y, z, id: this.index(x, y, z), material }, gain, crushing: core || plate, fissure, plate, distance: plate ? plateRadius * radius : radial + Math.max(0, along) * 1.5 });
     }
     candidates.sort((a, b) => a.distance - b.distance);
     // The stress field follows real material edges rather than line of sight. A cavity blocks
@@ -494,11 +496,16 @@ export class MasonryVolume {
       }
     }
     let fractureBudget = energy * 16 * (1 + pry * 2.2);
+    const shellCandidates = candidates.filter(candidate => candidate.plate && reached.has(candidate.node.id));
+    // A shell plate accumulates tensile damage to failure as one brittle piece. Do not grind its
+    // centre away node by node before the accumulated tensile damage releases it.
+    const coherentShell = shellCandidates.length >= 100;
     for (const candidate of candidates) {
       if (!reached.has(candidate.node.id)) continue;
       const n = candidate.node, { chunk, offset } = this.mutable(n.x, n.y, n.z);
       chunk.damage[offset] = clamp(chunk.damage[offset] + Math.max(1, Math.round(candidate.gain)), 0, 255);
       result.stats.affectedNodes++;
+      if (coherentShell && candidate.plate) { result.stats.weakenedNodes++; continue; }
       // A tensile opening must advance from an existing broken face. It cannot
       // punch a disconnected decorative trench or jump across a hollow chamber.
       const brokenNeighbor = candidate.fissure ? NEIGHBORS.find(d => {
@@ -512,6 +519,30 @@ export class MasonryVolume {
           result.cracks.push({ points: [this.nodePosition(n.x + brokenNeighbor[0], n.y + brokenNeighbor[1], n.z + brokenNeighbor[2]), this.nodePosition(n.x, n.y, n.z)], width: this.cellSize, material: n.material });
         }
       } else result.stats.weakenedNodes++;
+    }
+    if (coherentShell) {
+      // Follow only still-connected clay inside the shallow fracture lobe.
+      // Air and mortar divide the pieces; an untouched deeper bay cannot join.
+      const remaining = new Map(shellCandidates.map(candidate => [candidate.node.id, candidate.node]));
+      while (remaining.size) {
+        const first = remaining.values().next().value as Node;
+        const plate = [first]; remaining.delete(first.id);
+        for (let head = 0; head < plate.length; head++) for (const d of NEIGHBORS) {
+          const id = this.index(plate[head].x + d[0], plate[head].y + d[1], plate[head].z + d[2]);
+          const next = remaining.get(id);
+          if (next) { plate.push(next); remaining.delete(id); }
+        }
+        let weakness = 0;
+        for (const n of plate) {
+          const { key, offset } = this.chunkAddress(n.x, n.y, n.z);
+          weakness += (this.chunks.get(key)?.damage[offset] ?? 0) / this.strength(n.x, n.y, n.z, n.material);
+        }
+        // Local accumulated damage is the trigger, not an arbitrary every-Nth
+        // impact counter. Small remnants still break off when fully weakened.
+        if (weakness / plate.length < (plate.length >= 100 ? .82 : 1.1)) continue;
+        for (const n of plate) this.remove(n, removed);
+        result.stats.detachedNodes += plate.length; this.totalDetached += plate.length;
+      }
     }
     if (removed.length) this.detachIslands(removed, result, c, r + 2, trimFloorZ);
     if (removed.length) this.exposeCavities(removed);
@@ -614,7 +645,7 @@ export class MasonryVolume {
       // crosses a material boundary. Detached islands remain whole as before.
       const isDetached = detached.has(start.id);
       const fine = groups.length % 3 === 1;
-      const limit = isDetached ? 500 : fine ? Math.min(6, crushedGroupLimit) : crushedGroupLimit;
+      const limit = isDetached ? 1200 : fine ? Math.min(6, crushedGroupLimit) : crushedGroupLimit;
       for (let head = 0; head < group.length && group.length < limit; head++) {
         const n = group[head];
         for (const d of NEIGHBORS) {

@@ -69,7 +69,7 @@ export class HUD {
               <button id="chisel-type" type="button"><span>CHISEL · T</span><b>FLAT</b></button>
               <label class="hammer-speed-setting" for="chisel-width"><span>BLADE WIDTH · , / .</span><output id="chisel-width-value">5.0 cm</output><input id="chisel-width" type="range" min="10" max="50" step="5" value="50" aria-label="Flat chisel width in millimetres"><small id="chisel-width-hint">1–5 cm · wider blade, broader chips</small></label>
               <button id="chisel-tilt" type="button"><span>HAMMER TILT · [ / ]</span><b>15 deg DOWN</b></button>
-              <button id="chisel-side" type="button"><span>CHISEL DIRECTION / J K</span><b>0 deg STRAIGHT</b></button>
+              <button id="chisel-side" type="button"><span>CHISEL DIRECTION / J K</span><b>0 deg NEUTRAL</b></button>
               <button id="chisel-angle" type="button"><span>EDGE ANGLE · R</span><b>0°</b></button>
               <label class="hammer-speed-setting" for="hammer-speed"><span>CHISEL SPEED · − / +</span><output id="hammer-speed-value">250%</output><input id="hammer-speed" type="range" min="0" max="800" step="25" value="250" aria-label="Chisel destruction speed"><small>0% stop · 100% precise · 250% normal · 400–800% fast. Hold use + A / D to cut along the wall.</small></label>
             </div>

@@ -52,7 +52,8 @@ export class FPSRig extends THREE.Group {
   private hammerGripBlend = 0;
   private hammerLeftMain=false;
   private readonly hammerFeedOffset = new THREE.Vector3();
-  readonly hammerFit={housingCameraZ:0,wristReachM:[] as number[],feedM:0};
+  private hammerPostureY=0;
+  readonly hammerFit={housingCameraZ:0,wristReachM:[] as number[],feedM:0,postureY:0};
 
   /** Seat the real visible tip on the first remaining solid, then read it back. */
   contact(camera: THREE.Camera, wall: BrickWall): ChiselContact | null {
@@ -286,13 +287,19 @@ export class FPSRig extends THREE.Group {
       eye.addScaledVector(right,THREE.MathUtils.lerp(.12,-.12,swapped));
     }
     const hammerWork=this.selectedTool==='hammer'&&this.workPositionLocked;
-    if(hammerWork)eye.add(this.hammerFeedOffset);
+    if(hammerWork){eye.add(this.hammerFeedOffset);eye.y+=this.hammerPostureY;}
     return eye.addScaledVector(right,side*.20).addScaledVector(forward,hammerWork?0:-.085).add(new THREE.Vector3(0,-.22,0));
   }
   /** Find the shared, finite torso feed that keeps BOTH wrists within reach. */
   private seatHammerFeed(camera:THREE.Camera,axis:THREE.Vector3):void {
-    this.hammerFeedOffset.set(0,0,0);this.hammerFit.feedM=0;
+    this.hammerFeedOffset.set(0,0,0);this.hammerFit.feedM=0;this.hammerPostureY=0;this.hammerFit.postureY=0;
     if(!this.workPositionLocked)return;
+    // A small torso bend lets crouched upward work reach a low rear handle.
+    // Only the shoulders move: eyes, input aim and both arm lengths stay fixed.
+    const arms=this.armSets.get('hammer')??[];
+    const meanWristY=arms.reduce((sum,arm)=>sum+this.wrist(arm).y,0)/Math.max(1,arms.length);
+    this.hammerPostureY=THREE.MathUtils.clamp(meanWristY+.20-(camera.getWorldPosition(new THREE.Vector3()).y-.22),-.16,0);
+    this.hammerFit.postureY=this.hammerPostureY;
     // Feed follows the shaft, including its lateral/vertical component. A
     // 10 cm camera-forward offset exhausted one arm as soon as the shell fell.
     // Intersect both arm spheres with a bounded 24 cm torso travel segment.

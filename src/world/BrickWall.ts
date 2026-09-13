@@ -11,6 +11,7 @@ export type SprayMode = 'dots' | 'live';
 export type MasonryImpactKind = 'chase-chip' | 'demolish-chip' | 'demolish-crack' | 'demolish-spall' | 'demolish-split' | 'demolish-break';
 export interface ChiselContact { point: THREE.Vector3; direction: THREE.Vector3; edge: THREE.Vector3; energyJ: number; chisel: 'flat' | 'pointed'; widthM?: number; bladeOffsetM?: number }
 export interface MasonryImpact {
+  releaseDirection?: { x: number; y: number; z: number }; releaseEnergyJ?: number;
   points: THREE.Vector3[]; kind: MasonryImpactKind; brickSize: THREE.Vector3; seed: number; destroyed: boolean;
   fragments: MasonryFragment[]; removedVolume: number;
 }
@@ -185,7 +186,7 @@ export class BrickWall extends THREE.Group {
     this.lastMeshMs = performance.now() - meshStart;
     this.peakMeshMs = Math.max(this.peakMeshMs, this.lastMeshMs);
     const detached = result.fragments.some(fragment => fragment.detached);
-    return {points: [contact.point.clone()], kind: detached ? 'demolish-split' : result.removedNodes > 30 ? 'demolish-spall' : result.removedNodes ? 'demolish-chip' : 'demolish-crack', brickSize: new THREE.Vector3(.055, .035, .016), seed: result.seed, destroyed: false, fragments: result.fragments, removedVolume: result.removedVolume};
+    return {points: [contact.point.clone()], kind: detached ? 'demolish-split' : result.removedNodes > 30 ? 'demolish-spall' : result.removedNodes ? 'demolish-chip' : 'demolish-crack', brickSize: new THREE.Vector3(.055, .035, .016), seed: result.seed, destroyed: false, fragments: result.fragments, removedVolume: result.removedVolume, releaseDirection: result.releaseDirection, releaseEnergyJ: result.releaseEnergyJ};
   }
   flushGeometry(): void {
     for(const key of this.volume.takeDirtyChunks()) {

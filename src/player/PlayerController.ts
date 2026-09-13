@@ -66,6 +66,7 @@ export class PlayerController {
     const previousZ=this.camera.position.z;
     this.camera.position.addScaledVector(this.velocity, dt);
     const work=this.workPosition;
+    const wasLocked=work.locked;
     const wallDistanceNow=this.camera.position.z-GAME_CONFIG.room.wallFrontZ;
     const facingWall=Math.cos(this.yaw)>.2;
     if(!this.wallWorkEnabled || !facingWall){work.locked=false;}
@@ -73,8 +74,12 @@ export class PlayerController {
     // back while the player is standing inside the entry zone after release.
     if(work.locked && y<-.12){work.locked=false;work.released=true;}
     if(wallDistanceNow>1.15 || y>.2)work.released=false;
-    if(this.wallWorkEnabled && facingWall && !work.released && !work.locked && wallDistanceNow<(this.handWorkTargetY===null?1.10:.94) && wallDistanceNow>.30)work.locked=true;
-    work.targetDistanceM=this.wallWorkDistance;
+    if(this.wallWorkEnabled && facingWall && !work.released && !work.locked && y>=-.12 && wallDistanceNow<(this.handWorkTargetY===null?1.10:.94) && wallDistanceNow>.30)work.locked=true;
+    // Looking or changing a tool pose must not pull the camera to a newly
+    // calculated standoff. Take up a new distance on approach/forward intent;
+    // once braced, keep that distance until the player deliberately moves.
+    if(!work.locked||y>.12)work.targetDistanceM=this.wallWorkDistance;
+    else if(!wasLocked)work.targetDistanceM=this.handWorkTargetY!==null?this.wallWorkDistance:wallDistanceNow;
     if(work.locked){
       if(this.wallToolTravelSpeedMps!==null && y>=0){
         // A/D follow the wall tangent at the cutting feed rate, independent of
@@ -88,18 +93,11 @@ export class PlayerController {
         this.camera.position.x-=forward.x*y*speed*dt;
         this.velocity.copy(right).multiplyScalar(x*speed);
       }
-      // Preserve the aimed wall point while the body settles to its standoff.
-      // Lateral walking still advances the work point along the wall.
-      const view=new THREE.Vector3(0,0,-1).applyEuler(new THREE.Euler(this.pitch,this.yaw,0,this.camera.rotation.order));
-      const focus=this.camera.position.clone(); focus.z=previousZ;
-      focus.addScaledVector(view,(GAME_CONFIG.room.wallFrontZ-previousZ)/view.z);
-      const target=GAME_CONFIG.room.wallFrontZ+this.wallWorkDistance;
+      const target=GAME_CONFIG.room.wallFrontZ+work.targetDistanceM;
       this.camera.position.z=THREE.MathUtils.damp(previousZ,target,18,dt);
       if(Math.abs(this.camera.position.z-target)<.002)this.camera.position.z=target;
-      if(Math.abs(this.camera.position.z-previousZ)>1e-8){
-        this.camera.lookAt(focus);
-        this.pitch=this.camera.rotation.x; this.yaw=this.camera.rotation.y;
-      }
+      // Bracing may move the body to the physical tool distance, but it must
+      // never overwrite the yaw/pitch supplied by mouse or touch input.
       // Forward force is absorbed by the stance; sideways walking remains free.
       if(y>=0)this.velocity.z=0;
     }

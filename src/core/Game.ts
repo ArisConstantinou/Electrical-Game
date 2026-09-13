@@ -366,9 +366,11 @@ export class Game {
     });
     addEventListener('wirehouse:side-chisel', event => {
       const wall=this.room.brickWall, delta=(event as CustomEvent<number>).detail;
-      const angles=[0,25,45,55,-25,-45,-55];
+      // +15 degrees cancels the natural shoulder-side approach, so a physical
+      // straight-on attack remains available through touch as well as keys.
+      const angles=[0,15,25,45,55,-15,-25,-45,-55];
       wall.chiselSideDegrees=delta ? Math.max(-55,Math.min(55,wall.chiselSideDegrees+delta)) : angles[(angles.indexOf(wall.chiselSideDegrees)+1)%angles.length];
-      document.querySelector('#chisel-side b')!.textContent=`${Math.abs(wall.chiselSideDegrees)} deg ${wall.chiselSideDegrees<0 ? 'LEFT' : wall.chiselSideDegrees>0 ? 'RIGHT' : 'STRAIGHT'}`;
+      document.querySelector('#chisel-side b')!.textContent=`${Math.abs(wall.chiselSideDegrees)} deg ${wall.chiselSideDegrees<0 ? 'LEFT' : wall.chiselSideDegrees>0 ? 'RIGHT' : 'NEUTRAL'}`;
     });
     addEventListener('wirehouse:tilt-chisel', event => {
       const wall=this.room.brickWall;

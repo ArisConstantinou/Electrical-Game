@@ -76,14 +76,16 @@ try {
     await click('#settings-toggle');
     for (let attempt = 0; attempt < 12 && (await state(page)).tilt !== angle; attempt++) await click('#chisel-tilt');
     assert.equal((await state(page)).tilt, angle, 'Native settings did not select the requested tilt');
+    if(angle===0)await click('#chisel-side'); // +15 cancels the shoulder-side approach.
+    if(angle<0){await click('#mortar-settings summary');await click('#work-height');}
     await click('#settings-close');
-    await page.evaluate(() => {
+    await page.evaluate(angle => {
       const g = window.__wireTheHouse, c = g.renderer.camera;
       // Waist-height work permits both tilt signs within the existing finite
-      // worker reach. High targets intentionally clamp downward hammer pitch.
-      g.hammerWorkStance.restore(c); c.position.set(.72, 1.65, -1.4); c.lookAt(.72, 1.02, g.room.brickWall.volume.frontZ);
+      // worker reach. Upward work uses the native crouch setting; no eye orbit.
+      g.hammerWorkStance.restore(c); c.position.set(.72, g.player.eyeHeight, -1.4); c.lookAt(.72, angle>0?.90:1.02, g.room.brickWall.volume.frontZ);
       g.player.yaw = c.rotation.y; g.player.pitch = c.rotation.x;
-    });
+    },angle);
     await step(page, 90);
     const cdp = mobile ? await context.newCDPSession(page) : null;
     async function move(on, backwards = false) {

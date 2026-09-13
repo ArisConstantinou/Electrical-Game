@@ -30,7 +30,8 @@
     "test:tool-view": "node tests/hammer-eye-input.mjs && node tests/shared-tool-view-ui.mjs",
     "test:tool-contact": "node tests/tool-poses-contact.mjs",
     "test:continuous-chase": "node tests/chase-feed-input.mjs && node tests/masonry-fragment-size.mjs && node tests/continuous-chase-ui.mjs",
-    "test:angled-fracture": "node tests/angled-fracture.mjs && node tests/angled-fracture-ui.mjs"
+    "test:angled-fracture": "node tests/angled-fracture.mjs && node tests/angled-fracture-ui.mjs",
+    "test:demolition-feel": "node tests/coherent-shell-fracture.mjs && node tests/debris-plate-visibility.mjs && node tests/hammer-free-look.mjs && node tests/hammer-free-look-ui.mjs && node tests/debris-plate-ui.mjs"
   },
   "dependencies": {
     "three": "0.185.1"

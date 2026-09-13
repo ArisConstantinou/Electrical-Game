@@ -16,6 +16,8 @@ interface Particle {
   wallSupported: boolean;
   ownedGeometry: boolean;
   transient: boolean;
+  collisionProbes: THREE.Vector3[] | null;
+  restPose: { x: number; z: number; halfWidth: number; halfHeight: number; halfDepth: number };
 }
 
 const pooledPlaceholder = new THREE.BoxGeometry(1, 1, 1);
@@ -48,6 +50,7 @@ export class ChasingSystem {
   private readonly particles: Particle[] = [];
   private readonly meshPool: THREE.Mesh[] = [];
   private readonly previousPosition = new THREE.Vector3();
+  private readonly probePosition = new THREE.Vector3();
   lastSpawnMs = 0;
   maximumSpawnMs = 0;
   lastUpdateMs = 0;
@@ -136,6 +139,9 @@ export class ChasingSystem {
   private spawnDebris(impact: MasonryImpact): void {
     const started = performance.now();
     const random = seeded(impact.seed);
+    const firstNewParticle = this.particles.length;
+    const release = impact.releaseDirection ?? { x: 0, y: 0, z: 1 };
+    const releaseDirection = new THREE.Vector3(release.x, release.y, release.z).normalize();
     // The fracture core is the only source of debris. A cracking-only strike
     // creates no fake solid pieces and every body carries its removed volume.
     for (const source of impact.fragments ?? []) {
@@ -171,7 +177,11 @@ export class ChasingSystem {
         fragment.geometry = pooledPlaceholder;
         fragment.scale.set(width, height, depth);
       }
-      const transient = !source.detached && source.volume < 0.000008;
+      const span = Math.max(width, height, depth);
+      // Thin shell plates can span several centimetres without the volume of a
+      // solid cube. Their actual geometry, not volume alone, determines fines.
+      const plate = source.detached || span >= .04;
+      const transient = !plate && source.volume < 0.000008;
       fragment.name = source.detached ? 'Detached masonry island' : 'Crushed masonry chip';
       fragment.userData = {
         volume: source.volume, material: materialNames[source.material],
@@ -183,17 +193,22 @@ export class ChasingSystem {
       fragment.receiveShadow = true;
       fragment.raycast = () => undefined;
       this.scene.add(fragment);
-      const speed = source.detached ? 0.08 : 0.18;
-      const spin = source.detached ? 2.2 : 7;
+      const speed = plate ? 1.05 : .35;
+      const spin = plate ? 2.2 : 7;
       // Brittle chips can enter the exposed chamber instead of all ejecting
       // toward the operator. Their birth location stays at the removed solid.
-      const inward = random() < .42;
+      // Opened shell plates mostly release toward the free wall face. Small
+      // crushed chips can still fall into the chambers and rest on their webs.
+      const inward = random() < (plate ? .08 : .42);
       fragment.userData.inward = inward;
+      const velocity = releaseDirection.clone().multiplyScalar((inward ? -1 : 1) * speed * (.8 + random() * .8));
+      velocity.x += (random() - .5) * speed * .25;
+      velocity.y += (random() - .6) * speed * .1;
       this.particles.push({
         mesh: fragment,
-        velocity: new THREE.Vector3((random() - 0.5) * speed, (random()-.6) * speed * 0.3, (inward?-1:1)*speed * (0.8 + random() * 0.8)),
+        velocity,
         angularVelocity: new THREE.Vector3((random() - 0.5) * spin, (random() - 0.5) * spin, (random() - 0.5) * spin),
-        life: transient ? 2.5 + random() * 1.5 : 65 + random() * 20,
+        life: transient ? 2.5 + random() * 1.5 : plate ? 100 + random() * 30 : 65 + random() * 20,
         halfWidth: width * 0.5,
         halfHeight: height * 0.5,
         halfDepth: depth * 0.5,
@@ -202,8 +217,29 @@ export class ChasingSystem {
         wallSupported: false,
         ownedGeometry: actualGeometry,
         transient,
+        collisionProbes: actualGeometry ? this.geometryCollisionProbes(fragment.geometry) : null,
+        restPose: depth < Math.min(width, height)
+          ? { x: Math.PI / 2, z: 0, halfWidth: width / 2, halfHeight: depth / 2, halfDepth: height / 2 }
+          : width < height
+            ? { x: 0, z: Math.PI / 2, halfWidth: height / 2, halfHeight: width / 2, halfDepth: depth / 2 }
+            : { x: 0, z: 0, halfWidth: width / 2, halfHeight: height / 2, halfDepth: depth / 2 },
       });
       this.totalEmittedVolume += source.volume;
+    }
+    // Reserve only a fraction of this blow for ALL emitted bodies together.
+    // Bigger releases divide the same impulse budget instead of giving every
+    // new plate another complete hammer blow's energy.
+    const kineticBudget = Math.max(0, impact.releaseEnergyJ ?? 4) * .12;
+    let kineticEnergy = 0;
+    for (let i = firstNewParticle; i < this.particles.length; i++) {
+      const p = this.particles[i], mass = Number(p.mesh.userData.massKg), w = p.angularVelocity;
+      const rotation = mass / 6 * ((p.halfHeight ** 2 + p.halfDepth ** 2) * w.x ** 2 + (p.halfWidth ** 2 + p.halfDepth ** 2) * w.y ** 2 + (p.halfWidth ** 2 + p.halfHeight ** 2) * w.z ** 2);
+      kineticEnergy += mass * p.velocity.lengthSq() * .5 + rotation;
+    }
+    const velocityScale = kineticEnergy > kineticBudget ? Math.sqrt(kineticBudget / kineticEnergy) : 1;
+    for (let i = firstNewParticle; i < this.particles.length; i++) {
+      this.particles[i].velocity.multiplyScalar(velocityScale);
+      this.particles[i].angularVelocity.multiplyScalar(velocityScale);
     }
     this.trimRubbleBudget();
     this.peakActiveFragments = Math.max(this.peakActiveFragments, this.particles.length);
@@ -240,8 +276,12 @@ export class ChasingSystem {
         if (!particle.settled && particle.mesh.position.y <= contact.height) {
           // Rubble comes to rest on a broad face. This gives every settled piece a
           // stable solid footprint instead of leaving arbitrarily rotated meshes interpenetrating.
-          particle.mesh.rotation.x = 0;
-          particle.mesh.rotation.z = 0;
+          // Apply the random floor yaw after laying the broad face flat. XYZ
+          // order would tilt that face again while claiming its thin height.
+          particle.mesh.rotation.set(particle.restPose.x, particle.mesh.rotation.y, particle.restPose.z, 'YXZ');
+          particle.halfWidth = particle.restPose.halfWidth;
+          particle.halfHeight = particle.restPose.halfHeight;
+          particle.halfDepth = particle.restPose.halfDepth;
           contact = this.supportContact(particle, previousY);
           if (!contact.particle && contact.height === particle.halfHeight) {
             this.placeOnOpenFloor(particle);
@@ -275,6 +315,15 @@ export class ChasingSystem {
       particle.velocity[axis] = -velocity * 0.12;
       particle.angularVelocity.multiplyScalar(0.65);
       if (axis === 'y' && velocity < 0 && Math.abs(particle.velocity.y) < 0.16 && this.hasWallSupport(particle)) {
+        // Touching the lower web stops the downward component, not an ongoing
+        // outward release. Otherwise plates sleep on the first shelf within a
+        // frame of birth and never get the chance to clear the wall opening.
+        if (Math.hypot(particle.velocity.x, particle.velocity.z) > .025) {
+          particle.velocity.y = 0;
+          particle.velocity.x *= .985;
+          particle.velocity.z *= .985;
+          continue;
+        }
         if (!this.hasSettledOverlap(particle)) {
           particle.settled = true;
           particle.wallSupported = true;
@@ -302,12 +351,58 @@ export class ChasingSystem {
     const p = particle.mesh.position;
     // The editable wall is on the north face; escaped debris needs no voxel
     // queries. Probe actual material occupancy so opened chambers remain empty.
-    if (p.z - particle.halfDepth > GAME_CONFIG.room.wallFrontZ + 0.08) return false;
+    const radius = Math.hypot(particle.halfWidth, particle.halfHeight, particle.halfDepth);
+    if (p.z - radius > GAME_CONFIG.room.wallFrontZ + 0.08) return false;
+    if (particle.collisionProbes) {
+      // A hollow/irregular plate's bounding-box centre and corners may contain
+      // no clay at all. Using those points pins an already detached piece into
+      // surrounding intact webs. Probe only its real triangles, in its pose.
+      for (const local of particle.collisionProbes) {
+        this.probePosition.copy(local).applyQuaternion(particle.mesh.quaternion).add(p);
+        if (this.wall.isSolidAt(this.probePosition.x, this.probePosition.y, this.probePosition.z)) return true;
+      }
+      return false;
+    }
     if (this.wall.isSolidAt(p.x, p.y, p.z)) return true;
     for (const x of [-0.86, 0.86]) for (const y of [-0.86, 0.86]) for (const z of [-0.86, 0.86]) {
       if (this.wall.isSolidAt(p.x + particle.halfWidth * x, p.y + particle.halfHeight * y, p.z + particle.halfDepth * z)) return true;
     }
     return false;
+  }
+
+  private geometryCollisionProbes(geometry: THREE.BufferGeometry): THREE.Vector3[] {
+    const positions = geometry.getAttribute('position'), normals = geometry.getAttribute('normal');
+    const probes: THREE.Vector3[] = [];
+    const triangles = positions.count / 3, stride = Math.max(1, Math.ceil(triangles / 48));
+    for (let triangle = 0; triangle < triangles; triangle += stride) {
+      const i = triangle * 3;
+      const center = new THREE.Vector3(
+        (positions.getX(i) + positions.getX(i + 1) + positions.getX(i + 2)) / 3,
+        (positions.getY(i) + positions.getY(i + 1) + positions.getY(i + 2)) / 3,
+        (positions.getZ(i) + positions.getZ(i + 1) + positions.getZ(i + 2)) / 3,
+      );
+      center.addScaledVector(new THREE.Vector3().fromBufferAttribute(normals, i), -.0001);
+      probes.push(center);
+    }
+    // Keep the actual extremities even when the mesh needs decimation for the
+    // collision-query budget. No bounding-box corner is manufactured here.
+    for (const axis of ['x', 'y', 'z'] as const) for (const sign of [-1, 1]) {
+      let best = 0, value = -Infinity;
+      for (let i = 0; i < positions.count; i++) {
+        const candidate = positions.getComponent(i, axis === 'x' ? 0 : axis === 'y' ? 1 : 2) * sign;
+        if (candidate > value) { best = i; value = candidate; }
+      }
+      // A corner is simultaneously on several fracture planes. Offsetting it
+      // along only one face normal can leave it inside the neighbouring wall's
+      // other plane. The incident triangle interior has an unambiguous side.
+      const i = Math.floor(best / 3) * 3;
+      probes.push(new THREE.Vector3(
+        (positions.getX(i) + positions.getX(i + 1) + positions.getX(i + 2)) / 3,
+        (positions.getY(i) + positions.getY(i + 1) + positions.getY(i + 2)) / 3,
+        (positions.getZ(i) + positions.getZ(i + 1) + positions.getZ(i + 2)) / 3,
+      ).addScaledVector(new THREE.Vector3().fromBufferAttribute(normals, i), -.0001));
+    }
+    return probes;
   }
 
   private hasWallSupport(particle: Particle): boolean {
@@ -412,7 +507,15 @@ export class ChasingSystem {
     while (this.particles.length > MAX_RUBBLE_PIECES || this.transientFragmentCount > MAX_TRANSIENT_PIECES) {
       let index = this.particles.findIndex(particle => particle.transient && particle.settled);
       if (index < 0) index = this.particles.findIndex(particle => particle.transient);
-      if (index < 0) index = this.particles.findIndex(particle => particle.settled);
+      if (index < 0) {
+        // Keep the larger plates in the visible rubble mix when many newer
+        // chips arrive. The hard body budget and volume ledger remain intact.
+        let smallest = Infinity;
+        for (let i = 0; i < this.particles.length; i++) {
+          const particle = this.particles[i], volume = Number(particle.mesh.userData.volume);
+          if (particle.settled && volume < smallest) { index = i; smallest = volume; }
+        }
+      }
       this.retireParticle(Math.max(0, index));
       this.budgetRetirements += 1;
     }
