@@ -7,6 +7,8 @@ try{
  await page.goto('http://127.0.0.1:5362/Electrical-Game/');await page.waitForFunction(()=>window.__wireTheHouse?.roomWater.waterProActive);await page.locator('#start-button').click();
  await page.evaluate(async()=>{
   const g=window.__wireTheHouse,r=g.renderer,c=r.camera;await r.waitForFrame();
+  // A visible puddle keeps the real optical boundary active on optimized dry floors.
+  g.roomWater.addFloorWater(0,0,12);g.roomWater.rebuildGeometry();
   c.position.set(0,1.65,-1.95);c.lookAt(0,1.4,-2.41);g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;g.selectTool('trowel');
   // Observe any forbidden legacy dispatch while preserving the real method.
   window.__calls=[];

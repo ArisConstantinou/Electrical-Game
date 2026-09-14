@@ -16,6 +16,10 @@ export class Renderer {
   readonly ready:Promise<void>;
   private readonly gpu:WebGPURenderer;
   private water:RoomWaterRuntime|null=null;
+  private roomWater:RoomWaterSystem|null=null;
+  // One initial/transition update synchronizes the vendor mesh and underwater
+  // fog. Once dry, water optical passes have no pixels to contribute.
+  private waterWasVisible=true;
   private renderTask:Promise<void>|null=null;
   private pendingSize:{width:number;height:number}|null=null;
   private lastRenderTime=performance.now();
@@ -76,6 +80,7 @@ export class Renderer {
     const {createRoomWater}=await import('../generated/room-water-runtime.js');
     this.snapshotRenderCamera();
     this.water=await createRoomWater(this.gpu,this.scene,this.renderCamera,room);
+    this.roomWater=room;
   }
   private prepareMaterials():void{
     this.scene.traverse(object=>{
@@ -128,7 +133,15 @@ export class Renderer {
     this.snapshotRenderCamera();
     this.prepareMaterials();
     const now=performance.now(),dt=Math.min(.05,(now-this.lastRenderTime)/1000);this.lastRenderTime=now;
-    if(!this.water){this.gpu.render(this.scene,this.renderCamera);return true;}
+    const waterVisible=this.roomWater?.surface.visible??false;
+    const updateWater=this.water&&(waterVisible||this.waterWasVisible);
+    this.waterWasVisible=waterVisible;
+    if(!this.water||!updateWater){
+      // The Water Pro update normally owns this reset; dry frames still need
+      // fresh diagnostics rather than accumulating every draw since loading.
+      this.gpu.info.reset();
+      this.gpu.render(this.scene,this.renderCamera);return true;
+    }
     this.renderTask=this.water.update(dt).then(()=>{this.gpu.render(this.scene,this.renderCamera);}).catch(error=>{this.renderError=String(error);console.error('Room Water Pro rendering failed',error);}).finally(()=>{this.renderTask=null;});
     return true;
   }

@@ -1,4 +1,6 @@
 export const TROWEL_CHARGE_SECONDS = .95;
+/** A full charge remains releasable briefly, then expires without a cast. */
+export const TROWEL_FULL_CHARGE_GRACE_SECONDS = .8;
 export const TROWEL_RELEASE_SECONDS = .16;
 export const TROWEL_CAST_SECONDS = .82;
 

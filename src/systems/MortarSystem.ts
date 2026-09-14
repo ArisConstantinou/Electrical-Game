@@ -3,7 +3,7 @@ import type { InstallationPoint } from '../electrical/InstallationPoint';
 import type { BrickWall } from '../world/BrickWall';
 import { MortarField } from './MortarField';
 import { WATER_GUN_MODES, type WaterGunSetting } from './WaterGun';
-import { sampleTrowelMotion, TROWEL_CHARGE_SECONDS, TROWEL_RELEASE_SECONDS, TROWEL_CAST_SECONDS } from '../player/TrowelMotion';
+import { sampleTrowelMotion, TROWEL_CHARGE_SECONDS, TROWEL_FULL_CHARGE_GRACE_SECONDS, TROWEL_RELEASE_SECONDS, TROWEL_CAST_SECONDS } from '../player/TrowelMotion';
 
 type WetBatch = { mesh: THREE.Mesh; used: number; live: number; free: Array<{ start: number; count: number }> };
 type WetPatch = { batch: WetBatch; start: number; count: number; alpha: number };
@@ -93,6 +93,8 @@ export class MortarSystem {
   private readonly wetBatchMaterial: THREE.MeshBasicMaterial;
   private readonly ray = new THREE.Raycaster();
   private wasHeld = false;
+  private heldSeconds = 0;
+  private overheld = false;
   private releasedPhase = 0;
   private recoveringThrow = false;
   private pendingCast: { phase: number; elapsed: number } | null = null;
@@ -152,7 +154,7 @@ export class MortarSystem {
   }
   ready(point:InstallationPoint):boolean {this.refreshOpeningGeometry();return this.evaluateCoverage(point,true)>=.68;}
   cancel(): void {
-    this.wasHeld = false; this.charge = 0;
+    this.wasHeld = false; this.charge = 0; this.heldSeconds = 0; this.overheld = false;
     if (this.pendingCast) { this.pendingCast = null; this.releasedPhase = 0; this.recoveringThrow = false; }
     this.rearmOnRelease = false;
   }
@@ -162,10 +164,11 @@ export class MortarSystem {
     const recovering=this.recovery>0&&this.recoveringThrow;
     const casting=Boolean(this.pendingCast)||recovering;
     const active=this.wasHeld||casting,phase=this.wasHeld?this.charge:this.pendingCast?.phase??(recovering?this.releasedPhase:0);
-    const quality:'ready'|'early'|'perfect'|'late'=!active?'ready':phase<.42?'early':phase<=.58?'perfect':'late';
+    const quality:'ready'|'early'|'perfect'|'late'=this.overheld||!active?'ready':phase<.42?'early':phase<=.58?'perfect':'late';
     const castElapsed=this.pendingCast?.elapsed??(recovering?TROWEL_CAST_SECONDS-this.recovery:null);
-    const motion=sampleTrowelMotion({holding:this.wasHeld,charge:phase,castElapsed});
-    return {holding:this.wasHeld,phase,quality,swingDegrees:motion.rollDegrees,strength:phase,splash:this.faceSplash,lastRelease:this.releaseCount,casting,castElapsed,stage:motion.stage,motion};
+    // Expiring the throwing bar does not move or reload the held trowel.
+    const motion=sampleTrowelMotion({holding:this.wasHeld,charge:this.overheld?1:phase,castElapsed});
+    return {holding:this.wasHeld,overheld:this.overheld,phase,quality,swingDegrees:motion.rollDegrees,strength:phase,splash:this.faceSplash,lastRelease:this.releaseCount,casting,castElapsed,stage:motion.stage,motion};
   }
   swing(held: boolean, dt: number, camera: THREE.Camera, origin: THREE.Vector3 | (() => THREE.Vector3)): void {
     dt=Math.max(0,Number.isFinite(dt)?dt:0);
@@ -185,11 +188,22 @@ export class MortarSystem {
       return;
     }
     if (this.recovery > 0) { if(held)this.rearmOnRelease=true;else this.rearmOnRelease=false; return; }
-    if(this.rearmOnRelease){if(!held)this.rearmOnRelease=false;return;}
-    if (held) { this.wasHeld = true; this.charge = Math.min(1, this.charge + dt / TROWEL_CHARGE_SECONDS); }
+    if(this.rearmOnRelease){if(!held){this.rearmOnRelease=false;if(this.overheld)this.wasHeld=false;this.overheld=false;}return;}
+    if (held) {
+      this.heldSeconds += dt;
+      if(this.heldSeconds + 1e-9 >= TROWEL_CHARGE_SECONDS + TROWEL_FULL_CHARGE_GRACE_SECONDS){
+        // Expiry must neither commit a cast nor start charging another scoop
+        // under the same finger. Only a release and fresh press can rearm it.
+        this.wasHeld=true;this.charge=0;this.heldSeconds=0;
+        this.overheld=true;this.rearmOnRelease=true;this.releasedPhase=0;
+        this.lastOutcome='Throwing bar reset: release, then hold again to charge.';
+        return;
+      }
+      this.wasHeld = true; this.charge = Math.min(1, this.heldSeconds / TROWEL_CHARGE_SECONDS);
+    }
     else if (this.wasHeld) {
       this.releasedPhase=this.charge;this.pendingCast={phase:this.charge,elapsed:0};
-      this.wasHeld=false;this.charge=0;
+      this.wasHeld=false;this.charge=0;this.heldSeconds=0;
     }
   }
   private releaseScoop(phase:number,camera:THREE.Camera,tip:THREE.Vector3):void {

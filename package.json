@@ -35,6 +35,8 @@
     "test:demolition-feel": "node tests/coherent-shell-fracture.mjs && node tests/debris-plate-visibility.mjs && node tests/hammer-free-look.mjs && node tests/hammer-free-look-ui.mjs && node tests/debris-plate-ui.mjs",
     "test:tool-performance": "node tests/room-water-geometry.mjs && node tests/tool-hud-performance.mjs && node tests/tool-hud-state.mjs",
     "test:mobile-controls": "node tests/mobile-manual-input.mjs && node tests/mobile-hud-layout.mjs && node tests/mobile-hammer-contact.mjs",
+    "test:mobile-performance": "node tests/room-buoyancy-policy.mjs && node tests/renderer-dry-water.mjs && node tests/mobile-render-performance.mjs && node tests/mobile-work-profile.mjs",
+    "test:masonry-impact": "node tests/masonry-impact-equivalence.mjs",
     "test:deep-mortar": "node tests/mortar-deep-fill.mjs && node tests/mortar-deep-native.mjs",
     "test:loose-debris": "node tests/split-debris-geometry.mjs && node tests/debris-restrike.mjs && node tests/debris-plate-visibility.mjs && node tests/debris-restrike-ui.mjs",
     "test:wall-strafe": "node tests/hammer-strafe-continuity.mjs && node tests/hammer-free-look-ui.mjs",

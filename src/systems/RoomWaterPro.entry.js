@@ -3,6 +3,7 @@
 import { WaterSystem, WaterSurfaceMaterial, getPresetParams } from 'threejs-water-pro';
 import { MeshBasicNodeMaterial, NormalBlending, Object3D, CubeCamera, CubeRenderTarget, LinearMipmapLinearFilter } from 'three/webgpu';
 import { attribute, positionLocal, positionWorld, cameraPosition, vec3, vec4, clamp, smoothstep, cubeTexture, tanh, uniform, Fn, output, fog as sceneFog, rangeFogFactor } from 'three/tsl';
+import { skipUnusedOceanBuoyancy } from './roomBuoyancyPolicy.js';
 
 export async function createRoomWater(renderer,scene,camera,room){
   const previous=new Set(scene.children),environment=scene.environment,background=scene.background,fog=scene.fog;
@@ -36,6 +37,13 @@ export async function createRoomWater(renderer,scene,camera,room){
   preset.fresnel.surface.iorRatio=1.333;
   preset.fresnel.surface.refractionStrength=.045;
   water.loadPreset(preset);water.floor.setVisible(false);water.cameraTracking=false;water.setPosition(0,0);water.wake.enabled=false;
+  // No ocean buoyancy registrations exist in this room, and its submersion
+  // comes from the conservative floor field below. WebGL's stock camera-only
+  // buoyancy sample otherwise downloads both complete 256px FFT textures every
+  // frame. Keep the simulation/optical update awaited and its wave sampler
+  // intact; only omit this unused readback while both consumers are absent.
+  water.underwater.enabled=false;
+  skipUnusedOceanBuoyancy(water);
   water.foam.surface.enabled=false;water.foam.waves.enabled=false;water.foam.shoreline.enabled=false;water.ssr.enabled=true;
   water.ssr.maxDistance=8;water.ssr.stepCount=96;water.ssr.strength=.9;water.ssr.thickness=.003;water.sparkle.enabled=false;
   // A room must reflect its own scene, not Water Pro's default ocean sky.

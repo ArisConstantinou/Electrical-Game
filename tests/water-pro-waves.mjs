@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
+import {blockPointerLock} from './browser-safety.mjs';
 
 const url=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/';
 const out=process.argv[3]??'output/water-pro-waves';
@@ -11,11 +12,17 @@ const frames=page=>page.evaluate(async()=>{const g=window.__wireTheHouse;for(let
 try{
   for(const backend of ['webgpu','webgl']){
     const page=await browser.newPage({viewport:{width:1366,height:768}}),errors=[];
+    await blockPointerLock(page.context());
     page.on('pageerror',error=>errors.push(error.message));
     const target=new URL(url);if(backend==='webgl')target.searchParams.set('renderer','webgl');
     await page.goto(target.href);await page.waitForFunction(()=>window.__wireTheHouse?.roomWater.waterProActive);
     await page.locator('#start-button').click();await page.waitForTimeout(600);
-    await page.evaluate(()=>{const g=window.__wireTheHouse;g.step=()=>{};g.fpsRig.visible=false;});
+    await page.evaluate(async()=>{
+      const g=window.__wireTheHouse;g.step=()=>{};g.fpsRig.visible=false;await g.renderer.waitForFrame();
+      window.__waveReadbacks=0;
+      const gpu=g.renderer.gpu,read=gpu.readRenderTargetPixelsAsync.bind(gpu);
+      gpu.readRenderTargetPixelsAsync=(...args)=>{window.__waveReadbacks++;return read(...args);};
+    });
     let previous=0;
     for(const depth of [.2,.6,1.8]){
       await page.evaluate(({depth,previous})=>{
@@ -23,11 +30,13 @@ try{
         for(let z=0;z<f.rows;z++)for(let x=0;x<f.columns;x++)r.addFloorWater(f.minX+(x+.5)*f.dx,f.minZ+(z+.5)*f.dz,(depth-previous)*f.area*1000);
         r.update(.1);c.position.set(0,2.65,1.8);c.lookAt(0,.6,-2.41);c.updateMatrixWorld(true);
       },{depth,previous});previous=depth;
-      await frames(page);
+      const before=await page.evaluate(()=>window.__waveReadbacks);await frames(page);
+      assert.equal(await page.evaluate(()=>window.__waveReadbacks),before,'Rendered waves must not download unused ocean camera samples');
       const a=await page.evaluate(async()=>{
         const g=window.__wireTheHouse,positions=Array.from({length:64},(_,i)=>g.renderer.camera.position.clone().set((i%8-4)*.3,0,(Math.floor(i/8)-4)*.3));
         return await g.renderer.water.sampleWaves(positions);
       });
+      if(backend==='webgl')assert((await page.evaluate(()=>window.__waveReadbacks))>before,'Explicit wave queries must still read actual FFT textures');
       await page.screenshot({path:`${out}/${backend}-${depth}m-a.png`});await frames(page);
       const state=await page.evaluate(async()=>{
         const g=window.__wireTheHouse,r=g.roomWater,p=r.surfaceGeometry.getAttribute('position');

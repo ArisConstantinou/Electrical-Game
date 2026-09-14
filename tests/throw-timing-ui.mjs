@@ -30,6 +30,7 @@ async function sample(page) {
     const labels = [...document.querySelectorAll('#mortar-panel strong,#mortar-panel small,#mortar-panel button,#mortar-panel b,#mortar-panel span,#trowel-swing-gauge output,#trowel-swing-gauge span,#trowel-swing-gauge b')].filter(e => visible(e) && e.textContent.trim());
     const badFonts = labels.filter(e => parseFloat(getComputedStyle(e).fontSize) < 12).map(e => ({ text: e.textContent, font: getComputedStyle(e).fontSize }));
     const rig = g.fpsRig.tools.get('trowel');
+    const toolPose = { position: rig.position.toArray(), rotation: rig.rotation.toArray(), scale: rig.scale.toArray(), loadVisible: rig.getObjectByName('trowel-load').visible };
     const arm = g.fpsRig.armSets.get('trowel').find(a => a.side === 1);
     const Vector = g.renderer.camera.position.constructor;
     const worldOrientation = rig.getWorldQuaternion(g.renderer.camera.quaternion.clone());
@@ -43,7 +44,7 @@ async function sample(page) {
       cameraForward: g.renderer.camera.getWorldDirection(new Vector()).toArray(),
     };
     const compact = { unified: q('#mortar-panel').contains(q('#trowel-swing-gauge')), floatingButtons: q('#mortar-panel').querySelectorAll('button').length, dialVisible: visible(q('.swing-gauge-dial')), missionHeight: q('#top-hud').getBoundingClientRect().height, panelHeight: q('#mortar-panel').getBoundingClientRect().height };
-    return { straightArm, feedback: g.mortar.throwFeedback, mass: g.mortar.launchedMass, projectiles: g.mortar.projectiles.map(p => ({ mass: p.mass, bond: p.bond, velocity: p.velocity.toArray() })), rig: { degrees: g.fpsRig.mortarSwingDegrees, holding: g.fpsRig.mortarHolding, rotation: rig.rotation.toArray() }, ui: { quality: q('#mortar-flow').dataset.quality, holding: q('#mortar-flow').dataset.holding, cursor: parseFloat(q('#throw-timing-cursor').style.left), meter: Number(q('#throw-timing-track').getAttribute('aria-valuenow')), degrees: parseFloat(q('#trowel-swing-degrees').textContent.replace('−', '-')), strength: parseFloat(q('#trowel-swing-strength').textContent), splash: Number(q('#mortar-face-splash').style.opacity), flowVisible: visible(q('#mortar-flow')), gaugeVisible: visible(q('#trowel-swing-gauge')) }, layout: { compact, width: innerWidth, height: innerHeight, scrollWidth: document.documentElement.scrollWidth, scrollHeight: document.documentElement.scrollHeight, bounds, badFonts }, rendererError: g.renderer.lastError ?? '' };
+    return { toolPose, straightArm, feedback: g.mortar.throwFeedback, mass: g.mortar.launchedMass, projectiles: g.mortar.projectiles.map(p => ({ mass: p.mass, bond: p.bond, velocity: p.velocity.toArray() })), rig: { degrees: g.fpsRig.mortarSwingDegrees, holding: g.fpsRig.mortarHolding, rotation: rig.rotation.toArray() }, ui: { quality: q('#mortar-flow').dataset.quality, holding: q('#mortar-flow').dataset.holding, cursor: parseFloat(q('#throw-timing-cursor').style.left), meter: Number(q('#throw-timing-track').getAttribute('aria-valuenow')), degrees: parseFloat(q('#trowel-swing-degrees').textContent.replace('−', '-')), strength: parseFloat(q('#trowel-swing-strength').textContent), splash: Number(q('#mortar-face-splash').style.opacity), flowVisible: visible(q('#mortar-flow')), gaugeVisible: visible(q('#trowel-swing-gauge')) }, layout: { compact, width: innerWidth, height: innerHeight, scrollWidth: document.documentElement.scrollWidth, scrollHeight: document.documentElement.scrollHeight, bounds, badFonts }, rendererError: g.renderer.lastError ?? '' };
   });
 }
 function checkUI(data, name) {
@@ -176,13 +177,41 @@ try {
     }
     await advance(page, 5);
     const beforeEnd = await sample(page);
-    await hold(true); await advance(page, 2.4);
-    const heldEnd = await sample(page); assert.equal(heldEnd.feedback.phase, 1); assert.equal(heldEnd.mass, beforeEnd.mass, 'Full bar must wait for release');
+    await hold(true); await advance(page, 1.3);
+    const heldEnd = await sample(page); checkUI(heldEnd, `${config.name}-full-charge-grace`);
+    assert.equal(heldEnd.feedback.phase, 1); assert.equal(heldEnd.feedback.overheld, false);
+    assert.equal(heldEnd.mass, beforeEnd.mass, 'Full bar must wait for release during grace');
+    await advance(page, .46);
+    const expired = await sample(page); checkUI(expired, `${config.name}-expired-charge`);
+    assert.equal(expired.feedback.phase, 0); assert.equal(expired.feedback.overheld, true);
+    assert.equal(expired.feedback.holding, true); assert.equal(expired.feedback.casting, false);
+    assert.equal(expired.feedback.stage, 'prepare'); assert.equal(expired.mass, beforeEnd.mass);
+    assert.deepEqual(expired.feedback.motion, heldEnd.feedback.motion, 'Bar expiry must preserve the loaded full-charge trowel pose');
+    assert.deepEqual(expired.rig.rotation, heldEnd.rig.rotation, 'Bar expiry must not reset the physical trowel rotation');
+    assert.deepEqual(expired.toolPose, heldEnd.toolPose, 'Bar expiry must preserve the actual loaded tool position, rotation and scale');
+    assert.equal(expired.feedback.motion.loadVisible, true);
+    assert.equal(await page.locator('#throw-quality').textContent(), 'RESET · RELEASE', 'Expired gauge must explain how to rearm');
+    if(config.mobile) assert.equal(await page.locator('#mobile-use-status').textContent(), 'RELEASE TO RESET');
+    assert.equal(await page.evaluate(() => window.__wireTheHouse.input.actionHeld), true, 'Expiry test must keep the native input held');
+    await frame(page); await page.screenshot({ path: join(out, `${config.name}-overheld-reset.png`) });
+    await advance(page, 2.4);
+    const stillExpired = await sample(page);
+    assert.equal(stillExpired.feedback.phase, 0); assert.equal(stillExpired.feedback.overheld, true);
+    assert.deepEqual(stillExpired.feedback.motion, heldEnd.feedback.motion, 'Continued hold must keep the same loaded trowel pose after bar reset');
+    assert.deepEqual(stillExpired.toolPose, heldEnd.toolPose, 'Continued expired hold must not reset the actual loaded tool transform');
+    assert.equal(stillExpired.mass, beforeEnd.mass, 'Expired hold must not auto-rearm or auto-throw');
     await hold(false); await advance(page, 0);
-    assert.equal((await sample(page)).mass, beforeEnd.mass);
+    await advance(page, .9);
+    const releasedExpiry = await sample(page); checkUI(releasedExpiry, `${config.name}-expired-released`);
+    assert.equal(releasedExpiry.feedback.overheld, false); assert.equal(releasedExpiry.mass, beforeEnd.mass, 'Release after expiry must not throw');
+    assert.equal(await page.locator('#throw-quality').textContent(), 'HOLD TO SWING');
+    await hold(true); await advance(page, .475);
+    const rearmed = await sample(page); checkUI(rearmed, `${config.name}-fresh-charge`);
+    assert.equal(rearmed.feedback.quality, 'perfect'); assert.equal(rearmed.feedback.holding, true);
+    await hold(false); await advance(page, 0);
     await advance(page, .16);
     assert(Math.abs((await sample(page)).mass - beforeEnd.mass - .65) < 1e-8);
-    item.barEnd = { heldSeconds: 2.4, noAutomaticThrow: true };
+    item.barEnd = { graceSeconds: .8, expiresAfterSeconds: 1.75, noAutomaticThrow: true, releaseAfterExpiryDoesNotThrow: true, nativeInputRearmed: true, expired, releasedExpiry, rearmed };
     await advance(page, 5);
     for (const kind of ['tool-switch', 'blur', ...(config.mobile ? ['pointer-cancel'] : [])]) {
       const before = await sample(page); await hold(true); await advance(page, .3);
@@ -194,6 +223,16 @@ try {
       assert.equal((await sample(page)).mass, before.mass, `${config.name}: ${kind} accidentally launched`);
       item.cancellations.push(kind); await select('trowel');
     }
+    const beforeSettingsCancel = await sample(page);
+    await hold(true); await advance(page, .475); await hold(false); await advance(page, .08);
+    assert.equal((await sample(page)).feedback.casting, true);
+    await page.locator('#settings-toggle')[config.mobile ? 'tap' : 'click']();
+    await page.waitForFunction(() => document.querySelector('#settings-toggle').getAttribute('aria-expanded') === 'true');
+    await advance(page, .9);
+    assert.equal((await sample(page)).mass, beforeSettingsCancel.mass, 'Opening settings must cancel a pending cast before its release');
+    assert.equal((await sample(page)).feedback.casting, false);
+    await page.locator('#settings-close')[config.mobile ? 'tap' : 'click']();
+    item.cancellations.push('settings-pending-cast');
     await select('trowel');
     assert.equal(await page.locator('#mortar-pack').count(), 0, 'Press-to-pack control must be removed');
     const relocated = ['#mortar-angle-down', '#mortar-angle-up', '#mortar-swing', '#work-height'];
@@ -210,7 +249,9 @@ try {
     await page.screenshot({ path: join(out, `${config.name}-settings-before.png`) });
     const useSetting = async selector => {
       await page.locator(selector).scrollIntoViewIfNeeded();
-      await page.waitForTimeout(80);
+      // The settings panel uses smooth scrolling; wait for the real button to
+      // become hit-testable instead of clicking during an intermediate scroll.
+      await page.waitForFunction(selector => { const e=document.querySelector(selector),r=e.getBoundingClientRect();return e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)); }, selector);
       const target = await page.locator(selector).evaluate(e => { const r=e.getBoundingClientRect(), x=r.x+r.width/2, y=r.y+r.height/2; return {x,y,hit:e.contains(document.elementFromPoint(x,y))}; });
       assert(target.hit, `${config.name}: ${selector} is visually obstructed`);
       if (config.mobile) await page.touchscreen.tap(target.x,target.y); else await page.mouse.click(target.x,target.y);

@@ -421,39 +421,45 @@ export class MasonryVolume {
     // crushed core. Their material remains fully present until its strength fails.
     const grainSeed = hash(Math.floor(c.x / 5), Math.floor(c.y / 5), Math.floor(c.z / 5), this.seed);
     const grainAngle = (grainSeed % 6283) / 1000;
+    const canPryPlate = pry > .12 && width >= .025;
+    const plateLength = .045 + pry * .055, plateWidth = .030 + width * .65;
+    const stretch = input.chisel === 'flat' ? 1.55 : 1;
     // Local contact-facing slab: even a large energy setting cannot jump a chamber to its rear wall.
     for (let y = Math.max(1, c.y - r); y <= Math.min(this.ny, c.y + r); y++) for (let x = Math.max(1, c.x - r); x <= Math.min(this.nx, c.x + r); x++) for (let z = Math.max(1, c.z - r); z <= Math.min(this.nz, c.z + r); z++) {
-      const material = this.nodeMaterial(x, y, z); if (!material) continue;
       const p = this.nodePosition(x, y, z), delta = { x: p.x - contact.point.x, y: p.y - contact.point.y, z: p.z - contact.point.z };
-      if (trimFloorZ !== undefined) {
-        // The exposed front lip is part of the flake being pried off. Protect
-        // the backing, not that lip, or upward contact gets stuck on it forever.
-        if (p.z <= trimFloorZ + this.hz + 1e-9) continue;
-        if (!NEIGHBORS.some(d => this.nodeAirExposed(x + d[0], y + d[1], z + d[2]) && !this.nodeMaterial(x + d[0], y + d[1], z + d[2]))) continue;
-      }
+      if (trimFloorZ !== undefined && p.z <= trimFloorZ + this.hz + 1e-9) continue;
       const along = delta.x * direction.x + delta.y * direction.y + delta.z * direction.z;
       const wallDepth = -delta.z;
-      const lateral = delta.x * tangent.x + delta.y * tangent.y;
-      const sideways = delta.x * -tangent.y + delta.y * tangent.x;
-      // Asymmetric shallow flake ahead of the blade, with a rough perimeter.
-      // It cannot reach the next chamber wall just because the shaft is tilted.
-      const plateLength = .045 + pry * .055;
-      const plateWidth = .030 + width * .65;
-      const plateRadius = Math.hypot((lateral - pry * .018) / plateLength, sideways / plateWidth);
-      const plateEdge = 1 + .12 * Math.sin(Math.atan2(sideways, lateral) * 5 + grainAngle);
-      const plate = pry > .12 && width >= .025 && material === MaterialId.Clay && wallDepth >= -.032 && wallDepth <= .024 && plateRadius < plateEdge;
-      if (!plate && (along < -.045 || along > depthLimit)) continue;
+      const inPlateSlab = canPryPlate && wallDepth >= -.032 && wallDepth <= .024;
+      // Most of the bounding cube lies outside both contact-facing slabs. Reject
+      // it before querying brick bores, damage chunks or trigonometric fields.
+      if (!inPlateSlab && (along < -.045 || along > depthLimit)) continue;
       const u = delta.x * edge.x + delta.y * edge.y + delta.z * edge.z;
       const v = delta.x * across.x + delta.y * across.y + delta.z * across.z;
-      const stretch = input.chisel === 'flat' ? 1.55 : 1;
       const edgeDistance = Math.sign(u) * Math.max(0, Math.abs(u) - edgeExtension);
       const radial = Math.hypot(edgeDistance / stretch, v);
       if (radial > crackRadius) continue;
+      const material = this.nodeMaterial(x, y, z); if (!material) continue;
+      if (trimFloorZ !== undefined) {
+        // Protect the established backing while retaining its exposed front lip.
+        if (!NEIGHBORS.some(d => this.nodeAirExposed(x + d[0], y + d[1], z + d[2]) && !this.nodeMaterial(x + d[0], y + d[1], z + d[2]))) continue;
+      }
+      // Asymmetric shallow flake ahead of the blade, with a rough perimeter.
+      // It cannot reach the next chamber wall just because the shaft is tilted.
+      let plateRadius = 0, plateEdge = 0, plate = false;
+      if (inPlateSlab && material === MaterialId.Clay) {
+        const lateral = delta.x * tangent.x + delta.y * tangent.y;
+        const sideways = delta.x * -tangent.y + delta.y * tangent.x;
+        plateRadius = Math.hypot((lateral - pry * .018) / plateLength, sideways / plateWidth);
+        plateEdge = 1 + .12 * Math.sin(Math.atan2(sideways, lateral) * 5 + grainAngle);
+        plate = plateRadius < plateEdge;
+      }
+      if (!plate && (along < -.045 || along > depthLimit)) continue;
       const angular = Math.atan2(v, u), anisotropy = 1 + .18 * Math.sin(angular * 3 + (seed % 97)) + .12 * Math.cos(angular * 5 - (seed % 71));
       const effectiveRadius = radius * anisotropy;
       const core = radial < effectiveRadius;
       let corridor = false;
-      for (let branch = 0; branch < 3; branch++) {
+      for (let branch = 0; !core && !corridor && branch < 3; branch++) {
         const angle = grainAngle + branch * 2.094 + .22 * Math.sin(radial * 85 + branch);
         const forward = edgeDistance / stretch * Math.cos(angle) + v * Math.sin(angle);
         const sideways = Math.abs(edgeDistance / stretch * Math.sin(angle) - v * Math.cos(angle));
@@ -663,11 +669,23 @@ export class MasonryVolume {
       const x = n.x + dx, y = n.y + dy, z = n.z + dz;
       if (x >= 0 && y >= 0 && z >= 0 && x <= this.nx && y <= this.ny && z <= this.nz) cubes.set(this.index(x, y, z), { x, y, z });
     }
+    // Adjacent cubes share their lattice corners. Material and positions cannot
+    // change during this extraction, so sample each corner only once per impact.
+    const corners = new Map<number, { point: Vec3; before: number; after: number }>();
     for (const c of cubes.values()) {
       const ids = CORNERS.map(offset => this.index(c.x + offset[0], c.y + offset[1], c.z + offset[2]));
-      const after = CORNERS.map(offset => Number(this.nodeMaterial(c.x + offset[0], c.y + offset[1], c.z + offset[2]) !== MaterialId.Air));
-      const before = after.map((material, i) => removedMap.has(ids[i]) ? 1 : material);
-      const points = CORNERS.map(offset => this.nodePosition(c.x + offset[0], c.y + offset[1], c.z + offset[2]));
+      const samples = CORNERS.map((offset, i) => {
+        let sample = corners.get(ids[i]);
+        if (!sample) {
+          const x = c.x + offset[0], y = c.y + offset[1], z = c.z + offset[2];
+          const after = Number(this.nodeMaterial(x, y, z) !== MaterialId.Air);
+          sample = { point: this.nodePosition(x, y, z), before: removedMap.has(ids[i]) ? 1 : after, after };
+          corners.set(ids[i], sample);
+        }
+        return sample;
+      });
+      const after = samples.map(sample => sample.after), before = samples.map(sample => sample.before);
+      const points = samples.map(sample => sample.point);
       for (const tetra of TETRA) {
         const ownerCorner = tetra.find(i => owners.has(ids[i])); if (ownerCorner === undefined) continue;
         const group = groups[owners.get(ids[ownerCorner])!];

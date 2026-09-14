@@ -7,7 +7,7 @@ import * as THREE from 'three';
 
 const require=createRequire(import.meta.url),ts=require('typescript'),modules=new Map();
 function load(file){file=resolve(file);if(modules.has(file))return modules.get(file);const exports={};modules.set(file,exports);new Function('require','exports',ts.transpileModule(readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText)(name=>name.startsWith('.')?load(resolve(dirname(file),name+'.ts')):require(name),exports);return exports;}
-const {sampleTrowelMotion,TROWEL_RELEASE_SECONDS,TROWEL_CAST_SECONDS}=load(fileURLToPath(new URL('../src/player/TrowelMotion.ts',import.meta.url)));
+const {sampleTrowelMotion,TROWEL_CHARGE_SECONDS,TROWEL_FULL_CHARGE_GRACE_SECONDS,TROWEL_RELEASE_SECONDS,TROWEL_CAST_SECONDS}=load(fileURLToPath(new URL('../src/player/TrowelMotion.ts',import.meta.url)));
 const {MortarSystem}=load(fileURLToPath(new URL('../src/systems/MortarSystem.ts',import.meta.url)));
 const normal=new THREE.Vector3(0,0,1),report=[];
 function fixture(){
@@ -50,6 +50,42 @@ assert(results[2].heldKg>.35,'Ideal throw fails to transfer a useful scoop into 
 assert(results[5].heldKg>.04,'Late cast never deposits any of its forward mortar');
 assert(results[5].backwardKg>results[4].backwardKg&&results[5].release.splash>results[4].release.splash,'Overthrow splash is not monotonic');
 report.push({check:'Actual early, ideal and late contact, gravity, adhesion and finite mass',results});
+
+{
+  const timeout=TROWEL_CHARGE_SECONDS+TROWEL_FULL_CHARGE_GRACE_SECONDS,clocks=[];
+  for(const slice of [1/120,1/60,.05,timeout]){
+    const {system,camera,origin}=fixture();let elapsed=0;
+    while(elapsed<timeout-1e-9){
+      const dt=Math.min(slice,timeout-elapsed);elapsed+=dt;system.swing(true,dt,camera,origin);
+      if(elapsed<timeout-1e-9)assert.equal(system.throwFeedback.overheld,false,'Charge expired before the full-power grace elapsed');
+    }
+    assert.equal(system.throwFeedback.overheld,true);assert.equal(system.charge,0);
+    assert.equal(system.throwFeedback.holding,true);assert.equal(system.throwFeedback.casting,false);
+    assert.equal(system.throwFeedback.stage,'prepare');assert.equal(system.throwFeedback.swingDegrees,0);
+    assert.deepEqual(system.throwFeedback.motion,sampleTrowelMotion({holding:true,charge:1,castElapsed:null}),'Only the bar resets: the loaded trowel must keep its full-charge held pose');
+    for(let i=0;i<20;i++)system.swing(true,.5,camera,origin);
+    assert.equal(system.charge,0,'Uninterrupted overhold started a second charge');
+    assert.equal(system.throwFeedback.overheld,true);assert.equal(system.launchedMass,0);
+    assert.equal(system.throwFeedback.motion.loadVisible,true);assert.equal(system.throwFeedback.motion.stage,'prepare');
+    system.swing(false,.1,camera,origin);system.swing(false,1,camera,origin);
+    assert.equal(system.throwFeedback.overheld,false);assert.equal(system.throwFeedback.casting,false);
+    assert.equal(system.throwFeedback.holding,false);assert.equal(system.throwFeedback.stage,'ready');
+    assert.equal(system.launchedMass,0,'Releasing an expired charge fired mortar');
+    system.swing(true,TROWEL_CHARGE_SECONDS*.5,camera,origin);
+    assert.equal(system.throwFeedback.quality,'perfect');
+    system.swing(false,0,camera,origin);system.swing(false,TROWEL_RELEASE_SECONDS,camera,origin);
+    assert.equal(system.throwFeedback.lastRelease,1);assert.equal(system.launchedMass,.65);
+    clocks.push({slice,expiresAt:elapsed,renewedRelease:system.throwFeedback.lastRelease});
+  }
+  const {system,camera,origin}=fixture();
+  system.swing(true,timeout-.001,camera,origin);assert.equal(system.charge,1);
+  system.swing(false,0,camera,origin);system.swing(false,TROWEL_RELEASE_SECONDS,camera,origin);
+  assert.equal(system.launchedMass,.65,'Full charge inside grace no longer casts');
+  advance(system,1);system.swing(true,timeout,camera,origin);system.cancel();
+  assert.equal(system.throwFeedback.overheld,false,'Tool-change cancellation retained expired UI state');
+  system.swing(true,.2,camera,origin);assert(system.throwFeedback.holding);
+  report.push({check:'Full charge expires after .8 seconds, blocks repeats and release shots, then rearms a fresh cast',clocks});
+}
 
 {
   const {system,camera,origin}=fixture();system.swing(true,.4,camera,origin);system.cancel();system.swing(false,0,camera,origin);

@@ -11,6 +11,7 @@ export interface MortarThrowFeedback {
   splash: number;
   lastRelease: number;
   casting?: boolean;
+  overheld?: boolean;
   stage?: string;
 }
 
@@ -454,6 +455,11 @@ export class HUD {
     if(active&&state.holding)this.shell.querySelector<HTMLElement>('#mortar-swing')!.textContent=state.quality==='perfect'?'RELEASE NOW':'SWINGING…';
     if(active&&state.holding)this.shell.querySelector<HTMLElement>('#mortar-hint')!.textContent=state.quality==='perfect'?'Release now for a clean throw into the chase.':state.quality==='late'?'The swing is late: more power sends more mortar back toward you.':'Keep holding toward the green centre; an early throw can slip and fall.';
     if(active&&state.quality==='ready'&&!recovery)this.shell.querySelector<HTMLElement>('#mortar-hint')!.textContent='Hold, then release in the green centre. Early throws can fall; late throws splash back.';
+    if(active&&state.overheld){
+      this.shell.querySelector<HTMLElement>('#throw-quality')!.textContent='RESET · RELEASE';
+      this.shell.querySelector<HTMLElement>('#mortar-swing')!.textContent='RELEASE TO RESET';
+      this.shell.querySelector<HTMLElement>('#mortar-hint')!.textContent='Held too long. Release, then hold again to load the swing.';
+    }
     const splash=this.shell.querySelector<HTMLElement>('#mortar-face-splash')!;
     const splashAmount=Math.max(0,Math.min(1,state.splash));
     splash.style.opacity=String(splashAmount*.84);

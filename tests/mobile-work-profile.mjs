@@ -1,0 +1,43 @@
+import { chromium } from 'playwright';
+import { mkdir, writeFile } from 'node:fs/promises';
+import assert from 'node:assert/strict';
+import { blockPointerLock } from './browser-safety.mjs';
+
+const url=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/?renderer=webgl';
+const out=process.argv[3]??'output/mobile-work-profile';await mkdir(out,{recursive:true});
+const browser=await chromium.launch({channel:'chrome',headless:true});
+const report={url,method:'Real RAF, 390x844 touch Chromium with device scale 3. Native tool selection/held USE; controlled sinusoidal camera rotation. Inclusive CPU timings overlap. Emulation, not physical iPhone FPS.',stages:[],errors:[]};
+try{
+ const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:3});await blockPointerLock(context);
+ const page=await context.newPage();page.on('pageerror',e=>report.errors.push(e.message));
+ await page.goto(url);await page.locator('#start-button').tap({timeout:120000});
+ await page.evaluate(()=>{
+  const g=window.__wireTheHouse,c=g.renderer.camera;
+  c.position.set(.3,g.player.eyeHeight,g.room.brickWall.volume.frontZ+.8);g.player.pitch=-.35;g.player.yaw=0;c.rotation.set(-.35,0,0,'YXZ');
+  const p=window.__workProfile={active:false,rotate:false,methods:{},frames:[],presentations:[],draws:[],start:0};
+  const wrap=(object,name,label)=>{const original=object[name];if(typeof original!=='function')return;object[name]=function(...args){
+   if(label==='game.step'){if(p.rotate){g.player.yaw=Math.sin(performance.now()*.0016)*.3;}if(p.active)p.frames.push(performance.now());}
+   const start=performance.now();try{return original.apply(this,args);}finally{if(p.active){const a=p.methods[label]??={calls:0,total:0,worst:0};const d=performance.now()-start;a.calls++;a.total+=d;a.worst=Math.max(a.worst,d);}}
+  };};
+  for(const [object,prefix,names] of [[g,'game',['step','performAction']],[g.fpsRig,'rig',['update','contact','poseArms','poseTrowel','aimWaterGun']],[g.chasing,'debris',['update','spawnDebris','overlapsWall','hasWallSupport','supportContact']],[g.room.brickWall,'wall',['aim','removeAtAim','processPendingSupport','flushPendingMeshes']],[g.mortar,'mortar',['update','preview','coverage','swing']],[g.roomWater,'water',['update']],[g.renderer,'render',['render']]])for(const name of names)wrap(object,name,prefix+'.'+name);
+  const render=g.renderer.gpu.render.bind(g.renderer.gpu);
+  g.renderer.gpu.render=(scene,camera)=>{const result=render(scene,camera);if(p.active&&scene===g.renderer.scene&&!g.renderer.gpu.getRenderTarget()){p.draws.push(g.renderer.webgl.info.render.calls);p.presentations.push(performance.now());}return result;};
+ });
+ const cdp=await context.newCDPSession(page);
+ for(const [tool,held,rotate] of [['spray',false,true],['hammer',true,true],['trowel',false,true],['hose',true,true],['fitting',false,true],['level',false,true],['spring',false,true],['cutter',false,true]]){
+  await page.locator(`[data-tool="${tool}"]`).tap();
+  await page.evaluate(rotate=>{window.__workProfile.rotate=rotate;},rotate);
+  if(held){const b=await page.locator('#look-joystick').boundingBox();await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:b.x+b.width/2,y:b.y+b.height/2,id:1}]});}
+  await page.waitForTimeout(1200);
+  await page.evaluate(()=>{const p=window.__workProfile;p.methods={};p.frames=[];p.presentations=[];p.draws=[];p.start=performance.now();p.active=true;});
+  await page.waitForTimeout(3200);
+  const state=await page.evaluate(()=>{const p=window.__workProfile;p.active=false;const g=window.__wireTheHouse,duration=performance.now()-p.start,intervals=p.presentations.slice(1).map((t,i)=>t-p.presentations[i]).sort((a,b)=>a-b);return{fps:p.presentations.length*1000/duration,renderedFrames:p.presentations.length,p95Ms:intervals[Math.floor(intervals.length*.95)],frames:p.frames.length,drawCalls:p.draws.reduce((a,b)=>a+b,0)/p.draws.length,methods:Object.fromEntries(Object.entries(p.methods).map(([k,v])=>[k,{calls:v.calls,msPerFrame:v.total/p.frames.length,worst:v.worst}])),impacts:g.room.brickWall.impactCount,removedCm3:g.room.brickWall.volume.removedVolume*1e6,fragments:g.chasing.activeFragmentCount,pixelRatio:g.renderer.webgl.getPixelRatio(),waterLitres:g.roomWater.telemetry.receivedLitres,renderer:g.renderer.performanceTelemetry??null,renderError:g.renderer.renderError,pointerLock:!!document.pointerLockElement};});
+  report.stages.push({tool,held,rotate,...state});console.log(JSON.stringify(report.stages.at(-1)));
+  if(held)await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+  await page.screenshot({path:`${out}/${tool}.png`});await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));
+  assert.equal(state.pointerLock,false);assert.equal(state.renderError,'');assert(state.frames>10);
+  if(tool==='hammer')assert(state.impacts>0&&state.removedCm3>0,'Held hammer must remove real wall material while rotating');
+  if(tool==='hose')assert(state.waterLitres>0,'Held hose must emit real water');
+ }
+ assert.deepEqual(report.errors,[]);await context.close();
+}finally{await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));await browser.close();}
