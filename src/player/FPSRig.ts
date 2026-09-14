@@ -3,6 +3,7 @@ import { buildToolModel } from './ToolModels';
 import type { TrowelMotion } from './TrowelMotion';
 import { workerHand, workerArm, poseWorkerArm, flexWorkerHand, poseToolGrip, MAX_WRIST_REACH_M, UPPER_ARM_M, FOREARM_M, type WorkerArm } from './WorkerArm';
 import type { BrickWall, ChiselContact } from '../world/BrickWall';
+import type { BoxKind } from '../data/installationRules';
 
 export type RigTool = 'spray' | 'hammer' | 'fitting' | 'level' | 'spring' | 'cutter' | 'trowel' | 'hose';
 export const RIG_TOOLS: RigTool[] = ['spray', 'hammer', 'fitting', 'level', 'spring', 'cutter', 'trowel', 'hose'];
@@ -39,6 +40,8 @@ export class FPSRig extends THREE.Group {
   hoseActive = false;
   fittingBoxAvailable = true;
   private readonly fittingBoxParts: THREE.Object3D[] = [];
+  private readonly fittingVariants=new Map<string,{parts:THREE.Object3D[];kinds:readonly BoxKind[];width:number}>();
+  private fittingPreset='1G';
   levelTiltDegrees = 0;
   mortarCharge = 0;
   mortarRecovery = 0;
@@ -225,6 +228,16 @@ export class FPSRig extends THREE.Group {
   }
 
   show(tool: RigTool): void { this.selectedTool=tool; this.tools.forEach((group, key) => { group.visible = key === tool; }); this.armSets.forEach((arms,key)=>arms.forEach(arm=>arm.group.visible=key===tool)); }
+  get fittingBoxKinds():readonly BoxKind[]{return this.fittingVariants.get(this.fittingPreset)!.kinds;}
+  /** Switch the finite supply model without rebuilding geometry or the hand. */
+  setFittingBoxKinds(kinds:readonly BoxKind[]):void{
+    const preset=kinds.join('+'),variant=this.fittingVariants.get(preset);
+    if(!variant||preset===this.fittingPreset)return;
+    this.fittingPreset=preset;
+    const tool=this.tools.get('fitting')!;
+    tool.userData.fittingBoxKinds=[...variant.kinds];tool.userData.fittingGroupWidth=variant.width;tool.userData.fittingBoxCount=variant.kinds.length;
+    for(const part of this.fittingBoxParts)part.visible=this.fittingBoxAvailable&&part.userData.fittingPreset===preset;
+  }
   setSprayColor(color: number): void {
     this.sprayCanMaterial?.color.setHex(color);
     this.tools.get('spray')?.traverse(object=>{if(object instanceof THREE.Mesh && object.userData.sprayColor)(object.material as THREE.MeshStandardMaterial).color.setHex(color);});
@@ -289,7 +302,7 @@ export class FPSRig extends THREE.Group {
     // view. The entire tool moves with the wrist; arm lengths stay physical.
     const handTool=this.selectedTool!=='hammer';
     this.position.x=handTool&&innerWidth<innerHeight?-.065:.02;
-    this.position.y=(handTool&&this.touchViewport.matches&&innerHeight<520?.02:this.restingY)+bob;
+    this.position.y=(handTool&&this.touchViewport.matches&&innerHeight<520?(this.selectedTool==='fitting'?-.07:.02):this.restingY)+bob;
     this.strikeAmount = Math.max(0, this.strikeAmount - dt * 5.5);
     this.rotation.x = -Math.sin(this.strikeAmount * Math.PI) * 0.16;
     this.toolAction=Math.max(0,this.toolAction-dt*2.5);
@@ -439,7 +452,7 @@ export class FPSRig extends THREE.Group {
   poseArms(camera:THREE.Camera):void {
     const emptyFitting=this.selectedTool==='fitting'&&!this.fittingBoxAvailable;
     if(this.selectedTool==='fitting'){
-      for(const part of this.fittingBoxParts)part.visible=this.fittingBoxAvailable;
+      for(const part of this.fittingBoxParts)part.visible=this.fittingBoxAvailable&&part.userData.fittingPreset===this.fittingPreset;
       const hand=this.armSets.get('fitting')!.find(arm=>arm.side===1)!.hand;
       hand.userData.gripping=this.fittingBoxAvailable;
       hand.userData.gripRole=emptyFitting?'reaching':'primary';
@@ -510,7 +523,14 @@ export class FPSRig extends THREE.Group {
   }
   private createDetailedTool(kind: Exclude<RigTool,'hammer'>):THREE.Group {
     const group=buildToolModel(kind);
-    if(kind==='fitting')this.fittingBoxParts.push(...group.children);
+    if(kind==='fitting'){
+      for(const kinds of [['1G'],['2G'],['2G','1G']] as const){
+        const variant=kinds.length===1&&kinds[0]==='1G'?group:buildToolModel('fitting',kinds);
+        const parts=[...variant.children],preset=kinds.join('+');
+        this.fittingVariants.set(preset,{parts,kinds,width:variant.userData.fittingGroupWidth});
+        for(const part of parts){part.visible=preset===this.fittingPreset;group.add(part);this.fittingBoxParts.push(part);}
+      }
+    }
     this.attachArms(kind,group);
     if(kind==='fitting'){
       const hand=this.armSets.get(kind)!.find(arm=>arm.side===1)!.hand;

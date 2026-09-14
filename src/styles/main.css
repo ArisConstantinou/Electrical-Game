@@ -431,3 +431,26 @@ button {
   #level-panel .spirit-visual { display:none; }
   #level-panel .level-title { letter-spacing:.05em; }
 }
+
+#box-fit-size { font-size:12px; font-weight:700; color:#ddd8ce; }
+#box-fit-status { font-size:14px; font-weight:700; line-height:1.25; color:#ffc38a; }
+#box-fit-status[data-fit="fits"] { color:#72efab; }
+#box-fit-status[data-fit="retrieve"] { color:#e7eee9; }
+#box-fit-legend { display:flex; align-items:center; flex-wrap:wrap; gap:4px; font-size:12px; }
+#box-fit-legend i { width:9px; height:9px; background:#ff3429; }
+#box-fit-legend i:nth-of-type(2) { margin-left:5px; background:#ffae32; }
+@media (pointer:coarse), (max-width:760px) {
+  #game-shell[data-active-tool="fitting"] #interaction-prompt { top:285px; }
+}
+@media (pointer:coarse) and (max-height:500px) {
+  #box-supply { width:290px; }
+  #box-fit-status { font-size:14px; }
+  #game-shell[data-active-tool="fitting"] #interaction-prompt { top:245px; }
+}
+
+@media (pointer:coarse) and (max-height:500px) {
+  #box-supply { top:60px; padding:4px; gap:2px; }
+  #box-supply>b, #box-fit-legend { display:none; }
+  #box-fit-size { line-height:1; }
+  #box-fit-status { line-height:1.15; }
+}

@@ -21,6 +21,8 @@
     "test:trowel": "node tests/throw-timing-physics.mjs && node tests/rough-mortar-geometry.mjs && node tests/tool-selection-stability.mjs && node tests/trowel-motion-ui.mjs && node tests/throw-timing-ui.mjs && node tests/queued-work-input.mjs",
     "test:mortar-stacking": "node tests/mortar-volume-regression.mjs && node tests/mortar-stacking-ui.mjs",
     "test:box-placement": "node tests/hand-work-stance.mjs && node tests/box-multiple-physics.mjs && node tests/multiple-box-mission.mjs && node tests/level-seating.mjs && node tests/box-placement-ui.mjs",
+    "test:box-fit": "node tests/box-fit-preflight.mjs && node tests/fitting-held-preset.mjs && node tests/box-fit-preview-ui.mjs",
+    "test:horizontal-bricks": "node tests/horizontal-masonry-profile.mjs",
     "test:multiple-boxes": "node tests/multiple-boxes-ui.mjs",
     "test:default-flood": "node tests/default-flood-ui.mjs",
     "test:tools-visual": "node tests/tools-visual-smoke.mjs",

@@ -31,7 +31,9 @@ try {
     { name: 'concrete', angle: 0, chisel: 'pointed', widthM: .025, options: { material: 'concrete' } },
   ];
   for (const seed of [1234, 193187, 8721]) for (const specimen of cases) {
-    const options = { seed, ...specimen.options };
+    // This historical CPU oracle compares the original vertical profile;
+    // horizontal-rounded has its own geometry/save/mesh acceptance test.
+    const options = { seed, hollowProfile: 'rounded-five', ...specimen.options };
     const before = new Before(options), after = new After(options), times = [[], []], lookups = [0, 0];
     for (const [index, wall] of [before, after].entries()) {
       const query = wall.nodeMaterial.bind(wall);

@@ -15,7 +15,7 @@ export interface MasonryVolumeOptions {
   tileSize?: number; seed?: number; renderThickness?: number; material?: 'hollow-clay' | 'concrete';
   solidMaterial?: MaterialId;
   /** Explicit profile keeps older saved damage aligned with its original solids. */
-  hollowProfile?: 'rounded-five' | 'legacy-rectangular';
+  hollowProfile?: 'horizontal-rounded' | 'rounded-five' | 'legacy-rectangular';
   maxConnectivityNodes?: number;
 }
 export interface MasonryImpactInput { point: Vec3; direction: Vec3; edge?: Vec3; energyJ?: number; chisel: 'pointed' | 'flat'; /** Flat cutting-edge width in metres, 10–50 mm. Pointed chisels ignore it. */ widthM?: number; seed?: number; /** Upward finishing stroke: preserve the locally established cavity backing. */ trim?: boolean }
@@ -67,7 +67,7 @@ export class MasonryVolume {
   private readonly maxConnectivityNodes: number;
 
   constructor(options: MasonryVolumeOptions = {}) {
-    this.options = { ...options, hollowProfile: options.hollowProfile ?? 'rounded-five' }; this.width = options.width ?? 6; this.height = options.height ?? 3;
+    this.options = { ...options, hollowProfile: options.hollowProfile ?? 'horizontal-rounded' }; this.width = options.width ?? 6; this.height = options.height ?? 3;
     this.depth = options.depth ?? .18; this.frontZ = options.frontZ ?? -2.41;
     this.cellSize = options.cellSize ?? .008; this.tileSize = options.tileSize ?? 24;
     this.seed = (options.seed ?? (globalThis.crypto?.getRandomValues(new Uint32Array(1))[0] ?? Math.floor(Math.random() * 0xffffffff))) >>> 0;
@@ -126,9 +126,17 @@ export class MasonryVolume {
     if (localY < .006 || localY > pitchY - .006 || localX < .006 || localX > pitchX - .006) return MaterialId.Mortar;
     const shell = .015;
     if (d < shell || d > clayDepth - shell || localX < .018 || localX > pitchX - .018 || localY < .016 || localY > pitchY - .016) return MaterialId.Clay;
-    // Five bores along the brick length, two through its depth. The solid side
-    // faces the room; the perforated end section is only revealed by fracture.
-    // Rounded bores retain curved shell fragments rather than rectangular slots.
+    if(this.options.hollowProfile==='horizontal-rounded'){
+      // The extrusion axis follows the laid brick's horizontal length (X).
+      // Two bores across its height and two through depth retain resolvable
+      // horizontal webs; the outside shells and mortar courses stay unchanged.
+      const heightPitch=(pitchY-.032)/2,depthPitch=(clayDepth-shell*2)/2;
+      const boreY=((localY-.016)%heightPitch+heightPitch)%heightPitch-heightPitch*.5;
+      const boreZ=((d-shell)%depthPitch+depthPitch)%depthPitch-depthPitch*.5;
+      return(boreY/(heightPitch*.42))**2+(boreZ/(depthPitch*.5-.006))**2<1?MaterialId.Air:MaterialId.Clay;
+    }
+    // Saved vertical profiles keep their original X/Z cross-section and Y
+    // extrusion, so restoring old damage cannot silently replace its solids.
     const innerWidth = pitchX - .036;
     const ribPitch = innerWidth / 5;
     if (this.options.hollowProfile === 'legacy-rectangular') {

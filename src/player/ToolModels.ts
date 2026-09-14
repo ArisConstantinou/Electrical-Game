@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { ElectricalBox } from '../electrical/Box';
+import { INSTALLATION_RULES, type BoxKind } from '../data/installationRules';
 
 export type ToolModelKind = 'spray' | 'trowel' | 'spring' | 'level' | 'cutter' | 'hose' | 'fitting' | 'hammer';
 type Point = readonly [number, number, number];
@@ -290,17 +292,22 @@ function hose(): THREE.Group {
   return gripFrame(metadata(group, [.177, -.101, .010], [.082, .026, -.2185]),[-.048,.118,-.033]);
 }
 
-function fitting(): THREE.Group {
-  const group = new THREE.Group(), white = mat(0xe3e0d6, .69), inner = mat(0xbabbb2, .8), metal = steel();
+function fitting(kinds:readonly BoxKind[]=['1G']): THREE.Group {
+  const group = new THREE.Group();
   const body = new THREE.Group(); body.position.set(.095, -.025, -.065); body.rotation.y = -.2; group.add(body);
-  const shell = roundedRectangle(.079, .079, .004), opening = roundedRectangle(.069, .069, .003); shell.holes.push(new THREE.Path(opening.getPoints(12)));
-  part(body, extrude(shell, .043), white, [0, 0, 0], 'Flush gang box open plastic walls');
-  part(body, new THREE.BoxGeometry(.073, .073, .0025), inner, [0, 0, -.020], 'Gang box back wall');
-  for (const x of [-.027, .027]) { part(body, new THREE.BoxGeometry(.008, .015, .038), white, [x, 0, 0], 'Integral fixing screw lug'); screw(body, [x, 0, .021], .0027); }
-  for (const y of [-.018, .018]) for (const x of [-.018, .018]) {
-    torus(body, .0085, .0008, white, [x, y, -.0175], 'Conduit knockout score ring');
-  }
-  const screwBar = rod(body, [-.033, .032, .019], [.033, .032, .019], .0011, metal, 'Thin fixing ear'); screwBar.visible = true;
+  const width=(kind:BoxKind)=>kind==='1G'?INSTALLATION_RULES.box.oneGang.width:INSTALLATION_RULES.box.twoGang.width;
+  const groupWidth=kinds.reduce((sum,kind)=>sum+width(kind),0)+Math.max(0,kinds.length-1)*INSTALLATION_RULES.box.groupGap;
+  // The held supply is the actual casing geometry. Keep its rightmost rim at
+  // the established grip, extending wider presets to the left of the same hand.
+  let cursor=.0395-.006-groupWidth;
+  kinds.forEach((kind,index)=>{
+    const box=new ElectricalBox(kind,`held-${kinds.join('+')}:box-${index}`);
+    box.position.set(cursor+box.width/2,0,.017);cursor+=box.width+INSTALLATION_RULES.box.groupGap;
+    body.add(box);
+  });
+  body.name=`Held ${kinds.join(' + ')} casings`;body.userData.fittingPreset=kinds.join('+');
+  group.userData.fittingBoxKinds=[...kinds];group.userData.fittingGroupWidth=groupWidth;
+  group.userData.fittingBoxCount=kinds.length;
   const grip=vector([.039,-.001,.004]).applyQuaternion(body.quaternion).add(body.position);
   return gripFrame(metadata(group,grip.toArray() as [number,number,number],[.095,-.025,-.085]),[0,1,0],body.quaternion.clone());
 }
@@ -401,7 +408,7 @@ export function addHammerDetails(group: THREE.Group): THREE.Group {
   const housing=hammer(); housing.name='Cordless SDS max housing'; group.add(housing); return group;
 }
 
-export function buildToolModel(kind: ToolModelKind): THREE.Group {
+export function buildToolModel(kind: ToolModelKind,fittingKinds?:readonly BoxKind[]): THREE.Group {
   let group: THREE.Group;
   switch (kind) {
     case 'spray': group = spray(); break;
@@ -410,7 +417,7 @@ export function buildToolModel(kind: ToolModelKind): THREE.Group {
     case 'level': group = level(); break;
     case 'cutter': group = cutter(); break;
     case 'hose': group = hose(); break;
-    case 'fitting': group = fitting(); break;
+    case 'fitting': group = fitting(fittingKinds); break;
     case 'hammer': group = hammer(); break;
   }
   group.name = `Reference model: ${kind}`; group.userData.modelKind = kind;

@@ -135,9 +135,11 @@ export class HUD {
           <div id="reticle" aria-hidden="true"><span></span><span></span></div>
           <div id="interaction-prompt" role="status"></div>
           <div id="box-supply" class="hud-card" aria-label="Box supply" hidden>
-            <b>PLACE ANOTHER BOX</b>
+            <b>BOX FIT CHECK</b>
             <div class="box-presets">${['1G','2G','2G+1G'].map(kind=>`<button id="box-preset-${kind.replace('+','-')}" type="button" data-box-preset="${kind}" aria-pressed="${kind==='2G+1G'}">${kind}</button>`).join('')}</div>
-            <span>Aim at a chase to place · Aim at a box to pick up</span>
+            <output id="box-fit-size">RECESS 216 × 74 × 37 mm</output>
+            <output id="box-fit-status" role="status" data-fit="out-of-reach">Aim at the wall to check the recess.</output>
+            <span id="box-fit-legend"><i></i> RED: REMOVE <i></i> AMBER: DEPTH</span>
           </div>
           <div id="level-panel" class="hud-card" aria-label="Leveling controls">
             <div class="level-title">SPIRIT LEVEL · FULL GROUP</div>
@@ -361,6 +363,16 @@ export class HUD {
     modeToggle?.classList.toggle('visible', hasContextMode);
     if (modeToggle) modeToggle.dataset.modeKind = hasContextMode ? selectedTool : '';
     this.shell.dataset.aimed = targeted ? 'true' : 'false';
+  }
+
+  updateBoxFit(fit:{mode:string;reason:string|null;required:{width:number;height:number;depth:number}|null;extraDepthMm:number}):void {
+    const dimensions=fit.required?`${Math.round(fit.required.width*1000)} × ${Math.round(fit.required.height*1000)} × ${Math.round(fit.required.depth*1000)} mm`:'';
+    const key=[fit.mode,fit.reason,dimensions,fit.extraDepthMm].join(':');
+    if(!this.displayChanged('box-fit',key))return;
+    const status=this.shell.querySelector<HTMLElement>('#box-fit-status')!;
+    status.dataset.fit=fit.mode;
+    status.textContent=fit.mode==='retrieve'?'TAP TO PICK UP THIS BOX':fit.mode==='fits'?'FITS · TAP TO PLACE':fit.mode==='out-of-reach'?'MOVE CLOSER TO CHECK FIT':fit.reason==='other-box'?'ANOTHER BOX BLOCKS THIS SPOT':`REMOVE MARKED · +${fit.extraDepthMm} mm DEPTH`;
+    this.shell.querySelector('#box-fit-size')!.textContent=fit.mode==='retrieve'?'BOX AT CROSSHAIR':dimensions?`RECESS ${dimensions}`:'AIM AT THE WALL';
   }
 
   updateBoxPreset(preset:string):void {

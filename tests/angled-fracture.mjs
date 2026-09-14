@@ -24,7 +24,9 @@ function meshVolume(positions) {
 
 try {
   const { MasonryVolume } = await server.ssrLoadModule('/src/world/MasonryVolume.ts');
-  const intact = new MasonryVolume({ seed: 1234 });
+  // Preserve the earlier explicit vertical profile's saved geometry contract.
+  // Default horizontal extrusion is covered by horizontal-masonry-profile.mjs.
+  const intact = new MasonryVolume({ seed: 1234, hollowProfile: 'rounded-five' });
   const pitchX = intact.width / 21, pitchY = intact.height / 23;
   const y = 10.5 * pitchY, startX = -intact.width / 2 + 10 * pitchX;
   const innerWidth = pitchX - .036, innerDepth = intact.depth - .03;
