@@ -390,3 +390,44 @@ button {
   #tool-quick-controls {right:132px;}
   #aim-quick-controls {grid-template-columns:repeat(2,54px);top:auto;bottom:calc(max(7px,env(safe-area-inset-bottom)) + 65px);}
 }
+
+/* Box supply remains available while earlier installations are unfinished. */
+#box-supply { top:140px; left:24px; width:290px; padding:12px; display:grid; gap:8px; pointer-events:auto; }
+#box-supply[hidden] { display:none; }
+#box-supply>b { font-size:14px; }
+#box-supply>span { font-size:12px; line-height:1.35; }
+.box-presets { display:flex; gap:6px; }
+.box-presets button { flex:1; min-height:44px; border:1px solid #81715f; background:#34302a; color:white; font:700 14px/1 sans-serif; touch-action:manipulation; }
+.box-presets button[aria-pressed="true"] { background:#a44827; border-color:#f1ad75; }
+@media (pointer:coarse), (max-width:760px) {
+  #box-supply { top:80px; left:10px; width:min(290px,calc(100% - 102px)); padding:9px; gap:6px; }
+  #game-shell[data-active-tool="fitting"] #interaction-prompt { top:215px; }
+}
+@media (pointer:coarse) and (max-height:500px) {
+  #box-supply { top:68px; width:290px; padding:7px; gap:4px; }
+  #game-shell[data-active-tool="fitting"] #interaction-prompt { top:180px; }
+}
+
+/* Measuring controls must stay below the real level and above touch aim zones. */
+#level-panel { z-index:8; bottom:24px; }
+.leveling-active #desktop-key-guide, .leveling-active #tool-status { display:none; }
+@media (pointer:coarse), (max-width:760px) {
+  .leveling-active #mobile-move-zone, .leveling-active #joystick,
+  .leveling-active #look-joystick, .leveling-active #tool-quick-controls,
+  .leveling-active #aim-quick-controls { display:none; }
+  #level-panel { bottom:90px; padding:10px; }
+  .spirit-visual { grid-template-columns:minmax(120px,1fr) minmax(100px,.7fr); gap:8px; margin:7px 0; }
+  .spirit-vial,.depth-visual { height:32px; }
+  #depth-marker { height:25px; }
+  #level-readout { margin:7px 0; }
+  #level-readout span { padding:7px 4px; font-size:14px; }
+  .level-buttons { gap:6px; }
+  .level-buttons button { min-height:44px; }
+  .level-buttons .confirm { grid-column:1 / 3; }
+  .level-buttons .cancel { grid-column:3 / 5; }
+}
+@media (pointer:coarse) and (max-height:500px) {
+  #level-panel { left:auto; right:10px; bottom:82px; width:290px; transform:none; padding:8px; }
+  #level-panel .spirit-visual { display:none; }
+  #level-panel .level-title { letter-spacing:.05em; }
+}

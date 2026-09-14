@@ -5,7 +5,9 @@ import type { MortarSystem } from './MortarSystem';
 import { GAME_CONFIG } from '../data/gameConfig';
 
 type State='proud'|'loose'|'supported'|'bonded'|'floor';
-interface Placement {state:State;velocityY:number;secured:boolean;contactMaterial:'brick'|'mortar'|'air'|'floor';checkTime:number;displacedKg:number;repackedKg:number;looseKg:number}
+interface Placement {state:State;velocityY:number;secured:boolean;contactMaterial:'brick'|'mortar'|'air'|'floor'|'box';checkTime:number;displacedKg:number;repackedKg:number;looseKg:number;supportRevision?:string}
+interface CasingPart {center:THREE.Vector3;half:THREE.Vector3;axes:THREE.Vector3[]}
+interface Casing {matrix:number[];parts:CasingPart[];bounds:THREE.Box3}
 const BACK=new THREE.Vector3(0,0,-1),DOWN=new THREE.Vector3(0,-1,0);
 const CLEARANCE=.0012;
 
@@ -13,7 +15,59 @@ const CLEARANCE=.0012;
  * gravity sweeps their bottom faces, and only actual mortar contact bonds them. */
 export class BoxPlacementSystem {
   private readonly placements=new Map<InstallationPoint,Placement>();
+  private readonly casings=new WeakMap<InstallationPoint,Casing>();
+  private boxesRevision=0;
   constructor(private readonly wall:BrickWall,private readonly mortar:MortarSystem,private readonly points:InstallationPoint[]){}
+
+  /** Select the nearest visible casing, including boxes dropped to the floor. */
+  target(camera:THREE.Camera):InstallationPoint|null{
+    const ray=new THREE.Raycaster(camera.getWorldPosition(new THREE.Vector3()),camera.getWorldDirection(new THREE.Vector3()),0,GAME_CONFIG.interaction.maxDistance);
+    let target:InstallationPoint|null=null,distance=Infinity;
+    for(const point of this.points){if(!point.boxGroup.visible)continue;point.updateWorldMatrix(true,true);
+      const hit=ray.intersectObjects(point.boxGroup.boxes,true)[0];if(hit&&hit.distance<distance){distance=hit.distance;target=point;}}
+    return target;
+  }
+
+  /** Exact rectangular solids used by ElectricalBox, retaining its hollow centre. */
+  private casing(point:InstallationPoint):Casing{
+    point.updateWorldMatrix(true,true);const matrix=point.boxGroup.matrixWorld.elements,cached=this.casings.get(point);
+    if(cached&&matrix.every((value,index)=>value===cached.matrix[index]))return cached;
+    const parts:CasingPart[]=[],bounds=new THREE.Box3();
+    for(const box of point.boxGroup.boxes)for(const child of box.children){
+      if(!(child instanceof THREE.Mesh)||child.geometry.type!=='BoxGeometry')continue;
+      child.geometry.computeBoundingBox();const local=child.geometry.boundingBox!;
+      const axes=[new THREE.Vector3().setFromMatrixColumn(child.matrixWorld,0),new THREE.Vector3().setFromMatrixColumn(child.matrixWorld,1),new THREE.Vector3().setFromMatrixColumn(child.matrixWorld,2)];
+      const half=local.getSize(new THREE.Vector3()).multiplyScalar(.5).multiply(new THREE.Vector3(...axes.map(axis=>axis.length())));
+      axes.forEach(axis=>axis.normalize());parts.push({center:local.getCenter(new THREE.Vector3()).applyMatrix4(child.matrixWorld),half,axes});
+      bounds.union(local.clone().applyMatrix4(child.matrixWorld));
+    }
+    const result={matrix:[...matrix],parts,bounds};this.casings.set(point,result);return result;
+  }
+
+  /** Continuous separating-axis sweep of two rigid casing panels. */
+  private panelTravel(a:CasingPart,b:CasingPart,direction:THREE.Vector3,distance:number,offset:THREE.Vector3):number|null{
+    const delta=b.center.clone().sub(a.center).sub(offset),axes=[...a.axes,...b.axes];
+    for(const x of a.axes)for(const y of b.axes){const cross=new THREE.Vector3().crossVectors(x,y);if(cross.lengthSq()>1e-16)axes.push(cross.normalize());}
+    let enter=-Infinity,leave=Infinity;
+    for(const axis of axes){
+      const radius=a.half.x*Math.abs(axis.dot(a.axes[0]))+a.half.y*Math.abs(axis.dot(a.axes[1]))+a.half.z*Math.abs(axis.dot(a.axes[2]))+b.half.x*Math.abs(axis.dot(b.axes[0]))+b.half.y*Math.abs(axis.dot(b.axes[1]))+b.half.z*Math.abs(axis.dot(b.axes[2]));
+      const gap=delta.dot(axis),speed=direction.dot(axis);
+      if(Math.abs(speed)<1e-12){if(Math.abs(gap)>=radius-1e-9)return null;continue;}
+      const t0=(gap-radius)/speed,t1=(gap+radius)/speed;enter=Math.max(enter,Math.min(t0,t1));leave=Math.min(leave,Math.max(t0,t1));
+      if(enter>=leave-1e-9)return null;
+    }
+    if(leave<=1e-9||enter>distance+1e-9)return null;
+    return Math.max(0,enter);
+  }
+
+  private casingTravel(point:InstallationPoint,direction:THREE.Vector3,distance:number,offset=new THREE.Vector3()):number|null{
+    const moving=this.casing(point),start=moving.bounds.clone().translate(offset),swept=start.clone().union(start.clone().translate(direction.clone().multiplyScalar(distance)));
+    let nearest:number|null=null;
+    for(const other of this.points){if(other===point||!other.boxGroup.visible)continue;const fixed=this.casing(other);if(!swept.intersectsBox(fixed.bounds))continue;
+      for(const a of moving.parts)for(const b of fixed.parts){const travel=this.panelTravel(a,b,direction,nearest??distance,offset);if(travel!==null&&(nearest===null||travel<nearest))nearest=travel;}
+    }
+    return nearest;
+  }
 
   place(point:InstallationPoint,camera:THREE.Camera):{success:boolean;message:string}{
     if(point.boxGroup.visible){
@@ -28,9 +82,16 @@ export class BoxPlacementSystem {
     if(distance<=0||distance>GAME_CONFIG.interaction.maxDistance)return{success:false,message:'Move to the wall and choose where the box should sit.'};
     const target=origin.addScaledVector(direction,distance);
     if(Math.abs(target.x)>GAME_CONFIG.room.width/2||target.y<0||target.y>GAME_CONFIG.room.height)return{success:false,message:'Aim at a reachable part of the wall.'};
+    const previousPointPosition=point.position.clone();
     point.placeAt(target.x,target.y);point.boxGroup.position.set(0,0,0);point.boxGroup.rotation.set(0,0,0);point.updateWorldMatrix(true,true);
     const insertion=this.insertionLimit(point);
-    point.boxGroup.position.z=insertion.depth;point.boxGroup.visible=true;point.boxGroup.levelBar.visible=false;point.updateWorldMatrix(true,true);
+    point.boxGroup.position.z=insertion.depth;point.updateWorldMatrix(true,true);
+    const travel=Math.max(0,camera.getWorldPosition(new THREE.Vector3()).z-.08-point.boxGroup.getWorldPosition(new THREE.Vector3()).z);
+    if(this.casingTravel(point,BACK,travel,new THREE.Vector3(0,0,travel))!==null){
+      point.position.copy(previousPointPosition);point.boxGroup.position.set(0,0,0);point.updateWorldMatrix(true,true);
+      return{success:false,message:'Another box blocks this position. Leave room for both casings and their front rims.'};
+    }
+    point.boxGroup.visible=true;point.boxGroup.levelBar.visible=false;this.boxesRevision++;
     const displaced=this.mortar.pressBox(point);
     const placement:Placement={state:insertion.depth>.003?'proud':'loose',velocityY:0,secured:false,contactMaterial:insertion.material,checkTime:0,...displaced};
     this.placements.set(point,placement);point.boxGroup.userData.placement=placement;point.boxGroup.userData.minimumDepth=insertion.depth;
@@ -49,6 +110,7 @@ export class BoxPlacementSystem {
   }
 
   retrieve(point:InstallationPoint):{success:boolean;message:string}{
+    this.boxesRevision++;
     point.boxGroup.visible=false;point.boxGroup.levelBar.visible=false;this.placements.delete(point);delete point.boxGroup.userData.placement;delete point.boxGroup.userData.minimumDepth;
     point.boxGroup.position.set(0,0,0);point.boxGroup.rotation.set(0,0,0);
     if(point.conduit){point.remove(point.conduit);point.conduit=null;point.pipeStep='measure';}
@@ -96,15 +158,41 @@ export class BoxPlacementSystem {
   }
 
   canAdjust(point:InstallationPoint):boolean {const p=this.placements.get(point);return !p||p.state==='supported'||p.state==='bonded';}
-  constrainAdjustment(point:InstallationPoint,previousPosition:THREE.Vector3,previousTilt:number):void{
-    const placement=this.placements.get(point);if(!placement)return;
+  constrainAdjustment(point:InstallationPoint,previousPosition:THREE.Vector3,previousTilt:number):boolean{
+    const placement=this.placements.get(point);
+    if(placement?.state==='supported'&&!placement.secured&&(placement.contactMaterial==='brick'||placement.contactMaterial==='box')&&point.boxGroup.rotation.z!==previousTilt){
+      // A dry casing rotates on its support rather than driving its lower
+      // corner into the ledge. Measure the actual casing (never the level bar)
+      // and preserve its lowest point before validating the proposed pose.
+      const proposedPosition=point.boxGroup.position.clone(),proposedTilt=point.boxGroup.rotation.z;
+      point.boxGroup.position.copy(previousPosition);point.boxGroup.rotation.z=previousTilt;
+      const previousBottom=this.casing(point).bounds.min.y;
+      point.boxGroup.position.copy(proposedPosition);point.boxGroup.rotation.z=proposedTilt;
+      const proposedBottom=this.casing(point).bounds.min.y;
+      if(Number.isFinite(previousBottom)&&Number.isFinite(proposedBottom))point.boxGroup.position.y+=previousBottom-proposedBottom;
+    }
     const depth=this.insertionLimit(point).depth;
-    if(point.boxGroup.position.z<depth||!this.canAdjust(point)){point.boxGroup.position.copy(previousPosition);point.boxGroup.rotation.z=previousTilt;}
-    else this.mortar.pressBox(point);
+    let accepted=point.boxGroup.position.z>=depth&&this.canAdjust(point);
+    if(accepted){
+      const proposed=point.boxGroup.position.clone(),tilt=point.boxGroup.rotation.z,translation=previousPosition.clone().sub(proposed);
+      if(tilt===previousTilt){const distance=translation.length();accepted=this.casingTravel(point,distance?translation.clone().multiplyScalar(-1/distance):BACK,distance,translation)===null;}
+      else{
+        // A level adjustment rotates rigid panels in small increments; test the
+        // full arc as well as its final pose, rather than teleporting past a rim.
+        const steps=Math.max(1,Math.ceil(Math.abs(tilt-previousTilt)/.002));
+        for(let step=1;step<=steps&&accepted;step++){const t=step/steps;point.boxGroup.position.lerpVectors(previousPosition,proposed,t);point.boxGroup.rotation.z=previousTilt+(tilt-previousTilt)*t;accepted=this.casingTravel(point,BACK,0)===null;}
+        point.boxGroup.position.copy(proposed);point.boxGroup.rotation.z=tilt;
+      }
+    }
+    if(!accepted){point.boxGroup.position.copy(previousPosition);point.boxGroup.rotation.z=previousTilt;}
+    else{this.mortar.pressBox(point);this.boxesRevision++;if(placement)placement.checkTime=0;}
+    point.updateWorldMatrix(true,true);
     point.boxGroup.userData.minimumDepth=depth;
+    return accepted;
   }
 
   private rearBond(point:InstallationPoint,allowCured=false):{tack:boolean;bonded:boolean}{
+    if(!this.mortar.field.nodes.size)return{tack:false,bonded:false};
     let contacts=0,stable=0,total=0;point.updateWorldMatrix(true,true);
     for(const box of point.boxGroup.boxes){
       const nx=Math.ceil(box.width/.018),ny=4;
@@ -127,8 +215,9 @@ export class BoxPlacementSystem {
     return{tack:contacts/Math.max(1,total)>=.32||enough(sideContacts),bonded:stable/Math.max(1,total)>=.32||enough(sideStable)};
   }
 
-  private downwardClearance(point:InstallationPoint,distance:number):{distance:number;material:'brick'|'mortar'|'floor'|'air'}{
-    let allowed=distance,material:'brick'|'mortar'|'floor'|'air'='air';point.updateWorldMatrix(true,true);
+  private downwardClearance(point:InstallationPoint,distance:number):{distance:number;material:'brick'|'mortar'|'floor'|'air'|'box'}{
+    let allowed=distance,material:'brick'|'mortar'|'floor'|'air'|'box'='air';point.updateWorldMatrix(true,true);
+    const boxTravel=this.casingTravel(point,DOWN,distance+CLEARANCE);if(boxTravel!==null){allowed=Math.max(0,boxTravel-CLEARANCE);material='box';}
     for(const box of point.boxGroup.boxes){
       const nx=Math.ceil((box.width+.012)/.004),nz=Math.ceil((box.depth-.006)/.004);
       const depths=Array.from({length:nz+1},(_,i)=>-box.depth+.0007+(box.depth-.0067)*i/nz);depths.push(.003);
@@ -147,20 +236,30 @@ export class BoxPlacementSystem {
 
   update(dt:number):void{
     dt=THREE.MathUtils.clamp(dt,0,.05);
+    if(dt===0)return;
     for(const[point,p]of this.placements){
-      if(!point.boxGroup.visible)continue;p.checkTime-=dt;
+      if(!point.boxGroup.visible)continue;
+      if(p.state==='floor'){this.refreshStage(point,p);continue;}p.checkTime-=dt;
+      const due=p.checkTime<=0,revision=`${this.wall.volume.removedNodeCount}:${this.mortar.field.revision}:${this.boxesRevision}`;
+      if(!due&&(p.state==='supported'||p.state==='bonded')&&p.supportRevision===revision)continue;
       if(p.checkTime<=0){
         p.checkTime=.12;const bond=this.rearBond(point,p.secured);
         if(bond.tack){p.velocityY=0;p.state=bond.bonded?'bonded':'supported';p.secured=bond.bonded;p.contactMaterial='mortar';}
         else {p.secured=false;if(p.state==='bonded'||p.state==='supported')p.state='loose';}
       }
-      if(!p.secured&&['mortared','leveling','leveled','conduit','complete'].includes(point.stage)){point.boxGroup.levelBar.visible=false;point.setStage('fitted');}
-      if(p.contactMaterial==='mortar'&&(p.state==='bonded'||p.state==='supported'))continue;
+      if(p.contactMaterial==='mortar'&&(p.state==='bonded'||p.state==='supported')){this.refreshStage(point,p);continue;}
       p.velocityY-=9.81*dt;const travel=-p.velocityY*dt,clearance=this.downwardClearance(point,travel+.0001);
       point.boxGroup.position.y-=Math.min(travel,clearance.distance);
+      if(Math.min(travel,clearance.distance)>0)this.boxesRevision++;
       if(clearance.distance<travel){p.velocityY=0;p.state=clearance.material==='floor'?'floor':'supported';p.contactMaterial=clearance.material;}
       else {p.state='loose';p.contactMaterial='air';}
+      p.supportRevision=`${this.wall.volume.removedNodeCount}:${this.mortar.field.revision}:${this.boxesRevision}`;
+      this.refreshStage(point,p);
     }
+  }
+  private refreshStage(point:InstallationPoint,p:Placement):void{
+    if(point.stage==='leveling'&&(p.state==='supported'||p.state==='bonded'))return;
+    if(!p.secured&&['mortared','leveling','leveled','conduit','complete'].includes(point.stage)){point.boxGroup.levelBar.visible=false;point.setStage('fitted');}
   }
   get telemetry(){return this.points.map(point=>{const p=this.placements.get(point);return{id:point.definition.id,visible:point.boxGroup.visible,state:p?.state??'held',secured:p?.secured??false,protrusionMm:point.boxGroup.position.z*1000,insertionDepthMm:Math.max(0,.037-point.boxGroup.position.z)*1000,velocityY:p?.velocityY??0,contactMaterial:p?.contactMaterial??'air',displacedKg:p?.displacedKg??0,repackedKg:p?.repackedKg??0,looseKg:p?.looseKg??0};});}
 }

@@ -25,7 +25,7 @@ export type InstallationStage = 'inspect' | 'marked' | 'chasing' | 'chased' | 'f
 export type PipeStep = 'measure' | 'cut' | 'bend' | 'install' | 'done';
 
 export interface InstallationDefinition {
-  id: 'A' | 'B' | 'C';
+  id: string;
   label: string;
   kind: 'socket' | 'switch';
   boxes: BoxKind[];

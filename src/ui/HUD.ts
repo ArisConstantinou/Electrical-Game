@@ -134,6 +134,11 @@ export class HUD {
           <div id="mortar-face-splash" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
           <div id="reticle" aria-hidden="true"><span></span><span></span></div>
           <div id="interaction-prompt" role="status"></div>
+          <div id="box-supply" class="hud-card" aria-label="Box supply" hidden>
+            <b>PLACE ANOTHER BOX</b>
+            <div class="box-presets">${['1G','2G','2G+1G'].map(kind=>`<button id="box-preset-${kind.replace('+','-')}" type="button" data-box-preset="${kind}" aria-pressed="${kind==='2G+1G'}">${kind}</button>`).join('')}</div>
+            <span>Aim at a chase to place · Aim at a box to pick up</span>
+          </div>
           <div id="level-panel" class="hud-card" aria-label="Leveling controls">
             <div class="level-title">SPIRIT LEVEL · FULL GROUP</div>
             <div class="spirit-visual" aria-label="Live spirit level bubble">
@@ -142,7 +147,7 @@ export class HUD {
             </div>
             <div id="level-readout"></div>
             <div class="level-buttons">
-              <button data-level="left">LEFT</button><button data-level="right">RIGHT</button>
+              <button data-level="left">ROTATE LEFT</button><button data-level="right">ROTATE RIGHT</button>
               <button data-level="in">IN</button><button data-level="out">OUT</button>
               <button data-level="confirm" class="confirm">CONFIRM</button>
               <button data-level="cancel" class="cancel">EXIT LEVEL<span class="desktop-only"> · RMB</span></button>
@@ -231,6 +236,7 @@ export class HUD {
         if(!alreadyHandled)action();
       });
     };
+    root.querySelectorAll<HTMLButtonElement>('[data-box-preset]').forEach(button=>bindHammerButton(`#${button.id}`,()=>dispatchEvent(new CustomEvent('wirehouse:box-preset',{detail:button.dataset.boxPreset}))));
     bindHammerButton('#hammer-view-left',()=>window.dispatchEvent(new CustomEvent('wirehouse:hammer-view-side',{detail:1})));
     bindHammerButton('#hammer-view-right',()=>window.dispatchEvent(new CustomEvent('wirehouse:hammer-view-side',{detail:-1})));
     bindHammerButton('#hammer-view-toggle',()=>window.dispatchEvent(new CustomEvent('wirehouse:hammer-view-side',{detail:0})));
@@ -311,7 +317,7 @@ export class HUD {
       this.prompt.textContent = '';this.prompt.classList.remove('visible', 'warning');this.messageUntil=0;
     }
     const placement=point?.boxGroup.userData.placement;
-    const loose=placement&&!placement.secured;
+    const loose=placement&&!placement.secured&&point?.stage!=='leveling';
     const floor=loose&&placement.state==='floor';
     const key=[selectedTool,targeted,missionProgress,point?.definition.id,point?.definition.label,point?.stage,!!loose,!!floor,point?.stage==='leveling'?point.boxGroup.tiltDegrees:'',point?.stage==='leveling'?point.boxGroup.depthError:''].join(':');
     if(!this.displayChanged('objective',key))return;
@@ -319,6 +325,8 @@ export class HUD {
     this.selectedTool = selectedTool;
     this.chiselOrientation.hidden = selectedTool !== 'hammer';
     this.shell.dataset.activeTool=selectedTool;
+    this.shell.classList.toggle('leveling-active',point?.stage==='leveling');
+    this.shell.querySelector<HTMLElement>('#box-supply')!.hidden=selectedTool!=='fitting';
     if(toolChanged){this.shell.querySelectorAll<HTMLButtonElement>('#tool-quick-controls button').forEach(button=>{button.hidden=!button.dataset.quickTools!.split(' ').includes(selectedTool);});this.shell.querySelector('#tool-quick-controls')!.scrollLeft=0;}
     this.shell.classList.toggle('mortar-tool',selectedTool==='trowel'||selectedTool==='hose');
     this.progress.style.width = `${missionProgress}%`;
@@ -333,6 +341,7 @@ export class HUD {
     this.shell.querySelector('#objective-compact')!.textContent = `${point.definition.label.split(' · ')[0]} · ${floor?'RETRIEVE BOX':loose?'TRIAL FIT':compactStage[point.stage]??'WORK'}`;
     this.levelPanel.classList.toggle('visible', point.stage === 'leveling');
     if (point.stage === 'leveling') {
+      this.levelPanel.querySelector('.level-title')!.textContent=`SPIRIT LEVEL · ${point.definition.label}`;
       const tilt = point.boxGroup.tiltDegrees;
       const depth = point.boxGroup.depthError * 1000;
       this.levelReadout.innerHTML = `<span class="${point.boxGroup.isLevel ? 'ok' : ''}">LEVEL ${tilt >= 0 ? '+' : ''}${tilt.toFixed(2)}°</span><span class="${point.boxGroup.isFlush ? 'ok' : ''}">DEPTH ${depth >= 0 ? '+' : ''}${depth.toFixed(1)} mm</span>`;
@@ -352,6 +361,10 @@ export class HUD {
     modeToggle?.classList.toggle('visible', hasContextMode);
     if (modeToggle) modeToggle.dataset.modeKind = hasContextMode ? selectedTool : '';
     this.shell.dataset.aimed = targeted ? 'true' : 'false';
+  }
+
+  updateBoxPreset(preset:string):void {
+    this.shell.querySelectorAll<HTMLButtonElement>('[data-box-preset]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.boxPreset===preset)));
   }
 
   updateWaterGun(setting:WaterGunSetting,floorLitres:number,depthMm:number):void {

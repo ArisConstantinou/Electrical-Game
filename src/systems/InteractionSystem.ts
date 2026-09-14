@@ -31,7 +31,7 @@ export class InteractionSystem {
 
   action(point: InstallationPoint, tool: RigTool, camera: THREE.Camera, continuing = false): InteractionResult {
     if(tool==='fitting'&&this.placementSystem)return this.placementSystem.place(point,camera);
-    if(['level','spring','cutter'].includes(tool)&&point.boxGroup.userData.placement&&!point.boxGroup.userData.placement.secured)return{success:false,message:'The box is loose. Support and secure it with mortar before continuing.'};
+    if(['spring','cutter'].includes(tool)&&point.boxGroup.userData.placement&&!point.boxGroup.userData.placement.secured)return{success:false,message:'The box is loose. Support and secure it with mortar before continuing.'};
     if (tool === 'spray') {
       const firstMark = point.stage === 'inspect';
       const painted = this.marking.spray(camera, point);
@@ -58,13 +58,9 @@ export class InteractionSystem {
     if (tool === 'fitting' && point.stage === 'fitted') {
       return { success: false, message: 'Mist the masonry with the hose (8), then cast mortar with the trowel (7). Fill all four sides.' };
     }
-    if (tool === 'level' && point.stage === 'mortared') {
-      if (!this.mortar.ready(point)) {
-        point.setStage('fitted');
-        return {success:false,message:'The mortar bed has lost support. Refill the gaps before leveling.'};
-      }
-      this.leveling.begin(point);
-      return { success: true, message: 'Leveling mode: correct tilt and flush depth.' };
+    if (tool === 'level' && point.stage !== 'leveling') {
+      const begun=this.leveling.begin(point);
+      return { success: begun, message: begun ? 'Level on selected box. Rotate left / right and adjust depth.' : 'Support the box in the chase before placing the level. A falling or floor box cannot be leveled.' };
     }
     if (tool === 'level' && point.stage === 'leveling') {
       if(point.boxGroup.isLevel&&point.boxGroup.isFlush&&!this.mortar.ready(point)){
