@@ -371,7 +371,8 @@ export class HUD {
     if(!this.displayChanged('box-fit',key))return;
     const status=this.shell.querySelector<HTMLElement>('#box-fit-status')!;
     status.dataset.fit=fit.mode;
-    status.textContent=fit.mode==='retrieve'?'TAP TO PICK UP THIS BOX':fit.mode==='fits'?'FITS · TAP TO PLACE':fit.mode==='out-of-reach'?'MOVE CLOSER TO CHECK FIT':fit.reason==='other-box'?'ANOTHER BOX BLOCKS THIS SPOT':`REMOVE MARKED · +${fit.extraDepthMm} mm DEPTH`;
+    const obstruction=fit.reason==='other-box'?'ANOTHER BOX BLOCKS THIS SPOT':`REMOVE MARKED · +${fit.extraDepthMm} mm DEPTH`;
+    status.textContent=fit.mode==='retrieve'?'TAP TO PICK UP THIS BOX':fit.mode==='fits'?'FITS · TAP TO PLACE':fit.mode==='out-of-reach'?(fit.reason==='fits'?'CAVITY FITS · MOVE CLOSER':fit.reason==='out-of-reach'?'AIM AT A CLOSER WALL AREA':`${obstruction} · MOVE CLOSER`):obstruction;
     this.shell.querySelector('#box-fit-size')!.textContent=fit.mode==='retrieve'?'BOX AT CROSSHAIR':dimensions?`RECESS ${dimensions}`:'AIM AT THE WALL';
   }
 

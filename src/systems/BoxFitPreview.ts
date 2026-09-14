@@ -68,9 +68,11 @@ export class BoxFitPreview {
     }
     const attribute=this.outlines.geometry.getAttribute('position') as THREE.BufferAttribute;
     (attribute.array as Float32Array).set(positions);attribute.needsUpdate=true;this.outlines.geometry.setDrawRange(0,positions.length/3);
-    (this.outlines.material as THREE.LineBasicMaterial).color.set(this.mode==='fits'?0x54ec93:this.mode==='out-of-reach'?0xb7c6ce:0xff5948);
+    // Reach controls insertion, not inspection. A completed fit check must
+    // never become a misleading white outline simply because the arm is far.
+    (this.outlines.material as THREE.LineBasicMaterial).color.set(fit.reason==='out-of-reach'?0x69b8ff:fit.fits?(reachable?0x54ec93:0x69b8ff):0xff5948);
     let count=0;
-    if(this.mode==='blocked'&&fit.reason!=='other-box')for(const cell of fit.blockedCells){
+    if(!fit.fits&&fit.reason!=='other-box')for(const cell of fit.blockedCells){
       if(count>=4096)break;
       this.matrix.makeTranslation(cell.x,cell.y,cell.surfaceZ+.0018);this.blockedMesh.setMatrixAt(count,this.matrix);
       this.color.set(cell.surfaceZ<target.wallFrontZ-.006?0xffae32:0xff3429);this.blockedMesh.setColorAt(count++,this.color);

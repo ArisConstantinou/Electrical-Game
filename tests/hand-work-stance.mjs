@@ -20,4 +20,13 @@ advance(30);assert(Math.abs(target().y-aimed)<1e-5);
 input.mobileLook.y=.5;const beforeLook=target().y;advance(10);assert(Math.abs(target().y-beforeLook)>.001);input.mobileLook.y=0;
 keys.add('KeyS');advance(45);keys.clear();assert.equal(player.workPosition.locked,false);assert(camera.position.z-front>.9);advance(90);assert(Math.abs(camera.position.y-1.65)<.001);
 aim(.3,front+1.5);advance();assert.equal(player.workPosition.locked,false);assert(Math.abs(camera.position.y-1.65)<.001);
+// Reproduce the user's tool sequence: hammer is already braced at its longer
+// working distance, then BOX is selected without any new forward input.
+for(const crouched of [false,true]){
+ player.crouched=crouched;aim(1.1,front+.93);player.handWorkTargetY=null;player.wallWorkDistance=.93;player.workPosition.locked=true;player.workPosition.targetDistanceM=.93;player.update(1/60);
+ const hammerTarget=target().y;player.wallWorkDistance=.46;advance(90);
+ assert(Math.abs(camera.position.z-front-.46)<.002,'Switching from braced hammer takes up hand-tool reach');
+ assert(Math.abs(target().y-hammerTarget)<1e-5,'Tool transition preserves the aimed wall point');
+ const reach=Math.hypot(.2,camera.position.y-.22-target().y,camera.position.z+.03-front);assert(reach<.68,'Standing and crouched hammer-to-box transitions become physically reachable');
+}
 console.log(JSON.stringify({suite:'hand-work-stance',checks,aimPreserved:true,mobileAimWorks:true,backwardReleases:true,farRemainsStanding:true,pass:true}));

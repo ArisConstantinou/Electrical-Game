@@ -13,6 +13,7 @@ export class PlayerController {
   crouched = false;
   handWorkTargetY:number|null=null;
   private handWorkEyeHeight:number|null=null;
+  private wasHandWork=false;
   get eyeHeight(): number { return this.crouched || this.input.pressed('ControlLeft') || this.input.pressed('ControlRight') ? .95 : this.handWorkEyeHeight ?? GAME_CONFIG.player.eyeHeight; }
   yaw = 0;
   pitch = -0.62;
@@ -39,6 +40,8 @@ export class PlayerController {
   }
 
   update(dt: number): void {
+    const enteringHandWork=this.handWorkTargetY!==null&&!this.wasHandWork;
+    this.wasHandWork=this.handWorkTargetY!==null;
     const wallDistance = Math.abs(this.camera.position.z - GAME_CONFIG.room.wallFrontZ);
     const handWork=this.handWorkTargetY!==null&&this.wallWorkEnabled&&Math.cos(this.yaw)>.65&&wallDistance<.94&&!this.workPosition.released;
     // Bend knees/hips for low hand work. The body never rises above standing
@@ -81,7 +84,10 @@ export class PlayerController {
     // Looking or changing a tool pose must not pull the camera to a newly
     // calculated standoff. Take up a new distance on approach/forward intent;
     // once braced, keep that distance until the player deliberately moves.
-    if(!work.locked||y>.12)work.targetDistanceM=this.wallWorkDistance;
+    // A hammer braces the body farther away than a hand-held box. Switching
+    // to hand work takes up that shorter reach once, while later aim changes
+    // retain the chosen stance and the same wall point stays under the reticle.
+    if(!work.locked||y>.12||enteringHandWork)work.targetDistanceM=this.wallWorkDistance;
     else if(!wasLocked)work.targetDistanceM=this.handWorkTargetY!==null?this.wallWorkDistance:wallDistanceNow;
     if(work.locked){
       if(this.wallToolTravelSpeedMps!==null && y>=0){

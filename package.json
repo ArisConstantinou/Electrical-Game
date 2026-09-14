@@ -27,6 +27,8 @@
     "test:default-flood": "node tests/default-flood-ui.mjs",
     "test:tools-visual": "node tests/tools-visual-smoke.mjs",
     "test:room-water-field": "node tests/room-water-field.mjs",
+    "test:water-droplets": "node tests/water-droplet-scale.mjs && node tests/hose-nozzle-ui.mjs",
+    "test:vertical-joints": "node tests/vertical-joint-contact.mjs && node tests/vertical-joint-ui.mjs",
     "test:room-water": "node tests/room-water-smoke.mjs",
     "test:room-water-performance": "node tests/room-water-performance.mjs",
     "test:chisel-balanced": "node tests/chisel-balanced-ui.mjs",

@@ -139,8 +139,10 @@ export class RoomWaterSystem {
     }
     this.field.update(dt);
     for(let i=0;i<this.drops.length;i++){
-      const drop=this.drops[i],r=THREE.MathUtils.clamp(Math.cbrt(drop.litres*.001)*.25,.002,.013);
-      this.transform.position.copy(drop.point);this.transform.quaternion.setFromUnitVectors(this.upAxis,drop.velocity.clone().normalize());this.transform.scale.set(r,r*(1+Math.min(2,drop.velocity.length()*.22)),r);this.transform.updateMatrix();this.droplets.setMatrixAt(i,this.transform.matrix);
+      // A batch carries many droplets (and may merge at the simulation budget).
+      // Its litres must never become one centimetre-sized rendered water ball.
+      const drop=this.drops[i],r=.0008+.001*(.5+.5*Math.sin(i*2.399963+drop.age*3));
+      this.transform.position.copy(drop.point);this.transform.quaternion.setFromUnitVectors(this.upAxis,drop.velocity.clone().normalize());this.transform.scale.set(r,r*(1+Math.min(.6,drop.velocity.length()*.12)),r);this.transform.updateMatrix();this.droplets.setMatrixAt(i,this.transform.matrix);
       // A short motion trail reads as falling water rather than a rigid wire.
       // This visual cap never changes the batch's velocity or carried litres.
       const speed=drop.velocity.length(),trailLength=Math.min(.04,speed*.008);
@@ -165,8 +167,11 @@ export class RoomWaterSystem {
     let segments=0,spray=0;
     const drawDrop=(point:THREE.Vector3,velocity:THREE.Vector3,r:number)=>{
       if(spray>=160)return;
+      // Flow sets the continuous column's thickness; detached splash stays fine
+      // even in FLOOD. Motion is conveyed by its trajectory, not a large oval.
+      r=Math.min(r,.0018);
       this.transform.position.copy(point);this.transform.quaternion.setFromUnitVectors(this.upAxis,velocity.clone().normalize());
-      this.transform.scale.set(r,r*(1+Math.min(3,velocity.length()*.18)),r);this.transform.updateMatrix();this.sprayDrops.setMatrixAt(spray++,this.transform.matrix);
+      this.transform.scale.set(r,r*(1+Math.min(.6,velocity.length()*.12)),r);this.transform.updateMatrix();this.sprayDrops.setMatrixAt(spray++,this.transform.matrix);
     };
     for(let i=0;i<this.streamCount;i++){
       const ring=i===0?0:Math.sqrt(i/(this.streamCount-1)),angle=i*2.399963229728653;

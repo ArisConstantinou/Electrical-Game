@@ -53,12 +53,13 @@ try{
  for(const [name,viewport,mobile] of [['desktop',{width:1366,height:768},false],['mobile',{width:390,height:844},true],['landscape',{width:844,height:390},true]]){
   if(process.env.QA_PLATFORM&&process.env.QA_PLATFORM!==name)continue;
   const context=await browser.newContext({viewport,isMobile:mobile,hasTouch:mobile});await blockPointerLock(context);const page=await context.newPage();page.on('pageerror',e=>report.errors.push(`${name}: ${e.message}`));
+  await page.routeWebSocket('**',()=>{});
   await page.goto(url);await page.waitForFunction(()=>window.__wireTheHouse?.boxFitPreview&&window.__wireTheHouse?.roomWater.waterProActive,undefined,{timeout:120000});await page.locator('#start-button')[mobile?'tap':'click']();
   const fixture=await page.evaluate(async()=>{
    const g=window.__wireTheHouse,v=g.room.brickWall.volume;window.__fitStep=g.step.bind(g);g.step=()=>{};await g.renderer.waitForFrame();
    const instanceColorBeforeBoxSelection=!!g.boxFitPreview.blockedMesh.instanceColor;
    const backend=JSON.parse(window.render_game_to_text()).water.backend;
-   const areas=[{x:-.85,y:1.22,width:.042,height:.14,depth:.075},{x:0,y:1.22,width:.30,height:.14,depth:.012},{x:.85,y:1.22,width:.105,height:.14,depth:.075},{x:1.65,y:1.22,width:.38,height:.14,depth:.075},{x:0,y:.67,width:.90,height:.40,depth:.026}];
+   const areas=[{x:-.85,y:1.22,width:.042,height:.14,depth:.075},{x:0,y:1.22,width:.30,height:.14,depth:.012},{x:.85,y:1.22,width:.105,height:.14,depth:.075},{x:1.65,y:1.22,width:.38,height:.14,depth:.075},{x:0,y:.67,width:.90,height:.40,depth:.026},{x:2.35,y:1.2,width:.38,height:.55,depth:.075}];
    const save=v.serialize(),chunks=new Map(save.chunks.map(c=>[c.key,new Map(c.edits.map(e=>[e[0],e]))]));let removed=0;
    for(const area of areas)for(let x=Math.max(1,Math.floor((area.x-area.width/2+v.width/2)/v.hx));x<=Math.ceil((area.x+area.width/2+v.width/2)/v.hx)+1;x++)for(let y=Math.floor((area.y-area.height/2)/v.hy);y<=Math.ceil((area.y+area.height/2)/v.hy)+1;y++)for(let z=1;z<=Math.ceil(area.depth/v.hz);z++){
     const p=v.nodePosition(x,y,z);if(Math.abs(p.x-area.x)>area.width/2||Math.abs(p.y-area.y)>area.height/2||!v.nodeMaterial(x,y,z))continue;
@@ -69,7 +70,18 @@ try{
   });
   assert(fixture.removed>0);assert(fixture.instanceColorBeforeBoxSelection,'Instance colours exist before any empty preview compiles');
   assert.equal(fixture.backend,process.env.QA_WEBGL==='1'?'webgl':'webgpu');
-  await aim(page,-1.65,1.22,2);await tool(page,'fitting',mobile);await press(page,'#box-preset-1G',mobile);await refresh(page);const far=await state(page);assert.equal(far.status,'out-of-reach');assert.equal(far.highlightCount,0);await shot(page,`${name}-cold-distant-empty-preview`);await use(page,mobile);assert.equal(visible(await state(page)).length,0);
+  // Begin outside the stance and approach with actual movement input. Selecting
+  // BOX while the hammer remains locked must take up hand reach automatically.
+  await tool(page,'hammer',mobile);await aim(page,2.35,1.22,1.3);
+  if(mobile){const b=await page.locator('#joystick').boundingBox(),cdp=await context.newCDPSession(page);await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:b.x+b.width/2,y:b.y+b.height/2,id:51}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:b.x+b.width/2,y:b.y+4,id:51}]});await step(page,120);await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await cdp.detach();}
+  else{await page.keyboard.down('KeyW');await step(page,120);await page.keyboard.up('KeyW');}
+  await step(page,30);
+  const hammerStance=await page.evaluate(()=>{const g=window.__wireTheHouse;return{...g.player.workPosition};});assert(hammerStance.locked&&hammerStance.distanceM>.7,'Native approach enters the longer hammer stance');
+  await tool(page,'fitting',mobile);await press(page,'#box-preset-2G-1G',mobile);await step(page,120);await refresh(page);
+  const transition=await state(page),handStance=await page.evaluate(()=>({...window.__wireTheHouse.player.workPosition}));
+  assert(Math.abs(handStance.distanceM-.46)<.002,'BOX selection takes up hand reach without another forward gesture');assert.equal(transition.status,'fits');assert.deepEqual(transition.handKinds,['2G','1G']);
+  await shot(page,`${name}-hammer-to-box-reachable`);await use(page,mobile);assert.equal(visible(await state(page)).length,1,'Native USE places the mixed group after hammer approach');await use(page,mobile);assert.equal(visible(await state(page)).length,0,'Native USE retrieves the placed mixed group');
+  await aim(page,-1.65,1.22,2);await tool(page,'fitting',mobile);await press(page,'#box-preset-1G',mobile);await refresh(page);const far=await state(page);assert.equal(far.status,'out-of-reach');assert(far.highlightCount>0,'Distant inspection still shows masonry/depth obstructions');assert.match(far.text,/REMOVE MARKED.*MOVE CLOSER/);await shot(page,`${name}-distant-blocked-preview`);await use(page,mobile);assert.equal(visible(await state(page)).length,0);
   await aim(page,-1.65);await step(page,60);const intact=await state(page);assert.equal(intact.assessment.fits,false);assert.equal(intact.status,'blocked');assert(intact.highlightCount>0&&intact.previewVisible);assert(intact.assessment.proudDepthM>.025);assert.match(intact.text,/mm/i);await step(page,120);const idle=await state(page);assert.equal(idle.checks,intact.checks,'Stationary BOX reuses the completed fit assessment');const tilePixels=await redTilePixels(page,await shot(page,`${name}-intact-blocked`));assert(tilePixels.samples>100&&tilePixels.fraction>.05,`${name}: cold far-to-near preview must render red filled tiles, not white (${JSON.stringify(tilePixels)})`);await use(page,mobile);assert.equal(visible(await state(page)).length,0,'Intact masonry refuses placement');
   await tool(page,'hammer',mobile);const pinned=await state(page);assert(pinned.guide&&pinned.previewVisible,'Failed placement remains a hammer excavation guide');sameTarget(pinned.assessment.target,intact.assessment.target);await shot(page,`${name}-hammer-pinned-guide`);await aim(page,-.85);const lookedAway=await state(page);assert(lookedAway.guide&&lookedAway.previewVisible);sameTarget(lookedAway.assessment.target,pinned.assessment.target,'Hammer look cannot move the intended box recess');await tool(page,'spray',mobile);assert.equal((await state(page)).previewVisible,false,'Other tools hide the guide');await tool(page,'fitting',mobile);
   await aim(page,-.85);const narrow=await state(page);assert.equal(narrow.assessment.fits,false);assert(narrow.assessment.blockedCells.some(c=>Math.abs(c.x-narrow.assessment.target.x)>.02),'Narrow cavity identifies remaining side masonry');await shot(page,`${name}-narrow-side-highlight`);await use(page,mobile);assert.equal(visible(await state(page)).length,0);
@@ -81,7 +93,7 @@ try{
   await aim(page,first.position[0],first.position[1]);const retrievalPreview=await state(page);assert.equal(retrievalPreview.status,'retrieve');assert.equal(retrievalPreview.previewVisible,false);await use(page,mobile);const retrieved=await state(page);assert.equal(visible(retrieved).length,1);assert.deepEqual(retrieved.handKinds,['1G'],'Retrieved casing becomes the held preset');assert.equal(retrieved.points.find(p=>p.id===first.id).visible,false);assert(visible(retrieved).some(p=>p.kinds.join('+')==='2G+1G'));
   await tool(page,'spray',mobile);await aim(page,0,.67,.75);await shot(page,`${name}-horizontal-brick-cutaway`);const final=await state(page);assert.equal(final.profile,'horizontal-rounded');assert.equal(final.previewVisible,false);assert.equal(final.overflow,false);assert.equal(final.error,'');assert.equal(final.locked,false);
   await tool(page,'fitting',mobile);await aim(page,-1.65);const layout=await fitLayout(page,mobile);
-  report.cases.push({name,viewport,fixture,far,tilePixels,layout,intact,pinned,lookedAway,narrow,shallow,smallFits,largerBlocked,wide,firstPlaced,two,retrieved,final});console.log(JSON.stringify({platform:name,passed:true,redTileFraction:tilePixels.fraction}));await context.close();
+  report.cases.push({name,viewport,fixture,hammerStance,handStance,transition,far,tilePixels,layout,intact,pinned,lookedAway,narrow,shallow,smallFits,largerBlocked,wide,firstPlaced,two,retrieved,final});console.log(JSON.stringify({platform:name,passed:true,redTileFraction:tilePixels.fraction}));await context.close();
  }
  assert.deepEqual(report.errors,[]);
 }finally{await browser.close();await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));}

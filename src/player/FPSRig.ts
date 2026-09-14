@@ -3,6 +3,7 @@ import { buildToolModel } from './ToolModels';
 import type { TrowelMotion } from './TrowelMotion';
 import { workerHand, workerArm, poseWorkerArm, flexWorkerHand, poseToolGrip, MAX_WRIST_REACH_M, UPPER_ARM_M, FOREARM_M, type WorkerArm } from './WorkerArm';
 import type { BrickWall, ChiselContact } from '../world/BrickWall';
+import { MaterialId } from '../world/MasonryVolume';
 import type { BoxKind } from '../data/installationRules';
 
 export type RigTool = 'spray' | 'hammer' | 'fitting' | 'level' | 'spring' | 'cutter' | 'trowel' | 'hose';
@@ -131,6 +132,19 @@ export class FPSRig extends THREE.Group {
     // Tilting upward changes the blade attack, not the selected depth/target.
     // Ordinary excavation still follows the shaft through the front aperture.
     const upward=wall.chiselTiltDegrees<0;
+    if(!upward){
+      // A recessed joint is only about 12 mm wide. Starting the angled shaft
+      // at the facade projection of the crosshair sends it beside that joint,
+      // into a hollow brick, even though the player is aiming at its grey face.
+      // Seat the shaft through the visible joint instead. Trace from outside
+      // the wall so a nearer lip still blocks the real blade; never teleport
+      // contact through intact masonry to the selected backing.
+      const visible=wall.volume.raycast(eye,view,distance+.28/Math.max(.08,Math.abs(view.z)));
+      if(visible?.material===MaterialId.Mortar){
+        const travel=(wall.volume.frontZ-visible.point.z)/Math.max(.04,-direction.z)+.02;
+        origin.set(visible.point.x,visible.point.y,visible.point.z).addScaledVector(direction,-travel);
+      }
+    }
     const rayOrigin=upward?eye:origin,rayDirection=upward?view:direction;
     const reach=upward?distance+.28/Math.max(.08,Math.abs(view.z)):Math.min(.38,.24/Math.abs(direction.z));
     const actualAxisContact=(candidate:ReturnType<typeof wall.volume.raycast>)=>{
