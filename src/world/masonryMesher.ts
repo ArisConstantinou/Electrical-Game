@@ -26,9 +26,10 @@ export interface MeshSource {
 export const CORNERS = [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]];
 export const TETRA = [[0, 5, 1, 6], [0, 1, 2, 6], [0, 2, 3, 6], [0, 3, 7, 6], [0, 7, 4, 6], [0, 4, 5, 6]];
 type Point = { x: number; y: number; z: number };
-interface CutVertex { point: Point; before: number; after: number }
+interface CutVertex { point: Point; before: number; after: number; slot?: number }
+interface ClipOperation { a: number; b: number; t: number }
 type Polyhedron = CutVertex[][];
-function clipPolyhedron(faces: Polyhedron, distance: (vertex: CutVertex) => number): Polyhedron {
+function clipPolyhedron(faces: Polyhedron, distance: (vertex: CutVertex) => number, operations?: ClipOperation[]): Polyhedron {
   let hasInside = false, hasOutside = false;
   for (const face of faces) for (const vertex of face) { const d = distance(vertex); if (d > 1e-12) hasInside = true; if (d < -1e-12) hasOutside = true; }
   if (!hasOutside) return faces;
@@ -42,6 +43,7 @@ function clipPolyhedron(faces: Polyhedron, distance: (vertex: CutVertex) => numb
       if ((da > 1e-12 && db < -1e-12) || (da < -1e-12 && db > 1e-12)) {
         const t = da / (da - db);
         const v: CutVertex = { point: { x: a.point.x + (b.point.x - a.point.x) * t, y: a.point.y + (b.point.y - a.point.y) * t, z: a.point.z + (b.point.z - a.point.z) * t }, before: a.before + (b.before - a.before) * t, after: a.after + (b.after - a.after) * t };
+        if (operations) { v.slot = 4 + operations.length; operations.push({ a: a.slot!, b: b.slot!, t }); }
         polygon.push(v);
         if (!intersections.some(c => Math.abs(c.point.x - v.point.x) + Math.abs(c.point.y - v.point.y) + Math.abs(c.point.z - v.point.z) < 1e-10)) intersections.push(v);
       } else if (Math.abs(da) <= 1e-12 && !intersections.some(c => c === a)) intersections.push(a);
@@ -92,6 +94,66 @@ export function clippedTetra(points: Point[], before: number[], after?: number[]
   }
   return { faces: faces.map(face => face.map(v => v.point)), volume };
 }
+
+/** Binary tetrahedral removal has only 81 before/after topologies. Record the
+ * intersection arithmetic once per tetra orientation, then replay it on the
+ * actual world coordinates. No quantization, coarser fracture or mass estimate
+ * is involved. Each volume owns its cache so different lattice scales cannot mix.
+ */
+export function createRemovalClipper(): (points: Point[], before: number[], after: number[], orientation: number, indices?: readonly number[]) => { faces: Point[][]; volume: number; triangles: Point[] } {
+  const plans = new Map<number, { operations: ClipOperation[]; vertices: Point[]; centerSlots: number[]; result: { faces: Point[][]; volume: number; triangles: Point[] } }>();
+  const directIndices=[0,1,2,3],fraction=[0,.125,.5,.875,1];
+  return (points, before, after, orientation, indices=directIndices) => {
+    let key = orientation,beforeCount=0,afterCount=0;
+    for (let i=0;i<4;i++) {const index=indices[i];key = key*3 + (after[index] ? 2 : before[index] ? 1 : 0);beforeCount+=before[index];afterCount+=after[index];}
+    let plan = plans.get(key);
+    if (!plan) {
+      const vertices = indices.map((index,i)=>({point:points[index],before:before[index],after:after[index],slot:i}));
+      let faces: Polyhedron = [[vertices[0],vertices[1],vertices[2]],[vertices[0],vertices[3],vertices[1]],[vertices[0],vertices[2],vertices[3]],[vertices[1],vertices[3],vertices[2]]];
+      const operations: ClipOperation[] = [];
+      faces = clipPolyhedron(faces,v=>v.before-.5,operations);
+      if (faces.length) faces = clipPolyhedron(faces,v=>.5-v.after,operations);
+      const pool=Array.from({length:4+operations.length},()=>({x:0,y:0,z:0}));
+      const slots=faces.map(face=>face.map(vertex=>vertex.slot!));
+      plan={operations,vertices:pool,centerSlots:slots.flat(),result:{faces:slots.map(face=>face.map(slot=>pool[slot])),volume:0,triangles:[]}}; plans.set(key,plan);
+    }
+    // This internal clipper is consumed synchronously before its next call.
+    // Reuse its vertices/faces instead of allocating thousands of polygons per
+    // hammer blow; callers retaining a result must copy it.
+    const vertices=plan.vertices,result=plan.result;
+    for(let i=0;i<4;i++){const p=points[indices[i]];vertices[i].x=p.x;vertices[i].y=p.y;vertices[i].z=p.z;}
+    for (let i=0;i<plan.operations.length;i++) {
+      const operation=plan.operations[i],a=vertices[operation.a],b=vertices[operation.b],t=operation.t,v=vertices[4+i];
+      v.x=a.x+(b.x-a.x)*t;v.y=a.y+(b.y-a.y)*t;v.z=a.z+(b.z-a.z)*t;
+    }
+    if (!result.faces.length) {result.volume=0;return result;}
+    if (!result.triangles.length) {
+      const center={x:0,y:0,z:0};
+      const count=plan.centerSlots.length;
+      for(const slot of plan.centerSlots){const v=vertices[slot];center.x+=v.x/count;center.y+=v.y/count;center.z+=v.z/count;}
+      for(const face of result.faces)for(let i=1;i<face.length-1;i++){
+        const a=face[0];let b=face[i],c=face[i+1];
+        const nx=(b.y-a.y)*(c.z-a.z)-(b.z-a.z)*(c.y-a.y);
+        const ny=(b.z-a.z)*(c.x-a.x)-(b.x-a.x)*(c.z-a.z);
+        const nz=(b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x);
+        if(Math.hypot(nx,ny,nz)<1e-14)continue;
+        if(nx*(a.x-center.x)+ny*(a.y-center.y)+nz*(a.z-center.z)<0){const swap=b;b=c;c=swap;}
+        result.triangles.push(a,b,c);
+      }
+    }
+    // For binary values the .5 solid fraction depends only on how many
+    // tetra vertices are occupied: 0, 1/8, 1/2, 7/8, 1. Since after-solid is
+    // contained in before-solid, their exact difference needs no face-volume sum.
+    const a=vertices[0],b=vertices[1],c=vertices[2],d=vertices[3];
+    const bx=b.x-a.x,by=b.y-a.y,bz=b.z-a.z;
+    const cx=c.x-a.x,cy=c.y-a.y,cz=c.z-a.z;
+    const dx=d.x-a.x,dy=d.y-a.y,dz=d.z-a.z;
+    const tetraVolume=Math.abs(bx*(cy*dz-cz*dy)+by*(cz*dx-cx*dz)+bz*(cx*dy-cy*dx))/6;
+    const volume=tetraVolume*(fraction[beforeCount]-fraction[afterCount]);
+    result.volume=volume;return result;
+  };
+}
+
 export class MeshBuilder {
   readonly positions: number[] = [];
   readonly normals: number[] = [];

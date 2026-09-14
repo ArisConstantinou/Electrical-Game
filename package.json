@@ -47,7 +47,10 @@
     "test:render-motion": "node tests/render-motion-coherence.mjs && node tests/queued-work-input.mjs",
     "test:wet-wall": "node tests/wet-wall-coverage.mjs && node tests/wet-wall-ui.mjs",
     "test:wet-fracture": "node tests/wet-fracture-surface.mjs && node tests/hose-fracture-ui.mjs",
-    "test:trowel-stability": "node tests/trowel-pose-stability.mjs && node tests/mobile-stick-neutral.mjs && node tests/trowel-native-camera-ui.mjs"
+    "test:trowel-stability": "node tests/trowel-pose-stability.mjs && node tests/mobile-stick-neutral.mjs && node tests/trowel-native-camera-ui.mjs",
+    "test:hose-stability": "node tests/hose-pose-stability.mjs && node tests/hose-nozzle-ui.mjs",
+    "test:phone-resume": "node tests/renderer-lifecycle.mjs && node tests/phone-resume-ui.mjs",
+    "test:chisel-performance": "node tests/masonry-removal-clipper.mjs && node tests/masonry-sustained-performance.mjs && node tests/masonry-paint-invalidation.mjs && node tests/debris-update-performance.mjs && node tests/debris-render-boundary.mjs"
   },
   "dependencies": {
     "three": "0.185.1"

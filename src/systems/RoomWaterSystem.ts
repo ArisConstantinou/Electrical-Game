@@ -14,16 +14,16 @@ export class RoomWaterSystem {
   readonly group=new THREE.Group();
   readonly surfaceGeometry=new THREE.BufferGeometry();
   readonly surface=new THREE.Mesh(this.surfaceGeometry,new THREE.MeshPhysicalMaterial({color:0x94bdc4,roughness:.12,metalness:.05,transparent:true,opacity:.62,depthWrite:false}));
-  readonly droplets=new THREE.InstancedMesh(new THREE.SphereGeometry(1,10,8),new THREE.MeshPhysicalMaterial({color:0xd8f0ed,roughness:.07,metalness:.05,transparent:true,opacity:.4,depthWrite:false}),128);
+  readonly droplets=new THREE.InstancedMesh(new THREE.SphereGeometry(1,10,8),new THREE.MeshPhysicalMaterial({color:0xb6c9cc,roughness:.07,metalness:0,transparent:true,opacity:.18,depthWrite:false}),128);
   readonly streaks=new THREE.LineSegments(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({color:0xc5e7eb,transparent:true,opacity:.22}));
   readonly jetState:WaterJetState={active:false,origin:new THREE.Vector3(),direction:new THREE.Vector3(0,0,-1),flowLitresPerSecond:0,speedMps:8,spreadRadians:.12};
   private readonly streamCount=25;
   private readonly streamSteps=14;
-  private readonly jetStreams=new THREE.InstancedMesh(new THREE.CylinderGeometry(1,1,1,8,1,true),new THREE.MeshPhysicalMaterial({color:0xd4e9e8,emissive:0x172123,roughness:.045,metalness:.05,transparent:true,opacity:.3,depthWrite:false}),25*14);
-  private readonly sprayDrops=new THREE.InstancedMesh(new THREE.SphereGeometry(1,8,6),new THREE.MeshPhysicalMaterial({color:0xe1f3f3,emissive:0x151a1b,roughness:.06,transparent:true,opacity:.55,depthWrite:false}),160);
+  private readonly jetStreams=new THREE.InstancedMesh(new THREE.CylinderGeometry(1,1,1,8,1,true),new THREE.MeshPhysicalMaterial({color:0xb6c9cc,roughness:.045,metalness:0,transparent:true,opacity:.1,depthWrite:false}),25*14);
+  private readonly sprayDrops=new THREE.InstancedMesh(new THREE.SphereGeometry(1,8,6),new THREE.MeshPhysicalMaterial({color:0xc5d4d6,roughness:.06,transparent:true,opacity:.24,depthWrite:false}),160);
   private readonly coreSides=16;
   private readonly corePositions=new Float32Array(15*16*3);
-  private readonly jetCore=new THREE.Mesh(new THREE.BufferGeometry(),new THREE.MeshPhysicalMaterial({color:0xb7d8db,emissive:0x101719,roughness:.035,metalness:.05,clearcoat:1,clearcoatRoughness:.03,transparent:true,opacity:.46,depthWrite:false}));
+  private readonly jetCore=new THREE.Mesh(new THREE.BufferGeometry(),new THREE.MeshPhysicalMaterial({color:0xb6c9cc,roughness:.035,metalness:0,clearcoat:1,clearcoatRoughness:.03,transparent:true,opacity:.14,depthWrite:false}));
   private readonly upAxis=new THREE.Vector3(0,1,0);
   private jetGeometryTime=0;
   private jetSegments=0;
@@ -155,10 +155,11 @@ export class RoomWaterSystem {
    * remains exclusively in emission/runoff batches: these are never extra litres. */
   private updateJetVisuals():void{
     const jet=this.jetState,direction=jet.direction;
+    const mist=jet.flowLitresPerSecond<.2,cohesive=jet.flowLitresPerSecond>=3;
     jet.impactPoint=undefined;jet.impactNormal=undefined;
     const right=new THREE.Vector3().crossVectors(direction,Math.abs(direction.y)>.95?new THREE.Vector3(1,0,0):this.upAxis).normalize();
     const up=new THREE.Vector3().crossVectors(right,direction).normalize();
-    const radius=THREE.MathUtils.clamp(Math.sqrt(jet.flowLitresPerSecond*.001/(Math.PI*jet.speedMps*this.streamCount))*.6,.0011,.007);
+    const radius=THREE.MathUtils.clamp(Math.sqrt(jet.flowLitresPerSecond*.001/(Math.PI*jet.speedMps*this.streamCount))*.6,mist?.00035:.0008,.005);
     const flightTime=Math.min(1.4,5/jet.speedMps);
     const corePoints:THREE.Vector3[]=[];
     let segments=0,spray=0;
@@ -192,11 +193,15 @@ export class RoomWaterSystem {
         const length=previous.distanceTo(next);
         if(i===0)corePoints.push(next.clone());
         if(length>.0001){
-          this.transform.position.copy(previous).lerp(next,.5);this.transform.quaternion.setFromUnitVectors(this.upAxis,next.clone().sub(previous).normalize());
-          // Moving necks in the liquid columns and bright beads convey flow.
-          const neck=.82+.18*Math.sin(this.time*32-step*1.7+i);
-          this.transform.scale.set(radius*neck,length,radius*neck);this.transform.updateMatrix();this.jetStreams.setMatrixAt(segments++,this.transform.matrix);
-          if(step%4===i%4){const phase=(this.time*jet.speedMps*.8+i*.37)%1;drawDrop(previous.clone().lerp(next,phase),velocity,radius*1.5);}
+          // Mist is separated droplets; shower uses thin strands. JET/FLOOD
+          // use one pressure column, without layering 25 translucent cylinders
+          // inside it (their accumulated opacity made clear water look milky).
+          if(!mist&&!cohesive){
+            this.transform.position.copy(previous).lerp(next,.5);this.transform.quaternion.setFromUnitVectors(this.upAxis,next.clone().sub(previous).normalize());
+            const neck=.82+.18*Math.sin(this.time*32-step*1.7+i);
+            this.transform.scale.set(radius*neck,length,radius*neck);this.transform.updateMatrix();this.jetStreams.setMatrixAt(segments++,this.transform.matrix);
+          }
+          if(mist||step%4===i%4){const phase=(this.time*jet.speedMps*.8+i*.37)%1;drawDrop(previous.clone().lerp(next,phase),velocity,radius*(mist?1:1.5));}
         }
         if(impact)break;previous.copy(next);
       }

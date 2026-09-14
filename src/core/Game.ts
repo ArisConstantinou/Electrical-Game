@@ -75,6 +75,10 @@ export class Game {
   private readonly chasing: ChasingSystem;
   private readonly interaction: InteractionSystem;
   private lastTime = performance.now();
+  private animationFrame:number|null=null;
+  private loopReady=false;
+  private lifecyclePaused=false;
+  private lifecycleGeneration=0;
   private resultShown = false;
   private actionCooldown = 0;
   private wasSpraying = false;
@@ -121,6 +125,13 @@ export class Game {
     this.mobileControls.setAimInputMode(this.aimInputMode);
     new MobileHUD();
     this.bindEvents();
+    document.addEventListener('visibilitychange',()=>{if(document.hidden)this.suspendLifecycle();else void this.resumeLifecycle();});
+    document.addEventListener('freeze',this.suspendLifecycle);
+    document.addEventListener('resume',()=>void this.resumeLifecycle());
+    addEventListener('pagehide',this.suspendLifecycle);
+    addEventListener('pageshow',()=>void this.resumeLifecycle());
+    addEventListener('focus',()=>{if(this.lifecyclePaused)void this.resumeLifecycle();});
+    addEventListener('wirehouse:graphics-lost',()=>{this.suspendLifecycle();if(!document.hidden)queueMicrotask(()=>void this.resumeLifecycle());});
     this.hud.onStart(() => {
       this.started = true;
       if (matchMedia('(any-pointer: fine)').matches) this.desktopControls.requestLock();
@@ -132,11 +143,12 @@ export class Game {
     startButton.textContent = 'PREPARING WATER AND SITE…';
     this.ready = this.renderer.ready.then(async () => {
       await this.renderer.attachRoomWater(this.roomWater);
+      this.renderer.setWarmupFactory(()=>this.mortar.createRenderWarmup());
       await this.renderer.prepareToolResources(this.mortar.createRenderWarmup());
       startButton.disabled = false;
       startButton.textContent = 'ENTER THE SITE';
-      this.lastTime = performance.now();
-      requestAnimationFrame(this.loop);
+      this.loopReady=true;
+      if(document.hidden)this.suspendLifecycle();else await this.resumeLifecycle();
     });
   }
 
@@ -281,6 +293,7 @@ export class Game {
     // Catch-up physics may run several times per image. Build wet surfaces
     // only once at presentation, keeping cheap flat patches within one budget.
     if(present)this.mortar.flushWetGeometry(64,3);
+    if(present)this.chasing.flushFragmentRendering(2048,.5);
     if (present && this.renderer.render()) {
       const workReticle = this.selectedTool === 'hammer' && this.fpsRig.reachable
         ? this.fpsRig.chiselTipWorld.clone().project(this.renderer.renderCamera) : null;
@@ -541,12 +554,39 @@ export class Game {
 
   private isContinuousAction(): boolean { return this.selectedTool === 'spray' || this.selectedTool === 'hammer' || this.selectedTool === 'hose'; }
 
+  private suspendLifecycle=():void=>{
+    this.lifecycleGeneration++;this.lifecyclePaused=true;
+    if(this.animationFrame!==null)cancelAnimationFrame(this.animationFrame);this.animationFrame=null;
+    this.mobileControls.cancelActiveGestures();this.input.resetTransientInput();
+    this.mortar.cancel();
+    this.renderer.suspend();
+  };
+  private async resumeLifecycle():Promise<void>{
+    if(!this.loopReady||document.hidden)return;
+    const generation=++this.lifecycleGeneration;this.lifecyclePaused=true;
+    if(this.animationFrame!==null)cancelAnimationFrame(this.animationFrame);this.animationFrame=null;
+    this.mobileControls.cancelActiveGestures();this.input.resetTransientInput();
+    try{
+      await this.renderer.resume();
+      if(generation!==this.lifecycleGeneration||document.hidden)return;
+      // Phone lock time is not simulation time: no queued strikes, throws or
+      // water emission may catch up when the screen wakes.
+      this.lastTime=performance.now();this.actionCooldown=0;this.lifecyclePaused=false;
+      this.animationFrame=requestAnimationFrame(this.loop);
+    }catch(error){
+      this.renderer.renderError=String(error);
+      this.hud.notify('Graphics could not resume. Return to the game to retry.',false,4500);
+    }
+  }
+
   private loop = (time: number): void => {
+    this.animationFrame=null;
+    if(this.lifecyclePaused||document.hidden)return;
     // Water's depth, reflection and final colour passes share the live scene.
     // Moving its camera/arms between those passes caused alternating tool
     // positions and shadows. Keep elapsed time until the next accepted frame;
     // keyboard/touch intent and mouse angles continue to accumulate meanwhile.
-    if(this.renderer.framePending){requestAnimationFrame(this.loop);return;}
+    if(this.renderer.framePending){this.animationFrame=requestAnimationFrame(this.loop);return;}
     const elapsed = Math.max(0,Math.min((time - this.lastTime) / 1000,.25));
     this.lastTime = time;
     // Preserve simulation time on slow GPUs using bounded physics steps, with
@@ -556,6 +596,6 @@ export class Game {
       const dt=Math.min(remaining,.05);remaining-=dt;
       this.step(dt,dt,remaining<=1e-8);
     }
-    requestAnimationFrame(this.loop);
+    this.animationFrame=requestAnimationFrame(this.loop);
   };
 }

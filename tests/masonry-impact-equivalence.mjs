@@ -5,21 +5,39 @@ import { createServer } from 'vite';
 
 // Keep the original fracture implementation as an independent oracle. Compare
 // actual repeated impacts, including every Float32 fragment vertex and saved edit.
+// Coplanar caps can choose another fan start. Trace the independent generic
+// clipper to compare complete polygon boundaries before any triangulation, then
+// check the actual Float32 vertex sets, fragment bounds and physical state.
 const baselineRef = 'b9f5c77';
 const output = 'output/masonry-impact-equivalence';
 await mkdir(output, { recursive: true });
 const baseline = execFileSync('git', ['show', `${baselineRef}:src/world/MasonryVolume.ts`], { encoding: 'utf8' });
-await writeFile(`${output}/MasonryVolume.baseline.ts`, baseline.replace("'./masonryMesher'", "'/src/world/masonryMesher'"));
+await writeFile(`${output}/MasonryVolume.baseline.ts`, baseline.replace("'./masonryMesher'", "'/src/world/masonryMesher'").replace("const poly = clippedTetra(tetra.map(i => points[i]), tetra.map(i => before[i]), tetra.map(i => after[i]));", "const poly = this.__traceRemovedTetra(tetra.map(i => points[i]), tetra.map(i => before[i]), tetra.map(i => after[i]));"));
 const server = await createServer({ server: { middlewareMode: true, hmr: false }, optimizeDeps: { noDiscovery: true, include: [] }, appType: 'custom', logLevel: 'error' });
-const clean = result => result && { ...result, stats: { ...result.stats, milliseconds: 0 } };
+const clean = result => result && { ...result, removedVolume: 0, fragments: result.fragments.map(fragment=>({...fragment,volume:0,positions:undefined})), stats: { ...result.stats, milliseconds: 0 } };
+const faceKeys=faces=>faces.map(face=>[...new Set(face.map(p=>[p.x,p.y,p.z].map(v=>v.toFixed(11)).join(',')))].sort().join(';')).sort();
+const vertices=positions=>[...new Set(Array.from({length:positions.length/3},(_,i)=>`${positions[i*3]},${positions[i*3+1]},${positions[i*3+2]}`))].sort();
+const sameRemovedGeometry=(current,original,traceCurrent,traceOriginal,label)=>{
+  assert.deepStrictEqual(traceCurrent,traceOriginal,`${label}: canonical tetra facet boundaries changed`);
+  traceCurrent.length=traceOriginal.length=0;
+  assert.deepStrictEqual(clean(current),clean(original),`${label}: impact state changed`);
+  if(!current)return;
+  assert(Math.abs(current.removedVolume-original.removedVolume)<1e-14,`${label}: removed mass changed`);
+  for(let i=0;i<current.fragments.length;i++){
+    const a=current.fragments[i],b=original.fragments[i];
+    assert(Math.abs(a.volume-b.volume)<1e-14,`${label}: fragment mass changed`);
+    assert.deepStrictEqual(vertices(a.positions),vertices(b.positions),`${label}: actual Float32 fragment vertices changed`);
+  }
+};
 const summary = times => {
   const sorted = [...times].sort((a, b) => a - b);
   return { samples: times.length, medianMs: sorted[Math.floor(sorted.length / 2)], p95Ms: sorted[Math.floor((sorted.length - 1) * .95)], totalMs: times.reduce((sum, value) => sum + value, 0) };
 };
-const report = { baselineRef, checks: ['exact impact results and fragment vertices', 'exact persistent edits and removed mass', 'exact deferred support results', 'exact mesher inputs'], cases: [] };
+const report = { baselineRef, checks: ['exact impact state, canonical clipped facet boundaries and Float32 fragment vertex sets', 'exact persistent edits; removed mass within 1e-14 m3', 'exact deferred support results', 'exact mesher inputs'], cases: [] };
 try {
   const { MasonryVolume: Before } = await server.ssrLoadModule(`/${output}/MasonryVolume.baseline.ts`);
   const { MasonryVolume: After } = await server.ssrLoadModule('/src/world/MasonryVolume.ts');
+  const { clippedTetra } = await server.ssrLoadModule('/src/world/masonryMesher.ts');
   const cases = [
     { name: 'flat-normal', angle: 0, chisel: 'flat', widthM: .05 },
     { name: 'flat-narrow', angle: 15, chisel: 'flat', widthM: .01 },
@@ -35,6 +53,9 @@ try {
     // horizontal-rounded has its own geometry/save/mesh acceptance test.
     const options = { seed, hollowProfile: 'rounded-five', ...specimen.options };
     const before = new Before(options), after = new After(options), times = [[], []], lookups = [0, 0];
+    const traces=[[],[]],currentClip=after.clipRemovedTetra;
+    before.__traceRemovedTetra=(...args)=>{const poly=clippedTetra(...args);traces[0].push(faceKeys(poly.faces));return poly;};
+    after.clipRemovedTetra=(...args)=>{const poly=currentClip(...args);traces[1].push(faceKeys(poly.faces));return poly;};
     for (const [index, wall] of [before, after].entries()) {
       const query = wall.nodeMaterial.bind(wall);
       wall.nodeMaterial = (...args) => { lookups[index]++; return query(...args); };
@@ -55,14 +76,14 @@ try {
         results[index] = [before, after][index].impact(input);
         times[index].push(results[index].stats.milliseconds);
       }
-      assert.deepStrictEqual(clean(results[1]), clean(results[0]), `${seed}/${specimen.name}/${blow}: impact changed`);
+      sameRemovedGeometry(results[1],results[0],traces[1],traces[0],`${seed}/${specimen.name}/${blow}`);
       fragments += results[1].fragments.length;
-      assert.deepStrictEqual(after.serialize(), before.serialize(), `${seed}/${specimen.name}/${blow}: save changed`);
+      assert.deepStrictEqual({...after.serialize(),removedVolume:0}, {...before.serialize(),removedVolume:0}, `${seed}/${specimen.name}/${blow}: save changed`);
       if (blow % 4 === 3) {
-        assert.deepStrictEqual(clean(after.processPendingSupport(12000)), clean(before.processPendingSupport(12000)));
+        sameRemovedGeometry(after.processPendingSupport(12000),before.processPendingSupport(12000),traces[1],traces[0],`${seed}/${specimen.name}/${blow}: support`);
       }
     }
-    assert.deepStrictEqual(after.serialize(), before.serialize());
+    assert.deepStrictEqual({...after.serialize(),removedVolume:0}, {...before.serialize(),removedVolume:0});
     const dirty = before.takeDirtyChunks();
     assert.deepStrictEqual(after.takeDirtyChunks(), dirty);
     for (const key of dirty) assert.deepStrictEqual(after.exportMeshJob(key), before.exportMeshJob(key));

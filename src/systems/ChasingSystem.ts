@@ -18,9 +18,18 @@ interface Particle {
   ownedGeometry: boolean;
   transient: boolean;
   collisionProbes: THREE.Vector3[] | null;
+  footprintCache?: { yaw: number; width: number; depth: number; value: THREE.Vector2 };
+  wallSupportCache?: { revision: number; pose: number[]; supported: boolean };
+  wallOverlapCache?: { revision: number; pose: number[]; overlaps: boolean };
+  canonicalGeometry?: THREE.BufferGeometry;
   restPose: { x: number; z: number; halfWidth: number; halfHeight: number; halfDepth: number };
 }
 type SplitResult = {pieces:Array<{positions:Float32Array;volume:number}>;originalVolume:number};
+interface BoundaryJob {
+  positions: Float32Array; bits: Uint32Array; cursor: number; removed: Uint8Array; links: Int32Array;
+  vertices: Map<number, number[]>; faces: Map<number | string, { direction: number; head: number }>;
+  cancelled: number; indices?: Uint16Array | Uint32Array; written: number;
+}
 
 const pooledPlaceholder = new THREE.BoxGeometry(1, 1, 1);
 // MaterialId: Air=0, Clay=1, Mortar=2, Render=3, Concrete=4.
@@ -58,6 +67,10 @@ export class ChasingSystem {
   private splitWorkerFailed = false;
   private splitRequest = 0;
   private readonly pendingSplits = new Map<number,{particle:Particle;impact:MasonryImpact}>();
+  private readonly boundaryJobs = new Map<Particle, BoundaryJob>();
+  get pendingFragmentRendering(): number { return this.boundaryJobs.size; }
+  get renderedFragmentTriangles(): number { return this.particles.reduce((n, p) => n + (p.mesh.geometry.index?.count ?? p.mesh.geometry.getAttribute('position').count) / 3, 0); }
+  get canonicalFragmentTriangles(): number { return this.particles.reduce((n, p) => n + (p.canonicalGeometry ?? p.mesh.geometry).getAttribute('position').count / 3, 0); }
   get pendingDebrisSplits():number {return this.pendingSplits.size;}
   async waitForDebrisSplits():Promise<void>{while(this.pendingSplits.size)await new Promise(resolve=>setTimeout(resolve,4));}
   lastSpawnMs = 0;
@@ -129,7 +142,14 @@ export class ChasingSystem {
       if (particle.transient || particle.mesh.position.y < .2) continue;
       particle.mesh.updateWorldMatrix(true, false);
       const hits: THREE.Intersection[] = [];
-      THREE.Mesh.prototype.raycast.call(particle.mesh, this.debrisRay, hits);
+      // The visible index omits only paired internal tetra faces. Tool contact
+      // still uses the exact original unindexed solid, including origin-inside
+      // contacts, as do subsequent cuts and their conserved-volume ledger.
+      const visibleGeometry = particle.mesh.geometry;
+      try {
+        particle.mesh.geometry = particle.canonicalGeometry ?? visibleGeometry;
+        THREE.Mesh.prototype.raycast.call(particle.mesh, this.debrisRay, hits);
+      } finally { particle.mesh.geometry = visibleGeometry; }
       for (const hit of hits) if (hit.distance < closest) { closest = hit.distance; target = particle; point = hit.point; }
     }
     if (!target || !point) return null;
@@ -164,7 +184,7 @@ export class ChasingSystem {
       return impact;
     }
     const split = canSplit
-      ? splitDebrisGeometry(target.mesh.geometry, axis) : null;
+      ? splitDebrisGeometry(target.canonicalGeometry ?? target.mesh.geometry, axis) : null;
     if (split) {
       this.replaceFragment(target,impact,{originalVolume:split.originalVolume,pieces:split.pieces.map(piece=>{const positions=new Float32Array(piece.geometry.getAttribute('position').array);piece.geometry.dispose();return{positions,volume:piece.volume}})});
     } else {
@@ -268,19 +288,12 @@ export class ChasingSystem {
       let depth = Math.max(0.001, source.size.z);
       const actualGeometry = Boolean(source.positions?.length);
       if (actualGeometry) {
-        const geometry = new THREE.BufferGeometry();
-        geometry.setAttribute('position', new THREE.BufferAttribute(source.positions!.slice(), 3));
-        geometry.computeBoundingBox();
-        const center = geometry.boundingBox!.getCenter(new THREE.Vector3());
-        const size = geometry.boundingBox!.getSize(new THREE.Vector3());
+        const { geometry, center, size } = this.prepareFragmentGeometry(source.positions!);
         width = size.x; height = size.y; depth = size.z;
-        geometry.translate(-center.x, -center.y, -center.z);
         // Keep fracture planes in local coordinates between repeated cuts.
         // Baking every body rotation into Float32 vertices erodes cap topology.
         if(orientation){center.applyQuaternion(orientation);fragment.quaternion.copy(orientation);}
         fragment.position.add(center);
-        geometry.computeVertexNormals();
-        geometry.computeBoundingSphere();
         fragment.geometry = geometry;
       } else {
         // Crushed fines may be aggregated by the core without a retained mesh.
@@ -338,6 +351,14 @@ export class ChasingSystem {
             ? { x: 0, z: Math.PI / 2, halfWidth: height / 2, halfHeight: width / 2, halfDepth: depth / 2 }
             : { x: 0, z: 0, halfWidth: width / 2, halfHeight: height / 2, halfDepth: depth / 2 },
       });
+      if (actualGeometry && fragment.geometry.getAttribute('position').count > 72) {
+        const positions = fragment.geometry.getAttribute('position').array as Float32Array, triangles = positions.length / 9;
+        this.boundaryJobs.set(this.particles[this.particles.length - 1], {
+          positions, bits: new Uint32Array(positions.buffer, positions.byteOffset, positions.length), cursor: 0,
+          removed: new Uint8Array(triangles), links: new Int32Array(triangles).fill(-1),
+          vertices: new Map(), faces: new Map(), cancelled: 0, written: 0,
+        });
+      }
       this.totalEmittedVolume += source.volume;
     }
     // Reserve only a fraction of this blow for ALL emitted bodies together.
@@ -423,6 +444,82 @@ export class ChasingSystem {
     this.maximumUpdateMs = Math.max(this.maximumUpdateMs, this.lastUpdateMs);
   }
 
+  /** Incremental render-only cancellation of exactly coincident, oppositely
+   * wound tetra faces. No weld tolerance, exterior simplification or synchronous
+   * spawn scan; the presenter shares one small budget across all fragments. */
+  flushFragmentRendering(triangleLimit = 256, budgetMs = .5): number {
+    const start = performance.now(); let processed = 0;
+    while (processed < triangleLimit && this.boundaryJobs.size) {
+      const [particle, job] = this.boundaryJobs.entries().next().value!;
+      const triangleCount = job.removed.length;
+      if (job.indices) {
+        while (job.cursor < triangleCount && processed < triangleLimit) {
+          const triangle = job.cursor++; processed++;
+          if (!job.removed[triangle]) { const vertex = triangle * 3; job.indices[job.written++] = vertex; job.indices[job.written++] = vertex + 1; job.indices[job.written++] = vertex + 2; }
+          if (processed % 32 === 0 && performance.now() - start >= budgetMs) return processed;
+        }
+        if (job.cursor === triangleCount) {
+          const geometry = particle.mesh.geometry, canonical = new THREE.BufferGeometry();
+          // Attributes remain shared and untouched; the canonical geometry never
+          // enters the renderer and therefore owns no duplicate GPU buffers.
+          for (const name of Object.keys(geometry.attributes)) canonical.setAttribute(name, geometry.getAttribute(name));
+          canonical.boundingBox = geometry.boundingBox?.clone() ?? null;
+          canonical.boundingSphere = geometry.boundingSphere?.clone() ?? null;
+          particle.canonicalGeometry = canonical;
+          geometry.setIndex(new THREE.BufferAttribute(job.indices, 1));
+          this.boundaryJobs.delete(particle);
+        }
+      } else {
+        while (job.cursor < triangleCount && processed < triangleLimit) {
+          this.cancelInternalFace(job, job.cursor++); processed++;
+          if (processed % 32 === 0 && performance.now() - start >= budgetMs) return processed;
+        }
+        if (job.cursor === triangleCount) {
+          if (!job.cancelled) this.boundaryJobs.delete(particle);
+          else {
+            const count = (triangleCount - job.cancelled) * 3;
+            job.indices = job.positions.length / 3 > 65535 ? new Uint32Array(count) : new Uint16Array(count);
+            job.cursor = 0; job.vertices.clear(); job.faces.clear();
+          }
+        }
+      }
+      if (performance.now() - start >= budgetMs) break;
+    }
+    return processed;
+  }
+
+  private cancelInternalFace(job: BoundaryJob, triangle: number): void {
+    const p = job.positions, bits = job.bits, ids = [0, 0, 0];
+    for (let corner = 0; corner < 3; corner++) {
+      const offset = triangle * 9 + corner * 3;
+      const hash = (Math.imul(p[offset] === 0 ? 0 : bits[offset], 73856093)
+        ^ Math.imul(p[offset + 1] === 0 ? 0 : bits[offset + 1], 19349663)
+        ^ Math.imul(p[offset + 2] === 0 ? 0 : bits[offset + 2], 83492791)) >>> 0;
+      let bucket = job.vertices.get(hash), id = -1;
+      if (bucket) for (const candidate of bucket) {
+        const other = candidate * 3;
+        if (p[other] === p[offset] && p[other + 1] === p[offset + 1] && p[other + 2] === p[offset + 2]) { id = candidate; break; }
+      }
+      else { bucket = []; job.vertices.set(hash, bucket); }
+      if (id < 0) { id = offset / 3; bucket!.push(id); }
+      ids[corner] = id;
+    }
+    // Repeated vertices describe a zero-area face. Keeping it is conservative.
+    if (ids[0] === ids[1] || ids[0] === ids[2] || ids[1] === ids[2]) return;
+    const direction = ((ids[0] > ids[1] ? 1 : 0) + (ids[0] > ids[2] ? 1 : 0) + (ids[1] > ids[2] ? 1 : 0)) % 2 ? -1 : 1;
+    ids.sort((a, b) => a - b);
+    const base = p.length / 3 + 1;
+    const key = base < 200000 ? ids[0] + ids[1] * base + ids[2] * base * base : ids.join(',');
+    const face = job.faces.get(key);
+    if (!face) job.faces.set(key, { direction, head: triangle });
+    else if (face.direction === direction) { job.links[triangle] = face.head; face.head = triangle; }
+    else {
+      job.removed[triangle] = 1; job.removed[face.head] = 1; job.cancelled += 2;
+      face.head = job.links[face.head];
+      if (face.head < 0) job.faces.delete(key);
+    }
+  }
+
   private advanceAgainstWall(particle: Particle, dt: number): void {
     const position = particle.mesh.position;
     this.previousPosition.copy(position);
@@ -469,10 +566,29 @@ export class ChasingSystem {
 
   private overlapsWall(particle: Particle): boolean {
     const p = particle.mesh.position;
-    // The editable wall is on the north face; escaped debris needs no voxel
-    // queries. Probe actual material occupancy so opened chambers remain empty.
+    // Escaped debris needs neither wall samples nor pose-cache bookkeeping.
     const radius = Math.hypot(particle.halfWidth, particle.halfHeight, particle.halfDepth);
     if (p.z - radius > GAME_CONFIG.room.wallFrontZ + 0.08) return false;
+    // Sliding/rebounding fragments often test the identical pose on successive
+    // axes. Reuse that exact occupancy result until pose or masonry changes.
+    const revision = this.wall.volume?.surfaceRevision;
+    if (typeof revision !== 'number') return this.queryWallOverlap(particle);
+    const q = particle.mesh.quaternion;
+    const cache = particle.wallOverlapCache;
+    if (cache && cache.revision === revision
+      && cache.pose[0] === p.x && cache.pose[1] === p.y && cache.pose[2] === p.z
+      && cache.pose[3] === q.x && cache.pose[4] === q.y && cache.pose[5] === q.z && cache.pose[6] === q.w
+      && cache.pose[7] === particle.halfWidth && cache.pose[8] === particle.halfHeight && cache.pose[9] === particle.halfDepth) return cache.overlaps;
+    const overlaps = this.queryWallOverlap(particle), pose = cache?.pose ?? [];
+    pose[0] = p.x; pose[1] = p.y; pose[2] = p.z; pose[3] = q.x; pose[4] = q.y; pose[5] = q.z; pose[6] = q.w;
+    pose[7] = particle.halfWidth; pose[8] = particle.halfHeight; pose[9] = particle.halfDepth;
+    if (cache) { cache.revision = revision; cache.overlaps = overlaps; }
+    else particle.wallOverlapCache = { revision, pose, overlaps };
+    return overlaps;
+  }
+
+  private queryWallOverlap(particle: Particle): boolean {
+    const p = particle.mesh.position;
     if (particle.collisionProbes) {
       // A hollow/irregular plate's bounding-box centre and corners may contain
       // no clay at all. Using those points pins an already detached piece into
@@ -506,12 +622,14 @@ export class ChasingSystem {
     }
     // Keep the actual extremities even when the mesh needs decimation for the
     // collision-query budget. No bounding-box corner is manufactured here.
-    for (const axis of ['x', 'y', 'z'] as const) for (const sign of [-1, 1]) {
-      let best = 0, value = -Infinity;
-      for (let i = 0; i < positions.count; i++) {
-        const candidate = positions.getComponent(i, axis === 'x' ? 0 : axis === 'y' ? 1 : 2) * sign;
-        if (candidate > value) { best = i; value = candidate; }
-      }
+    const extrema = [0, 0, 0, 0, 0, 0], values = [Infinity, -Infinity, Infinity, -Infinity, Infinity, -Infinity];
+    const array = positions.array;
+    for (let i = 0; i < positions.count; i++) for (let axis = 0; axis < 3; axis++) {
+      const value = array[i * 3 + axis], offset = axis * 2;
+      if (value < values[offset]) { values[offset] = value; extrema[offset] = i; }
+      if (value > values[offset + 1]) { values[offset + 1] = value; extrema[offset + 1] = i; }
+    }
+    for (const best of extrema) {
       // A corner is simultaneously on several fracture planes. Offsetting it
       // along only one face normal can leave it inside the neighbouring wall's
       // other plane. The incident triangle interior has an unambiguous side.
@@ -525,7 +643,61 @@ export class ChasingSystem {
     return probes;
   }
 
+  /** Prepare an unindexed fracture mesh without the repeated full-buffer scans
+   * in translate -> bounding box -> normals -> normalize -> bounding sphere.
+   * Each triangle still has the same Float32 positions and flat face normal. */
+  private prepareFragmentGeometry(source: Float32Array): { geometry: THREE.BufferGeometry; center: THREE.Vector3; size: THREE.Vector3 } {
+    const geometry = new THREE.BufferGeometry(), positions = source.slice();
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.computeBoundingBox();
+    const center = geometry.boundingBox!.getCenter(new THREE.Vector3()), size = geometry.boundingBox!.getSize(new THREE.Vector3());
+    const min = geometry.boundingBox!.min, max = geometry.boundingBox!.max;
+    min.set(Infinity, Infinity, Infinity); max.set(-Infinity, -Infinity, -Infinity);
+    for (let i = 0; i < positions.length; i += 3) {
+      positions[i] -= center.x; positions[i + 1] -= center.y; positions[i + 2] -= center.z;
+      // Bounds must use rounded positions, just as BufferGeometry.translate does.
+      min.x = Math.min(min.x, positions[i]); min.y = Math.min(min.y, positions[i + 1]); min.z = Math.min(min.z, positions[i + 2]);
+      max.x = Math.max(max.x, positions[i]); max.y = Math.max(max.y, positions[i + 1]); max.z = Math.max(max.z, positions[i + 2]);
+    }
+    const normals = new Float32Array(positions.length), sphereCenter = geometry.boundingBox!.getCenter(new THREE.Vector3());
+    let radiusSquared = 0;
+    for (let i = 0; i < positions.length; i += 9) {
+      const cbx = positions[i + 6] - positions[i + 3], cby = positions[i + 7] - positions[i + 4], cbz = positions[i + 8] - positions[i + 5];
+      const abx = positions[i] - positions[i + 3], aby = positions[i + 1] - positions[i + 4], abz = positions[i + 2] - positions[i + 5];
+      // Three stores the cross product into Float32 before normalizing it.
+      const nx = Math.fround(cby * abz - cbz * aby), ny = Math.fround(cbz * abx - cbx * abz), nz = Math.fround(cbx * aby - cby * abx);
+      const inverseLength = 1 / (Math.sqrt(nx * nx + ny * ny + nz * nz) || 1);
+      for (let vertex = i; vertex < i + 9; vertex += 3) {
+        normals[vertex] = nx * inverseLength; normals[vertex + 1] = ny * inverseLength; normals[vertex + 2] = nz * inverseLength;
+        const dx = positions[vertex] - sphereCenter.x, dy = positions[vertex + 1] - sphereCenter.y, dz = positions[vertex + 2] - sphereCenter.z;
+        radiusSquared = Math.max(radiusSquared, dx * dx + dy * dy + dz * dz);
+      }
+    }
+    geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+    geometry.boundingSphere = new THREE.Sphere(sphereCenter, Math.sqrt(radiusSquared));
+    return { geometry, center, size };
+  }
+
   private hasWallSupport(particle: Particle): boolean {
+    // Settled clay cannot lose support until either it or the editable wall
+    // changes. Re-reading all its triangle attributes every physics step adds
+    // work proportional to the rubble left inside the chase, even at rest.
+    const revision = this.wall.volume?.surfaceRevision;
+    if (particle.settled && typeof revision === 'number') {
+      const p = particle.mesh.position, q = particle.mesh.quaternion;
+      const cache = particle.wallSupportCache;
+      if (cache && cache.revision === revision
+        && cache.pose[0] === p.x && cache.pose[1] === p.y && cache.pose[2] === p.z
+        && cache.pose[3] === q.x && cache.pose[4] === q.y && cache.pose[5] === q.z && cache.pose[6] === q.w
+        && cache.pose[7] === particle.halfWidth && cache.pose[8] === particle.halfHeight) return cache.supported;
+      const supported = this.queryWallSupport(particle);
+      particle.wallSupportCache = { revision, pose: [p.x, p.y, p.z, q.x, q.y, q.z, q.w, particle.halfWidth, particle.halfHeight], supported };
+      return supported;
+    }
+    return this.queryWallSupport(particle);
+  }
+
+  private queryWallSupport(particle: Particle): boolean {
     const p = particle.mesh.position;
     if(particle.collisionProbes){
       const positions=particle.mesh.geometry.getAttribute('position'),normals=particle.mesh.geometry.getAttribute('normal');
@@ -628,12 +800,18 @@ export class ChasingSystem {
   }
 
   private floorFootprint(particle: Particle): THREE.Vector2 {
+    const yaw = particle.mesh.rotation.y, width = particle.halfWidth, depth = particle.halfDepth;
+    const cache = particle.footprintCache;
+    if (cache && cache.yaw === yaw && cache.width === width && cache.depth === depth) return cache.value;
     const cosine = Math.abs(Math.cos(particle.mesh.rotation.y));
     const sine = Math.abs(Math.sin(particle.mesh.rotation.y));
-    return new THREE.Vector2(
+    const value = cache?.value ?? new THREE.Vector2();
+    value.set(
       particle.halfWidth * cosine + particle.halfDepth * sine,
       particle.halfWidth * sine + particle.halfDepth * cosine,
     );
+    particle.footprintCache = { yaw, width, depth, value };
+    return value;
   }
 
   private trimRubbleBudget(): void {
@@ -656,10 +834,12 @@ export class ChasingSystem {
 
   private retireParticle(index: number, accountRetirement = true): void {
     const [particle] = this.particles.splice(index, 1);
+    this.boundaryJobs.delete(particle);
     this.releaseDependents(particle);
     this.scene.remove(particle.mesh);
     if(accountRetirement)this.totalRetiredVolume += Number(particle.mesh.userData.volume);
     if (particle.ownedGeometry) particle.mesh.geometry.dispose();
+    particle.canonicalGeometry?.dispose();
     particle.mesh.geometry = pooledPlaceholder;
     particle.mesh.visible = false;
     particle.mesh.userData = {};

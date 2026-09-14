@@ -303,6 +303,9 @@ export class BrickWall extends THREE.Group {
   endSprayStroke(): void { this.lastPaintPoint = null; }
   showMarks(_pointId: string): void { /* Player-authored paint is already visible. */ }
   private clearPaint(point: THREE.Vector3, radius: number): void {
+    // A blank mark canvas has nothing to erase. Avoid uploading its 8 MB
+    // texture on every chisel blow until the player has actually painted it.
+    if (!this.paintCount) return;
     this.paint.save(); this.paint.globalCompositeOperation='destination-out'; this.paint.beginPath();
     this.paint.arc((point.x/6+.5)*2048,(1-point.y/3)*1024,radius/6*2048,0,Math.PI*2);this.paint.fill();this.paint.restore();this.texture.needsUpdate=true;
   }

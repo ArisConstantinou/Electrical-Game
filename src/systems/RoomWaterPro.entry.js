@@ -130,8 +130,10 @@ export async function createRoomWater(renderer,scene,camera,room){
     return vec4(immersed.mix(atmosphericFog.rgb,underwater),output.a);
   })();
   room.waterProActive=true;room.waterProBackend=water.backend;
+  let disposed=false;
   return{
     async update(dt){
+      if(disposed)return;
       surface.visible=room.surface.visible;
       const meanDepth=room.field.volumeLitres/(room.field.width*room.field.depth*1000);
       const band=Math.min(20,Math.floor(meanDepth/.02));
@@ -145,6 +147,7 @@ export async function createRoomWater(renderer,scene,camera,room){
       }
       water.color.waterDepth=Math.max(.001,meanDepth);
       updateImpact(dt);await water.update(dt);
+      if(disposed)return;
       // Its stock underwater controller samples an ocean centred at y=0.
       // The finite room has an independently rising, volume-derived surface.
       const submerged=camera.position.y<room.field.surfaceAt(camera.position.x,camera.position.z);
@@ -156,7 +159,7 @@ export async function createRoomWater(renderer,scene,camera,room){
     },
     resize(width,height){water.resize(width,height);},
     async sampleWaves(positions){water.sampler.setPositions(positions.slice(0,128));await water.sampler.update();return water.sampler.getSamples().map(sample=>({height:sample.height,normal:sample.normal.toArray()}));},
-    dispose(){water.dispose();scene.fogNode=fogNode;},
+    dispose(){disposed=true;water.dispose();scene.fogNode=fogNode;},
     backend:water.backend,
   };
 }

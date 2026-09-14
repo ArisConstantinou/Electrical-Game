@@ -1,4 +1,4 @@
-import { MeshBuilder, meshVolume, clippedTetra, CORNERS, TETRA, type MeshData, type MasonryMeshJob } from './masonryMesher';
+import { MeshBuilder, meshVolume, clippedTetra, createRemovalClipper, CORNERS, TETRA, type MeshData, type MasonryMeshJob } from './masonryMesher';
 
 export interface Vec3 { x: number; y: number; z: number }
 export enum MaterialId { Air = 0, Clay = 1, Mortar = 2, Render = 3, Concrete = 4 }
@@ -61,6 +61,7 @@ export class MasonryVolume {
   private surfaceSequence = 0;
   private readonly exposedAir = new Set<number>();
   private readonly pendingSupport: SupportJob[] = [];
+  private readonly clipRemovedTetra = createRemovalClipper();
   private trimPatch: { anchor: Vec3; floorZ: number } | null = null;
   get trimmingState(): { anchor: Vec3; floorZ: number } | null { return this.trimPatch ? { anchor: { ...this.trimPatch.anchor }, floorZ: this.trimPatch.floorZ } : null; }
   private sequence = 0;
@@ -684,7 +685,7 @@ export class MasonryVolume {
     const detached = new Set(removed.slice(crushedCount).map(n => n.id));
     const removedMap = new Map(removed.map(n => [n.id, n]));
     const remaining = new Map(removedMap), owners = new Map<number, number>();
-    const groups: Array<{ descriptor: MasonryFragment; mesh: MeshBuilder }> = [];
+    const groups: Array<{ descriptor: MasonryFragment; positions: number[] }> = [];
     while (remaining.size) {
       const start = remaining.values().next().value as Node;
       const group = [start]; remaining.delete(start.id);
@@ -703,7 +704,7 @@ export class MasonryVolume {
       }
       const descriptor = this.fragmentDescriptor(group, isDetached); descriptor.volume = 0;
       for (const node of group) owners.set(node.id, groups.length);
-      groups.push({ descriptor, mesh: new MeshBuilder() });
+      groups.push({ descriptor, positions: [] });
     }
     const cubes = new Map<number, Vec3>();
     for (const n of removed) for (const dx of [-1, 0]) for (const dy of [-1, 0]) for (const dz of [-1, 0]) {
@@ -727,21 +728,21 @@ export class MasonryVolume {
       });
       const after = samples.map(sample => sample.after), before = samples.map(sample => sample.before);
       const points = samples.map(sample => sample.point);
-      for (const tetra of TETRA) {
+      for (let orientation=0;orientation<TETRA.length;orientation++) {
+        const tetra=TETRA[orientation];
         const ownerCorner = tetra.find(i => owners.has(ids[i])); if (ownerCorner === undefined) continue;
         const group = groups[owners.get(ids[ownerCorner])!];
-        const poly = clippedTetra(tetra.map(i => points[i]), tetra.map(i => before[i]), tetra.map(i => after[i]));
+        const poly = this.clipRemovedTetra(points, before, after, orientation, tetra);
         if (poly.volume < 1e-15) continue;
         group.descriptor.volume += poly.volume;
-        const all = poly.faces.flat(), center = { x: 0, y: 0, z: 0 };
-        for (const p of all) { center.x += p.x / all.length; center.y += p.y / all.length; center.z += p.z / all.length; }
-        const color = this.materialColor(group.descriptor.material, c.x, c.y, c.z);
-        for (const face of poly.faces) for (let i = 1; i < face.length - 1; i++) group.mesh.triangle(face[0], face[i], face[i + 1], color, { x: face[0].x - center.x, y: face[0].y - center.y, z: face[0].z - center.z });
+        // Templates already contain outward triangle winding. Copy only the
+        // positions consumed by fragment physics/rendering; no discarded streams.
+        for (const p of poly.triangles) group.positions.push(p.x,p.y,p.z);
       }
     }
     for (const group of groups) {
       if (group.descriptor.volume < 1e-15) continue;
-      const positions = new Float32Array(group.mesh.positions), min = { x: Infinity, y: Infinity, z: Infinity }, max = { x: -Infinity, y: -Infinity, z: -Infinity };
+      const positions = new Float32Array(group.positions), min = { x: Infinity, y: Infinity, z: Infinity }, max = { x: -Infinity, y: -Infinity, z: -Infinity };
       for (let i = 0; i < positions.length; i += 3) { min.x = Math.min(min.x, positions[i]); min.y = Math.min(min.y, positions[i + 1]); min.z = Math.min(min.z, positions[i + 2]); max.x = Math.max(max.x, positions[i]); max.y = Math.max(max.y, positions[i + 1]); max.z = Math.max(max.z, positions[i + 2]); }
       const position = { x: (min.x + max.x) * .5, y: (min.y + max.y) * .5, z: (min.z + max.z) * .5 };
       for (let i = 0; i < positions.length; i += 3) { positions[i] -= position.x; positions[i + 1] -= position.y; positions[i + 2] -= position.z; }

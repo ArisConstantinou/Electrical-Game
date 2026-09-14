@@ -359,13 +359,29 @@ export class FPSRig extends THREE.Group {
   /** Aim the physical nozzle around the held grip, before sampling its outlet. */
   aimWaterGun(camera:THREE.Camera,target:THREE.Vector3):void {
     const tool=this.tools.get('hose')!,grip=new THREE.Vector3().fromArray(tool.userData.gripPoint);
-    const anchor=grip.clone().applyQuaternion(tool.quaternion).add(tool.position);
-    for(let i=0;i<3;i++){
-      const outlet=this.toolTipWorld(camera,'hose');
-      const direction=target.clone().sub(outlet).normalize().applyQuaternion(this.getWorldQuaternion(new THREE.Quaternion()).invert());
-      tool.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,-1),direction);
+    const localTarget=this.worldToLocal(target.clone()),anchor=grip.clone();
+    const tipOffset=new THREE.Vector3().fromArray(tool.userData.tipPoint).sub(grip);
+    // Start from the same held grip each frame, rather than yesterday's rotated
+    // outlet. That feedback loop flipped the gun when a nearby wall crossed
+    // the outlet, even with a completely stationary camera and touch.
+    // Retract towards the body when the target is inside the barrel's reach;
+    // leave a short forward water path instead of aiming back at the player.
+    const lateralSq=(localTarget.x-anchor.x)**2+(localTarget.y-anchor.y)**2;
+    const clearance=Math.max(.08,Math.sqrt(Math.max(0,(tipOffset.length()+.04)**2-lateralSq)));
+    anchor.z=Math.max(anchor.z,localTarget.z+clearance);
+    for(let i=0;i<4;i++){
+      const toTarget=localTarget.clone().sub(anchor);
+      // Solve R * (tipOffset + distance * -Z) = target - grip. This aims
+      // from the actual offset nozzle in one operation, without an unstable
+      // fixed-point iteration around an outlet that is itself rotating.
+      const forward=Math.sqrt(Math.max(0,toTarget.lengthSq()-tipOffset.x**2-tipOffset.y**2));
+      const aimOffset=tipOffset.clone();aimOffset.z=-forward;
+      tool.quaternion.setFromUnitVectors(aimOffset.normalize(),toTarget.normalize());
       tool.position.copy(anchor).sub(grip.clone().applyQuaternion(tool.quaternion));
       this.constrainHeldTool(camera);
+      const held=grip.clone().applyQuaternion(tool.quaternion).add(tool.position);
+      if(held.distanceToSquared(anchor)<1e-12)break;
+      anchor.copy(held);
     }
   }
   waterGunDirectionWorld():THREE.Vector3 {

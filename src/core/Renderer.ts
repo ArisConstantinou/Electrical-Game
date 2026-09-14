@@ -14,7 +14,18 @@ export class Renderer {
   eyePitch = 0;
   readonly webgl: WebGPURenderer;
   readonly ready:Promise<void>;
-  private readonly gpu:WebGPURenderer;
+  private gpu:WebGPURenderer;
+  private readonly forceWebGL=new URLSearchParams(location.search).get('renderer')==='webgl';
+  private suspended=false;
+  private deviceLost=false;
+  private contextLost=false;
+  private contextRestored:Promise<void>|null=null;
+  private resolveContextRestored:(()=>void)|null=null;
+  private recoveryTask:Promise<void>|null=null;
+  private renderGeneration=0;
+  private recoveryCount=0;
+  private waterRoots:THREE.Object3D[]=[];
+  private warmupFactory:(()=>THREE.Group)|null=null;
   private water:RoomWaterRuntime|null=null;
   private roomWater:RoomWaterSystem|null=null;
   // One initial/transition update synchronizes the vendor mesh and underwater
@@ -28,7 +39,8 @@ export class Renderer {
   private readonly gazeQuaternion=new THREE.Quaternion();
   renderError='';
   /** Gameplay may advance again once all passes using this scene have finished. */
-  get framePending():boolean{return this.renderTask!==null;}
+  get framePending():boolean{return this.renderTask!==null||this.recoveryTask!==null||this.deviceLost||this.suspended;}
+  get lifecycleTelemetry():object{return{suspended:this.suspended,recovering:this.recoveryTask!==null,deviceLost:this.deviceLost,contextLost:this.contextLost,recoveries:this.recoveryCount,generation:this.renderGeneration};}
 
   constructor(container: HTMLElement) {
     this.scene.background = new THREE.Color(0xaab9bd);
@@ -38,14 +50,14 @@ export class Renderer {
     this.camera.name = 'First-person camera';
     this.camera.userData.studioEntityId = 'camera:first-person';
     this.camera.rotation.order = 'YXZ';
-    this.gpu = new WebGPURenderer({ antialias: true, powerPreference: 'high-performance', forceWebGL:new URLSearchParams(location.search).get('renderer')==='webgl' });
+    this.gpu = new WebGPURenderer({ antialias: true, powerPreference: 'high-performance', forceWebGL:this.forceWebGL });
     // Preserve the established diagnostics path. WebGPU calls counts render
     // passes cumulatively; old WebGL info.render.calls meant frame draw calls.
-    const info=this.gpu.info;
     this.webgl=new Proxy(this.gpu,{get:(target,key)=>{
+      target=this.gpu;const info=target.info;
       if(key==='info')return{...info,render:{...info.render,calls:info.render.drawCalls},memory:info.memory};
       const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;
-    }});
+    },set:(_target,key,value)=>Reflect.set(this.gpu,key,value,this.gpu)});
     this.webgl.setPixelRatio(Math.min(devicePixelRatio, GAME_CONFIG.renderer.maxPixelRatio));
     this.webgl.shadowMap.enabled = true;
     this.webgl.shadowMap.type = THREE.PCFShadowMap;
@@ -55,8 +67,80 @@ export class Renderer {
     this.webgl.domElement.id = 'game-canvas';
     this.webgl.domElement.setAttribute('aria-label', 'WIRE THE HOUSE first-person game');
     container.append(this.webgl.domElement);
+    this.bindDeviceLoss();
+    this.webgl.domElement.addEventListener('webglcontextlost',event=>{
+      event.preventDefault();this.contextLost=true;
+      this.contextRestored??=new Promise(resolve=>{this.resolveContextRestored=resolve;});
+    });
+    this.webgl.domElement.addEventListener('webglcontextrestored',()=>{
+      this.contextLost=false;this.resolveContextRestored?.();this.resolveContextRestored=null;this.contextRestored=null;
+    });
     this.resize();
     this.ready=this.gpu.init().then(()=>undefined);
+  }
+
+  private bindDeviceLoss():void{
+    this.gpu.onDeviceLost=()=>{
+      this.deviceLost=true;
+      window.dispatchEvent(new CustomEvent('wirehouse:graphics-lost'));
+    };
+  }
+  setWarmupFactory(factory:()=>THREE.Group):void{this.warmupFactory=factory;}
+  suspend():void{this.suspended=true;this.renderGeneration++;}
+  async resume():Promise<void>{
+    this.suspended=false;
+    if(this.recoveryTask)return this.recoveryTask;
+    this.lastRenderTime=performance.now();
+    // A suspended GPU readback can remain unresolved after the page returns.
+    // Retire its entire renderer/runtime instead of racing a second optical
+    // update on the same instance if it does not finish within a short grace.
+    const pending=this.renderTask;
+    const recovery=(async()=>{
+      if(this.contextRestored)await this.contextRestored;
+      if(pending&&!this.deviceLost){
+        let timer:ReturnType<typeof setTimeout>|undefined;
+        try{await Promise.race([pending,new Promise<void>(resolve=>{timer=setTimeout(resolve,1200);})]);}
+        finally{if(timer!==undefined)clearTimeout(timer);}
+      }
+      if(this.deviceLost||this.renderTask===pending&&pending!==null)await this.rebuildGraphics();
+      this.lastRenderTime=performance.now();this.waterWasVisible=true;this.resize();
+    })();
+    this.recoveryTask=recovery;
+    try{await recovery;}finally{if(this.recoveryTask===recovery)this.recoveryTask=null;}
+  }
+  private async rebuildGraphics():Promise<void>{
+    this.renderGeneration++;this.renderTask=null;
+    const previous=this.gpu,canvas=previous.domElement;
+    // Graphics resources are disposable; the room, water simulation fields,
+    // placements and gameplay camera remain the same live objects.
+    this.water?.dispose();this.water=null;
+    for(const root of this.waterRoots)root.removeFromParent();this.waterRoots=[];
+    previous.onDeviceLost=()=>{};this.disposePreservingCanvas(previous);
+    // Retired vendor continuations may wake much later. Fail their next GPU
+    // entry immediately; they must never draw into the reused canvas again.
+    const retired=()=>{throw new Error('Retired graphics generation');};
+    previous.render=retired;previous.renderAsync=retired;
+    previous.compute=retired;previous.computeAsync=retired;
+    this.gpu=new WebGPURenderer({canvas,antialias:true,powerPreference:'high-performance',forceWebGL:this.forceWebGL});
+    this.gpu.setPixelRatio(Math.min(devicePixelRatio,GAME_CONFIG.renderer.maxPixelRatio));
+    this.gpu.shadowMap.enabled=true;this.gpu.shadowMap.type=THREE.PCFShadowMap;
+    this.gpu.outputColorSpace=THREE.SRGBColorSpace;this.gpu.toneMapping=THREE.ACESFilmicToneMapping;this.gpu.toneMappingExposure=1.05;
+    this.bindDeviceLoss();await this.gpu.init();this.deviceLost=false;this.resize();
+    if(this.roomWater)await this.attachRoomWater(this.roomWater);
+    if(this.warmupFactory)await this.prepareToolResources(this.warmupFactory());
+    this.renderError='';this.recoveryCount++;
+  }
+
+  private disposePreservingCanvas(renderer:WebGPURenderer):void{
+    // Three r185's WebGL fallback dispose deliberately calls loseContext().
+    // This canvas is being recovered and reused, so preserve its restored
+    // context while still disposing every renderer cache and GPU resource.
+    const backend=renderer.backend as unknown as {isWebGLBackend?:boolean;extensions?:{get:(name:string)=>unknown}};
+    const extensions=backend.isWebGLBackend?backend.extensions:undefined;
+    if(!extensions){renderer.dispose();return;}
+    const get=extensions.get;
+    extensions.get=function(name:string){return name==='WEBGL_lose_context'?null:get.call(this,name);};
+    try{renderer.dispose();}finally{extensions.get=get;}
   }
 
   resize = (): void => {
@@ -79,7 +163,9 @@ export class Renderer {
     if(new URLSearchParams(location.search).get('waterPro')==='0'){room.waterProBackend='diagnostic-disabled';return;}
     const {createRoomWater}=await import('../generated/room-water-runtime.js');
     this.snapshotRenderCamera();
+    const previous=new Set(this.scene.children);
     this.water=await createRoomWater(this.gpu,this.scene,this.renderCamera,room);
+    this.waterRoots=this.scene.children.filter(object=>!previous.has(object));
     this.roomWater=room;
   }
   /** Compile transient tool samples under the actual scene lights before play.
@@ -139,7 +225,7 @@ export class Renderer {
   }
   /** True means renderCamera now contains the accepted frame's exact view. */
   render():boolean{
-    if(this.renderTask)return false;
+    if(this.framePending)return false;
     if(this.pendingSize){
       const {width,height}=this.pendingSize;this.pendingSize=null;
       if(this.water)this.water.resize(width,height);
@@ -159,7 +245,11 @@ export class Renderer {
       this.gpu.info.reset();
       this.gpu.render(this.scene,this.renderCamera);return true;
     }
-    this.renderTask=this.water.update(dt).then(()=>{this.gpu.render(this.scene,this.renderCamera);}).catch(error=>{this.renderError=String(error);console.error('Room Water Pro rendering failed',error);}).finally(()=>{this.renderTask=null;});
+    const generation=this.renderGeneration,gpu=this.gpu;
+    const task=this.water.update(dt).then(()=>{if(generation===this.renderGeneration&&!this.suspended)gpu.render(this.scene,this.renderCamera);}).catch(error=>{
+      if(generation===this.renderGeneration&&!this.deviceLost){this.renderError=String(error);console.error('Room Water Pro rendering failed',error);}
+    }).finally(()=>{if(this.renderTask===task)this.renderTask=null;});
+    this.renderTask=task;
     return true;
   }
   async waitForFrame():Promise<void>{await this.ready;await this.renderTask;}
