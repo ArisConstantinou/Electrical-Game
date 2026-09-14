@@ -7,19 +7,20 @@ import {blockPointerLock} from './browser-safety.mjs';
 
 const url=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/?renderer=webgl',out=process.argv[3]??'output/trowel-raf-profile';
 await mkdir(out,{recursive:true});
-const paths=['src/core/Renderer.ts','src/core/Game.ts','src/player/FPSRig.ts','src/systems/MortarSystem.ts'];
+const paths=['src/core/Renderer.ts','src/core/Game.ts','src/player/FPSRig.ts','src/player/ToolModels.ts','src/systems/MortarSystem.ts','src/systems/MortarField.ts'];
 const hashes=async()=>Object.fromEntries(await Promise.all(paths.map(async path=>[path,createHash('sha256').update(await readFile(path)).digest('hex')])));
 const report={url,head:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),sourceBefore:await hashes(),method:'Actual RAF, native stationary touch hold/release, 390x844 DPR3 Chromium. Camera fixture established once; no clock or frame gating. Inclusive CPU timings overlap. Physical iPhone unverified.',console:[],errors:[],cases:[]};
 const browser=await chromium.launch({channel:'chrome',headless:true});
 try{
  const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:3});await blockPointerLock(context);
  const page=await context.newPage();page.on('pageerror',e=>report.errors.push(e.message));page.on('console',m=>{if(m.text().includes('vite')||m.type()==='error')report.console.push(m.text());});
+ await page.routeWebSocket('**',()=>{});
  await page.goto(url);await page.locator('#start-button').tap({timeout:120000});await page.locator('[data-tool="trowel"]').tap();
  await page.evaluate(()=>{
   const g=window.__wireTheHouse,c=g.renderer.camera;c.position.set(.3,g.player.eyeHeight,g.room.brickWall.volume.frontZ+.8);g.player.pitch=-.2;g.player.yaw=0;c.rotation.set(-.2,0,0,'YXZ');
   const p=window.__trowelRAF={active:false,stage:'idle',frames:[],renders:[],methods:{},rafs:[],start:0};
   const raf=t=>{if(p.active)p.rafs.push({t,pending:g.renderer.framePending});requestAnimationFrame(raf);};requestAnimationFrame(raf);
-  for(const [o,prefix,names]of [[g,'game',['step']],[g.mortar,'mortar',['swing','update','preview','syncFieldMeshes']],[g.fpsRig,'rig',['update','poseTrowel']],[g.renderer,'renderer',['render','prepareMaterials']],[g.renderer.gpu.backend,'backend',['createRenderPipeline','_completeCompile','createAttribute','createTexture','updateTexture','createBindings','updateBindings']]])for(const name of names){
+  for(const [o,prefix,names]of [[g,'game',['step']],[g.mortar,'mortar',['swing','update','preview','syncFieldGeometry','deposit']],[g.mortar.field,'field',['remesh','add']],[g.fpsRig,'rig',['update','poseTrowel']],[g.renderer,'renderer',['render','prepareMaterials']],[g.renderer.gpu.backend,'backend',['createRenderPipeline','_completeCompile','createAttribute','createTexture','updateTexture','createBindings','updateBindings']]])for(const name of names){
    const original=o[name];if(typeof original!=='function')continue;
    o[name]=function(...args){const t=performance.now();try{return original.apply(this,args);}finally{if(p.active){const d=performance.now()-t,label=prefix+'.'+name,a=p.methods[label]??=[];a.push({t,d,stage:g.mortar.throwFeedback.stage});if(prefix==='game'){const f=g.mortar.throwFeedback,tool=g.fpsRig.tools.get('trowel');p.frames.push({t,dt:args[0],cpu:d,stage:f.stage,castElapsed:f.castElapsed,holding:f.holding,roll:f.motion.rollDegrees,pitch:g.player.pitch,cameraPitch:g.renderer.camera.rotation.x,renderPitch:g.renderer.renderCamera.rotation.x,tool:tool.position.toArray(),projectiles:g.mortar.projectiles.length});}}}};
   }
@@ -47,6 +48,7 @@ try{
   finally{g.renderer.scene.remove(group);g.step=step;}
  });
  const cdp=await context.newCDPSession(page),b=await page.locator('#look-joystick').boundingBox();
+ if(process.env.QA_CPU_RATE)await cdp.send('Emulation.setCPUThrottlingRate',{rate:Number(process.env.QA_CPU_RATE)});
  const touch=held=>cdp.send('Input.dispatchTouchEvent',{type:held?'touchStart':'touchEnd',touchPoints:held?[{x:b.x+b.width/2,y:b.y+b.height/2,id:1}]:[]});
  await page.waitForTimeout(1000);
  for(let cast=0;cast<Number(process.env.QA_CASTS??3);cast++){

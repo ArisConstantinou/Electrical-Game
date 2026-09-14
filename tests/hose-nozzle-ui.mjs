@@ -32,7 +32,7 @@ try{
    await page.screenshot({path:`${out}/${backend}-${distance}-${mode}.png`});await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
    let maxAngle=0;for(let i=1;i<result.frames.length;i++){const a=result.frames[i-1].quaternion,b=result.frames[i].quaternion;maxAngle=Math.max(maxAngle,2*Math.acos(Math.min(1,Math.abs(a.reduce((s,v,j)=>s+v*b[j],0)))));}
    report.cases.push({backend,distance,mode,maxAngle,...result});
-   if(!process.env.QA_BASELINE){assert(result.frames.length>10);assert(result.detachedDiameterMm<=3.601,`${backend}/${distance}/${mode}: huge detached water drops`);assert(maxAngle<.015,`${backend}/${distance}/${mode}: stationary nozzle rotates ${maxAngle} radians`);assert(result.streamOpacity<=.15&&result.coreOpacity<=.2&&result.emissive===0);if(mode==='mist'){assert.equal(result.segments,0);assert(!result.coreVisible);assert(result.drops>0);}}
+   if(!process.env.QA_BASELINE){assert(result.frames.length>10);assert(result.detachedDiameterMm<=3.601,`${backend}/${distance}/${mode}: huge detached water drops`);assert(maxAngle<.015,`${backend}/${distance}/${mode}: stationary nozzle rotates ${maxAngle} radians`);assert(result.streamOpacity<=.15&&result.coreOpacity>=.25&&result.coreOpacity<=.35&&result.emissive===0);if(mode==='mist'){assert.equal(result.segments,0);assert(!result.coreVisible);assert(result.drops>0);}}
    assert(!result.locked&&!result.errors);console.log(JSON.stringify({backend,distance,mode,maxAngle,frames:result.frames.length,segments:result.segments,drops:result.drops}));
   }
   await context.close();

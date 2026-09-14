@@ -21,6 +21,7 @@ try {
     const context = await browser.newContext({ viewport: platform.viewport, isMobile: platform.mobile, hasTouch: platform.mobile });
     await blockPointerLock(context);
     const page = await context.newPage();
+    await page.routeWebSocket('**',()=>{});
     page.on('pageerror', e => report.errors.push({ platform: platform.name, message: e.message }));
     await page.goto(url);
     await page.waitForFunction(() => window.__wireTheHouse?.renderer.renderCamera, null, { timeout: 120000 });
@@ -67,10 +68,11 @@ try {
       const p = load.geometry.getAttribute('position'), rest = load.geometry.getAttribute('restPosition');
       let bottomMotion = 0, shapeChange = 0, signature = 0;
       for (let i = 0; i < p.count; i++) {
-        const movement = Math.hypot(p.getX(i) - rest.getX(i), p.getY(i) - rest.getY(i), p.getZ(i) - rest.getZ(i));
+        const vertex=load.getVertexPosition(i,new V());
+        const movement = Math.hypot(vertex.x - rest.getX(i), vertex.y - rest.getY(i), vertex.z - rest.getZ(i));
         if (rest.getY(i) <= 0) bottomMotion = Math.max(bottomMotion, movement);
         shapeChange = Math.max(shapeChange, movement);
-        signature += p.getX(i) * (i % 7 + 1) + p.getY(i) * (i % 13 + 1) + p.getZ(i) * (i % 17 + 1);
+        signature += vertex.x * (i % 7 + 1) + vertex.y * (i % 13 + 1) + vertex.z * (i % 17 + 1);
       }
       const masses = g.mortar.telemetry;
       return {

@@ -20,6 +20,21 @@ function fixture(Rig=FPSRig){
  return{camera,input,player,rig,tool,load,pose,normals:()=>normals};
 }
 const held=sampleTrowelMotion({holding:true,charge:1,castElapsed:null});
+// Inspect the actual GPU morph shape across continuous strain, not just the
+// unchanged base attribute. Its fixed underside must remain on the blade.
+{
+ const f=fixture(),rest=f.load.geometry.getAttribute('restPosition'),vertex=new THREE.Vector3();let maximumErrorM=0;
+ for(let step=0;step<=100;step++){
+  const strain=step/100;f.rig.mortarStrain=strain;f.rig.mortarAppliedStrain=-1;f.pose(held,0);
+  for(let i=0;i<rest.count;i++){
+   f.load.getVertexPosition(i,vertex);const x=rest.getX(i),y=rest.getY(i),z=rest.getZ(i),weight=THREE.MathUtils.clamp(y/.066,0,1),stretch=1+strain*.42*weight,shrink=1/Math.sqrt(stretch);
+   maximumErrorM=Math.max(maximumErrorM,vertex.distanceTo(new THREE.Vector3(x*shrink,y*shrink,z*stretch-strain*.027*weight)));
+   if(y<=0)assert(vertex.distanceTo(new THREE.Vector3(x,y,z))<1e-10,'Morph moves the blade contact patch');
+  }
+ }
+ assert(maximumErrorM<.00002,'Morph interpolation changes the paste shape by more than 0.02 mm');
+ assert.equal(f.normals(),0,'Trowel motion must not rebuild normals on the game thread');report.morphMaximumErrorM=maximumErrorM;
+}
 function settledBenchmark(Rig){const f=fixture(Rig);for(let i=0;i<240;i++)f.pose(held,1/60);const count=f.normals(),start=performance.now();for(let i=0;i<360;i++)f.pose(held,1/60);return{averageMs:(performance.now()-start)/360,normalRebuilds:f.normals()-count};}
 if(process.env.QA_COMPARE_HEAD==='1'){
  const source=execFileSync('git',['show','HEAD:src/player/FPSRig.ts'],{encoding:'utf8'});

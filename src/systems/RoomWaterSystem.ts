@@ -23,7 +23,7 @@ export class RoomWaterSystem {
   private readonly sprayDrops=new THREE.InstancedMesh(new THREE.SphereGeometry(1,8,6),new THREE.MeshPhysicalMaterial({color:0xc5d4d6,roughness:.06,transparent:true,opacity:.24,depthWrite:false}),160);
   private readonly coreSides=16;
   private readonly corePositions=new Float32Array(15*16*3);
-  private readonly jetCore=new THREE.Mesh(new THREE.BufferGeometry(),new THREE.MeshPhysicalMaterial({color:0xb6c9cc,roughness:.035,metalness:0,clearcoat:1,clearcoatRoughness:.03,transparent:true,opacity:.14,depthWrite:false}));
+  private readonly jetCore=new THREE.Mesh(new THREE.BufferGeometry(),new THREE.MeshPhysicalMaterial({color:0x8bbdce,roughness:.055,metalness:0,clearcoat:1,clearcoatRoughness:.03,transparent:true,opacity:.30,depthWrite:false}));
   private readonly upAxis=new THREE.Vector3(0,1,0);
   private jetGeometryTime=0;
   private jetSegments=0;
@@ -84,7 +84,9 @@ export class RoomWaterSystem {
     const coreIndices=[];
     for(let ring=0;ring<this.streamSteps;ring++)for(let side=0;side<this.coreSides;side++){
       const a=ring*this.coreSides+side,b=ring*this.coreSides+(side+1)%this.coreSides;
-      coreIndices.push(a,b,a+this.coreSides,b,b+this.coreSides,a+this.coreSides);
+      // Rings advance along the jet while their radial basis turns the other
+      // way. Outward winding keeps the visible near surface and its highlights.
+      coreIndices.push(a,a+this.coreSides,b,b,a+this.coreSides,b+this.coreSides);
     }
     this.jetCore.geometry.setIndex(coreIndices);this.jetCore.geometry.setDrawRange(0,0);
     for(const mesh of [this.jetStreams,this.sprayDrops]){mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);mesh.frustumCulled=false;mesh.count=0;}

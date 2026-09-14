@@ -146,7 +146,8 @@ function trowel(): THREE.Group {
   part(group, new THREE.SphereGeometry(.0035, 12, 8), forgedSteel, [.183, -.108, .126], 'Recessed tang end');
 
   // One connected mound with a broad contact patch and irregular aggregate.
-  // Rest coordinates never change; FPSRig deforms this same buffer in place.
+  // Rest coordinates never change. Shared precomputed poses move the paste on
+  // the GPU without rebuilding its normals during the short wrist flick.
   const loadGeometry = new THREE.SphereGeometry(1, 48, 28);
   const loadPositions = loadGeometry.getAttribute('position'), loadColors: number[] = [];
   for (let i = 0; i < loadPositions.count; i++) {
@@ -170,8 +171,20 @@ function trowel(): THREE.Group {
   loadGeometry.setAttribute('color', new THREE.Float32BufferAttribute(loadColors, 3));
   const restPositions = new Float32Array(loadPositions.array);
   loadGeometry.setAttribute('restPosition', new THREE.BufferAttribute(restPositions, 3));
-  (loadPositions as THREE.BufferAttribute).setUsage(THREE.DynamicDrawUsage);
   loadGeometry.computeVertexNormals();
+  loadGeometry.morphAttributes.position=[];loadGeometry.morphAttributes.normal=[];
+  for(let frame=1;frame<=8;frame++){
+    const strain=frame/8,target=new THREE.BufferGeometry(),position=loadPositions.clone();
+    target.setAttribute('position',position);target.setIndex(loadGeometry.index);
+    for(let i=0;i<position.count;i++){
+      const x=restPositions[i*3],y=restPositions[i*3+1],z=restPositions[i*3+2],weight=THREE.MathUtils.clamp(y/.066,0,1);
+      const stretch=1+strain*.42*weight,shrink=1/Math.sqrt(stretch);
+      position.setXYZ(i,x*shrink,y*shrink,z*stretch-strain*.027*weight);
+    }
+    target.computeVertexNormals();
+    loadGeometry.morphAttributes.position.push(position.clone());
+    loadGeometry.morphAttributes.normal.push(target.getAttribute('normal').clone());target.dispose();
+  }
   const wetMortar = mat(0xffffff, .84, 0); wetMortar.vertexColors = true;
   const load = part(group, loadGeometry, wetMortar, [.183, -.168, -.142], 'trowel-load');
   load.userData.restPositions = restPositions;

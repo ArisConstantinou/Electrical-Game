@@ -23,11 +23,18 @@ export class MortarField {
   private readonly chunkNodes = new Map<string, Set<string>>();
   private readonly occupiedMin = new THREE.Vector3(Infinity, Infinity, Infinity);
   private readonly occupiedMax = new THREE.Vector3(-Infinity, -Infinity, -Infinity);
+  private meshSamples: {x:number;y:number;z:number;size:number;values:Float64Array}|null=null;
+  private readonly settling:Array<{remaining:number;elapsed:number;cells:Set<string>;blocked:(p:THREE.Vector3)=>boolean}>=[];
   private key(x: number, y: number, z: number): string { return `${x},${y},${z}`; }
   private chunkKey(x: number, y: number, z: number): string { return this.key(Math.floor(x / CHUNK), Math.floor(y / CHUNK), Math.floor(z / CHUNK)); }
   get nodeMass(): number { return this.spacing ** 3 * this.density; }
   get mass(): number { let sum = 0; for (const node of this.nodes.values()) sum += node.value * this.nodeMass; return sum; }
-  private at(x: number, y: number, z: number): number { return this.nodes.get(this.key(x,y,z))?.value ?? 0; }
+  private at(x: number, y: number, z: number): number {
+    const samples=this.meshSamples;
+    if(samples){const dx=x-samples.x,dy=y-samples.y,dz=z-samples.z,n=samples.size;
+      if(dx>=0&&dy>=0&&dz>=0&&dx<n&&dy<n&&dz<n)return samples.values[(dx*n+dy)*n+dz];}
+    return this.nodes.get(this.key(x,y,z))?.value ?? 0;
+  }
   private changed(node: Node): void {
     for (let x=-1;x<=0;x++) for(let y=-1;y<=0;y++) for(let z=-1;z<=0;z++) this.dirty.add(this.chunkKey(node.x+x,node.y+y,node.z+z));
   }
@@ -93,6 +100,7 @@ export class MortarField {
     const depth=THREE.MathUtils.clamp(mass/this.density/(Math.PI*radius*radius)*2.5,.018,.075);
     const center=point.clone().addScaledVector(axis,depth*.3),reach=Math.max(radius,depth),h=this.spacing;
     const candidates:Array<{x:number;y:number;z:number;weight:number;old:number;age:number;dilution:number}>=[];
+    const flowCells=new Set<string>();
     const min=[Math.floor((center.x-reach)/h),Math.floor((center.y-reach)/h),Math.floor((center.z-reach)/h)];
     const max=[Math.ceil((center.x+reach)/h),Math.ceil((center.y+reach)/h),Math.ceil((center.z+reach)/h)];
     if(profile){min[2]=Math.floor((profile.frontZ-.20)/h);max[2]=Math.floor((profile.frontZ+.004)/h);}
@@ -113,7 +121,8 @@ export class MortarField {
         delta.copy(q).sub(center);const axial=delta.dot(axis),radial=Math.max(0,delta.lengthSq()-axial*axial),metric=radial/(radius*radius)+axial*axial/(depth*depth);
         if(metric>=1||blocked(q))continue;weight=(1-metric)**1.4;
       }
-      const old=this.nodes.get(this.key(x,y,z));if((old?.value??0)>.9999)continue;
+      const key=this.key(x,y,z);flowCells.add(key);
+      const old=this.nodes.get(key);if((old?.value??0)>.9999||(old?.age??0)>=FRESH_SECONDS)continue;
       candidates.push({x,y,z,weight,old:old?.value??0,age:old?.age??0,dilution:old?.dilution??0});
     }
     if(!candidates.length)return 0;
@@ -145,10 +154,54 @@ export class MortarField {
         recovered+=increment;if(recovered>=unresolved-1e-8)break;
       }
     }
-    if(added>0)this.revision++;return (added-unresolved+recovered)*this.nodeMass;
+    if(added>0){
+      this.revision++;
+      // Impact briefly yields the fresh bed. Keep the same finite quantity in
+      // its checked, backed footprint; cured mortar is never remobilized.
+      if(this.settling.length>=4)this.settling.shift();
+      this.settling.push({remaining:4,elapsed:0,cells:flowCells,blocked});
+    }
+    return (added-unresolved+recovered)*this.nodeMass;
   }
 
-  tick(dt:number):void {for(const node of this.nodes.values()){node.age+=dt;node.dilution=Math.max(0,node.dilution-dt*.006);}}
+  tick(dt:number):void {
+    for(const node of this.nodes.values()){node.age+=dt;node.dilution=Math.max(0,node.dilution-dt*.006);}
+    this.settleFresh(dt);
+  }
+
+  /** Short plastic settling, not an endlessly flowing fluid. Transfers change
+   * the collision field and its union skin together, conserving mass and age. */
+  private settleFresh(dt:number):void {
+    const q=new THREE.Vector3(),h=this.spacing;
+    for(let batchIndex=this.settling.length-1;batchIndex>=0;batchIndex--){
+      const batch=this.settling[batchIndex];batch.elapsed+=dt;
+      if(batch.elapsed<.06)continue;batch.elapsed=0;batch.remaining--;
+      // Only cells present at the start can emit this step; newly reached cells
+      // wait until the next step before they can carry material onward.
+      const sources=[...batch.cells].map(key=>this.nodes.get(key)).filter((node):node is Node=>!!node&&node.value>=LEVEL&&node.age<FRESH_SECONDS);
+      let moved=0;
+      for(const source of sources){
+        const key=this.key(source.x,source.y,source.z),node=this.nodes.get(key);if(!node||node.age>=FRESH_SECONDS)continue;
+        // Interior material already confined on all sides has no free surface.
+        if(this.at(node.x,node.y,node.z+1)>.9&&this.at(node.x,node.y-1,node.z)>.9)continue;
+        let best:{x:number;y:number;z:number;value:number;score:number}|null=null;
+        for(const [dx,dy,dz] of [[0,-1,0],[0,0,-1],[-1,0,0],[1,0,0]]){
+          const x=node.x+dx,y=node.y+dy,z=node.z+dz,k=this.key(x,y,z);if(!batch.cells.has(k))continue;
+          const target=this.nodes.get(k);if((!target&&this.nodes.size>=this.maxNodes)||(target?.age??0)>=FRESH_SECONDS||batch.blocked(q.set(x*h,y*h,z*h)))continue;
+          const value=target?.value??0,score=node.value-value+(dy<0?.20:dz<0?.12:0);
+          if(score>.3&&(!best||score>best.score))best={x,y,z,value,score};
+        }
+        if(!best)continue;
+        const amount=Math.min(.22,source.value*.24,node.value-LEVEL,(1-best.value)*.5)*Math.max(.15,1-node.age/FRESH_SECONDS);
+        if(amount<.005)continue;
+        const target=this.nodes.get(this.key(best.x,best.y,best.z)),total=best.value+amount;
+        this.set(best.x,best.y,best.z,total,((target?.age??0)*best.value+node.age*amount)/total,((target?.dilution??0)*best.value+node.dilution*amount)/total);
+        this.set(node.x,node.y,node.z,node.value-amount,node.age,node.dilution);moved+=amount;
+      }
+      if(moved>0)this.revision++;
+      if(batch.remaining<=0||!moved)this.settling.splice(batchIndex,1);
+    }
+  }
   invalidateGeometry():void {for(const node of this.nodes.values())this.changed(node);}
 
   /** Water lowers fresh cohesion and physically removes local material. The
@@ -209,9 +262,20 @@ export class MortarField {
       const key=`${Math.round(p.x*1e8)},${Math.round(p.y*1e8)},${Math.round(p.z*1e8)}`;
       let normal=normalCache.get(key);if(!normal){normal=this.normal(p);normalCache.set(key,normal);}return normal;
     };
-    for(const key of this.dirty){
+    try { for(const key of this.dirty){
       if(results.length>=maxChunks)break;
       const [cx,cy,cz]=key.split(',').map(Number),x0=cx*CHUNK,y0=cy*CHUNK,z0=cz*CHUNK,positions:number[]=[],normals:number[]=[];
+      // Normal gradients revisit the same lattice samples thousands of times.
+      // A local, exact Float64 snapshot removes string/map work in that hot
+      // loop; the two-cell halo contains the .6-cell gradient on both sides.
+      const size=CHUNK+5,samples={x:x0-2,y:y0-2,z:z0-2,size,values:new Float64Array(size**3)};
+      for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++)for(let dz=-1;dz<=1;dz++){
+        for(const entry of this.chunkNodes.get(this.key(cx+dx,cy+dy,cz+dz))??[]){
+          const node=this.nodes.get(entry)!,x=node.x-samples.x,y=node.y-samples.y,z=node.z-samples.z;
+          if(x>=0&&y>=0&&z>=0&&x<size&&y<size&&z<size)samples.values[(x*size+y)*size+z]=node.value;
+        }
+      }
+      this.meshSamples=samples;
       const cubes=new Set<string>();
       for(let dx=0;dx<=1;dx++)for(let dy=0;dy<=1;dy++)for(let dz=0;dz<=1;dz++){
         const entries=this.chunkNodes.get(this.key(cx+dx,cy+dy,cz+dz));if(!entries)continue;
@@ -240,7 +304,8 @@ export class MortarField {
       let mass=0,age=Infinity,dilution=0;for(const nodeKey of this.chunkNodes.get(key)??[]){const node=this.nodes.get(nodeKey)!;mass+=node.value*this.nodeMass;age=Math.min(age,node.age);dilution=Math.max(dilution,node.dilution);}
       results.push({key,geometry,mass,age:Number.isFinite(age)?age:0,dilution});
       this.dirty.delete(key);
-    }
+      this.meshSamples=null;
+    }} finally {this.meshSamples=null;}
     return results;
   }
 

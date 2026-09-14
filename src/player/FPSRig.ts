@@ -292,17 +292,12 @@ export class FPSRig extends THREE.Group {
     while(remaining>0){const step=Math.min(remaining,1/120);this.mortarStrainVelocity+=(180*(target-this.mortarStrain)-23*this.mortarStrainVelocity)*step;this.mortarStrain+=this.mortarStrainVelocity*step;remaining-=step;}
     if(Math.abs(this.mortarStrain-target)<1e-5&&Math.abs(this.mortarStrainVelocity)<1e-5){this.mortarStrain=target;this.mortarStrainVelocity=0;}
     const strain=THREE.MathUtils.clamp(this.mortarStrain,0,1);
-    // The empty blade still completes its wrist motion, but invisible mortar
-    // needs no vertex upload or normal rebuild. Settled/duplicate poses likewise
-    // reuse the same buffer; a 1e-5 strain change is below one micron here.
+    // Blend precomputed strain poses. Rebuilding 1,421 vertices and their
+    // normals here used several milliseconds per frame on slower phones.
     if(load.visible&&Math.abs(strain-this.mortarAppliedStrain)>1e-5){
-      const position=load.geometry.getAttribute('position'),rest=load.geometry.getAttribute('restPosition');
-      for(let i=0;i<position.count;i++){
-        const x=rest.getX(i),y=rest.getY(i),z=rest.getZ(i),weight=THREE.MathUtils.clamp(y/(load.userData.deformationHeight??.045),0,1);
-        const stretch=1+strain*.42*weight,shrink=1/Math.sqrt(stretch);
-        position.setXYZ(i,x*shrink,y*shrink,z*stretch-strain*.027*weight);
-      }
-      position.needsUpdate=true;load.geometry.computeVertexNormals();this.mortarAppliedStrain=strain;
+      const weights=load.morphTargetInfluences!,scaled=strain*weights.length,lower=Math.floor(scaled),fraction=scaled-lower;
+      weights.fill(0);if(lower>0)weights[lower-1]=1-fraction;if(lower<weights.length)weights[lower]=fraction;
+      this.mortarAppliedStrain=strain;
     }
     // The conservative bound contains all deformed poses without reallocating.
     load.geometry.boundingSphere??=new THREE.Sphere(new THREE.Vector3(),.16);

@@ -475,7 +475,7 @@ export class MortarSystem {
     // receives no confinement boost and open-air rays never reach this path.
     const confined=incoming>.2&&depth>.012&&depth<(volume.depth??.2)+.008
       ? THREE.MathUtils.smoothstep(depth,.012,.035) : 0;
-    if(confined>0)prepared=Math.max(prepared,.76*confined);
+    if(confined>0)prepared=Math.max(prepared,.88*confined);
     const effectiveIncidence=Math.max(incidence,confined*(.65+.25*incoming));
     return THREE.MathUtils.clamp(prepared * (1 - .8 * wet.film) * Math.min(1, speed / 2) * effectiveIncidence ** 1.3 / (1 + Math.max(0, speed - 6) * .12), 0, .93);
   }
@@ -570,8 +570,12 @@ export class MortarSystem {
     // An impact facet must not rotate a separate sheet. Wet material joins a
     // fixed-world scalar volume and grows along the working face.
     const growth = normal.z > .25 ? normal.clone().lerp(Z, .65).normalize() : normal.clone();
-    const boxes = this.openings(), volume = this.wall.volume;
+    const volume = this.wall.volume;
+    let boxes=this.openings(),blockerRevision=this.geometryRevision;
     const blocked = (q: THREE.Vector3): boolean => {
+      // Settling outlives this impact by 0.24 s. A newly placed or rotated box
+      // must immediately update its exclusion volume for those later steps.
+      if(blockerRevision!==this.geometryRevision){boxes=this.openings();blockerRevision=this.geometryRevision;}
       if (typeof volume.isOccupied === 'function' && volume.isOccupied(q.x,q.y,q.z)) return true;
       return boxes.some(box => { const local=q.clone().applyMatrix4(box.inverse); return Math.abs(local.x)<box.halfWidth && Math.abs(local.y)<box.halfHeight && local.z>box.minZ && local.z<box.maxZ; });
     };
