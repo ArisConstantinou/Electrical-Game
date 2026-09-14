@@ -6,8 +6,8 @@ import { WATER_GUN_MODES, type WaterGunSetting } from './WaterGun';
 import { sampleTrowelMotion, TROWEL_CHARGE_SECONDS, TROWEL_FULL_CHARGE_GRACE_SECONDS, TROWEL_RELEASE_SECONDS, TROWEL_CAST_SECONDS } from '../player/TrowelMotion';
 
 type WetBatch = { mesh: THREE.Mesh; used: number; live: number; free: Array<{ start: number; count: number }> };
-type WetPatch = { batch: WetBatch; start: number; count: number; alpha: number };
-type WaterCell = { pore: number; film: number; patch: WetPatch; position: THREE.Vector3; normal: THREE.Vector3 };
+type WetPatch = { batch: WetBatch; start: number; count: number; alpha: number; pending?:boolean };
+type WaterCell = { pore: number; film: number; patch: WetPatch; position: THREE.Vector3; normal: THREE.Vector3; surfaceRevision?:number };
 type Clod = { mesh: THREE.Mesh; velocity: THREE.Vector3; mass: number; age: number; contacts: number; slurry: boolean; bond: number };
 type Deposit = { fieldKey?: string; position: THREE.Vector3; radius: number; mass: number; mesh: THREE.Mesh; age: number; normal: THREE.Vector3; support: number };
 type Contact = { point: THREE.Vector3; normal: THREE.Vector3; distance: number; box: boolean };
@@ -91,6 +91,9 @@ export class MortarSystem {
   private readonly wetMaterial: THREE.MeshBasicMaterial;
   private readonly wetBatches: WetBatch[] = [];
   private readonly wetBatchMaterial: THREE.MeshBasicMaterial;
+  private wetWallRevision=-1;
+  private readonly pendingWetCells=new Set<WaterCell>();
+  private readonly pendingWetBatch:WetBatch;
   private readonly ray = new THREE.Raycaster();
   private wasHeld = false;
   private heldSeconds = 0;
@@ -132,6 +135,13 @@ export class MortarSystem {
     this.wetMaterial = new THREE.MeshBasicMaterial({ color: 0x302d22, map: texture, transparent: true, opacity: .2, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, side: THREE.DoubleSide });
     this.wetBatchMaterial = this.wetMaterial.clone();
     this.wetBatchMaterial.vertexColors = true; this.wetBatchMaterial.opacity = 1;
+    // Pending patches draw zero vertices. This tiny shared sample also warms
+    // the exact wet batch attributes before the first hose contact.
+    const placeholder=new THREE.BufferGeometry();
+    placeholder.setAttribute('position',new THREE.Float32BufferAttribute([-.02,-.02,0,.02,-.02,0,0,.02,0],3));
+    placeholder.setAttribute('uv',new THREE.Float32BufferAttribute([0,0,1,0,.5,1],2));
+    placeholder.setAttribute('color',new THREE.BufferAttribute(new Uint8Array(12).fill(255),4,true));
+    this.pendingWetBatch={mesh:new THREE.Mesh(placeholder,this.wetBatchMaterial),used:0,live:0,free:[]};
     this.mortarMaterial.onBeforeCompile = shader => {
       shader.vertexShader = 'varying vec3 mortarWorld;\n' + shader.vertexShader;
       shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n mortarWorld = (modelMatrix * vec4(position, 1.0)).xyz;');
@@ -305,6 +315,11 @@ export class MortarSystem {
 
   /** A spray footprint contains only exposed first-hit triangles, not an air-spanning plane. */
   private waterFootprint(point: THREE.Vector3, normal: THREE.Vector3, origin: THREE.Vector3): THREE.BufferGeometry {
+    const volume=this.wall.volume;
+    // Pristine planar masonry retains its compact regular footprint. Once the
+    // substrate is fractured, use its actual facets rather than joining 40 mm
+    // samples across 8 mm fracture geometry and crossing back into the wall.
+    if(typeof volume.surfaceTriangles==='function'&&volume.surfaceRevisionAt(point)>0&&this.field.sample(point)<.1)return this.fractureWaterFootprint(point,normal,origin);
     const rotation = new THREE.Quaternion().setFromUnitVectors(Z, normal), inverse = rotation.clone().invert();
     const samples: Array<THREE.Vector3 | null> = [], size = 4, positions: number[] = [], uvs: number[] = [];
     for (let y = 0; y <= size; y++) for (let x = 0; x <= size; x++) {
@@ -326,6 +341,59 @@ export class MortarSystem {
     for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) { const a = y * (size + 1) + x; add(a, a + 1, a + size + 2); add(a, a + size + 2, a + size + 1); }
     const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3)); geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2)); geometry.computeVertexNormals(); return geometry;
   }
+  private fractureWaterFootprint(point:THREE.Vector3,normal:THREE.Vector3,origin:THREE.Vector3):THREE.BufferGeometry{
+    const rotation=new THREE.Quaternion().setFromUnitVectors(Z,normal),inverse=rotation.clone().invert(),bounds=new THREE.Box3();
+    const half=WET_FOOTPRINT_SIZE*.5,depth=.035;
+    for(const x of [-half,half])for(const y of [-half,half])for(const z of [-depth,depth])bounds.expandByPoint(new THREE.Vector3(x,y,z).applyQuaternion(rotation).add(point));
+    const facets=this.wall.volume.surfaceTriangles(bounds.min,bounds.max),positions:number[]=[],uvs:number[]=[],openings=this.openings();
+    // Bin the actual facets in the spray's projective plane. Visibility then
+    // intersects a handful of nearby triangles instead of marching the full
+    // masonry field once for every tessellated facet.
+    const localOrigin=origin.clone().sub(point).applyQuaternion(inverse),bins=new Map<string,THREE.Vector3[][]>();
+    const localTriangles:THREE.Vector3[][]=[];
+    const projected=(p:THREE.Vector3)=>({x:(p.x-localOrigin.x)*localOrigin.z/(localOrigin.z-p.z)+localOrigin.x,y:(p.y-localOrigin.y)*localOrigin.z/(localOrigin.z-p.z)+localOrigin.y});
+    const binSize=.008;
+    const extent=half*localOrigin.z/(localOrigin.z-depth),minBin=Math.floor(-extent/binSize),maxBin=Math.floor(extent/binSize);
+    for(let i=0;i<facets.length;i+=9){
+      const triangle=[0,3,6].map(offset=>new THREE.Vector3().fromArray(facets,i+offset).sub(point).applyQuaternion(inverse));localTriangles.push(triangle);
+      const screen=triangle.map(projected),x0=Math.max(minBin,Math.floor(Math.min(...screen.map(p=>p.x))/binSize)),x1=Math.min(maxBin,Math.floor(Math.max(...screen.map(p=>p.x))/binSize)),y0=Math.max(minBin,Math.floor(Math.min(...screen.map(p=>p.y))/binSize)),y1=Math.min(maxBin,Math.floor(Math.max(...screen.map(p=>p.y))/binSize));
+      for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const key=`${x},${y}`,list=bins.get(key);if(list)list.push(triangle);else bins.set(key,[triangle]);}
+    }
+    const visibilityRay=new THREE.Ray(localOrigin),intersection=new THREE.Vector3();
+    const clip=(polygon:THREE.Vector3[],axis:'x'|'y'|'z',limit:number,sign:number):THREE.Vector3[]=>{
+      const result:THREE.Vector3[]=[];
+      for(let i=0;i<polygon.length;i++){
+        const a=polygon[i],b=polygon[(i+1)%polygon.length],da=limit-sign*a[axis],db=limit-sign*b[axis];
+        if(da>=0)result.push(a);
+        if((da>=0)!==(db>=0))result.push(a.clone().lerp(b,da/(da-db)));
+      }
+      return result;
+    };
+    for(let i=0;i<facets.length;i+=9){
+      const triangle=[0,3,6].map(offset=>new THREE.Vector3().fromArray(facets,i+offset));
+      const faceNormal=new THREE.Vector3().subVectors(triangle[1],triangle[0]).cross(new THREE.Vector3().subVectors(triangle[2],triangle[0]));
+      if(faceNormal.lengthSq()<1e-18)continue;
+      faceNormal.normalize();
+      if(faceNormal.dot(normal)<.15)continue;
+      let polygon=localTriangles[i/9];
+      for(const axis of ['x','y','z'] as const)for(const sign of [-1,1])polygon=clip(polygon,axis,axis==='z'?depth:half,sign);
+      if(polygon.length<3)continue;
+      const world=polygon.map(p=>p.clone().applyQuaternion(rotation).add(point));
+      const center=polygon.reduce((sum,p)=>sum.add(p),new THREE.Vector3()).multiplyScalar(1/polygon.length),screen=projected(center),distance=center.distanceTo(localOrigin);
+      visibilityRay.direction.copy(center).sub(localOrigin).normalize();
+      if((bins.get(`${Math.floor(screen.x/binSize)},${Math.floor(screen.y/binSize)}`)??[]).some(face=>visibilityRay.intersectTriangle(face[0],face[1],face[2],false,intersection)&&intersection.distanceTo(localOrigin)<distance-.00001))continue;
+      for(const piece of this.clipOpenings(world,openings))for(let j=1;j<piece.length-1;j++){
+        // Clipping can leave sub-pixel slivers smaller than the surface offset.
+        if(new THREE.Triangle(piece[0],piece[j],piece[j+1]).getArea()<1e-8)continue;
+        for(const vertex of [piece[0],piece[j],piece[j+1]]){
+        const local=vertex.clone().sub(point).applyQuaternion(inverse);
+        uvs.push(local.x/WET_FOOTPRINT_SIZE+.5,local.y/WET_FOOTPRINT_SIZE+.5);
+        local.copy(vertex).addScaledVector(faceNormal,.0001).sub(point).applyQuaternion(inverse);positions.push(local.x,local.y,local.z);
+        }
+      }
+    }
+    const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));geometry.userData.conforming=true;return geometry;
+  }
   /** Keep all contacted moisture cells; several hundred clipped footprints share
    * one draw call. A render-object budget must never become an absorption limit. */
   private addWetPatch(point: THREE.Vector3, normal: THREE.Vector3): WetPatch {
@@ -345,7 +413,7 @@ export class MortarSystem {
       if(candidate.used+count<=candidate.mesh.geometry.getAttribute('position').count){batch=candidate;start=candidate.used;candidate.used+=count;break;}
     }
     if(!batch){
-      const capacity=Math.max(WET_BATCH_VERTICES,count),buffer=new THREE.BufferGeometry();
+      const capacity=Math.max(WET_BATCH_VERTICES*(geometry.userData.conforming?4:1),count),buffer=new THREE.BufferGeometry();
       buffer.setAttribute('position',new THREE.BufferAttribute(new Float32Array(capacity*3),3).setUsage(THREE.DynamicDrawUsage));
       buffer.setAttribute('uv',new THREE.BufferAttribute(new Float32Array(capacity*2),2).setUsage(THREE.DynamicDrawUsage));
       const colors=new Uint8Array(capacity*4);colors.fill(255);
@@ -355,22 +423,39 @@ export class MortarSystem {
     }
     batch.live++;
     const positions=batch.mesh.geometry.getAttribute('position') as THREE.BufferAttribute,uvs=batch.mesh.geometry.getAttribute('uv') as THREE.BufferAttribute;
-    const offset=center.clone().addScaledVector(normal,.0015),p=new THREE.Vector3();
+    const offset=center.clone().addScaledVector(normal,geometry.userData.conforming?0:.0015),p=new THREE.Vector3();
     for(let i=0;i<count;i++){p.fromBufferAttribute(source,i).applyQuaternion(rotation).add(offset);positions.setXYZ(start+i,p.x,p.y,p.z);uvs.setXY(start+i,uv.getX(i),uv.getY(i));}
     positions.addUpdateRange(start*3,count*3);positions.needsUpdate=true;uvs.addUpdateRange(start*2,count*2);uvs.needsUpdate=true;
     batch.mesh.geometry.setDrawRange(0,batch.used);geometry.dispose();
     const patch={batch,start,count,alpha:-1};this.setWetAlpha(patch,0);return patch;
   }
   private setWetAlpha(patch:WetPatch,opacity:number):void {
+    if(patch.pending)return;
     const alpha=Math.round(THREE.MathUtils.clamp(opacity,0,1)*255);if(alpha===patch.alpha)return;patch.alpha=alpha;
     const colors=patch.batch.mesh.geometry.getAttribute('color') as THREE.BufferAttribute;
     for(let i=patch.start;i<patch.start+patch.count;i++)colors.array[i*4+3]=alpha;
     colors.addUpdateRange(patch.start*4,patch.count*4);colors.needsUpdate=true;
   }
   private removeWetPatch(patch:WetPatch):void {
+    if(patch.pending)return;
     this.setWetAlpha(patch,0);const batch=patch.batch;
     batch.free.push({start:patch.start,count:patch.count});batch.live--;
     if(!batch.live){this.group.remove(batch.mesh);batch.mesh.geometry.dispose();this.wetBatches.splice(this.wetBatches.indexOf(batch),1);}
+  }
+  private pendingWetPatch():WetPatch{return{batch:this.pendingWetBatch,start:0,count:0,alpha:0,pending:true};}
+  get pendingWetGeometry():number{return this.pendingWetCells.size;}
+  /** Called once per presented frame, outside physics catch-up. Water absorption
+   * is immediate; only its surface tessellation waits in this lossless queue. */
+  flushWetGeometry(limit=1,budgetMs=Infinity):number{
+    let built=0;const started=performance.now();
+    while(built<limit&&this.pendingWetCells.size){
+      const cell=this.pendingWetCells.values().next().value!;this.pendingWetCells.delete(cell);
+      cell.patch=this.addWetPatch(cell.position,cell.normal);
+      cell.surfaceRevision=this.wall.volume.surfaceRevisionAt?.(cell.position);
+      this.setWetAlpha(cell.patch,.65*cell.pore+.35*cell.film);built++;
+      if(performance.now()-started>=budgetMs)break;
+    }
+    return built;
   }
   moistureAt(p: THREE.Vector3): { pore: number; film: number } {
     const exact = this.water.get(this.waterKey(p)); if (exact) return exact;
@@ -397,6 +482,13 @@ export class MortarSystem {
   launch(origin: THREE.Vector3, velocity: THREE.Vector3, mass = .65): void {
     if (this.projectiles.length >= 48 || !Number.isFinite(mass) || mass <= 0) return;
     this.spawnClod(origin, velocity, mass); this.launchedMass += mass;
+  }
+  createRenderWarmup():THREE.Group{
+    const group=new THREE.Group();group.name='Mortar render warmup';group.userData.transient=true;
+    for(const geometry of this.clodGeometries){const mesh=new THREE.Mesh(geometry,this.clodMaterial);mesh.castShadow=true;mesh.frustumCulled=false;mesh.scale.setScalar(.04);group.add(mesh);}
+    const deposit=new THREE.Mesh(this.wetGeometry,this.mortarMaterial);deposit.castShadow=deposit.receiveShadow=true;deposit.frustumCulled=false;group.add(deposit);
+    const wet=new THREE.Mesh(this.pendingWetBatch.mesh.geometry,this.wetBatchMaterial);wet.frustumCulled=false;group.add(wet);
+    return group;
   }
   private spawnClod(origin: THREE.Vector3, velocity: THREE.Vector3, mass: number, slurry = false, bond = 1): void {
     const mesh = new THREE.Mesh(this.clodGeometries[this.clodSequence++%this.clodGeometries.length], this.clodMaterial); mesh.position.copy(origin); mesh.castShadow = true;
@@ -516,7 +608,7 @@ export class MortarSystem {
     this.fieldMeshTime=0;
   }
   get pendingGeometryChunks():number {return this.field.dirty.size;}
-  async waitForGeometry():Promise<void> {while(this.field.dirty.size){this.syncFieldGeometry(1);await new Promise(resolve=>setTimeout(resolve,0));}}
+  async waitForGeometry():Promise<void> {while(this.field.dirty.size||this.pendingWetCells.size){if(this.field.dirty.size)this.syncFieldGeometry(1);this.flushWetGeometry(1);await new Promise(resolve=>setTimeout(resolve,0));}}
 
   /** A pressed box extrudes fresh mortar out of its occupied envelope. Backing
    * behind the actual casing stays in place; excess remains counted as slurry. */
@@ -556,7 +648,7 @@ export class MortarSystem {
    * diluted/washed away; substrate prewetting is a separate state. */
   applyWater(point:THREE.Vector3,normal:THREE.Vector3,litres:number):{absorbedLitres:number;runoffLitres:number;washedMortarKg:number} {
     litres=Math.max(0,litres);let cell=this.water.get(this.waterKey(point));
-    if(!cell){cell={pore:0,film:0,patch:this.addWetPatch(point,normal),position:point.clone(),normal:normal.clone()};this.water.set(this.waterKey(point),cell);}
+    if(!cell){cell={pore:0,film:0,patch:this.pendingWetPatch(),position:point.clone(),normal:normal.clone(),surfaceRevision:this.wall.volume.surfaceRevisionAt?.(point)};this.water.set(this.waterKey(point),cell);this.pendingWetCells.add(cell);}
     const washed=this.field.wash(point,litres);
     let restingWash=0;
     for(let i=this.resting.length-1;i>=0;i--){
@@ -583,10 +675,18 @@ export class MortarSystem {
     this.recovery = Math.max(0, this.recovery - recoveryDt); this.faceSplash=Math.max(0,this.faceSplash-dt*.28);
     this.refreshOpeningGeometry();
     this.maintenanceTime += dt;
+    const wallRevision=this.wall.volume.surfaceRevision;
+    if(wallRevision!==undefined&&wallRevision!==this.wetWallRevision){
+      this.wetWallRevision=wallRevision;
+      for(const cell of this.water.values()){
+        const revision=this.wall.volume.surfaceRevisionAt(cell.position);if(revision===cell.surfaceRevision)continue;
+        this.removeWetPatch(cell.patch);cell.patch=this.pendingWetPatch();cell.surfaceRevision=revision;this.pendingWetCells.add(cell);
+      }
+    }
     for (const [key, cell] of this.water) {
       cell.pore = Math.max(0, cell.pore - dt * .0008); cell.film = Math.max(0, cell.film - dt * .045);
       this.setWetAlpha(cell.patch,.65 * cell.pore + .35 * cell.film);
-      if (cell.pore < .002 && cell.film < .002) { this.removeWetPatch(cell.patch); this.water.delete(key); continue; }
+      if (cell.pore < .002 && cell.film < .002) { this.removeWetPatch(cell.patch); this.pendingWetCells.delete(cell);this.water.delete(key); continue; }
       if (this.maintenanceTime > .4 && cell.film > .55 && this.streams.length < 30) {
         const mesh = new THREE.Mesh(this.wetGeometry, this.wetMaterial.clone()); mesh.scale.set(.14, .65, 1); mesh.position.copy(cell.position).addScaledVector(cell.normal, .003); mesh.quaternion.setFromUnitVectors(Z,cell.normal); this.group.add(mesh);
         this.streams.push({ mesh, speed: .04 + cell.film * .1, life: 1.6 }); cell.film -= .025;
@@ -722,5 +822,5 @@ export class MortarSystem {
     const value = Math.min(...counts) / 12;
     this.coverageCache.set(key, { time: this.simulationTime, revision: this.geometryRevision, transform, value }); return value;
   }
-  get telemetry() { return { angleDegrees: this.angleDegrees, power: this.charge, throwFeedback:this.throwFeedback, recovery: this.recovery, airborne: this.projectiles.length, launchedKg: this.launchedMass, stuckKg: this.stuckMass, restingKg: this.restingMass, restingBatches: this.resting.length, floorKg: this.floorMass, movingKg: this.pendingWashMass + this.projectiles.reduce((sum, clod) => sum + clod.mass, 0), washedKg: this.washedMass, volumeField: this.field.statistics, wetCells: this.water.size, wetDrawCalls: this.wetBatches.length, patches: this.deposits.length, outcome: this.lastOutcome, initialStabilitySeconds: 1.3, freshWorkingSeconds: 3600, geometryLimit: MAX_PATCHES, coverage: this.points.map(point => ({ id: point.definition.id, fraction: this.coverage(point) })) }; }
+  get telemetry() { return { angleDegrees: this.angleDegrees, power: this.charge, throwFeedback:this.throwFeedback, recovery: this.recovery, airborne: this.projectiles.length, launchedKg: this.launchedMass, stuckKg: this.stuckMass, restingKg: this.restingMass, restingBatches: this.resting.length, floorKg: this.floorMass, movingKg: this.pendingWashMass + this.projectiles.reduce((sum, clod) => sum + clod.mass, 0), washedKg: this.washedMass, volumeField: this.field.statistics, wetCells: this.water.size, pendingWetGeometry:this.pendingWetGeometry, wetDrawCalls: this.wetBatches.length, patches: this.deposits.length, outcome: this.lastOutcome, initialStabilitySeconds: 1.3, freshWorkingSeconds: 3600, geometryLimit: MAX_PATCHES, coverage: this.points.map(point => ({ id: point.definition.id, fraction: this.coverage(point) })) }; }
 }

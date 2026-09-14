@@ -49,6 +49,7 @@ export class FPSRig extends THREE.Group {
   mortarHolding = false;
   private mortarStrain = 0;
   private mortarStrainVelocity = 0;
+  private mortarAppliedStrain = -1;
   private readonly trowelElbow = new THREE.Vector3();
   chiselInAir = false;
   workStanceSide = 0;
@@ -275,13 +276,20 @@ export class FPSRig extends THREE.Group {
     const target=motion.stage==='drive'?.35:motion.stage==='flip'?1:motion.stage==='prepare'?.06:0;
     let remaining=Math.min(Math.max(dt,0),.1);
     while(remaining>0){const step=Math.min(remaining,1/120);this.mortarStrainVelocity+=(180*(target-this.mortarStrain)-23*this.mortarStrainVelocity)*step;this.mortarStrain+=this.mortarStrainVelocity*step;remaining-=step;}
-    const strain=THREE.MathUtils.clamp(this.mortarStrain,0,1),position=load.geometry.getAttribute('position'),rest=load.geometry.getAttribute('restPosition');
-    for(let i=0;i<position.count;i++){
-      const x=rest.getX(i),y=rest.getY(i),z=rest.getZ(i),weight=THREE.MathUtils.clamp(y/(load.userData.deformationHeight??.045),0,1);
-      const stretch=1+strain*.42*weight,shrink=1/Math.sqrt(stretch);
-      position.setXYZ(i,x*shrink,y*shrink,z*stretch-strain*.027*weight);
+    if(Math.abs(this.mortarStrain-target)<1e-5&&Math.abs(this.mortarStrainVelocity)<1e-5){this.mortarStrain=target;this.mortarStrainVelocity=0;}
+    const strain=THREE.MathUtils.clamp(this.mortarStrain,0,1);
+    // The empty blade still completes its wrist motion, but invisible mortar
+    // needs no vertex upload or normal rebuild. Settled/duplicate poses likewise
+    // reuse the same buffer; a 1e-5 strain change is below one micron here.
+    if(load.visible&&Math.abs(strain-this.mortarAppliedStrain)>1e-5){
+      const position=load.geometry.getAttribute('position'),rest=load.geometry.getAttribute('restPosition');
+      for(let i=0;i<position.count;i++){
+        const x=rest.getX(i),y=rest.getY(i),z=rest.getZ(i),weight=THREE.MathUtils.clamp(y/(load.userData.deformationHeight??.045),0,1);
+        const stretch=1+strain*.42*weight,shrink=1/Math.sqrt(stretch);
+        position.setXYZ(i,x*shrink,y*shrink,z*stretch-strain*.027*weight);
+      }
+      position.needsUpdate=true;load.geometry.computeVertexNormals();this.mortarAppliedStrain=strain;
     }
-    position.needsUpdate=true;load.geometry.computeVertexNormals();
     // The conservative bound contains all deformed poses without reallocating.
     load.geometry.boundingSphere??=new THREE.Sphere(new THREE.Vector3(),.16);
     this.poseArms(camera);tool.updateWorldMatrix(true,true);

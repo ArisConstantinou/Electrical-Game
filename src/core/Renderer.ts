@@ -82,6 +82,23 @@ export class Renderer {
     this.water=await createRoomWater(this.gpu,this.scene,this.renderCamera,room);
     this.roomWater=room;
   }
+  /** Compile transient tool samples under the actual scene lights before play.
+   * Shared geometry/materials remain owned by the tool; samples never simulate. */
+  async prepareToolResources(samples:THREE.Group):Promise<void>{
+    await this.ready;
+    this.snapshotRenderCamera();
+    samples.position.copy(this.camera.position).addScaledVector(this.camera.getWorldDirection(new THREE.Vector3()),.5);
+    this.scene.add(samples);
+    try{
+      this.prepareMaterials();
+      await this.gpu.compileAsync(samples,this.renderCamera,this.scene);
+      // The colour compiler does not visit every first-use shadow pipeline.
+      // Warm those under the same lights without showing sample mortar.
+      const previous=this.gpu.getRenderTarget(),target=new THREE.RenderTarget(1,1);
+      try{this.gpu.setRenderTarget(target);this.gpu.render(this.scene,this.renderCamera);}
+      finally{this.gpu.setRenderTarget(previous);target.dispose();}
+    }finally{this.scene.remove(samples);}
+  }
   private prepareMaterials():void{
     this.scene.traverse(object=>{
       const mesh=object as THREE.Mesh;if(!mesh.isMesh||Array.isArray(mesh.material))return;

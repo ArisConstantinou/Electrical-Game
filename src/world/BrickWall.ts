@@ -211,6 +211,7 @@ export class BrickWall extends THREE.Group {
     while(this.pendingMeshes.size || this.inFlightMeshes.size) await new Promise(resolve=>setTimeout(resolve,8));
   }
   private applyChunkMesh(key:string,data:MeshData): void {
+    this.volume.cacheSurfaceMesh(key,data.positions);
     const geometry=this.geometry(data), previous=this.chunks.get(key);
     if(previous) {previous.geometry.dispose();previous.geometry=geometry;return;}
     const chunk=new THREE.Mesh(geometry,wallMaterial);

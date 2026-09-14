@@ -56,6 +56,9 @@ export class MasonryVolume {
   readonly seed: number; readonly options: MasonryVolumeOptions;
   private readonly chunks = new Map<string, Chunk>();
   private readonly dirty = new Set<string>();
+  private readonly surfaceMeshes = new Map<string, Float32Array>();
+  private readonly surfaceVersions = new Map<string, number>();
+  private surfaceSequence = 0;
   private readonly exposedAir = new Set<number>();
   private readonly pendingSupport: SupportJob[] = [];
   private trimPatch: { anchor: Vec3; floorZ: number } | null = null;
@@ -84,6 +87,7 @@ export class MasonryVolume {
   get detachedNodeCount(): number { return this.totalDetached; }
   get impactCount(): number { return this.sequence; }
   get pendingSupportCount(): number { return this.pendingSupport.length; }
+  get surfaceRevision(): number { return this.surfaceSequence; }
   get memoryBytes(): number { return this.chunks.size * this.tileSize * this.tileSize * (this.nz + 2) * 2; }
   nodePosition(x: number, y: number, z: number): Vec3 {
     return { x: -this.width / 2 + (x - .5) * this.hx, y: (y - .5) * this.hy, z: this.frontZ + (.5 - z) * this.hz };
@@ -106,10 +110,39 @@ export class MasonryVolume {
     return { chunk, offset: address.offset };
   }
   private markDirty(x: number, y: number): void {
-    for (const dx of [-1, 0]) for (const dy of [-1, 0]) {
-      if (x + dx < 0 || y + dy < 0 || x + dx > this.nx || y + dy > this.ny) continue;
-      this.dirty.add(`${Math.floor((x + dx) / this.tileSize)},${Math.floor((y + dy) / this.tileSize)}`);
+    const x0=Math.floor(Math.max(0,x-1)/this.tileSize),x1=Math.floor(Math.min(this.nx,x)/this.tileSize),y0=Math.floor(Math.max(0,y-1)/this.tileSize),y1=Math.floor(Math.min(this.ny,y)/this.tileSize);
+    for(let tx=x0;tx<=x1;tx++)for(let ty=y0;ty<=y1;ty++){
+      const key=`${tx},${ty}`;
+      this.dirty.add(key);this.surfaceMeshes.delete(key);this.surfaceVersions.set(key,++this.surfaceSequence);
     }
+  }
+  private surfaceKeys(min:Vec3,max:Vec3):string[]{
+    const a=this.coordinates(min),b=this.coordinates(max),keys:string[]=[];
+    const x0=Math.max(0,Math.floor((Math.min(a.x,b.x)-1)/this.tileSize)),x1=Math.min(Math.floor(this.nx/this.tileSize),Math.floor((Math.max(a.x,b.x)+1)/this.tileSize));
+    const y0=Math.max(0,Math.floor((Math.min(a.y,b.y)-1)/this.tileSize)),y1=Math.min(Math.floor(this.ny/this.tileSize),Math.floor((Math.max(a.y,b.y)+1)/this.tileSize));
+    for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)keys.push(`${x},${y}`);return keys;
+  }
+  surfaceRevisionAt(point:Vec3,radius=.18):number{
+    let revision=0;for(const key of this.surfaceKeys({x:point.x-radius,y:point.y-radius,z:point.z-radius},{x:point.x+radius,y:point.y+radius,z:point.z+radius}))revision=Math.max(revision,this.surfaceVersions.get(key)??0);return revision;
+  }
+  /** Authoritative exposed facets for conforming surface effects. This does not
+   * depend on the asynchronously displayed wall mesh or change material state. */
+  surfaceTriangles(min:Vec3,max:Vec3):Float32Array{
+    const positions:number[]=[];
+    for(const key of this.surfaceKeys(min,max)){
+      let p=this.surfaceMeshes.get(key);
+      if(!p){p=(this.surfaceVersions.has(key)?this.buildChunkMesh(key):this.buildPristineChunkMesh(key)).positions;this.cacheSurfaceMesh(key,p);}
+      for(let i=0;i<p.length;i+=9){
+        if(Math.max(p[i],p[i+3],p[i+6])<min.x||Math.min(p[i],p[i+3],p[i+6])>max.x||Math.max(p[i+1],p[i+4],p[i+7])<min.y||Math.min(p[i+1],p[i+4],p[i+7])>max.y||Math.max(p[i+2],p[i+5],p[i+8])<min.z||Math.min(p[i+2],p[i+5],p[i+8])>max.z)continue;
+        for(let j=0;j<9;j++)positions.push(p[i+j]);
+      }
+    }
+    return new Float32Array(positions);
+  }
+  /** Called only for an accepted, current wall mesh, never a stale worker result. */
+  cacheSurfaceMesh(key:string,positions:Float32Array):void{
+    this.surfaceMeshes.set(key,positions);
+    if(this.surfaceMeshes.size>16)this.surfaceMeshes.delete(this.surfaceMeshes.keys().next().value!);
   }
   /** Original material, independent of all accumulated damage. */
   baseMaterial(x: number, y: number, z: number): MaterialId {
@@ -724,6 +757,7 @@ export class MasonryVolume {
   }
   restore(save: MasonrySave): void {
     if (save.version !== 1 || save.seed !== this.seed) throw new Error('Masonry save version or seed mismatch');
+    this.surfaceMeshes.clear();const surfaceRevision=++this.surfaceSequence;for(const key of this.chunkKeys)this.surfaceVersions.set(key,surfaceRevision);
     const profile = save.options.hollowProfile ?? 'legacy-rectangular';
     if (profile !== this.options.hollowProfile) {
       this.options.hollowProfile = profile;

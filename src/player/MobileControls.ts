@@ -223,8 +223,10 @@ export class MobileControls {
   }
   private updateLookJoystick(event: PointerEvent, joystick: HTMLElement): void {
     const rect = joystick.getBoundingClientRect(), radius = Math.max(1, rect.width / 2);
-    const rawX = (event.clientX - (rect.left + radius)) / radius;
-    const rawY = (event.clientY - (rect.top + radius)) / radius;
+    // USE starts neutral wherever the thumb lands. Only deliberate travel
+    // from that press steers the camera while charging or using a tool.
+    const rawX = (event.clientX - this.actionX) / radius;
+    const rawY = (event.clientY - this.actionY) / radius;
     const length = Math.hypot(rawX, rawY);
     // PlayerController already reduces angular speed near masonry. Keep one
     // predictable pad curve, rather than adding two more proximity slowdowns.

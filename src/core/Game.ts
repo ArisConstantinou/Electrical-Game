@@ -132,6 +132,7 @@ export class Game {
     startButton.textContent = 'PREPARING WATER AND SITE…';
     this.ready = this.renderer.ready.then(async () => {
       await this.renderer.attachRoomWater(this.roomWater);
+      await this.renderer.prepareToolResources(this.mortar.createRenderWarmup());
       startButton.disabled = false;
       startButton.textContent = 'ENTER THE SITE';
       this.lastTime = performance.now();
@@ -277,6 +278,9 @@ export class Game {
     if (this.mission.complete && !this.resultShown) { this.resultShown = true; this.hud.showResult(); if (document.pointerLockElement) void document.exitPointerLock(); }
     this.renderer.eyeYaw = 0;
     this.renderer.eyePitch = 0;
+    // Catch-up physics may run several times per image. Build wet surfaces
+    // only once at presentation, keeping cheap flat patches within one budget.
+    if(present)this.mortar.flushWetGeometry(64,3);
     if (present && this.renderer.render()) {
       const workReticle = this.selectedTool === 'hammer' && this.fpsRig.reachable
         ? this.fpsRig.chiselTipWorld.clone().project(this.renderer.renderCamera) : null;

@@ -45,7 +45,9 @@
     "test:wall-strafe": "node tests/hammer-strafe-continuity.mjs && node tests/hammer-free-look-ui.mjs",
     "test:hammer-side": "node tests/hammer-bilateral-controls.mjs && node tests/hammer-oblique-hands.mjs && node tests/hammer-wall-hug.mjs",
     "test:render-motion": "node tests/render-motion-coherence.mjs && node tests/queued-work-input.mjs",
-    "test:wet-wall": "node tests/wet-wall-coverage.mjs && node tests/wet-wall-ui.mjs"
+    "test:wet-wall": "node tests/wet-wall-coverage.mjs && node tests/wet-wall-ui.mjs",
+    "test:wet-fracture": "node tests/wet-fracture-surface.mjs && node tests/hose-fracture-ui.mjs",
+    "test:trowel-stability": "node tests/trowel-pose-stability.mjs && node tests/mobile-stick-neutral.mjs && node tests/trowel-native-camera-ui.mjs"
   },
   "dependencies": {
     "three": "0.185.1"
