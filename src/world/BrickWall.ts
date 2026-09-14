@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import { attribute, dot, floor, fract, mix, positionWorld, sin, smoothstep, texture as sampleTexture, uniform, uv, vec2 } from 'three/tsl';
 import { GAME_CONFIG } from '../data/gameConfig';
+import { laserBand, laserTint, laserEmission } from '../systems/LaserProjection';
 import type { InstallationDefinition } from '../data/installationRules';
 import type { InstallationPoint } from '../electrical/InstallationPoint';
 import { MasonryVolume, type MasonryFragment, type MasonryVolumeOptions } from './MasonryVolume';
@@ -31,7 +32,8 @@ const rawMasonry = masonryColor.mul(grain.mul(.15).add(.90).add(mottling.mul(.04
 const photographedClay = sampleTexture(brickImage, uv()).rgb.mul(masonryColor.r.div(.49));
 // A face mask keeps real mortar joints, internal chambers and broken edges on
 // their own rough clay/mortar colors in both WebGPU and the WebGL backend.
-wallMaterial.colorNode = mix(rawMasonry, photographedClay, attribute<'float'>('brickFace', 'float').mul(brickImageReady));
+wallMaterial.colorNode = mix(mix(rawMasonry, photographedClay, attribute<'float'>('brickFace', 'float').mul(brickImageReady)),laserTint,laserBand);
+wallMaterial.emissiveNode=laserEmission;
 type MeshData = ReturnType<MasonryVolume['buildChunkMesh']>;
 
 /** The wall owns one continuous material volume. Brick IDs never select damage. */
@@ -138,7 +140,7 @@ export class BrickWall extends THREE.Group {
   }
 
   registerInstallations(points: InstallationPoint[]): void { for (const point of points) this.installations.set(point.definition.id, point); }
-  aim(camera: THREE.Camera, maxDistance = GAME_CONFIG.interaction.maxDistance): { point: THREE.Vector3 } | null {
+  aim(camera: THREE.Camera, maxDistance:number = GAME_CONFIG.interaction.maxDistance): { point: THREE.Vector3 } | null {
     // This ray needs only the camera transform, not every finger/tool child.
     camera.updateWorldMatrix(true, false);
     this.raycaster.setFromCamera(new THREE.Vector2(), camera);

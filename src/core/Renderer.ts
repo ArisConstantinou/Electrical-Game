@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { WebGPURenderer, MeshStandardNodeMaterial } from 'three/webgpu';
-import { positionWorld, materialColor, sin, dot, floor, fract, vec2, vec3, smoothstep } from 'three/tsl';
+import { positionWorld, materialColor, sin, dot, floor, fract, vec2, vec3, smoothstep, mix } from 'three/tsl';
 import { GAME_CONFIG } from '../data/gameConfig';
+import { laserBand, laserTint, laserEmission } from '../systems/LaserProjection';
 import type { RoomWaterSystem } from '../systems/RoomWaterSystem';
 import type { RoomWaterRuntime } from '../generated/room-water-runtime';
 
@@ -191,19 +192,22 @@ export class Renderer {
       const old=mesh.material as THREE.MeshStandardMaterial;
       if(!old.isMeshStandardMaterial||(old as unknown as MeshStandardNodeMaterial).isNodeMaterial)return;
       const shader=String(old.onBeforeCompile),masonry=shader.includes('masonryPosition'),mortar=shader.includes('mortarWorld');
-      if(!masonry&&!mortar)return;
+      if(!masonry&&!mortar&&!old.userData.referenceLaserReceiver)return;
       let material=this.materialCache.get(old);
       if(!material){
         const node=new MeshStandardNodeMaterial();node.copy(old);
+        let surfaceColor=materialColor.rgb;
         if(masonry){
           const grain=fract(sin(dot(floor(positionWorld.xy.mul(1800)),vec2(127.1,311.7))).mul(43758.5453));
           const mottling=sin(positionWorld.x.mul(93).add(sin(positionWorld.y.mul(71)))).mul(sin(positionWorld.y.mul(127)));
           const grooves=smoothstep(.82,.99,sin(positionWorld.y.mul(3200)));
-          node.colorNode=materialColor.mul(grain.mul(.15).add(.90).add(mottling.mul(.045)).sub(grooves.mul(.035)));
-        }else{
+          surfaceColor=materialColor.rgb.mul(grain.mul(.15).add(.90).add(mottling.mul(.045)).sub(grooves.mul(.035)));
+        }else if(mortar){
           const grain=fract(sin(dot(floor(positionWorld.mul(1600)),vec3(127.1,311.7,74.7))).mul(43758.5453));
-          node.colorNode=materialColor.mul(grain.mul(.06).add(.96));
+          surfaceColor=materialColor.rgb.mul(grain.mul(.06).add(.96));
         }
+        node.colorNode=mix(surfaceColor,laserTint,laserBand);
+        node.emissiveNode=laserEmission;
         material=node;this.materialCache.set(old,node);
       }
       mesh.material=material;

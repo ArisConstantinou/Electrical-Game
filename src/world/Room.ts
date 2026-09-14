@@ -7,6 +7,7 @@ import { matteMaterial, siteMaterial } from './SiteMaterials';
 
 export class Room extends THREE.Group {
   readonly brickWall: BrickWall;
+  readonly referenceWalls: THREE.Object3D[] = [];
 
   constructor(scene: THREE.Scene) {
     super();
@@ -30,6 +31,7 @@ export class Room extends THREE.Group {
     this.add(ceiling);
 
     const sideMaterial = siteMaterial('plaster', 0xaca89d, 2.2, 3.4);
+    sideMaterial.userData.referenceLaserReceiver=true;
     const sideGeometry = new THREE.BoxGeometry(0.22, GAME_CONFIG.room.height, GAME_CONFIG.room.depth);
     for (const [name, x] of [['Left concrete wall', -GAME_CONFIG.room.width / 2 - 0.11], ['Right concrete wall', GAME_CONFIG.room.width / 2 + 0.11]] as const) {
       const side = new THREE.Mesh(sideGeometry, sideMaterial);
@@ -37,10 +39,12 @@ export class Room extends THREE.Group {
       side.name = name;
       side.userData.studioEntityId = `world:${name.toLowerCase().replaceAll(' ', '-')}`;
       side.receiveShadow = true;
+      this.referenceWalls.push(side);
       this.add(side);
     }
 
     const columnMaterial = siteMaterial('concrete', 0xa7a69d, .7, 5);
+    columnMaterial.userData.referenceLaserReceiver=true;
     for (const x of [-2.72, 2.72]) {
       const column = new THREE.Mesh(new THREE.BoxGeometry(0.36, GAME_CONFIG.room.height, 0.38), columnMaterial);
       column.position.set(x, GAME_CONFIG.room.height / 2, -2.37);
@@ -48,6 +52,7 @@ export class Room extends THREE.Group {
       column.userData.studioEntityId = `world:column:${x}`;
       column.castShadow = true;
       column.receiveShadow = true;
+      this.referenceWalls.push(column);
       this.add(column);
     }
 

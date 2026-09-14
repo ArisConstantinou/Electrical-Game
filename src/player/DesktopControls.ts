@@ -91,7 +91,8 @@ export class DesktopControls {
       window.dispatchEvent(new CustomEvent('wirehouse:cycle-tool', { detail: direction }));
     }, { passive: false });
     addEventListener('keydown', event => {
-      const directTools: Partial<Record<string, string>> = { Digit1: 'spring', Digit2: 'cutter', Digit3: 'spray', Digit4: 'hammer', Digit5: 'fitting', Digit6: 'level', Digit7: 'trowel', Digit8: 'hose' };
+      const directTools: Partial<Record<string, string>> = { Digit1: 'spring', Digit2: 'cutter', Digit3: 'spray', Digit4: 'hammer', Digit5: 'fitting', Digit6: 'level', Digit7: 'trowel', Digit8: 'hose', Digit9: 'measure', Digit0:'drill',KeyB:'driver',KeyL:'laser' };
+      if(event.code==='KeyM'&&!event.repeat&&!(event.target instanceof Element&&event.target.closest('input,textarea,select,[contenteditable="true"]')))window.dispatchEvent(new CustomEvent('wirehouse:measure-mark'));
       if (directTools[event.code]) window.dispatchEvent(new CustomEvent('wirehouse:select-tool', { detail: directTools[event.code] }));
       if (event.code === 'KeyV' && !event.repeat) window.dispatchEvent(new CustomEvent('wirehouse:cycle-spray-mode'));
       if (event.code === 'KeyC' && !event.repeat) window.dispatchEvent(new CustomEvent('wirehouse:cycle-spray-color'));

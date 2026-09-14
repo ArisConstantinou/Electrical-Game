@@ -3,6 +3,8 @@ import { INSTALLATION_RULES, type BoxKind } from '../data/installationRules';
 
 const whitePlastic = new THREE.MeshStandardMaterial({ color: 0xe7e4d9, roughness: 0.78, metalness: 0.02 });
 const innerPlastic = new THREE.MeshStandardMaterial({ color: 0xcfcbbf, roughness: 0.84, side: THREE.DoubleSide });
+whitePlastic.userData.referenceLaserReceiver=true;
+innerPlastic.userData.referenceLaserReceiver=true;
 
 const mesh = (geometry: THREE.BufferGeometry, material = whitePlastic): THREE.Mesh => {
   const result = new THREE.Mesh(geometry, material);

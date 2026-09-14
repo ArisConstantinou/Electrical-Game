@@ -1,13 +1,15 @@
 import * as THREE from 'three';
 import { buildToolModel } from './ToolModels';
+import { buildTapeMeasureModel, buildMeasurePencil } from './TapeMeasureModel';
+import { buildReferenceToolModel } from './ReferenceToolModels';
 import type { TrowelMotion } from './TrowelMotion';
 import { workerHand, workerArm, poseWorkerArm, flexWorkerHand, poseToolGrip, MAX_WRIST_REACH_M, UPPER_ARM_M, FOREARM_M, type WorkerArm } from './WorkerArm';
 import type { BrickWall, ChiselContact } from '../world/BrickWall';
 import { MaterialId } from '../world/MasonryVolume';
 import type { BoxKind } from '../data/installationRules';
 
-export type RigTool = 'spray' | 'hammer' | 'fitting' | 'level' | 'spring' | 'cutter' | 'trowel' | 'hose';
-export const RIG_TOOLS: RigTool[] = ['spray', 'hammer', 'fitting', 'level', 'spring', 'cutter', 'trowel', 'hose'];
+export type RigTool = 'spray' | 'hammer' | 'fitting' | 'level' | 'spring' | 'cutter' | 'trowel' | 'hose' | 'measure' | 'drill' | 'driver' | 'laser';
+export const RIG_TOOLS: RigTool[] = ['spray', 'hammer', 'fitting', 'level', 'spring', 'cutter', 'trowel', 'hose', 'measure', 'drill', 'driver', 'laser'];
 
 // The viewmodel belongs to the final transparent pass so wall paint can never
 // composite over the hands or tool, regardless of camera distance.
@@ -35,6 +37,11 @@ export class FPSRig extends THREE.Group {
   private readonly tipAnchor = new THREE.Vector3(.02, .005, -.749);
   private readonly armSets = new Map<RigTool, WorkerArm[]>();
   private selectedTool: RigTool = 'spray';
+  private measureMarkTime=0;
+  private readonly measureMarkPoint=new THREE.Vector3();
+  private readonly measureOrientation=new THREE.Quaternion();
+  private readonly measureMarkOrientation=new THREE.Quaternion();
+  private readonly referenceMotors=new Map<'drill'|'driver',THREE.Object3D>();
   reachable = false;
   contactStatus: 'ready'|'feeding'|'regripping'|'no-solid'|'too-close'|'out-of-reach' = 'out-of-reach';
   reachReason = 'Out of reach. Move closer or change your working angle.';
@@ -241,10 +248,15 @@ export class FPSRig extends THREE.Group {
     this.addTool('spray', this.createDetailedTool('spray'));
     this.addTool('hammer', this.createHammer());
     for(const tool of ['fitting','level','spring','cutter','trowel','hose'] as const)this.addTool(tool,this.createDetailedTool(tool));
+    const measure=buildTapeMeasureModel();this.attachArms('measure',measure);this.addTool('measure',measure);
+    for(const kind of ['drill','driver','laser'] as const){
+      const tool=buildReferenceToolModel(kind);this.attachArms(kind,tool);this.addTool(kind,tool);
+      if(kind!=='laser')this.referenceMotors.set(kind,tool.getObjectByName('reference-motor')!);
+    }
     this.show('spray');
   }
 
-  show(tool: RigTool): void { this.selectedTool=tool; this.tools.forEach((group, key) => { group.visible = key === tool; }); this.armSets.forEach((arms,key)=>arms.forEach(arm=>arm.group.visible=key===tool)); }
+  show(tool: RigTool): void { if(tool!=='measure')this.measureMarkTime=0; this.selectedTool=tool; this.tools.forEach((group, key) => { group.visible = key === tool; }); this.armSets.forEach((arms,key)=>arms.forEach(arm=>arm.group.visible=key===tool)); }
   get fittingBoxKinds():readonly BoxKind[]{return this.fittingVariants.get(this.fittingPreset)!.kinds;}
   /** Switch the finite supply model without rebuilding geometry or the hand. */
   setFittingBoxKinds(kinds:readonly BoxKind[]):void{
@@ -270,6 +282,51 @@ export class FPSRig extends THREE.Group {
     camera.updateMatrixWorld(true);this.updateWorldMatrix(true,true);
     const tool=this.tools.get('trowel')!;
     return tool.localToWorld(new THREE.Vector3().fromArray(tool.userData.releasePoint));
+  }
+  /** The world-vertical casing meets the measured blade endpoint without moving the camera. */
+  poseMeasure(camera:THREE.Camera,top:THREE.Vector3|null,normal=new THREE.Vector3(0,0,1)):void {
+    const tool=this.tools.get('measure')!;
+    camera.updateMatrixWorld(true);this.updateWorldMatrix(true,false);
+    // The model is authored in metres, independent of presentation scaling.
+    const parentScale=this.getWorldScale(new THREE.Vector3());
+    tool.scale.set(1/parentScale.x,1/parentScale.y,1/parentScale.z);
+    if(top){
+      this.measureOrientation.copy(this.measureWallOrientation(normal));
+      tool.quaternion.copy(this.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(this.measureOrientation));
+      tool.position.copy(this.worldToLocal(top.clone()));
+      tool.updateWorldMatrix(true,true);
+      this.reachable=this.gripsReachable(camera,tool);
+      tool.userData.measuring=true;
+    }else{
+      this.measureMarkTime=0;
+      tool.position.set(.11,-.04,-.03);tool.rotation.set(.12,-.16,-.16);
+      this.constrainHeldTool(camera);this.reachable=false;tool.userData.measuring=false;
+    }
+    this.poseArms(camera);
+  }
+  /** A short left-hand graphite stroke at the current measured point. */
+  markMeasure():void {
+    const tool=this.tools.get('measure')!;
+    if(this.selectedTool!=='measure'||!tool.userData.measuring)return;
+    tool.getWorldPosition(this.measureMarkPoint);this.measureMarkOrientation.copy(this.measureOrientation);this.measureMarkTime=.40;
+  }
+  /** Seat the real bit while the body and finite arm stay outside the wall. */
+  poseReferenceTool(camera:THREE.Camera,kind:'drill'|'driver',point:THREE.Vector3|null,normal:THREE.Vector3,working:boolean,dt:number):void {
+    const tool=this.tools.get(kind)!;
+    camera.updateMatrixWorld(true);this.updateWorldMatrix(true,false);
+    const orientation=this.measureWallOrientation(normal),scale=this.getWorldScale(new THREE.Vector3());tool.scale.set(1/scale.x,1/scale.y,1/scale.z);
+    this.reachable=point!==null&&this.canReachPoint(camera,point,.10,normal);
+    if(point&&this.reachable){
+      const tip=new THREE.Vector3().fromArray(tool.userData.tipPoint).applyQuaternion(orientation);
+      tool.position.copy(this.worldToLocal(point.clone().sub(tip)));
+      tool.quaternion.copy(this.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(orientation));
+    }else{
+      tool.position.set(.11,-.015,-.025);tool.rotation.set(.10,-.12,0);this.constrainHeldTool(camera);
+    }
+    const motor=this.referenceMotors.get(kind)!;
+    if(working&&this.reachable)motor.rotation.z=(motor.rotation.z+Math.min(Math.max(dt,0),.05)*(kind==='drill'?36:21))%(Math.PI*2);
+    tool.userData.working=working&&this.reachable;
+    this.poseArms(camera);
   }
   poseTrowel(camera: THREE.Camera, motion: TrowelMotion, dt = 0, wallFrontZ = -2.41): THREE.Vector3 {
     const tool=this.tools.get('trowel')!;
@@ -313,6 +370,7 @@ export class FPSRig extends THREE.Group {
   }
   strike(): void { this.strikeAmount = 1; }
   update(dt: number, moving: boolean, spraying = false): void {
+    this.measureMarkTime=Math.max(0,this.measureMarkTime-Math.min(Math.max(dt,0),.05));
     // Explicit side selection owns the hands. Geometric lean is only a fallback
     // for callers without a selected side, never a reason to undo that choice.
     const headLean=this.workHeadLeanM??-this.workStanceSide;
@@ -507,7 +565,7 @@ export class FPSRig extends THREE.Group {
   constrainWorkSurfaces(camera:THREE.Camera,frontForBounds:(bounds:THREE.Box3)=>number|null):number {
     // The hammer's working bit deliberately enters material and owns its
     // contact/feed solver. A generic envelope would pull it off the chisel hit.
-    if(this.selectedTool==='hammer')return 0;
+    if(this.selectedTool==='hammer'||this.selectedTool==='measure'||this.selectedTool==='drill'||this.selectedTool==='driver')return 0;
     const tool=this.tools.get(this.selectedTool)!;
     let retracted=0;
     for(let attempt=0;attempt<3;attempt++){
@@ -555,10 +613,11 @@ export class FPSRig extends THREE.Group {
       hand.userData.gripRole=emptyFitting?'reaching':'primary';
       if(!emptyFitting){hand.position.fromArray(hand.userData.fittingGripPosition);hand.quaternion.fromArray(hand.userData.fittingGripQuaternion);}
     }
-    if(this.selectedTool!=='hammer'&&this.selectedTool!=='trowel'&&!emptyFitting)this.constrainHeldTool(camera);
+    if(this.selectedTool!=='hammer'&&this.selectedTool!=='trowel'&&this.selectedTool!=='measure'&&this.selectedTool!=='drill'&&this.selectedTool!=='driver'&&!emptyFitting)this.constrainHeldTool(camera);
     const {right}=this.bodyFrame(camera);
     for(const arm of this.armSets.get(this.selectedTool)??[]){
-      if(arm.hand.userData.gripRole==='resting')this.poseRestingHand(camera,arm);
+      if(this.selectedTool==='measure'&&arm.side<0&&this.measureMarkTime>0)this.poseMeasurePencil(camera,arm);
+      else if(arm.hand.userData.gripRole==='resting')this.poseRestingHand(camera,arm);
       else if(emptyFitting)this.poseEmptyFittingHand(camera,arm);
       poseWorkerArm(arm,this.shoulder(camera,arm.side),this.wrist(arm),right,this.selectedTool==='trowel'&&arm.side===1?this.trowelElbow:undefined);
       flexWorkerHand(arm.hand,arm.hand.userData.gripRole==='resting'?0:this.toolAction+this.strikeAmount*.35+(this.hoseActive?.4:0),performance.now()*.001);
@@ -592,9 +651,45 @@ export class FPSRig extends THREE.Group {
     arm.hand.position.copy(arm.group.worldToLocal(wrist)).sub(new THREE.Vector3().fromArray(arm.hand.userData.wristPoint).applyQuaternion(arm.hand.quaternion));
     arm.hand.updateWorldMatrix(true,true);
   }
+  private poseMeasurePencil(camera:THREE.Camera,arm:WorkerArm):void {
+    this.poseRestingHand(camera,arm);
+    const restPosition=arm.hand.getWorldPosition(new THREE.Vector3()),restRotation=arm.hand.getWorldQuaternion(new THREE.Quaternion());
+    const elapsed=.40-this.measureMarkTime;
+    const blend=elapsed<.10?THREE.MathUtils.smoothstep(elapsed,0,.10):1-THREE.MathUtils.smoothstep(elapsed,.28,.40);
+    const stroke=THREE.MathUtils.clamp((elapsed-.10)/.18,0,1);
+    const rotation=this.measureMarkOrientation.clone().multiply(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),new THREE.Vector3(.35,.45,-.82).normalize()));
+    const tip=this.measureMarkPoint.clone().add(new THREE.Vector3(THREE.MathUtils.lerp(-.020,.019,stroke),0,.0002).applyQuaternion(this.measureMarkOrientation));
+    const grip=tip.sub(new THREE.Vector3(0,.098,0).applyQuaternion(rotation));
+    const position=restPosition.lerp(grip,blend),orientation=restRotation.slerp(rotation,blend);
+    const wristOffset=new THREE.Vector3().fromArray(arm.hand.userData.wristPoint).applyQuaternion(orientation);
+    const shoulder=this.shoulder(camera,arm.side),wrist=position.clone().add(wristOffset),reach=wrist.clone().sub(shoulder);
+    // Moving the camera during a stroke cannot stretch the arm or detach the hand.
+    if(reach.length()>MAX_WRIST_REACH_M)position.copy(shoulder).add(reach.setLength(MAX_WRIST_REACH_M-.0001)).sub(wristOffset);
+    const parent=arm.hand.parent!;parent.updateWorldMatrix(true,false);
+    arm.hand.quaternion.copy(parent.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(orientation));
+    arm.hand.position.copy(parent.worldToLocal(position));arm.hand.updateWorldMatrix(true,true);
+  }
   /** Hand tools need a body-space reachable target; a hose or mortar projectile can travel farther. */
-  canReachPoint(camera:THREE.Camera,point:THREE.Vector3,extension=.10):boolean {
+  canReachPoint(camera:THREE.Camera,point:THREE.Vector3,extension=.10,normal?:THREE.Vector3):boolean {
+    if(this.selectedTool==='drill'||this.selectedTool==='driver'){
+      const tool=this.tools.get(this.selectedTool)!,hand=this.armSets.get(this.selectedTool)!.find(arm=>arm.side===1)!.hand;
+      const wrist=new THREE.Vector3().fromArray(hand.userData.wristPoint).applyQuaternion(hand.quaternion).add(hand.position)
+        .sub(new THREE.Vector3().fromArray(tool.userData.tipPoint)).applyQuaternion(this.measureWallOrientation(normal??new THREE.Vector3(0,0,1))).add(point);
+      return this.shoulder(camera,1).distanceTo(wrist)<=MAX_WRIST_REACH_M;
+    }
+    if(this.selectedTool==='measure'){
+      const hand=this.armSets.get('measure')!.find(arm=>arm.side===1)!.hand;
+      const wrist=new THREE.Vector3().fromArray(hand.userData.wristPoint).applyQuaternion(hand.quaternion).add(hand.position)
+        .applyQuaternion(normal?this.measureWallOrientation(normal):this.measureOrientation).add(point);
+      return this.shoulder(camera,1).distanceTo(wrist)<=MAX_WRIST_REACH_M;
+    }
     return (this.selectedTool==='hammer'?[-1,1]:[1]).some(side=>this.shoulder(camera,side).distanceTo(point)<=MAX_WRIST_REACH_M+extension);
+  }
+  private measureWallOrientation(normal:THREE.Vector3):THREE.Quaternion {
+    const back=new THREE.Vector3(normal.x,0,normal.z).normalize(),up=new THREE.Vector3(0,1,0);
+    if(back.lengthSq()<.5)back.set(0,0,1);
+    const right=up.clone().cross(back).normalize();
+    return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(right,up,back));
   }
   debugPose():object {
     return {tool:this.selectedTool,reachable:this.reachable,arms:(this.armSets.get(this.selectedTool)??[]).map(arm=>({
@@ -609,8 +704,9 @@ export class FPSRig extends THREE.Group {
     for(const side of [1,-1]){
       const resting=side<0&&kind!=='hammer';
       const grip=side===1?primary.clone():resting?new THREE.Vector3():new THREE.Vector3().fromArray(group.userData.secondaryGripPoint);
-      const style=resting?'relaxed':side<0?'hammer-support':kind;
+      const style=kind==='measure'&&side<0?'spring':resting?'relaxed':side<0?'hammer-support':kind==='measure'||kind==='laser'?'fitting':kind==='drill'||kind==='driver'?'hose':kind;
       const hand=workerHand(side,style); hand.position.copy(grip);
+      if(kind==='measure'&&side<0)hand.add(buildMeasurePencil());
       if(!resting&&group.userData.gripQuaternion)hand.quaternion.fromArray(group.userData.gripQuaternion);
       hand.userData.gripping=!resting;hand.userData.gripRole=resting?'resting':'primary';
       const arm=workerArm(side,hand,grip);arms.push(arm);this.add(arm.group);
@@ -618,7 +714,7 @@ export class FPSRig extends THREE.Group {
     }
     this.armSets.set(kind,arms);
   }
-  private createDetailedTool(kind: Exclude<RigTool,'hammer'>):THREE.Group {
+  private createDetailedTool(kind: Exclude<RigTool,'hammer'|'measure'|'drill'|'driver'|'laser'>):THREE.Group {
     const group=buildToolModel(kind);
     if(kind==='fitting'){
       for(const kinds of [['1G'],['2G'],['2G','1G']] as const){

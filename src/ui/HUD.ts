@@ -104,7 +104,8 @@ export class HUD {
           <aside id="desktop-key-guide" class="hud-card" aria-label="Keyboard and mouse controls">
             <div><kbd>WASD</kbd><span>MOVE</span><kbd>MOUSE</kbd><span>LOOK</span><kbd>SHIFT</kbd><span>FAST</span></div>
             <div><kbd>LMB</kbd><span>USE / HOLD</span><kbd>E</kbd><span>INTERACT</span><kbd>WHEEL</kbd><span>SWITCH TOOL</span></div>
-            <div><kbd>1–8</kbd><span>SELECT TOOL</span><kbd>[ / ]</kbd><span>HAMMER TILT</span><kbd>C</kbd><span>COLOR</span></div>
+            <div><kbd>1–9</kbd><span>SELECT TOOL</span><kbd>9 / M</kbd><span>MEASURE / MARK</span><kbd>C</kbd><span>COLOR</span></div>
+            <div><kbd>0</kbd><span>DRILL</span><kbd>B</kbd><span>DRIVER</span><kbd>L</kbd><span>LASER</span></div>
             <div><kbd>Q</kbd><span>TOOL SIDE</span><kbd>T / R</kbd><span>CHISEL / ANGLE</span><kbd>F</kbd><span>FULLSCREEN</span><kbd>ESC</kbd><span>RELEASE MOUSE</span></div>
           </aside>
           <div id="mortar-panel" class="hud-card" hidden>
@@ -134,6 +135,20 @@ export class HUD {
           <div id="mortar-face-splash" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
           <div id="reticle" aria-hidden="true"><span></span><span></span></div>
           <div id="interaction-prompt" role="status"></div>
+          <aside id="measure-panel" class="hud-card" aria-label="Height from floor" hidden>
+            <span class="measure-kicker">TAPE MEASURE · FROM FLOOR</span>
+            <div class="measure-value"><output id="measure-height">—</output><span>m</span></div>
+            <span id="measure-hint">Aim at the wall</span>
+            <button id="measure-mark" type="button" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 17 12-12 3 3L7 20H4zM14 7l3 3M4 20h16"/></svg> PENCIL MARK<span class="desktop-only"> · M</span></button>
+          </aside>
+          <aside id="laser-panel" class="hud-card" aria-label="Laser fixing" hidden>
+            <b id="laser-tool-title">LASER LEVEL</b>
+            <output id="laser-work-height">—</output>
+            <span id="laser-hint">Aim at a pencil mark</span>
+            <div class="laser-progress"><span id="laser-progress-fill"></span></div>
+            <button id="laser-place" type="button" hidden>PLACE LASER</button>
+          </aside>
+          <output id="laser-reference" hidden></output>
           <div id="box-supply" class="hud-card" aria-label="Box supply" hidden>
             <b>BOX FIT CHECK</b>
             <div class="box-presets">${['1G','2G','2G+1G'].map(kind=>`<button id="box-preset-${kind.replace('+','-')}" type="button" data-box-preset="${kind}" aria-pressed="${kind==='2G+1G'}">${kind}</button>`).join('')}</div>
@@ -174,12 +189,16 @@ export class HUD {
               ${quickButton('quick-water-flow','FLOW','FLOOD','color','hose','cycle-water-mode')}
               ${quickButton('quick-loft-down','LOFT −','12°','down','trowel','mortar-angle',-5)}
               ${quickButton('quick-loft-up','LOFT +','12°','up','trowel','mortar-angle',5)}
-              ${quickButton('quick-work-height','HEIGHT','CROUCH','crouch','hammer spray trowel hose fitting level','work-height')}
+              ${quickButton('quick-work-height','HEIGHT','CROUCH','crouch','hammer spray trowel hose fitting level measure drill driver laser','work-height')}
             </nav>
             <button id="tool-mode-toggle" type="button" aria-label="Change selected tool mode">
               <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 10h15l-3-3m3 3-3 3M25 22H10l3 3m-3-3 3-3"/></svg><span>LIVE</span>
             </button>
             <nav id="mobile-tool-slider" aria-label="Select tool">
+              <button type="button" data-tool="measure" aria-label="Tape measure"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 5h17a5 5 0 0 1 5 5v10H5zM8 20v8h11M12 6v7M17 6v4M22 6v7M8 24h4"/><circle cx="17" cy="14" r="3"/></svg><span>MEASURE</span></button>
+              <button type="button" data-tool="drill" aria-label="Drill fixing hole"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 7h15v10H3zM18 10h7M25 9v4M6 17v10h9v-4l-3-6M5 27h12"/></svg><span>DRILL</span></button>
+              <button type="button" data-tool="driver" aria-label="Screwdriver"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 8h17v9H4zM21 11h7M7 17v10h9v-5l-3-5M27 8v6M5 27h13"/></svg><span>DRIVER</span></button>
+              <button type="button" data-tool="laser" aria-label="Laser level"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="9" y="7" width="14" height="20" rx="2"/><path d="M2 16h28M16 2v28M11 11h10M12 23h8"/></svg><span>LASER</span></button>
               <button type="button" data-tool="spray" aria-label="Spray"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M10 9h11l3 5v14H7V14zM12 4h8v5h-8z"/><path d="M24 11h5M26 7l4-2M26 15l4 2"/></svg><span>SPRAY</span></button>
               <button type="button" data-tool="hammer" aria-label="Demolition hammer"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 8h17l5 5-5 5H5zM16 18v11"/></svg><span>HAMMER</span></button>
               <button type="button" data-tool="fitting" aria-label="Fitting box"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="5" y="6" width="22" height="21" rx="2"/><circle cx="16" cy="16.5" r="5"/><path d="M8 10h3M21 10h3"/></svg><span>BOX</span></button>
@@ -193,10 +212,10 @@ export class HUD {
           <section id="start-screen" class="screen-panel">
             <div class="eyebrow">CYPRUS · RESIDENTIAL FIRST FIX</div>
             <h1>WIRE<br><span>THE HOUSE</span></h1>
-            <p>Choose where to work; spray marks are optional. Chase real masonry, throw mortar into the recess and set each box level and flush. Finish the PVC routes before plastering.</p>
+            <p>Measure from the floor and pencil the working height. Chase real masonry, throw mortar into the recess and set each box level and flush. Finish the PVC routes before plastering.</p>
             <div class="brief-grid"><span>3 installation points</span><span>No cable pulling</span><span>Desktop + mobile</span></div>
             <button id="start-button">ENTER THE SITE</button>
-            <small>WASD · MOUSE LOOK · LEFT CLICK / E USE TOOL · WHEEL / 1–8 TOOLS · V SPRAY · C COLOR · X CHASE / DEMOLISH</small>
+            <small>WASD · MOUSE LOOK · LEFT CLICK / E USE TOOL · 9 MEASURE · M MARK · 0 DRILL · B DRIVER · L LASER · WHEEL SWITCH TOOL</small>
           </section>
           <section id="result-panel" class="screen-panel result-panel">
             <div class="eyebrow">LIVING ROOM · INSPECTION PASSED</div>
@@ -239,6 +258,8 @@ export class HUD {
       });
     };
     root.querySelectorAll<HTMLButtonElement>('[data-box-preset]').forEach(button=>bindHammerButton(`#${button.id}`,()=>dispatchEvent(new CustomEvent('wirehouse:box-preset',{detail:button.dataset.boxPreset}))));
+    bindHammerButton('#measure-mark',()=>{if(!root.querySelector<HTMLButtonElement>('#measure-mark')!.disabled)dispatchEvent(new CustomEvent('wirehouse:measure-mark'));});
+    bindHammerButton('#laser-place',()=>{if(!root.querySelector<HTMLButtonElement>('#laser-place')!.disabled)dispatchEvent(new CustomEvent('wirehouse:laser-place'));});
     bindHammerButton('#hammer-view-left',()=>window.dispatchEvent(new CustomEvent('wirehouse:hammer-view-side',{detail:1})));
     bindHammerButton('#hammer-view-right',()=>window.dispatchEvent(new CustomEvent('wirehouse:hammer-view-side',{detail:-1})));
     bindHammerButton('#hammer-view-toggle',()=>window.dispatchEvent(new CustomEvent('wirehouse:hammer-view-side',{detail:0})));
@@ -333,7 +354,7 @@ export class HUD {
     this.shell.classList.toggle('mortar-tool',selectedTool==='trowel'||selectedTool==='hose');
     this.progress.style.width = `${missionProgress}%`;
     this.reticle.classList.toggle('active', targeted);
-    if(toolChanged)this.tool.innerHTML = `<span>SELECTED TOOL</span><b class="selected">${selectedTool.toUpperCase()}</b><em>${selectedTool==='trowel'?'HOLD · RELEASE':selectedTool==='hose'?'HOLD TO SPRAY':'LEFT CLICK TO USE'}</em>`;
+    if(toolChanged)this.tool.innerHTML = `<span>SELECTED TOOL</span><b class="selected">${selectedTool.toUpperCase()}</b><em>${selectedTool==='measure'?'AIM TO MEASURE · M TO MARK':selectedTool==='trowel'?'HOLD · RELEASE':selectedTool==='hose'?'HOLD TO SPRAY':'LEFT CLICK TO USE'}</em>`;
     if (!point) {
       this.objective.textContent = 'Site ready for inspection';
       this.shell.querySelector('#objective-compact')!.textContent = 'SITE / INSPECTION';
@@ -528,6 +549,31 @@ export class HUD {
     this.shell.querySelector('#mobile-action')!.textContent='USE';
     this.shell.querySelector('#aim-control-label')!.textContent='HOLD + AIM';
     this.shell.querySelector('#look-joystick')!.setAttribute('aria-label','Hold to use selected tool; drag to aim');
+  }
+  updateHeightMeasure(active:boolean,height:number|null,ready:boolean):void {
+    const value=height===null?'—':height.toFixed(2);
+    if(!this.displayChanged('height-measure',`${active}:${value}:${ready}`))return;
+    this.shell.querySelector<HTMLElement>('#measure-panel')!.hidden=!active;
+    this.shell.querySelector('#measure-height')!.textContent=value;
+    this.shell.querySelector('#measure-hint')!.textContent=ready?'Aim up or down to choose height':height===null?'Aim at a wall':'Move closer to measure';
+    this.shell.querySelector<HTMLButtonElement>('#measure-mark')!.disabled=!ready;
+    this.shell.querySelector('#mobile-action')!.textContent=active?'AIM':'USE';
+    this.shell.querySelector('#look-joystick-thumb small')!.textContent=active?'MEASURE':'+ AIM';
+    this.shell.querySelector('#look-joystick')!.setAttribute('aria-label',active?'Drag to aim the tape measure':'Hold to use selected tool; drag to aim');
+  }
+  updateLaser(tool:RigTool,state:{phase:string;hint:string;heightM:number|null;progress:number;active:boolean;mounted:boolean}):void {
+    const visible=['drill','driver','laser'].includes(tool),height=state.heightM===null?'—':`${state.heightM.toFixed(2)} m`;
+    if(!this.displayChanged('laser',`${tool}:${state.phase}:${height}:${Math.round(state.progress*100)}:${state.active}:${state.mounted}`))return;
+    this.shell.querySelector<HTMLElement>('#laser-panel')!.hidden=!visible;
+    this.shell.querySelector('#laser-tool-title')!.textContent=tool==='drill'?'DRILL FIXING HOLE':tool==='driver'?'FASTEN LASER':'LASER LEVEL';
+    this.shell.querySelector('#laser-work-height')!.textContent=height;
+    this.shell.querySelector('#laser-hint')!.textContent=state.hint;
+    this.shell.querySelector<HTMLElement>('#laser-progress-fill')!.style.width=`${Math.round(state.progress*100)}%`;
+    const button=this.shell.querySelector<HTMLButtonElement>('#laser-place')!;
+    button.hidden=tool!=='laser';button.disabled=!['mount-ready','mounted','active'].includes(state.phase);
+    button.textContent=state.mounted?'PICK UP LASER':'PLACE LASER';
+    const reference=this.shell.querySelector<HTMLElement>('#laser-reference')!;
+    reference.hidden=!state.active;reference.textContent=`LASER · ${height}`;
   }
   updateWorkHeight(crouched:boolean):void {
     if(!this.displayChanged('work-height',String(crouched)))return;
