@@ -16,6 +16,7 @@ import { MortarSystem } from '../systems/MortarSystem';
 import { RoomWaterSystem } from '../systems/RoomWaterSystem';
 import { BoxPlacementSystem } from '../systems/BoxPlacementSystem';
 import { BoxFitPreview } from '../systems/BoxFitPreview';
+import { WorkSurfaceClearance } from '../systems/WorkSurfaceClearance';
 import { GAME_CONFIG } from '../data/gameConfig';
 import { WATER_GUN_MODES } from '../systems/WaterGun';
 import { LevelingSystem, type LevelDirection } from '../systems/LevelingSystem';
@@ -56,6 +57,7 @@ export class Game {
   readonly roomWater: RoomWaterSystem;
   readonly boxPlacement: BoxPlacementSystem;
   readonly boxFitPreview: BoxFitPreview;
+  readonly workSurfaces: WorkSurfaceClearance;
   readonly ready: Promise<void>;
   readonly leveling = new LevelingSystem();
   readonly hud: HUD;
@@ -107,6 +109,7 @@ export class Game {
     this.roomWater = new RoomWaterSystem(this.renderer.scene, this.room.brickWall);
     this.boxPlacement = new BoxPlacementSystem(this.room.brickWall,this.mortar,this.mission.points);
     this.boxFitPreview = new BoxFitPreview(this.renderer.scene,this.boxPlacement);
+    this.workSurfaces = new WorkSurfaceClearance(this.mortar,this.mission.points);
     this.fpsRig.setFittingBoxKinds(this.mission.boxPreset.split('+') as Array<'1G'|'2G'>);
     this.mortar.onRunoff = event => this.roomWater.addRunoff(event);
     this.mortar.onWaterEmission = event => this.roomWater.addEmission(event);
@@ -219,7 +222,11 @@ export class Game {
       this.fpsRig.poseArms(camera);
     }
     const releaseOrigin = this.fpsRig.toolTipWorld(this.renderer.camera, this.selectedTool);
-    if (mortarTool && this.selectedTool === 'trowel') this.mortar.swing(this.input.actionHeld,dt,this.renderer.camera,()=>this.fpsRig.poseTrowel(this.renderer.camera,this.mortar.throwFeedback.motion,0,this.room.brickWall.volume.frontZ));
+    if (mortarTool && this.selectedTool === 'trowel') this.mortar.swing(this.input.actionHeld,dt,this.renderer.camera,()=>{
+      this.fpsRig.poseTrowel(this.renderer.camera,this.mortar.throwFeedback.motion,0,this.room.brickWall.volume.frontZ);
+      this.fpsRig.constrainWorkSurfaces(this.renderer.camera,this.workSurfaces.frontForBounds);
+      return this.fpsRig.trowelReleaseWorld(this.renderer.camera);
+    });
     else this.mortar.cancel();
     const waterSetting=WATER_GUN_MODES[this.waterGunModeIndex];
     const waterHeld=mortarTool&&this.selectedTool==='hose'&&this.input.actionHeld;
@@ -248,6 +255,7 @@ export class Game {
     if (this.selectedTool === 'hammer') this.fpsRig.contact(this.renderer.camera, this.room.brickWall);
     else if(this.selectedTool==='trowel')this.fpsRig.poseTrowel(this.renderer.camera,this.mortar.throwFeedback.motion,dt,this.room.brickWall.volume.frontZ);
     else this.fpsRig.poseArms(this.renderer.camera);
+    if(this.selectedTool!=='hammer'&&this.selectedTool!=='hose')this.fpsRig.constrainWorkSurfaces(this.renderer.camera,this.workSurfaces.frontForBounds);
     const waterHit = this.selectedTool === 'spray' || mortarTool ? this.room.brickWall.aim(this.renderer.camera) : null;
     const wallAim = Boolean(waterHit);
     const aimedBox=['fitting','level','spring','cutter'].includes(this.selectedTool)?this.boxPlacement.target(this.renderer.camera):null;

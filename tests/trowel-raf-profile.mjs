@@ -7,7 +7,7 @@ import {blockPointerLock} from './browser-safety.mjs';
 
 const url=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/?renderer=webgl',out=process.argv[3]??'output/trowel-raf-profile';
 await mkdir(out,{recursive:true});
-const paths=['src/core/Renderer.ts','src/core/Game.ts','src/player/FPSRig.ts','src/player/ToolModels.ts','src/systems/MortarSystem.ts','src/systems/MortarField.ts'];
+const paths=['src/core/Renderer.ts','src/core/Game.ts','src/player/FPSRig.ts','src/player/ToolModels.ts','src/systems/MortarSystem.ts','src/systems/MortarField.ts','src/systems/WorkSurfaceClearance.ts'];
 const hashes=async()=>Object.fromEntries(await Promise.all(paths.map(async path=>[path,createHash('sha256').update(await readFile(path)).digest('hex')])));
 const report={url,head:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),sourceBefore:await hashes(),method:'Actual RAF, native stationary touch hold/release, 390x844 DPR3 Chromium. Camera fixture established once; no clock or frame gating. Inclusive CPU timings overlap. Physical iPhone unverified.',console:[],errors:[],cases:[]};
 const browser=await chromium.launch({channel:'chrome',headless:true});

@@ -23,6 +23,8 @@ const place = (object: THREE.Object3D, x: number, y: number, z: number): THREE.O
 
 export class FPSRig extends THREE.Group {
   private readonly tools = new Map<RigTool, THREE.Group>();
+  private readonly heldBounds = new Map<string, THREE.Box3>();
+  private readonly surfaceBounds = new THREE.Box3();
   private readonly restingY = -0.12;
   private readonly touchViewport = window.matchMedia('(pointer: coarse)');
   private sprayCanMaterial: THREE.MeshStandardMaterial | null = null;
@@ -264,6 +266,11 @@ export class FPSRig extends THREE.Group {
     return group ? group.localToWorld(tip ? new THREE.Vector3().fromArray(tip) : new THREE.Vector3(.1,.04,-.14)) : camera.localToWorld(new THREE.Vector3(.15,-.18,-.55));
   }
   /** Pose around the actual grip before querying the moving release edge. */
+  trowelReleaseWorld(camera:THREE.Camera):THREE.Vector3 {
+    camera.updateMatrixWorld(true);this.updateWorldMatrix(true,true);
+    const tool=this.tools.get('trowel')!;
+    return tool.localToWorld(new THREE.Vector3().fromArray(tool.userData.releasePoint));
+  }
   poseTrowel(camera: THREE.Camera, motion: TrowelMotion, dt = 0, wallFrontZ = -2.41): THREE.Vector3 {
     const tool=this.tools.get('trowel')!;
     const arm=this.armSets.get('trowel')!.find(candidate=>candidate.side===1)!;
@@ -468,6 +475,63 @@ export class FPSRig extends THREE.Group {
       if(!moved)break;
     }
     tool.updateWorldMatrix(true,true);
+  }
+  /** Conservative local envelope, cached once per held box preset, including the gripping hand. */
+  heldToolBoundsWorld(target=new THREE.Box3()):THREE.Box3 {
+    const tool=this.tools.get(this.selectedTool)!;
+    const key=this.selectedTool==='fitting'?`${this.selectedTool}:${this.fittingPreset}:${this.fittingBoxAvailable}`:this.selectedTool;
+    tool.updateWorldMatrix(true,true);
+    let bounds=this.heldBounds.get(key);
+    if(!bounds){
+      bounds=new THREE.Box3();
+      const inverse=tool.matrixWorld.clone().invert(),relative=new THREE.Matrix4(),partBounds=new THREE.Box3();
+      const collect=(object:THREE.Object3D):void=>{
+        if(!object.visible&&object.name!=='trowel-load')return;
+        if(object instanceof THREE.Mesh){
+          object.geometry.computeBoundingBox();
+          if(object.geometry.boundingBox){
+            relative.multiplyMatrices(inverse,object.matrixWorld);
+            partBounds.copy(object.geometry.boundingBox).applyMatrix4(relative);bounds!.union(partBounds);
+          }
+        }
+        for(const child of object.children)collect(child);
+      };
+      collect(tool);
+      // Finger flex and the loaded trowel's morph envelopes stay inside this
+      // small skin. Never rebuild all mesh bounds during a swing or camera pan.
+      bounds.expandByScalar(.003);this.heldBounds.set(key,bounds);
+    }
+    return target.copy(bounds).applyMatrix4(tool.matrixWorld);
+  }
+  /** Retract a held tool from the local wall/patch/casing surface, with physical hand IK. */
+  constrainWorkSurfaces(camera:THREE.Camera,frontForBounds:(bounds:THREE.Box3)=>number|null):number {
+    // The hammer's working bit deliberately enters material and owns its
+    // contact/feed solver. A generic envelope would pull it off the chisel hit.
+    if(this.selectedTool==='hammer')return 0;
+    const tool=this.tools.get(this.selectedTool)!;
+    let retracted=0;
+    for(let attempt=0;attempt<3;attempt++){
+      const bounds=this.heldToolBoundsWorld(this.surfaceBounds),front=frontForBounds(bounds);
+      if(front===null||!Number.isFinite(front))break;
+      const correction=front+.002-bounds.min.z;
+      if(correction<=1e-6)break;
+      const position=tool.getWorldPosition(new THREE.Vector3());
+      if(this.selectedTool==='trowel'){
+        // Retract at the shoulder, preserving the authored straight wrist and
+        // fixed forearm axis throughout the flip. A generic two-bone IK pose
+        // here bends the wrist sharply even though the hand still holds the grip.
+        const shoulder=this.shoulder(camera,1),upper=this.trowelElbow.clone().sub(shoulder);
+        const z=Math.min(UPPER_ARM_M-.0001,upper.z+correction);
+        const lateral=Math.hypot(upper.x,upper.y),radius=Math.sqrt(UPPER_ARM_M**2-z*z);
+        const next=upper.clone();
+        if(lateral>1e-8){next.x*=radius/lateral;next.y*=radius/lateral;}else next.set(radius,0,z);
+        next.z=z;next.add(shoulder);
+        position.add(next.clone().sub(this.trowelElbow));this.trowelElbow.copy(next);
+      }else position.z+=correction;
+      tool.position.copy(this.worldToLocal(position));retracted+=correction;
+      this.poseArms(camera);
+    }
+    return retracted;
   }
   private restHammer(camera:THREE.Camera):void {
     this.reachable=false;this.chiselInAir=true;

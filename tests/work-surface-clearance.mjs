@@ -1,0 +1,24 @@
+import assert from 'node:assert/strict';
+import {build} from 'esbuild';
+import * as THREE from 'three';
+await build({entryPoints:['src/systems/WorkSurfaceClearance.ts'],outfile:'output/work-surface-clearance.mjs',bundle:true,platform:'node',format:'esm',external:['three']});
+const {WorkSurfaceClearance}=await import('../output/work-surface-clearance.mjs');
+const mortar={deposits:[]},points=[],surfaces=new WorkSurfaceClearance(mortar,points);
+const held=new THREE.Box3(new THREE.Vector3(-.1,1,-2.5),new THREE.Vector3(.1,1.2,-1.8));
+assert.equal(surfaces.frontForBounds(held),-2.41);
+const patch=new THREE.Mesh(new THREE.BoxGeometry(.15,.15,.02));patch.position.set(0,1.1,-2.39);mortar.deposits.push({mesh:patch});
+assert(Math.abs(surfaces.frontForBounds(held)+2.38)<1e-7);
+const firstBounds=patch.geometry.boundingBox;surfaces.frontForBounds(held);assert.equal(patch.geometry.boundingBox,firstBounds,'Unchanged geometry reuses bounds');
+patch.position.x=1;assert.equal(surfaces.frontForBounds(held),-2.41,'Distant patch does not move held tool');
+patch.position.x=0;patch.geometry=new THREE.BoxGeometry(.15,.15,.04);assert(Math.abs(surfaces.frontForBounds(held)+2.37)<1e-7,'Replacement mortar geometry updates clearance');
+patch.visible=false;assert.equal(surfaces.frontForBounds(held),-2.41);
+const point=new THREE.Group(),group=new THREE.Group(),box=new THREE.Group();
+box.add(new THREE.Mesh(new THREE.BoxGeometry(.14,.08,.035)));group.boxes=[box];group.add(box);point.boxGroup=group;point.add(group);point.position.set(0,1.1,-2.35);points.push(point);
+// A hidden helper deliberately protrudes far beyond the casing.
+const helper=new THREE.Mesh(new THREE.BoxGeometry(1,1,1));helper.visible=false;helper.position.z=1;group.add(helper);
+assert(Math.abs(surfaces.frontForBounds(held)+2.3325)<1e-7);
+group.position.z=.02;assert(Math.abs(surfaces.frontForBounds(held)+2.3125)<1e-7,'Depth adjustment invalidates cached world bounds');
+group.rotation.z=.2;assert(Number.isFinite(surfaces.frontForBounds(held)));
+group.visible=false;assert.equal(surfaces.frontForBounds(held),-2.41,'Retrieved box stops being an obstacle');
+held.translate(new THREE.Vector3(10,0,0));assert.equal(surfaces.frontForBounds(held),null);
+console.log(JSON.stringify({passed:true,checks:11}));

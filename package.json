@@ -30,6 +30,8 @@
     "test:water-droplets": "node tests/water-droplet-scale.mjs && node tests/hose-nozzle-ui.mjs",
     "test:water-stream": "node tests/water-stream-geometry.mjs && node tests/water-stream-visibility-ui.mjs",
     "test:soft-mortar": "node tests/mortar-soft-settling.mjs && node tests/mortar-practical-fill.mjs && node tests/mortar-soft-native.mjs",
+    "test:mortar-finishing": "node tests/mortar-tiny-gaps.mjs && node tests/mortar-settling-temporal.mjs && node tests/mortar-atomic-mesh.mjs && node tests/mortar-tiny-native.mjs && node tests/mortar-soft-native.mjs",
+    "test:held-tool-clearance": "node tests/work-surface-clearance.mjs && node tests/held-tool-surface-clearance.mjs && node tests/held-tool-surfaces-ui.mjs",
     "test:trowel-performance": "node tests/trowel-pose-stability.mjs && node tests/mortar-mesh-performance.mjs && node tests/trowel-raf-profile.mjs",
     "test:vertical-joints": "node tests/vertical-joint-contact.mjs && node tests/vertical-joint-ui.mjs",
     "test:room-water": "node tests/room-water-smoke.mjs",

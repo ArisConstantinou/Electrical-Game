@@ -24,7 +24,7 @@ export class MortarField {
   private readonly occupiedMin = new THREE.Vector3(Infinity, Infinity, Infinity);
   private readonly occupiedMax = new THREE.Vector3(-Infinity, -Infinity, -Infinity);
   private meshSamples: {x:number;y:number;z:number;size:number;values:Float64Array}|null=null;
-  private readonly settling:Array<{remaining:number;elapsed:number;cells:Set<string>;blocked:(p:THREE.Vector3)=>boolean}>=[];
+  private readonly settling:Array<{remaining:number;cells:Set<string>;blocked:(p:THREE.Vector3)=>boolean}>=[];
   private key(x: number, y: number, z: number): string { return `${x},${y},${z}`; }
   private chunkKey(x: number, y: number, z: number): string { return this.key(Math.floor(x / CHUNK), Math.floor(y / CHUNK), Math.floor(z / CHUNK)); }
   get nodeMass(): number { return this.spacing ** 3 * this.density; }
@@ -36,7 +36,12 @@ export class MortarField {
     return this.nodes.get(this.key(x,y,z))?.value ?? 0;
   }
   private changed(node: Node): void {
-    for (let x=-1;x<=0;x++) for(let y=-1;y<=0;y++) for(let z=-1;z<=0;z++) this.dirty.add(this.chunkKey(node.x+x,node.y+y,node.z+z));
+    // Interpolation changes touching cells, and the .6-cell normal gradient
+    // reaches one cell farther. Refresh both sides of a chunk boundary even
+    // when only its lighting gradient, not its triangles, has changed.
+    for(let x=Math.floor((node.x-2)/CHUNK);x<=Math.floor((node.x+1)/CHUNK);x++)
+      for(let y=Math.floor((node.y-2)/CHUNK);y<=Math.floor((node.y+1)/CHUNK);y++)
+        for(let z=Math.floor((node.z-2)/CHUNK);z<=Math.floor((node.z+1)/CHUNK);z++)this.dirty.add(this.key(x,y,z));
   }
   private set(x: number,y: number,z: number,value: number,age: number,dilution=0): void {
     const key=this.key(x,y,z), old=this.nodes.get(key);
@@ -99,21 +104,26 @@ export class MortarField {
     const axis=normal.clone().normalize(),radius=Math.max(.012,Math.cbrt(footprintMass/.65)*.084);
     const depth=THREE.MathUtils.clamp(mass/this.density/(Math.PI*radius*radius)*2.5,.018,.075);
     const center=point.clone().addScaledVector(axis,depth*.3),reach=Math.max(radius,depth),h=this.spacing;
-    const candidates:Array<{x:number;y:number;z:number;weight:number;old:number;age:number;dilution:number}>=[];
+    const candidates:Array<{x:number;y:number;z:number;weight:number;old:number;age:number;dilution:number;capacity:number}>=[];
     const flowCells=new Set<string>();
     const min=[Math.floor((center.x-reach)/h),Math.floor((center.y-reach)/h),Math.floor((center.z-reach)/h)];
     const max=[Math.ceil((center.x+reach)/h),Math.ceil((center.y+reach)/h),Math.ceil((center.z+reach)/h)];
-    if(profile){min[2]=Math.floor((profile.frontZ-.20)/h);max[2]=Math.floor((profile.frontZ+.004)/h);}
+    // A fixed 4 mm allowance can stop between lattice rows: a shallow clay rib
+    // then has no free node above it and leaves an unfillable slit in the bed.
+    // Admit the first exterior row for a thin coat, with density capped below
+    // so its interpolated skin still ends at most 10 mm outside the wall.
+    if(profile){min[2]=Math.floor((profile.frontZ-.20)/h);max[2]=Math.floor(profile.frontZ/h)+1;}
     const columns=new Map<string,number|null>();
     const q=new THREE.Vector3(),delta=new THREE.Vector3();
     for(let x=min[0];x<=max[0];x++)for(let y=min[1];y<=max[1];y++)for(let z=min[2];z<=max[2];z++){
-      q.set(x*h,y*h,z*h);let weight:number;
+      q.set(x*h,y*h,z*h);let weight:number,capacity=1;
       if(profile){
         const metric=((q.x-point.x)**2+(q.y-point.y)**2)/(radius*radius);if(metric>=1)continue;
         const key=this.key(x,y,0);let back=columns.get(key);if(back===undefined){back=profile.supportZ(q.x,q.y);columns.set(key,back);}
         // Only the first exposed surviving wall surface backs a column. Sealed
         // chambers behind an intact clay shell cannot receive remote mortar.
-        if(back===null||q.z<back||q.z>profile.frontZ+.004||blocked(q))continue;
+        if(back===null||q.z<back||blocked(q))continue;
+        if(z===max[2])capacity=Math.min(1,LEVEL/Math.max(LEVEL,1-(profile.frontZ+.010-q.z)/h));
         const fillDepth=Math.max(0,q.z-back);
         const cavityPriority=profile.frontZ-back>.012?8:.08;
         weight=(.25+.75*(1-metric)**.8)*Math.exp(-fillDepth/.032)*cavityPriority;
@@ -121,16 +131,20 @@ export class MortarField {
         delta.copy(q).sub(center);const axial=delta.dot(axis),radial=Math.max(0,delta.lengthSq()-axial*axial),metric=radial/(radius*radius)+axial*axial/(depth*depth);
         if(metric>=1||blocked(q))continue;weight=(1-metric)**1.4;
       }
-      const key=this.key(x,y,z);flowCells.add(key);
-      const old=this.nodes.get(key);if((old?.value??0)>.9999||(old?.age??0)>=FRESH_SECONDS)continue;
-      candidates.push({x,y,z,weight,old:old?.value??0,age:old?.age??0,dilution:old?.dilution??0});
+      const key=this.key(x,y,z);
+      // Keep the sub-cell finishing film at its capped density; settling it
+      // down to LEVEL would erase its skin, while filling it would exceed the
+      // coat limit. The deeper fresh material keeps its short plastic response.
+      if(capacity===1)flowCells.add(key);
+      const old=this.nodes.get(key);if((old?.value??0)>=capacity-.0001||(old?.age??0)>=FRESH_SECONDS)continue;
+      candidates.push({x,y,z,weight,old:old?.value??0,age:old?.age??0,dilution:old?.dilution??0,capacity});
     }
     if(!candidates.length)return 0;
     const target=mass/this.nodeMass;
-    const volume=(scale:number):number=>{let added=0;for(const c of candidates)added+=Math.max(0,Math.min(1,c.weight*scale)-c.old);return added;};
+    const volume=(scale:number):number=>{let added=0;for(const c of candidates)added+=Math.max(0,Math.min(c.capacity,c.weight*scale)-c.old);return added;};
     let low=0,high=128;for(let i=0;i<22;i++){const middle=(low+high)*.5;if(volume(middle)>target)high=middle;else low=middle;}
     let added=0;
-    for(const c of candidates){const value=Math.max(c.old,Math.min(1,c.weight*low)),increment=value-c.old;if(increment<1e-8)continue;if(!this.nodes.has(this.key(c.x,c.y,c.z))&&this.nodes.size>=this.maxNodes)break;
+    for(const c of candidates){const value=Math.max(c.old,Math.min(c.capacity,c.weight*low)),increment=value-c.old;if(increment<1e-8)continue;if(!this.nodes.has(this.key(c.x,c.y,c.z))&&this.nodes.size>=this.maxNodes)break;
       added+=increment;this.set(c.x,c.y,c.z,value,c.age*c.old/value,c.dilution*c.old/value);
     }
     // Collect diffuse tails with no visible skin. Repeated small retained
@@ -147,7 +161,7 @@ export class MortarField {
       candidates.sort((a,b)=>b.weight-a.weight);
       for(const c of candidates){
         const node=this.nodes.get(this.key(c.x,c.y,c.z)),old=node?.value??0;
-        const increment=Math.min(unresolved-recovered,1-old);if(increment<1e-8)continue;
+        const increment=Math.min(unresolved-recovered,c.capacity-old);if(increment<1e-8)continue;
         if(!node&&this.nodes.size>=this.maxNodes)break;
         const value=old+increment;
         this.set(c.x,c.y,c.z,value,(node?.age??0)*old/value,(node?.dilution??0)*old/value);
@@ -159,7 +173,7 @@ export class MortarField {
       // Impact briefly yields the fresh bed. Keep the same finite quantity in
       // its checked, backed footprint; cured mortar is never remobilized.
       if(this.settling.length>=4)this.settling.shift();
-      this.settling.push({remaining:4,elapsed:0,cells:flowCells,blocked});
+      this.settling.push({remaining:.24,cells:flowCells,blocked});
     }
     return (added-unresolved+recovered)*this.nodeMass;
   }
@@ -174,8 +188,8 @@ export class MortarField {
   private settleFresh(dt:number):void {
     const q=new THREE.Vector3(),h=this.spacing;
     for(let batchIndex=this.settling.length-1;batchIndex>=0;batchIndex--){
-      const batch=this.settling[batchIndex];batch.elapsed+=dt;
-      if(batch.elapsed<.06)continue;batch.elapsed=0;batch.remaining--;
+      const batch=this.settling[batchIndex],step=Math.min(Math.max(0,dt),batch.remaining);
+      if(step<=0)continue;batch.remaining-=step;
       // Only cells present at the start can emit this step; newly reached cells
       // wait until the next step before they can carry material onward.
       const sources=[...batch.cells].map(key=>this.nodes.get(key)).filter((node):node is Node=>!!node&&node.value>=LEVEL&&node.age<FRESH_SECONDS);
@@ -192,17 +206,40 @@ export class MortarField {
           if(score>.3&&(!best||score>best.score))best={x,y,z,value,score};
         }
         if(!best)continue;
-        const amount=Math.min(.22,source.value*.24,node.value-LEVEL,(1-best.value)*.5)*Math.max(.15,1-node.age/FRESH_SECONDS);
-        if(amount<.005)continue;
+        const base=Math.min(.22,source.value*.24,node.value-LEVEL,(1-best.value)*.5)*Math.max(.15,1-node.age/FRESH_SECONDS);
+        if(base<.005)continue;
+        // Distribute the same short yielding response over simulation time.
+        // Four 60 ms jumps made already adhered mortar visibly twitch; a
+        // normal frame now transfers only its share of that quantity.
+        const amount=Math.min(base*step/.06,node.value-LEVEL,1-best.value);
         const target=this.nodes.get(this.key(best.x,best.y,best.z)),total=best.value+amount;
         this.set(best.x,best.y,best.z,total,((target?.age??0)*best.value+node.age*amount)/total,((target?.dilution??0)*best.value+node.dilution*amount)/total);
         this.set(node.x,node.y,node.z,node.value-amount,node.age,node.dilution);moved+=amount;
       }
       if(moved>0)this.revision++;
-      if(batch.remaining<=0||!moved)this.settling.splice(batchIndex,1);
+      if(batch.remaining<=1e-8||!moved)this.settling.splice(batchIndex,1);
     }
   }
   invalidateGeometry():void {for(const node of this.nodes.values())this.changed(node);}
+
+  /** A remesh may span several frames while fresh material continues yielding.
+   * Copy one coherent field revision, including the interpolation/normal halo,
+   * so neighboring chunk boundaries can be published together without seams. */
+  createMeshSnapshot():MortarField {
+    const snapshot=new MortarField(),copiedChunks=new Set<string>();
+    snapshot.revision=this.revision;
+    for(const key of this.dirty){
+      snapshot.dirty.add(key);
+      const [x,y,z]=key.split(',').map(Number);
+      for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++)for(let dz=-1;dz<=1;dz++)copiedChunks.add(this.key(x+dx,y+dy,z+dz));
+    }
+    for(const key of copiedChunks){
+      const entries=this.chunkNodes.get(key);if(!entries)continue;
+      snapshot.chunkNodes.set(key,new Set(entries));
+      for(const entry of entries){const node=this.nodes.get(entry);if(node)snapshot.nodes.set(entry,{...node});}
+    }
+    return snapshot;
+  }
 
   /** Water lowers fresh cohesion and physically removes local material. The
    * returned kg must be transferred to moving slurry by the caller. */
@@ -287,7 +324,10 @@ export class MortarField {
       const emit=(a:THREE.Vector3,b:THREE.Vector3,c:THREE.Vector3,outward:THREE.Vector3):void=>{
         if(new THREE.Vector3().crossVectors(b.clone().sub(a),c.clone().sub(a)).dot(outward)<0)[b,c]=[c,b];
         for(const polygon of clip([a,b,c]))for(let i=1;i<polygon.length-1;i++){
-          const aa=polygon[0],bb=polygon[i],cc=polygon[i+1];if(new THREE.Vector3().crossVectors(bb.clone().sub(aa),cc.clone().sub(aa)).lengthSq()<1e-18)continue;
+          // Preserve tiny but real triangles where a settling isosurface
+          // crosses a chunk edge. Dropping them independently opened pinholes
+          // against the neighboring chunk's surviving boundary segment.
+          const aa=polygon[0],bb=polygon[i],cc=polygon[i+1];if(new THREE.Vector3().crossVectors(bb.clone().sub(aa),cc.clone().sub(aa)).lengthSq()<1e-24)continue;
           for(const p of [aa,bb,cc]){positions.push(p.x,p.y,p.z);const n=vertexNormal(p);normals.push(n.x,n.y,n.z);}
         }
       };

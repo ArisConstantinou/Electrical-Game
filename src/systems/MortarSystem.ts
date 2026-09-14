@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { InstallationPoint } from '../electrical/InstallationPoint';
 import type { BrickWall } from '../world/BrickWall';
-import { MortarField } from './MortarField';
+import { MortarField, type MortarFieldChunk } from './MortarField';
 import { WATER_GUN_MODES, type WaterGunSetting } from './WaterGun';
 import { sampleTrowelMotion, TROWEL_CHARGE_SECONDS, TROWEL_FULL_CHARGE_GRACE_SECONDS, TROWEL_RELEASE_SECONDS, TROWEL_CAST_SECONDS } from '../player/TrowelMotion';
 
@@ -12,6 +12,7 @@ type Clod = { mesh: THREE.Mesh; velocity: THREE.Vector3; mass: number; age: numb
 type Deposit = { fieldKey?: string; position: THREE.Vector3; radius: number; mass: number; mesh: THREE.Mesh; age: number; normal: THREE.Vector3; support: number };
 type Contact = { point: THREE.Vector3; normal: THREE.Vector3; distance: number; box: boolean };
 type Opening = { inverse: THREE.Matrix4; halfWidth: number; halfHeight: number; minZ: number; maxZ: number };
+type FieldMeshBatch = { snapshot: MortarField; keys: string[]; chunks: MortarFieldChunk[]; openings: Opening[] };
 const Z = new THREE.Vector3(0, 0, 1);
 const DENSITY = 1900;
 const MAX_PATCHES = 256;
@@ -65,6 +66,7 @@ export class MortarSystem {
   private readonly pendingWashPoint = new THREE.Vector3();
   private readonly pendingWashNormal = new THREE.Vector3(0,0,1);
   private fieldMeshTime = 0;
+  private pendingFieldMesh:FieldMeshBatch|null=null;
   private supportDirty = false;
   private lastWallRemovalCount = -1;
   readonly water = new Map<string, WaterCell>();
@@ -601,22 +603,44 @@ export class MortarSystem {
   }
 
   private syncFieldGeometry(maxChunks=Infinity): void {
-    const boxes=this.openings();
-    for(const chunk of this.field.remesh(triangle=>this.clipOpenings(triangle,boxes),maxChunks)){
+    // Explicit synchronous callers need the latest field (e.g. offline setup).
+    // During play, freeze one immutable generation and prepare one chunk per
+    // frame. Live settling/washing may continue without restarting that batch.
+    if(maxChunks===Infinity)this.cancelFieldMeshBatch();
+    if(!this.pendingFieldMesh){
+      if(!this.field.dirty.size)return;
+      const snapshot=this.field.createMeshSnapshot(),keys=[...snapshot.dirty];
+      for(const key of keys)this.field.dirty.delete(key);
+      this.pendingFieldMesh={snapshot,keys,chunks:[],openings:this.openings()};
+    }
+    const batch=this.pendingFieldMesh;
+    batch.chunks.push(...batch.snapshot.remesh(triangle=>this.clipOpenings(triangle,batch.openings),maxChunks));
+    if(batch.snapshot.dirty.size)return;
+    // Publish every touching chunk together. Publishing one at a time exposed
+    // different surfaces on either side of a seam after each plastic movement.
+    for(const chunk of batch.chunks){
       const index=this.deposits.findIndex(d=>d.fieldKey===chunk.key),old=index<0?undefined:this.deposits[index];
       if(!chunk.geometry.getAttribute('position').count){chunk.geometry.dispose();if(old){this.group.remove(old.mesh);old.mesh.geometry.dispose();this.deposits.splice(index,1);}continue;}
       const sphere=chunk.geometry.boundingSphere!;
       if(old){old.mesh.geometry.dispose();old.mesh.geometry=chunk.geometry;old.position.copy(sphere.center);old.radius=sphere.radius;old.mass=chunk.mass;old.age=chunk.age;old.support=1-Math.min(1,chunk.dilution);}
       else {const mesh=new THREE.Mesh(chunk.geometry,this.mortarMaterial);mesh.name='Continuous wet mortar volume';mesh.castShadow=mesh.receiveShadow=true;this.group.add(mesh);this.deposits.push({fieldKey:chunk.key,position:sphere.center.clone(),radius:sphere.radius,mass:chunk.mass,mesh,age:chunk.age,normal:Z.clone(),support:1-Math.min(1,chunk.dilution)});}
     }
+    this.pendingFieldMesh=null;
     this.fieldMeshTime=0;
   }
-  get pendingGeometryChunks():number {return this.field.dirty.size;}
-  async waitForGeometry():Promise<void> {while(this.field.dirty.size||this.pendingWetCells.size){if(this.field.dirty.size)this.syncFieldGeometry(1);this.flushWetGeometry(1);await new Promise(resolve=>setTimeout(resolve,0));}}
+  private cancelFieldMeshBatch():void {
+    const batch=this.pendingFieldMesh;if(!batch)return;
+    for(const chunk of batch.chunks)chunk.geometry.dispose();
+    for(const key of batch.keys)this.field.dirty.add(key);
+    this.pendingFieldMesh=null;
+  }
+  get pendingGeometryChunks():number {return this.field.dirty.size+(this.pendingFieldMesh?.snapshot.dirty.size??0);}
+  async waitForGeometry():Promise<void> {while(this.pendingGeometryChunks||this.pendingWetCells.size){if(this.pendingGeometryChunks)this.syncFieldGeometry(1);this.flushWetGeometry(1);await new Promise(resolve=>setTimeout(resolve,0));}}
 
   /** A pressed box extrudes fresh mortar out of its occupied envelope. Backing
    * behind the actual casing stays in place; excess remains counted as slurry. */
   pressBox(point:InstallationPoint):{displacedKg:number;repackedKg:number;looseKg:number}{
+    this.cancelFieldMeshBatch();
     point.updateWorldMatrix(true,true);
     const regions=point.boxGroup.boxes.map(box=>({inverse:box.matrixWorld.clone().invert(),width:box.width/2+.002,height:box.height/2+.002,depth:box.depth}));
     const removed=this.field.removeWhere(q=>regions.some(region=>{const p=q.clone().applyMatrix4(region.inverse);return Math.abs(p.x)<region.width&&Math.abs(p.y)<region.height&&p.z>=-region.depth&&p.z<.12;}),true);
@@ -639,6 +663,7 @@ export class MortarSystem {
   private refreshOpeningGeometry(): void {
     const boxes=this.openings(),signature=boxes.map(box=>box.inverse.elements.map(v=>v.toFixed(5)).join(',')).join('|');
     if(signature===this.openingSignature)return;this.openingSignature=signature;
+    this.cancelFieldMeshBatch();
     const removed=this.field.removeWhere(q=>boxes.some(box=>{const local=q.clone().applyMatrix4(box.inverse);return Math.abs(local.x)<box.halfWidth&&Math.abs(local.y)<box.halfHeight && local.z>box.minZ && local.z<box.maxZ;}));
     if(removed>0){this.stuckMass=Math.max(0,this.stuckMass-removed);const point=this.deposits[0]?.position??new THREE.Vector3(0,1,0);this.queueSlurry(point,Z,removed);}
     this.field.invalidateGeometry();this.geometryRevision++;
@@ -709,14 +734,14 @@ export class MortarSystem {
       const volume=this.wall.volume;
       if(typeof volume.isOccupied==='function'){
         const released=this.field.releaseUnsupported(q=>volume.isOccupied(q.x,q.y,q.z));
-        if(released.mass>0){this.stuckMass=Math.max(0,this.stuckMass-released.mass);this.queueSlurry(released.point,Z,released.mass);this.geometryRevision++;}
+        if(released.mass>0){this.cancelFieldMeshBatch();this.stuckMass=Math.max(0,this.stuckMass-released.mass);this.queueSlurry(released.point,Z,released.mass);this.geometryRevision++;}
       }
     }
     for(const deposit of this.deposits)deposit.age+=dt;
     // Field collision changes immediately. Only the visible skin is rebuilt
     // one spatial chunk per frame, so a scoop cannot pause every tool for a
     // full-cavity synchronous remesh.
-    if(this.field.dirty.size)this.syncFieldGeometry(1);
+    if(this.pendingGeometryChunks)this.syncFieldGeometry(1);
     if(this.pendingWashMass>.002&&this.projectiles.length<48){this.spawnClod(this.pendingWashPoint.clone().addScaledVector(this.pendingWashNormal,.025),new THREE.Vector3(0,-.25,.08),this.pendingWashMass,true);this.pendingWashMass=0;}
     if (this.maintenanceTime > .4) { this.maintenanceTime = 0; this.updateStages(); }
     const steps = Math.max(1, Math.ceil(dt / .012)), h = dt / steps;
