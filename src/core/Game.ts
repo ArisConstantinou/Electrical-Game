@@ -259,7 +259,7 @@ export class Game {
     const waterHit = this.selectedTool === 'spray' || mortarTool ? this.room.brickWall.aim(this.renderer.camera) : null;
     const wallAim = Boolean(waterHit);
     const aimedBox=['fitting','level','spring','cutter'].includes(this.selectedTool)?this.boxPlacement.target(this.renderer.camera):null;
-    this.boxFitPreview.update(this.renderer.camera,this.mission.boxPreset,this.started&&(this.selectedTool==='fitting'||this.selectedTool==='hammer'&&this.boxFitPreview.hasGuide),Boolean(aimedBox),dt,point=>this.fpsRig.canReachPoint(this.renderer.camera,point),this.selectedTool==='hammer');
+    this.boxFitPreview.update(this.renderer.camera,this.mission.boxPreset,this.started&&(this.selectedTool==='fitting'||this.selectedTool==='hammer'&&this.boxFitPreview.hasGuide),Boolean(aimedBox),dt,point=>this.fpsRig.canReachPoint(this.renderer.camera,point),this.selectedTool==='hammer',aimedBox?.boxGroup.position.z??0);
     this.hud.updateBoxFit(this.boxFitPreview.telemetry);
     const pointAim=this.selectedTool==='fitting'?Boolean(aimedBox||this.boxWorkAim()):Boolean(aimedBox||this.mission.target(this.renderer.camera));
     const aimed = this.selectedTool === 'hammer' ? this.fpsRig.reachable && !this.fpsRig.chiselInAir : this.selectedTool === 'spray' ? wallAim : pointAim;
@@ -273,7 +273,7 @@ export class Game {
     };
     const useStatus=this.selectedTool==='hammer'?(this.hammerSpeed===0?'SPEED 0 · PAUSED':hammerStatus[this.fpsRig.contactStatus])
       :this.selectedTool==='trowel'?(this.mortar.throwFeedback.overheld?'RELEASE TO RESET':this.mortar.recovery>0?'RELOADING':useHeld?'RELEASE TO THROW':'HOLD TO LOAD')
-      :this.selectedTool==='fitting'?(aimedBox?'TAP TO PICK UP':this.boxFitPreview.mode==='fits'?'TAP TO PLACE BOX':this.boxFitPreview.mode==='blocked'?'BREAK HIGHLIGHTED AREA':'MOVE INTO REACH')
+      :this.selectedTool==='fitting'?(aimedBox?'TAP TO PICK UP':this.boxFitPreview.mode==='fits'?'TAP TO PLACE BOX':this.boxFitPreview.mode==='proud'?`PLACE · +${this.boxFitPreview.telemetry.proudDepthMm} mm`:this.boxFitPreview.mode==='blocked'?'POSITION BLOCKED':'MOVE INTO REACH')
       :this.selectedTool==='level'?(this.mission.activePoint?.stage==='leveling'?'ADJUST SELECTED BOX':aimedBox?'TAP TO PLACE LEVEL':'AIM AT A BOX')
       :useHeld?'USING TOOL':'HOLD TO USE';
     this.hud.updateMobileUseStatus(useStatus,this.selectedTool==='hammer'?hammerReady:true,useHeld);
@@ -366,7 +366,7 @@ export class Game {
     if(this.selectedTool==='hammer'&&result.success)this.fpsRig.strike();
     // BOX uses the live fit panel; old failure toasts must not follow a new aim.
     if(result.message&&this.selectedTool!=='fitting')this.hud.notify(result.message,result.success,this.selectedTool==='level'?4500:700);
-    else if(result.success&&this.selectedTool==='fitting')this.hud.notify(retrieving?'Box picked up.':'Box placed flush.',true,900);
+    else if(result.success&&this.selectedTool==='fitting')this.hud.notify(retrieving?'Box picked up.':'Box placed.',true,900);
   }
 
   private boxWorkAim():THREE.Vector3|null {
@@ -539,6 +539,7 @@ export class Game {
   private selectTool(tool: RigTool): void {
     if (!RIG_TOOLS.includes(tool)) return;
     const changed = this.selectedTool !== tool;
+    if(changed&&this.selectedTool==='fitting'&&tool==='hammer')this.boxFitPreview.pin(this.renderer.camera,this.mission.boxPreset);
     if(changed){this.mobileControls.cancelActiveGestures();this.mortar.cancel();const point=this.mission.activePoint;if(point?.stage==='leveling')this.pendingSceneActions.push(()=>this.leveling.cancel(point));}
     this.selectedTool = tool;
     // Keep the established spray -> hammer gesture useful, but queue exactly

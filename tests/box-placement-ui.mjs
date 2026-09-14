@@ -18,7 +18,7 @@ async function action(page,mobile){
   await steps(page,1,0);
 }
 async function select(page,mobile,tool){if(mobile)await page.locator(`[data-tool="${tool}"]`).tap();else await page.keyboard.press(tool==='fitting'?'Digit5':'Digit6');await steps(page,1,0);}
-function unchangedPlacement(before,after,label){for(const key of ['point','boxLocal','visible','stage','mortarMass'])assert.deepEqual(after[key],before[key],`${label}: refusal preserves ${key}`);}
+function proudPlacement(before,after,label,minimumMm=1.2){assert(after.visible,`${label}: box is placed at the hard surface`);const placement=after.placement.find(p=>p.id===after.id);assert(placement.protrusionMm>minimumMm,`${label}: insufficient cavity leaves casing visibly proud`);assert(Math.abs(after.boxLocal[2]*1000-placement.protrusionMm)<1e-6,`${label}: rendered pose matches physical projection`);assert(Math.abs(after.mortarMass-before.mortarMass)<1e-6,`${label}: placement conserves mortar`);}
 async function clearVerticalWorkSlots(page){return page.evaluate(async()=>{
  const g=window.__wireTheHouse,v=g.room.brickWall.volume,save=v.serialize(),chunks=new Map(save.chunks.map(c=>[c.key,new Map(c.edits.map(e=>[e[0],e]))]));let removed=0;
  // Real material removal all the way to floor isolates gravity after a legal
@@ -55,8 +55,9 @@ try{
     await steps(page,150);
     if(mobile){await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await cdp.detach();}else await page.keyboard.up('KeyW');
     await steps(page,12);const beforeBlocked=await state(page);await action(page,mobile);const blocked=await state(page);
-    assert.equal(blocked.visible,false,`${name}: intact wall refuses a box even at normal closest approach`);unchangedPlacement(beforeBlocked,blocked,`${name} intact wall`);
-    await shot(page,`${name}-intact-wall-rejected`);
+    proudPlacement(beforeBlocked,blocked,`${name} intact wall`,37);
+    await shot(page,`${name}-intact-wall-proud`);
+    await page.evaluate(()=>{const g=window.__wireTheHouse;g.boxPlacement.retrieve(g.mission.points.find(p=>p.definition.id===window.__boxQAOriginalId));});
     const voidSlots=await clearVerticalWorkSlots(page);assert(voidSlots.removed>0);
     await action(page,mobile);const inserted=await state(page);assert(inserted.visible,`${name}: normal closest approach places box in cleared cavity`);
     const placed=inserted.placement.find(p=>p.id===inserted.id);assert(placed,`${name}: placement state exists`);assert(placed.protrusionMm<=1.20001,`${name}: accepted casing is flush`);assert.equal(placed.secured,false);oneHand(inserted,name);
@@ -96,8 +97,8 @@ try{
       });
       assert(cavities.narrow.removed>0&&cavities.full.removed>0,'cavity fixtures remove real material');
       await aim(page,-1.25,1.2,.42);const beforeNarrow=await state(page);await action(page,false);const narrow=await state(page);
-      assert.equal(narrow.visible,false,'narrow deep hole rejects full group');unchangedPlacement(beforeNarrow,narrow,'narrow footprint');
-      await shot(page,'desktop-narrow-hole-rejected');
+      proudPlacement(beforeNarrow,narrow,'narrow footprint');
+      await shot(page,'desktop-narrow-hole-proud');
       await page.evaluate(()=>{const g=window.__wireTheHouse;g.boxPlacement.retrieve(g.mission.points.find(p=>p.definition.id===window.__boxQAOriginalId));});
       await aim(page,-.25,1.2,.42);await action(page,false);const full=await state(page);const fullFit=full.placement.find(p=>p.id===full.id);
       assert(full.visible,'actual broad horizontal channel accepts box');assert(Math.abs(full.point[0]+.25)<.02&&Math.abs(full.point[1]-1.2)<.02,'native placement follows arbitrary horizontal channel aim, not original mission coordinates');assert(fullFit.protrusionMm<=1.20001,'full footprint and depth permit flush placement');assert(fullFit.insertionDepthMm>=35.8,'accepted group inserts its entire casing depth');
@@ -134,7 +135,7 @@ try{
         }
         save.chunks=[...chunks].map(([key,edits])=>({key,edits:[...edits.values()]}));save.removedVolume=(save.removedVolume??0)+removed*v.nodeVolume;v.restore(save);g.room.brickWall.flushGeometry();await g.room.brickWall.waitForGeometry();return{removed,layerDepthMm:v.hz*1000};
       });
-      assert(shallowFixture.removed>0);await aim(page,2.1,1.2,.42);const beforeShallow=await state(page);await action(page,false);const shallow=await state(page);assert.equal(shallow.visible,false,'shallow recess refuses placement until full depth is cleared');unchangedPlacement(beforeShallow,shallow,'shallow recess');await shot(page,'desktop-shallow-recess-rejected');
+      assert(shallowFixture.removed>0);await aim(page,2.1,1.2,.42);const beforeShallow=await state(page);await action(page,false);const shallow=await state(page);proudPlacement(beforeShallow,shallow,'shallow recess',15);await shot(page,'desktop-shallow-recess-proud');
       await page.evaluate(()=>{const g=window.__wireTheHouse;g.boxPlacement.retrieve(g.mission.points.find(p=>p.definition.id===window.__boxQAOriginalId));});
       const filledCavity=await page.evaluate(()=>{
         const g=window.__wireTheHouse,m=g.mortar,v=g.room.brickWall.volume,V=g.renderer.camera.position.constructor;let added=0;const before=m.field.mass+m.telemetry.movingKg+m.telemetry.restingKg+m.telemetry.floorKg;
@@ -149,10 +150,10 @@ try{
       await page.evaluate(()=>{const g=window.__wireTheHouse;g.boxPlacement.retrieve(g.mission.points.find(p=>p.definition.id===window.__boxQAOriginalId));});
       await select(page,false,'fitting');
       const curedBed=await page.evaluate(()=>{const g=window.__wireTheHouse,m=g.mortar,v=g.room.brickWall.volume,V=g.renderer.camera.position.constructor;let added=0;for(const x of [-.33,-.25,-.17])added+=m.field.add(new V(x,1.2,v.frontZ-.01),new V(0,0,1),.7,q=>v.isOccupied(q.x,q.y,q.z));for(const node of m.field.nodes.values())if(Math.abs(node.x*m.field.spacing+.25)<.3)node.age=4000;m.stuckMass+=added;m.syncFieldGeometry();return{added};});
-      await aim(page,-.25,1.2,.42);const beforeCured=await state(page);await action(page,false);const cured=await state(page);assert.equal(cured.visible,false,'cured mortar blocks placement instead of accepting a proud box');unchangedPlacement(beforeCured,cured,'cured mortar');await shot(page,'desktop-cured-mortar-rejected');
+      await aim(page,-.25,1.2,.42);const beforeCured=await state(page);await action(page,false);const cured=await state(page);proudPlacement(beforeCured,cured,'cured mortar');await shot(page,'desktop-cured-mortar-proud');
       report.scenarios.push({platform:name,cavities,narrow,full,ledge,dryLevel,dryConfirm,bed,freshBed,bonded,constrained,shallowFixture,shallow,filledCavity,pressed,perimeterPacking,secured,levelStarted,confirmed,washed,afterWash,curedBed,cured});
     }
     await page.close();
   }
-  assert.deepEqual(report.errors,[]);console.log(JSON.stringify({url,platforms:['desktop','mobile'],checks:['far denial','native close approach','intact wall refusal and flush placement in cleared slot','gravity and floor','native fallen retrieval','reposition','multiple supplied boxes preserve original fallen group','stable ID retrieval with continuing supply','fixed arm lengths','whole footprint collision','shallow recess refusal without mutation','dry ledge support','fresh mortar displacement and mass','cured mortar refuses placement without displacement','level depth constraint','secured native level confirmation','wash support revocation'],errors:report.errors,report:`${out}/report.json`}));
+  assert.deepEqual(report.errors,[]);console.log(JSON.stringify({url,platforms:['desktop','mobile'],checks:['far denial','native close approach','intact wall external seating and flush placement in cleared slot','gravity and floor','native fallen retrieval','reposition','multiple supplied boxes preserve original fallen group','stable ID retrieval with continuing supply','fixed arm lengths','whole footprint collision','shallow recess partial insertion with visible protrusion','dry ledge support','fresh mortar displacement and mass','cured mortar stops placement at its actual surface','level depth constraint','secured native level confirmation','wash support revocation'],errors:report.errors,report:`${out}/report.json`}));
 }finally{await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));await browser.close();}

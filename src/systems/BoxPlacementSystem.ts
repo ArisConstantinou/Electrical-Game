@@ -15,7 +15,7 @@ export interface BoxFitCell {x:number;y:number;surfaceZ:number;extraDepthM:numbe
 export interface BoxFitAssessment {
   target:{x:number;y:number;wallFrontZ:number}|null;
   required:{width:number;height:number;depth:number};
-  fits:boolean;proudDepthM:number;blockedCells:BoxFitCell[];reason:BoxFitReason;message:string;
+  fits:boolean;canPlace:boolean;proudDepthM:number;blockedCells:BoxFitCell[];reason:BoxFitReason;message:string;
 }
 
 /** Boxes are rigid hollow casings. Insertion sweeps their backing footprint,
@@ -83,7 +83,7 @@ export class BoxPlacementSystem {
    * placement time; no visible box, stage or mortar state changes on refusal. */
   assess(point:InstallationPoint,camera:THREE.Camera):BoxFitAssessment{
     const required={width:point.boxGroup.groupWidth,height:point.boxGroup.groupHeight,depth:Math.max(...point.boxGroup.boxes.map(box=>box.depth))};
-    const result:BoxFitAssessment={target:null,required,fits:false,proudDepthM:0,blockedCells:[],reason:'out-of-reach',message:'Aim the full box group at a reachable wall cavity.'};
+    const result:BoxFitAssessment={target:null,required,fits:false,canPlace:false,proudDepthM:0,blockedCells:[],reason:'out-of-reach',message:'Aim the full box group at a reachable wall cavity.'};
     const origin=camera.getWorldPosition(new THREE.Vector3()),direction=camera.getWorldDirection(new THREE.Vector3());
     if(direction.z>=-.01)return result;
     const distance=(this.wall.volume.frontZ-origin.z)/direction.z;
@@ -99,16 +99,20 @@ export class BoxPlacementSystem {
       point.boxGroup.position.set(0,0,0);point.boxGroup.rotation.set(0,0,0);point.updateWorldMatrix(true,true);
       const insertion=this.insertionLimit(point,result.blockedCells);result.proudDepthM=insertion.depth;
       result.blockedCells=[...new Map(result.blockedCells.map(cell=>[`${Math.round(cell.x*1e6)}:${Math.round(cell.y*1e6)}`,cell])).values()].slice(0,4095);
-      const travel=Math.max(0,origin.z-.08-this.wall.volume.frontZ);
-      if(this.casingTravel(point,BACK,travel,new THREE.Vector3(0,0,travel))!==null){
+      // Stop at the real masonry surface. The insertion sweep ends at this
+      // proud pose, not at an imaginary flush pose behind the obstruction.
+      const startDepth=Math.max(insertion.depth,origin.z-.08-this.wall.volume.frontZ);
+      const travel=startDepth-insertion.depth;
+      if(this.casingTravel(point,BACK,travel,new THREE.Vector3(0,0,startDepth))!==null){
         result.reason='other-box';result.message='Another box blocks this position. Leave room for both casings and their front rims.';
         result.blockedCells.push({x:target.x,y:target.y,surfaceZ:this.wall.volume.frontZ,extraDepthM:required.depth,material:'other-box'});
         return result;
       }
+      result.canPlace=true;
       if(insertion.depth>CLEARANCE+1e-8){
         result.reason=insertion.material==='mortar'?'cured-mortar':'masonry';
         const footprint=`${Math.round(required.width*1000)} × ${Math.round(required.height*1000)} × ${Math.round(required.depth*1000)} mm`;
-        result.message=`Box does not fit: clear the full ${footprint} cavity. ${result.reason==='cured-mortar'?'Hard mortar':'Brick'} needs up to ${Math.ceil((insertion.depth-CLEARANCE)*1000)} mm more depth in the marked area.`;
+        result.message=`Box will protrude ${Math.ceil(insertion.depth*1000)} mm. ${result.reason==='cured-mortar'?'Hard mortar':'Brick'} stops it here; clear the marked area for the full ${footprint} recess.`;
         return result;
       }
       result.fits=true;result.reason='fits';result.message='Full box group fits the cavity flush.';return result;
@@ -124,7 +128,7 @@ export class BoxPlacementSystem {
       if(!ray.intersectObjects(point.boxGroup.boxes,true).length)return{success:false,message:this.retrievalHint(point)!};
       return this.retrieve(point);
     }
-    const assessment=this.assess(point,camera);if(!assessment.fits||!assessment.target)return{success:false,message:assessment.message};
+    const assessment=this.assess(point,camera);if(!assessment.canPlace||!assessment.target)return{success:false,message:assessment.message};
     const target=new THREE.Vector3(assessment.target.x,assessment.target.y,assessment.target.wallFrontZ);
     point.position.copy(point.parent?point.parent.worldToLocal(target):target);point.boxGroup.position.set(0,0,assessment.proudDepthM);point.boxGroup.rotation.set(0,0,0);point.updateWorldMatrix(true,true);
     point.boxGroup.visible=true;point.boxGroup.levelBar.visible=false;this.boxesRevision++;
@@ -132,7 +136,9 @@ export class BoxPlacementSystem {
     const placement:Placement={state:'loose',velocityY:0,secured:false,contactMaterial:'air',checkTime:0,...displaced};
     this.placements.set(point,placement);point.boxGroup.userData.placement=placement;point.boxGroup.userData.minimumDepth=assessment.proudDepthM;
     point.setStage('fitted');
-    return{success:true,message:'Box inserted flush. Let it rest on the ledge, then pack fresh mortar behind and around the sides.'};
+    return{success:true,message:assessment.fits
+      ?'Box inserted flush. Let it rest on the ledge, then pack fresh mortar behind and around the sides.'
+      :`Box seated against ${assessment.reason==='cured-mortar'?'hard mortar':'masonry'}, protruding ${Math.ceil(assessment.proudDepthM*1000)} mm. Retrieve it and deepen the marked area to recess it fully.`};
   }
 
   /** Explain inventory state before a generic wall-reach check obscures it. */

@@ -365,14 +365,15 @@ export class HUD {
     this.shell.dataset.aimed = targeted ? 'true' : 'false';
   }
 
-  updateBoxFit(fit:{mode:string;reason:string|null;required:{width:number;height:number;depth:number}|null;extraDepthMm:number}):void {
+  updateBoxFit(fit:{mode:string;reason:string|null;required:{width:number;height:number;depth:number}|null;extraDepthMm:number;proudDepthMm?:number}):void {
     const dimensions=fit.required?`${Math.round(fit.required.width*1000)} × ${Math.round(fit.required.height*1000)} × ${Math.round(fit.required.depth*1000)} mm`:'';
-    const key=[fit.mode,fit.reason,dimensions,fit.extraDepthMm].join(':');
+    const proud=fit.proudDepthMm??0,key=[fit.mode,fit.reason,dimensions,fit.extraDepthMm,proud].join(':');
     if(!this.displayChanged('box-fit',key))return;
     const status=this.shell.querySelector<HTMLElement>('#box-fit-status')!;
     status.dataset.fit=fit.mode;
     const obstruction=fit.reason==='other-box'?'ANOTHER BOX BLOCKS THIS SPOT':`REMOVE MARKED · +${fit.extraDepthMm} mm DEPTH`;
-    status.textContent=fit.mode==='retrieve'?'TAP TO PICK UP THIS BOX':fit.mode==='fits'?'FITS · TAP TO PLACE':fit.mode==='out-of-reach'?(fit.reason==='fits'?'CAVITY FITS · MOVE CLOSER':fit.reason==='out-of-reach'?'AIM AT A CLOSER WALL AREA':`${obstruction} · MOVE CLOSER`):obstruction;
+    const protrusion=`PROTRUDES ${proud} mm`;
+    status.textContent=fit.mode==='retrieve'?(proud>2?`${protrusion} · TAP TO PICK UP`:'TAP TO PICK UP THIS BOX'):fit.mode==='fits'?'FITS FLUSH · TAP TO PLACE':fit.mode==='proud'?`${protrusion} · TAP TO PLACE`:fit.mode==='out-of-reach'?(fit.reason==='fits'?'CAVITY FITS · MOVE CLOSER':fit.reason==='out-of-reach'?'AIM AT A CLOSER WALL AREA':fit.reason==='other-box'?`${obstruction} · MOVE CLOSER`:`${protrusion} · MOVE CLOSER`):obstruction;
     this.shell.querySelector('#box-fit-size')!.textContent=fit.mode==='retrieve'?'BOX AT CROSSHAIR':dimensions?`RECESS ${dimensions}`:'AIM AT THE WALL';
   }
 

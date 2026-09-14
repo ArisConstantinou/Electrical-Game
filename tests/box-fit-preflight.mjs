@@ -35,10 +35,10 @@ try{
   save.chunks=[...chunks].map(([key,edits])=>({key,edits:[...edits.values()]}));save.removedVolume=(save.removedVolume??0)+removed*v.nodeVolume;v.restore(save);return removed;
  }
  const snapshot=f=>({position:f.point.position.toArray(),boxPosition:f.point.boxGroup.position.toArray(),rotation:f.point.boxGroup.quaternion.toArray(),visible:f.point.boxGroup.visible,stage:f.point.stage,placement:JSON.stringify(f.point.boxGroup.userData.placement??null),minimumDepth:f.point.boxGroup.userData.minimumDepth,mass:f.mortar.field.mass,points:f.points.length,revision:f.system.fitRevision});
- function noMutation(f,label){const before=snapshot(f),assessment=f.system.assess(f.point,f.camera);assert.equal(assessment.fits,false,label);assert.deepEqual(snapshot(f),before,`${label}: assessment mutated game state`);assert.equal(f.system.place(f.point,f.camera).success,false,label);assert.deepEqual(snapshot(f),before,`${label}: refusal mutated pose/stage/inventory/mortar`);return assessment;}
+ function noMutation(f,label){const before=snapshot(f),assessment=f.system.assess(f.point,f.camera);assert.equal(assessment.fits,false,label);assert.deepEqual(snapshot(f),before,`${label}: assessment mutated game state`);if(!assessment.canPlace){assert.equal(f.system.place(f.point,f.camera).success,false,label);assert.deepEqual(snapshot(f),before,`${label}: refusal mutated pose/stage/inventory/mortar`);}else assert(assessment.proudDepthM>.0012,`${label}: partial seating must stay visibly proud`);return assessment;}
  for(const kinds of [['1G'],['2G','1G']]){
   const f=fixture(kinds);f.point.boxGroup.position.set(.01,.02,.03);f.point.boxGroup.rotation.z=.2;
-  const intact=noMutation(f,'Intact wall rejects complete group');assert.equal(intact.reason,'masonry');assert(intact.blockedCells.length>100);assert(intact.blockedCells.every(c=>c.extraDepthM>.035));assert(intact.blockedCells.length<=4096);
+  const intact=noMutation(f,'Intact wall cannot recess complete group');assert.equal(intact.reason,'masonry');assert(intact.blockedCells.length>100);assert(intact.blockedCells.every(c=>c.extraDepthM>.035));assert(intact.blockedCells.length<=4096);
   for(const phase of ['intact','damaged']){
    if(phase==='damaged')excavate(f.wall.volume,f.point.boxGroup.groupWidth+.04,.12,.06);
    for(let i=0;i<5;i++)f.system.assess(f.point,f.camera);
@@ -51,7 +51,7 @@ try{
   assert(f.system.place(f.point,f.camera).success);assert(f.point.boxGroup.visible);assert(f.point.boxGroup.position.z<=.00120001);assert.equal(f.point.stage,'fitted');
   const duplicate=f.add(),original=f.point;f.point=duplicate;const other=noMutation(f,'Existing casing rejects overlapping new group');assert.equal(other.reason,'other-box');assert(original.boxGroup.visible);f.point=original;
   const beforeFall=f.system.fitRevision;f.system.update(.05);assert.notEqual(f.system.fitRevision,beforeFall,'Moving boxes invalidate fit previews');
-  report.checks.push(`${kinds.join('+')}: intact rejection, exact read-only preview, flush placement, casing overlap rejection, falling invalidation`);
+  report.checks.push(`${kinds.join('+')}: intact proud assessment, exact read-only preview, flush placement, casing overlap rejection, falling invalidation`);
  }
  {
   const f=fixture();excavate(f.wall.volume,.03,.13,.075);const narrow=noMutation(f,'Narrow deep slit cannot accept full group');assert(narrow.blockedCells.some(c=>Math.abs(c.x)>.04));
@@ -65,10 +65,10 @@ try{
   const f=fixture();excavate(f.wall.volume,.26,.12,.07);let added=0;
   for(const x of [-.08,0,.08])added+=f.mortar.field.add(new THREE.Vector3(x,1.2,f.front-.014),new THREE.Vector3(0,0,1),.8,()=>false);
   f.mortar.stuckMass+=added;if(cured)for(const node of f.mortar.field.nodes.values())node.age=4000;
-  if(cured){const hard=noMutation(f,'Hard mortar is a real insertion blocker');assert.equal(hard.reason,'cured-mortar');assert(hard.blockedCells.some(c=>c.material==='cured-mortar'));}
+  if(cured){const hard=noMutation(f,'Hard mortar limits insertion depth');assert.equal(hard.reason,'cured-mortar');assert(hard.blockedCells.some(c=>c.material==='cured-mortar'));}
   else{const mass=f.mortar.field.mass,before=snapshot(f);assert(f.system.assess(f.point,f.camera).fits,'Fresh paste yields inside full cavity');assert.deepEqual(snapshot(f),before);assert(f.system.place(f.point,f.camera).success);const p=f.point.boxGroup.userData.placement;assert(p.displacedKg>0);assert(Math.abs(p.displacedKg-p.repackedKg-p.looseKg)<1e-8);assert(Math.abs(f.mortar.field.mass+f.mortar.telemetry.movingKg+f.mortar.telemetry.floorKg+f.mortar.telemetry.restingKg-mass)<1e-6);}
  }
- report.checks.push('fresh mortar previews do not displace; accepted fresh bed conserves mass; cured mortar refuses without mutation');
+ report.checks.push('fresh mortar previews do not displace; accepted fresh bed conserves mass; cured mortar previews its proud stop without mutation');
  {
   const f=fixture();f.camera.position.z=f.front+3;f.camera.updateMatrixWorld(true);assert.equal(noMutation(f,'Unreachable wall').reason,'out-of-reach');
   f.camera.position.set(2.99,1.2,f.front+.42);f.camera.lookAt(2.99,1.2,f.front);f.camera.updateMatrixWorld(true);assert.equal(noMutation(f,'Group crosses wall boundary').reason,'out-of-reach');
