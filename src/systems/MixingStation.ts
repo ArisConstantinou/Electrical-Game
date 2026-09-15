@@ -53,8 +53,7 @@ export class MixingStation {
   private elapsed=0;
   private readonly pouring:THREE.Points;
   private pouringTime=0;
-  private visited=false;
-  private previousCrouched=false;
+  private automaticCrouch=false;
   private readonly activationDistance=2.8;
   private readonly mobileInteract:HTMLButtonElement|null;
   private readonly stationTrowel:THREE.Group;
@@ -119,15 +118,20 @@ export class MixingStation {
   get blocksWork():boolean{return this.active||this.carrying;}
   setActive(value:boolean):void{
     if(!this.game.started)return;
+    if(!value&&this.automaticCrouch){this.game.player.crouched=false;this.automaticCrouch=false;}
     this.active=value;this.stop();this.game.input.resetTransientInput();this.game.mortar.cancel();
     if(value){
       if(document.pointerLockElement)void document.exitPointerLock();
       this.game.player.workPosition.locked=false;
-      if(!this.visited){this.previousCrouched=this.game.player.crouched;this.visited=true;}
     }
     this.panel.hidden=!value;this.game.hud.shell.classList.toggle('mixing-active',value);this.uiKey='';
   }
   private stop():void{this.mixingNow=false;this.mixerApproach=null;}
+  /** Explicit stance controls override and release an assisted mixer stance. */
+  releaseAutomaticStance():void{
+    this.automaticCrouch=false;this.inserted=false;this.cleanSeconds=0;this.stop();
+    this.game.input.resetTransientInput();
+  }
   chooseTool(tool:MixingTool):void{
     if(this.carrying&&tool!=='hands'){this.message='Άφησε πρώτα τη σύκλα στο δάπεδο.';return;}
     // World pickups and toolbar actions both finish the current finite deposit,
@@ -172,6 +176,7 @@ export class MixingStation {
     // Never slide the work stance beyond the same room bounds as normal walking.
     if(Math.abs(to.x)>room.width/2-config.radius||to.z< -room.depth/2+config.radius+.25||to.z>room.depth/2-config.radius){this.mixerReachHint(object);return false;}
     this.mixerApproach={object,from:c.position.clone(),to,elapsed:0,yaw:player.yaw,pitch:player.pitch};
+    if(!player.crouched)this.automaticCrouch=true;
     player.crouched=true;this.message='Παίρνεις θέση δίπλα στη σύκλα…';return true;
   }
   private seatMixer(object:THREE.Object3D):void{
@@ -244,17 +249,39 @@ export class MixingStation {
   private aimedObject():StationTarget|null{
     if(!this.game.started||this.carrying)return null;
     const m=this.models,c=this.game.renderer.camera;m.group.updateMatrixWorld(true);
-    // The exact visible object always wins. The forgiving cone is only a
-    // fallback for empty space, never permission to work on a different object.
+    // Exact tools and ingredients win. Sand beside the narrow shovel gets a
+    // small pickup margin so the blade does not require pixel-perfect aim.
     const preferred=this.preferredTarget();
     this.ray.setFromCamera(new THREE.Vector2(),c);
     const roots=[m.bucket,m.sand,...m.sacks,m.rinse,m.water,m.mixer,m.shovel,this.stationTrowel].filter(object=>object.visible);
-    const hit=this.ray.intersectObjects(roots,true)[0];if(!hit||hit.distance>3.2)return preferred&&this.targetInWorkCone(preferred)?preferred:null;
+    const hit=this.ray.intersectObjects(roots,true)[0];
+    const shovelPickup=()=>this.nearbyVisibleShovel(roots);
+    if(!hit||hit.distance>3.2)return shovelPickup()??(preferred&&this.targetInWorkCone(preferred)?preferred:null);
     const belongs=(root:THREE.Object3D)=>{let object:THREE.Object3D|null=hit.object;while(object){if(object===root)return true;object=object.parent;}return false;};
     const sack=m.sacks.findIndex(belongs);if(sack>=0)return{kind:'sack',index:sack,object:m.sacks[sack]};
     for(const [kind,object] of [['water',m.water],['trowel',this.stationTrowel],['shovel',m.shovel],['mixer',m.mixer],['bucket',m.bucket],['sand',m.sand],['rinse',m.rinse]] as const)if(belongs(object)){
       if(kind==='mixer'&&this.inserted)return{kind:'bucket',object:m.bucket};
+      if(kind==='sand'){const shovel=shovelPickup();if(shovel)return shovel;}
       return{kind,object};
+    }
+    return null;
+  }
+  private nearbyVisibleShovel(roots:THREE.Object3D[]):StationTarget|null{
+    const shovel=this.models.shovel;if(!shovel.visible)return null;
+    const origin=this.game.renderer.camera.position,aim=this.ray.ray.clone();
+    const probe=new THREE.Raycaster(),point=new THREE.Vector3(),nearest=new THREE.Vector3();
+    const belongs=(object:THREE.Object3D)=>{let item:THREE.Object3D|null=object;while(item){if(item===shovel)return true;item=item.parent;}return false;};
+    const visible=(object:THREE.Object3D)=>{let item:THREE.Object3D|null=object;while(item){if(!item.visible)return false;item=item.parent;}return true;};
+    // Sample the actual blade, socket and shaft. A broad bounding box would
+    // capture empty corners around the tilted handle and steal sand strokes.
+    for(const y of [.10,.20,.34,.48,.62,.76,.90,1.06]){
+      point.set(0,y,.022);shovel.localToWorld(point);
+      const distance=point.distanceTo(origin);if(distance>3.2)continue;
+      aim.closestPointToPoint(point,nearest);
+      if(nearest.distanceTo(point)>Math.min(.18,distance*.10))continue;
+      probe.set(origin,point.clone().sub(origin).normalize());
+      const hit=probe.intersectObjects([...roots,this.game.room],true).find(intersection=>visible(intersection.object));
+      if(hit&&hit.distance<=3.2&&belongs(hit.object))return{kind:'shovel',object:shovel};
     }
     return null;
   }
@@ -284,7 +311,7 @@ export class MixingStation {
   action(action:Action):boolean{
     if(!this.game.started||!this.active)return false;
     const b=this.batch,m=this.models,state=b.getState(),sackIndex=Number(this.panel.querySelector<HTMLSelectElement>('#mixing-sack')!.value),sack=m.sacks[sackIndex];
-    if(action==='work'){if(this.carrying){this.message='Άφησε πρώτα τη σύκλα δίπλα στη δουλειά σου.';return false;}this.game.player.crouched=this.previousCrouched;this.setActive(false);window.dispatchEvent(new CustomEvent('wirehouse:select-tool',{detail:'trowel'}));return true;}
+    if(action==='work'){if(this.carrying){this.message='Άφησε πρώτα τη σύκλα δίπλα στη δουλειά σου.';return false;}this.setActive(false);window.dispatchEvent(new CustomEvent('wirehouse:select-tool',{detail:'trowel'}));return true;}
     if(action==='place')return this.placeBucket();
     if(this.carrying){this.message='Άφησε πρώτα τη σύκλα.';return false;}
     const target=action==='cement'?sack:action==='sand'?m.sand:action==='rinse'?m.rinse:m.bucket;
@@ -506,12 +533,13 @@ export class MixingStation {
     if(this.actionTime>0)model.position.y-=Math.sin((1-this.actionTime/.65)*Math.PI)*.035;
     // A world target can be farther away than the worker's arm span. Limit
     // translation before solving elbows so forearms cannot detach from wrists.
-    const right=new THREE.Vector3(1,0,0).applyQuaternion(c.quaternion);
     for(let pass=0;pass<8;pass++)for(const side of [1,-1]){
       if(side<0&&!model.userData.secondaryGripPoint)continue;
       const hand=this.toolHands.get(this.tool)![side===1?0:1],rotation=new THREE.Quaternion().fromArray((side===1?model.userData.gripQuaternion:model.userData.secondaryGripQuaternion)??[0,0,0,1]);
       const wrist=new THREE.Vector3().fromArray(hand.userData.wristPoint).applyQuaternion(rotation).add(new THREE.Vector3().fromArray(side===1?model.userData.gripPoint:model.userData.secondaryGripPoint)).applyQuaternion(model.quaternion).add(model.position);
-      const shoulder=c.worldToLocal(c.position.clone().addScaledVector(right,side*.18).add(new THREE.Vector3(0,-.3,0)));
+      // Held tools and their arms share the camera frame. A world-down shoulder
+      // swings into the centre of the view when looking into the bucket.
+      const shoulder=new THREE.Vector3(side*.18,-.30,.08);
       const offset=wrist.clone().sub(shoulder),distance=offset.length();
       if(distance>.545)model.position.addScaledVector(offset,(.545-distance)/distance);
     }
@@ -530,7 +558,9 @@ export class MixingStation {
       arm.hand.quaternion.fromArray(gripRotation??[0,0,0,1]);
       if(gripModel===this.models.mixer)arm.hand.quaternion.premultiply(this.models.mixer.quaternion);
       arm.hand.updateWorldMatrix(true,true);
-      const shoulder=c.position.clone().addScaledVector(right,arm.side*.18).add(new THREE.Vector3(0,-.3,0));
+      const shoulder=model?.visible
+        ?c.localToWorld(new THREE.Vector3(arm.side*.18,-.30,.08))
+        :c.position.clone().addScaledVector(right,arm.side*.18).add(new THREE.Vector3(0,-.3,0));
       const wrist=arm.hand.localToWorld(new THREE.Vector3().fromArray(arm.hand.userData.wristPoint));
       poseWorkerArm(arm,shoulder,wrist,right);
     }

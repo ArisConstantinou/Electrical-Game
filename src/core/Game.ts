@@ -480,7 +480,11 @@ export class Game {
       if(this.selectedTool !== 'hammer' || event.repeat) return;
       if(event.code === 'Minus' || event.code === 'Equal') {event.preventDefault();setHammerSpeed(this.hammerSpeed + (event.code === 'Equal' ? .25 : -.25));}
     });
-    addEventListener('wirehouse:work-height',()=>{this.player.crouched=!this.player.crouched;this.hud.updateWorkHeight(this.player.crouched);});
+    addEventListener('wirehouse:work-height',()=>{this.mixing.releaseAutomaticStance();this.player.crouched=!this.player.crouched;this.hud.updateWorkHeight(this.player.crouched);});
+    addEventListener('keydown',event=>{
+      if(!this.started||event.code!=='KeyV'||event.repeat||(event.target instanceof Element&&event.target.closest('input,textarea,select,[contenteditable="true"]')))return;
+      event.preventDefault();window.dispatchEvent(new CustomEvent('wirehouse:work-height'));
+    });
     const cancelSwing=()=>this.mortar.cancel();
     addEventListener('pointerdown',event=>{if(event.button===2)cancelSwing();});
     addEventListener('blur',cancelSwing);

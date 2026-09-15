@@ -9,7 +9,7 @@ import { sampleTrowelMotion, TROWEL_CHARGE_SECONDS, TROWEL_FULL_CHARGE_GRACE_SEC
 type WetBatch = { mesh: THREE.Mesh; used: number; live: number; free: Array<{ start: number; count: number }> };
 type WetPatch = { batch: WetBatch; start: number; count: number; alpha: number; pending?:boolean };
 type WaterCell = { pore: number; film: number; patch: WetPatch; position: THREE.Vector3; normal: THREE.Vector3; surfaceRevision?:number };
-type Clod = { mesh: THREE.Mesh; velocity: THREE.Vector3; mass: number; age: number; contacts: number; slurry: boolean; bond: number; variation:number; impactNormal?:THREE.Vector3 };
+type Clod = { mesh: THREE.Mesh; velocity: THREE.Vector3; mass: number; age: number; contacts: number; slurry: boolean; bond: number; variation:number; cleanRelease:boolean; impactNormal?:THREE.Vector3 };
 type Deposit = { fieldKey?: string; position: THREE.Vector3; radius: number; mass: number; mesh: THREE.Mesh; age: number; normal: THREE.Vector3; support: number };
 type Contact = { point: THREE.Vector3; normal: THREE.Vector3; distance: number; box: boolean };
 type Opening = { inverse: THREE.Matrix4; halfWidth: number; halfHeight: number; minZ: number; maxZ: number };
@@ -233,7 +233,7 @@ export class MortarSystem {
     const mass=this.reserveScoop?.(.65)??.65;
     if(!Number.isFinite(mass)||mass<=0){this.lastOutcome='No ready mortar nearby. Mix a batch and bring the bucket to the work.';return;}
     const bond=(phase<.42?.04+.96*(phase/.42)**2:1)*quality;
-    const launchVelocity=this.velocity(camera,phase,origin);this.spawnClod(origin,launchVelocity,mass*(1-backFraction),false,bond);this.onLaunch?.({speed:launchVelocity.length(),phase});
+    const launchVelocity=this.velocity(camera,phase,origin);this.spawnClod(origin,launchVelocity,mass*(1-backFraction),false,bond,phase>=.42&&phase<=.58);this.onLaunch?.({speed:launchVelocity.length(),phase});
     if(late>0){
       const towardFace=camera.getWorldPosition(new THREE.Vector3()).sub(origin);
       if(towardFace.lengthSq()<1e-6)camera.getWorldDirection(towardFace).negate();
@@ -475,7 +475,7 @@ export class MortarSystem {
     for (const cell of this.water.values()) { const d = cell.position.distanceTo(p); if (d < distance && Math.abs(cell.position.z - p.z) < .025) { distance = d; best = cell; } }
     return best ?? { pore: 0, film: 0 };
   }
-  retention(p: THREE.Vector3, v: THREE.Vector3, normal: THREE.Vector3): number {
+  retention(p: THREE.Vector3, v: THREE.Vector3, normal: THREE.Vector3, cleanRelease=false): number {
     const wet = this.moistureAt(p), speed = v.length(), incidence = Math.max(0, -v.clone().normalize().dot(normal));
     const receiver=this.field.stateAt(p.clone().addScaledVector(normal,-.006));
     let prepared=receiver.value>.35&&receiver.age<3600?.90*(1-Math.min(.65,receiver.dilution*.3)):(.35+.65*Math.min(1,wet.pore/.45));
@@ -489,6 +489,17 @@ export class MortarSystem {
       ? THREE.MathUtils.smoothstep(depth,.012,.035) : 0;
     if(confined>0)prepared=Math.max(prepared,.88*confined);
     const effectiveIncidence=Math.max(incidence,confined*(.65+.25*incoming));
+    // A correctly timed wrist transfer seats a cohesive scoop against the
+    // receiver. Do not impose the old guaranteed 7% waste (or 65% on dry
+    // brick) before the volume solver even checks available room. Oblique,
+    // flooded and low-energy contacts still lose material; capacity remains
+    // authoritative and poor batch quality is applied separately below.
+    if(cleanRelease){
+      prepared=Math.max(prepared,(.95+.05*Math.max(confined,Math.min(1,wet.pore/.45)))*(1-Math.min(.65,receiver.dilution*.3)));
+      const seating=THREE.MathUtils.smoothstep(effectiveIncidence,.45,.85);
+      const incidenceTransfer=THREE.MathUtils.lerp(effectiveIncidence**1.3,1,seating);
+      return THREE.MathUtils.clamp(prepared*(1-.8*wet.film)*Math.min(1,speed/2)*incidenceTransfer/(1+Math.max(0,speed-6)*.12),0,1);
+    }
     return THREE.MathUtils.clamp(prepared * (1 - .8 * wet.film) * Math.min(1, speed / 2) * effectiveIncidence ** 1.3 / (1 + Math.max(0, speed - 6) * .12), 0, .93);
   }
   launch(origin: THREE.Vector3, velocity: THREE.Vector3, mass = .65): void {
@@ -502,10 +513,10 @@ export class MortarSystem {
     const wet=new THREE.Mesh(this.pendingWetBatch.mesh.geometry,this.wetBatchMaterial);wet.frustumCulled=false;group.add(wet);
     return group;
   }
-  private spawnClod(origin: THREE.Vector3, velocity: THREE.Vector3, mass: number, slurry = false, bond = 1): void {
+  private spawnClod(origin: THREE.Vector3, velocity: THREE.Vector3, mass: number, slurry = false, bond = 1, cleanRelease=false): void {
     const variation=this.clodSequence++,mesh = new THREE.Mesh(this.clodGeometries[variation%this.clodGeometries.length], this.clodMaterial); mesh.position.copy(origin); mesh.castShadow = true;
     mesh.name='Cohesive wet mortar with ragged edges';
-    const clod={ mesh, velocity: velocity.clone(), mass, age: 0, contacts: 0, slurry, bond, variation };
+    const clod={ mesh, velocity: velocity.clone(), mass, age: 0, contacts: 0, slurry, bond, variation, cleanRelease };
     this.updateClodAppearance(clod);
     this.group.add(mesh); this.projectiles.push(clod);
   }
@@ -587,7 +598,7 @@ export class MortarSystem {
     return pieces;
   }
 
-  private deposit(p: THREE.Vector3, mass: number, normal: THREE.Vector3, sync=true,footprintMass=mass,impactVelocity?:THREE.Vector3,variation=0): number {
+  private deposit(p: THREE.Vector3, mass: number, normal: THREE.Vector3, sync=true,footprintMass=mass,impactVelocity?:THREE.Vector3,variation=0,seatScoop=false): number {
     if (mass <= .001) return 0;
     // An impact facet must not rotate a separate sheet. Wet material joins a
     // fixed-world scalar volume and grows along the working face.
@@ -617,7 +628,7 @@ export class MortarSystem {
     // Adhesion changes quantity, not the width of a scoop spreading across an
     // existing bed. Shrinking both trapped casts on full lips above empty gaps.
     const receiver=this.field.stateAt(p);
-    const spread=receiver.value>=.35||(frontZ!==undefined&&frontZ-p.z>.012)?footprintMass:mass;
+    const spread=seatScoop||receiver.value>=.35||(frontZ!==undefined&&frontZ-p.z>.012)?footprintMass:mass;
     const held = this.field.add(p, growth, mass, blocked,profile,spread);
     if (held > 0) { if(sync)this.syncFieldGeometry(); this.geometryRevision++; }
     return held;
@@ -771,8 +782,11 @@ export class MortarSystem {
       const d = next.clone().sub(a), hit = this.contact(a, d.clone().normalize(), d.length());
       if (hit) {
         clod.impactNormal??=hit.normal.clone().negate();
-        const fraction = clod.slurry || hit.box || this.insideBox(hit.point) || clod.contacts > 2 ? 0 : this.retention(hit.point, clod.velocity, hit.normal)*clod.bond;
-        const held = this.deposit(hit.point, clod.mass * fraction, hit.normal,false,clod.mass,clod.velocity,clod.variation); this.stuckMass += held;
+        const fraction = clod.slurry || hit.box || this.insideBox(hit.point) || clod.contacts > 2 ? 0 : this.retention(hit.point, clod.velocity, hit.normal,clod.cleanRelease&&clod.contacts===0)*clod.bond;
+        // A clean wrist transfer spreads the same scoop over a wider receiving
+        // area. The old footprint could hold only ~0.41 kg of a 0.65 kg scoop
+        // within the 10 mm surface coat limit, even on an empty flat wall.
+        const held = this.deposit(hit.point, clod.mass * fraction, hit.normal,false,clod.mass*(clod.cleanRelease?1.9:1),clod.velocity,clod.variation,clod.cleanRelease); this.stuckMass += held;
         if(clod.contacts===0&&!clod.slurry){const speed=clod.velocity.length(),incidence=speed>1e-6?Math.abs(clod.velocity.clone().multiplyScalar(1/speed).dot(hit.normal)):0;this.onImpact?.({speed,retainedKg:held,incidence});}
         clod.contacts++;
         clod.mass -= held;

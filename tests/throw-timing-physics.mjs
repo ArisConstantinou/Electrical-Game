@@ -208,4 +208,21 @@ report.push({check:'Actual early, ideal and late contact, gravity, adhesion and 
  report.push({check:'Ballistic aim converges at unchanged timing speed; manual loft remains active',samples});
 }
 
+{
+ const cases=[];
+ for(const surface of ['dry','damp','flooded','poor-batch']){
+  const {system,camera,origin}=fixture();system.angleDegrees=12;system.water.clear();
+  if(surface==='damp')system.moistureAt=()=>({pore:.45,film:0});
+  if(surface==='flooded')system.moistureAt=()=>({pore:1,film:.8});
+  if(surface==='poor-batch')system.scoopBond=()=>.25;
+  system.swing(true,.475,camera,origin);system.swing(false,0,camera,origin);system.swing(false,TROWEL_RELEASE_SECONDS,camera,origin);
+  advance(system,4);cases.push({surface,...ledger(system)});
+ }
+ assert(cases[0].heldKg>.62,'Perfect dry backed contact sheds a compulsory part of every scoop');
+ assert(cases[1].heldKg>.62,'Perfect damp backed contact sheds a compulsory part of every scoop');
+ assert(cases[2].floorKg>.3,'Perfect timing bypasses a flooded receiving surface');
+ assert(cases[3].floorKg>.4,'Perfect timing bypasses weak mortar quality');
+ report.push({check:'Perfect first contact has no compulsory waste; flooding and poor batches still shed',cases});
+}
+
 console.log(JSON.stringify({suite:'throw-timing-physics',passed:true,checks:report},null,2));
