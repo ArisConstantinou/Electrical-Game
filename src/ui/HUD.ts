@@ -171,6 +171,7 @@ export class HUD {
             </div>
           </div>
           <div id="mobile-controls" aria-label="Mobile controls">
+            <button id="mobile-interact" type="button" aria-label="Interact with nearby mixing object" aria-pressed="false" hidden><b>INTERACT</b><small>ΣΤΑΘΜΟΣ</small></button>
             <div id="mobile-move-zone" aria-label="Touch here to move"></div><div id="joystick" aria-label="Movement joystick"><div class="joystick-ring"></div><div id="joystick-thumb"></div></div>
             <div id="look-joystick" role="button" tabindex="0" aria-label="Hold to use selected tool; drag to aim"><div class="look-joystick-ring"></div><div id="look-joystick-thumb"><span id="mobile-action" aria-hidden="true">USE</span><small aria-hidden="true">+ AIM</small></div><div id="drag-aim-cue" aria-hidden="true"></div><small id="aim-control-label">HOLD + AIM</small><output id="mobile-use-status">READY</output></div>
             <nav id="aim-quick-controls" aria-label="Aim controls">
@@ -215,7 +216,7 @@ export class HUD {
             <p>Measure from the floor and pencil the working height. Chase real masonry, throw mortar into the recess and set each box level and flush. Finish the PVC routes before plastering.</p>
             <div class="brief-grid"><span>3 installation points</span><span>No cable pulling</span><span>Desktop + mobile</span></div>
             <button id="start-button">ENTER THE SITE</button>
-            <small>WASD · MOUSE LOOK · LEFT CLICK / E USE TOOL · 9 MEASURE · M MARK · 0 DRILL · B DRIVER · L LASER · WHEEL SWITCH TOOL</small>
+            <small>WASD · MOUSE LOOK · LEFT CLICK USE TOOL · E INTERACT / ALT USE · 9 MEASURE · M MARK · 0 DRILL · B DRIVER · L LASER · WHEEL SWITCH TOOL</small>
           </section>
           <section id="result-panel" class="screen-panel result-panel">
             <div class="eyebrow">LIVING ROOM · INSPECTION PASSED</div>

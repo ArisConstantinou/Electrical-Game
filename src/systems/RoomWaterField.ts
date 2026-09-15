@@ -1,15 +1,17 @@
+import { GAME_CONFIG } from '../data/gameConfig';
+
 /** Conservative finite-volume shallow water over a closed room floor.
  * Face velocities carry momentum, so water keeps spreading after impact instead
  * of behaving like a slowly diffusing stain. Volumes are cubic metres internally. */
 export class RoomWaterField {
-  readonly columns=64;
-  readonly rows=54;
+  readonly columns=80;
+  readonly rows=72;
   readonly depths=new Float64Array(this.columns*this.rows);
   readonly bed=new Float64Array(this.depths.length);
-  readonly width=5.96;
-  readonly depth=4.88;
-  readonly minX=-2.98;
-  readonly minZ=-2.39;
+  readonly width=GAME_CONFIG.room.width-.04;
+  readonly depth=GAME_CONFIG.room.depth-.12;
+  readonly minX=-this.width/2;
+  readonly minZ=GAME_CONFIG.room.wallFrontZ+.02;
   readonly dx=this.width/this.columns;
   readonly dz=this.depth/this.rows;
   readonly area=this.dx*this.dz;

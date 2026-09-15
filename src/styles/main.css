@@ -79,6 +79,11 @@ button {
 .level-buttons .confirm { background: #b85930; border-color: #df8658; }
 .level-buttons .cancel { grid-column: 1 / -1; background: #292621; border-color: #756a5c; }
 #mobile-controls { display: none; position: absolute; z-index: 6; inset: 0; pointer-events: none; }
+#mobile-interact { position:absolute; z-index:10; right:max(14px,env(safe-area-inset-right)); bottom:294px; min-width:112px; min-height:52px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; padding:7px 12px; border:1px solid #ffd08a; border-radius:8px; color:#fff; background:rgba(126,68,30,.94); box-shadow:0 6px 18px #0006; pointer-events:auto; touch-action:none; }
+#mobile-interact[hidden] { display:none; }
+#mobile-interact b { font:800 15px/1 'Barlow Condensed',sans-serif; letter-spacing:.07em; }
+#mobile-interact small { font:700 12px/1 'Barlow Condensed',sans-serif; color:#ffe2bd; }
+#mobile-interact[aria-pressed="true"] { background:#d06e32; transform:translateY(1px); }
 #joystick, #look-joystick { position: absolute; bottom: calc(max(12px, env(safe-area-inset-bottom)) + 126px); width: 124px; height: 124px; pointer-events: auto; touch-action: none; }
 #joystick, #look-joystick, #joystick *, #look-joystick * { -webkit-tap-highlight-color: transparent; }
 #joystick *, #look-joystick * { pointer-events: none; }

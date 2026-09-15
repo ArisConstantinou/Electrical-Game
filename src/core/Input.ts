@@ -4,6 +4,8 @@ export class Input {
   mobileLook = { x: 0, y: 0 };
   actionRequested = false;
   actionHeld = false;
+  interactionRequested = false;
+  interactionHeld = false;
 
   constructor() {
     addEventListener('keydown', this.onKeyDown);
@@ -18,12 +20,19 @@ export class Input {
     this.actionRequested = false;
     return requested;
   }
+  consumeInteraction(): boolean {
+    const requested = this.interactionRequested;
+    this.interactionRequested = false;
+    return requested;
+  }
   resetMobileMove(): void { this.mobileMove = { x: 0, y: 0 }; }
   resetMobileLook(): void { this.mobileLook = { x: 0, y: 0 }; }
   resetTransientInput(): void {
     this.keys.clear();
     this.actionHeld = false;
     this.actionRequested = false;
+    this.interactionHeld = false;
+    this.interactionRequested = false;
     this.resetMobileMove();
     this.resetMobileLook();
   }
@@ -31,12 +40,19 @@ export class Input {
   private onKeyDown = (event: KeyboardEvent): void => {
     this.keys.add(event.code);
     if (event.code === 'KeyE') {
+      this.interactionHeld = true;
       this.actionHeld = true;
-      if (!event.repeat) this.actionRequested = true;
+      if (!event.repeat) {
+        this.interactionRequested = true;
+        this.actionRequested = true;
+      }
     }
   };
   private onKeyUp = (event: KeyboardEvent): void => {
     this.keys.delete(event.code);
-    if (event.code === 'KeyE') this.actionHeld = false;
+    if (event.code === 'KeyE') {
+      this.interactionHeld = false;
+      this.actionHeld = false;
+    }
   };
 }

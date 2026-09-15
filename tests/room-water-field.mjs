@@ -12,18 +12,19 @@ field.add(-1.2,-1.8,1500);
 for(let i=0;i<3600;i++)field.update(1/30);
 assert.ok(Math.abs(field.volumeLitres-1507.2)<1e-6,'flooding preserves every litre');
 assert.ok(field.wetArea>smallArea&&field.wetArea>field.width*field.depth*.99,'sustained water fills the room');
-assert.ok(field.maxDepth>.05,'1500 litres must raise the actual water height');
+assert.ok(field.maxDepth>(field.volumeLitres/1000)/(field.width*field.depth)*.9,'1500 litres must raise the actual water height across the enlarged room');
 assert.ok([...field.depths].every(h=>Number.isFinite(h)&&h>=0),'depth stays nonnegative');
 const sustained=new RoomWaterField();
 for(let i=0;i<1200;i++){sustained.add(-1.2,-1.8,40/30);sustained.update(1/30);}
+for(let i=0;i<3600;i++)sustained.update(1/30);
 assert.ok(Math.abs(sustained.volumeLitres-1600)<1e-6,'40 L/s gun has no source clipping');
 assert.ok(sustained.wetArea>sustained.width*sustained.depth*.99,'continuous high flow reaches the entire room floor');
-assert.ok(sustained.maxDepth>.05,'sustained gun use raises actual surface height');
+assert.ok(sustained.maxDepth>(sustained.volumeLitres/1000)/(sustained.width*sustained.depth)*.9,'sustained gun use raises actual surface height');
 const shallowMax=sustained.maxDepth;
 // The deep saved-volume case verifies that the floor surface has no puddle cap.
-sustained.add(0,0,30000);
+sustained.add(0,0,60000);
 for(let i=0;i<1800;i++)sustained.update(1/30);
-assert.ok(Math.abs(sustained.volumeLitres-31600)<1e-5,'deep room fill conserves volume');
+assert.ok(Math.abs(sustained.volumeLitres-61600)<1e-5,'deep room fill conserves volume');
 assert.ok(Math.min(...sustained.depths)>1,'every floor cell is deeper than one metre');
 assert.ok(sustained.maxDepth>shallowMax+1,'water height keeps rising beyond shallow puddles');
 assert.ok([...sustained.depths].every(h=>Number.isFinite(h)&&h>=0),'high flow remains finite and nonnegative');

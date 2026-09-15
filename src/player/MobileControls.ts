@@ -9,6 +9,7 @@ export class MobileControls {
   private joystickPointer: number | null = null;
   private lookPointer: number | null = null;
   private lookActionPointer: number | null = null;
+  private interactionPointer: number | null = null;
   private lookX = 0;
   private lookY = 0;
   private actionX = 0;
@@ -93,6 +94,21 @@ export class MobileControls {
       }
     });
     action?.addEventListener('blur', () => { if (this.lookActionPointer === -1) this.releaseAction(true); });
+    const interact = surface.querySelector<HTMLButtonElement>('#mobile-interact');
+    interact?.addEventListener('pointerdown', event => {
+      if (event.pointerType === 'mouse' || this.interactionPointer !== null) return;
+      event.preventDefault(); event.stopPropagation();
+      this.interactionPointer = event.pointerId;
+      this.capture(interact, event.pointerId);
+      this.input.interactionHeld = true;
+      this.input.interactionRequested = true;
+      interact.setAttribute('aria-pressed', 'true');
+    });
+    for (const kind of ['pointerup', 'pointercancel', 'lostpointercapture'] as const) interact?.addEventListener(kind, event => {
+      if ((event as PointerEvent).pointerId !== this.interactionPointer) return;
+      event.preventDefault(); event.stopPropagation();
+      this.releaseInteraction(kind !== 'pointerup');
+    });
   }
 
   setAimControlMode(_mode: AimControlMode): void { this.cancelActiveGestures(); }
@@ -102,6 +118,7 @@ export class MobileControls {
   /** Cancellation discards a pending cast; ordinary USE release still casts. */
   cancelActiveGestures(): void {
     this.releaseAction(true);
+    this.releaseInteraction(true);
     this.releaseLook();
     this.releaseJoystick();
   }
@@ -219,6 +236,14 @@ export class MobileControls {
     action?.classList.remove('active'); action?.setAttribute('aria-pressed', 'false');
     const thumb = this.surface.querySelector<HTMLElement>('#look-joystick-thumb'); if (thumb) thumb.style.transform = 'translate(-50%, -50%)';
     if (cancel) window.dispatchEvent(new CustomEvent('wirehouse:cancel-mobile-action'));
+    this.releaseCapture(pointer);
+  }
+  private releaseInteraction(cancel: boolean): void {
+    if (this.interactionPointer === null) return;
+    const pointer = this.interactionPointer; this.interactionPointer = null;
+    this.input.interactionHeld = false;
+    if (cancel) this.input.interactionRequested = false;
+    this.surface.querySelector('#mobile-interact')?.setAttribute('aria-pressed', 'false');
     this.releaseCapture(pointer);
   }
   private updateLookJoystick(event: PointerEvent, joystick: HTMLElement): void {

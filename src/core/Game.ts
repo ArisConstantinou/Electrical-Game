@@ -16,6 +16,7 @@ import { LaserLevelSystem } from '../systems/LaserLevelSystem';
 import { setLaserProjection } from '../systems/LaserProjection';
 import { ChasingSystem } from '../systems/ChasingSystem';
 import { MortarSystem } from '../systems/MortarSystem';
+import { MixingStation } from '../systems/MixingStation';
 import { RoomWaterSystem } from '../systems/RoomWaterSystem';
 import { BoxPlacementSystem } from '../systems/BoxPlacementSystem';
 import { BoxFitPreview } from '../systems/BoxFitPreview';
@@ -61,6 +62,7 @@ export class Game {
   readonly mission: MissionSystem;
   readonly conduit: ConduitSystem;
   readonly mortar: MortarSystem;
+  readonly mixing: MixingStation;
   readonly roomWater: RoomWaterSystem;
   readonly boxPlacement: BoxPlacementSystem;
   readonly boxFitPreview: BoxFitPreview;
@@ -115,6 +117,9 @@ export class Game {
     this.chasing = new ChasingSystem(this.renderer.scene, this.room.brickWall);
     this.conduit = new ConduitSystem(this.renderer.scene, this.room.brickWall);
     this.mortar = new MortarSystem(this.renderer.scene, this.room.brickWall, this.mission.points);
+    this.mixing = new MixingStation(this);
+    this.mortar.reserveScoop = amount => this.mixing.reserveScoop(amount);
+    this.mortar.scoopBond = () => this.mixing.bondFactor;
     this.roomWater = new RoomWaterSystem(this.renderer.scene, this.room.brickWall);
     this.boxPlacement = new BoxPlacementSystem(this.room.brickWall,this.mortar,this.mission.points);
     this.boxFitPreview = new BoxFitPreview(this.renderer.scene,this.boxPlacement);
@@ -172,8 +177,9 @@ export class Game {
     const leveling = active?.stage === 'leveling';
     if (leveling && !this.wasLeveling && document.pointerLockElement) void document.exitPointerLock();
     this.wasLeveling = leveling;
-    const handWork=['fitting','level','measure','drill','driver','laser'].includes(this.selectedTool);
-    this.player.wallWorkEnabled=(this.selectedTool==='hammer'||handWork)&&!leveling;
+    const blockingWork=this.mixing.blocksWork&&!['drill','laser','driver'].includes(this.selectedTool);
+    const handWork=!blockingWork&&['fitting','level','measure','drill','driver','laser'].includes(this.selectedTool);
+    this.player.wallWorkEnabled=(this.selectedTool==='hammer'||handWork)&&!leveling&&!blockingWork;
     const cuttingStep=(this.room.brickWall.chiselType==='flat'?this.room.brickWall.chiselWidthM:.01)*.36;
     this.player.wallToolTravelSpeedMps=this.selectedTool==='hammer'&&this.input.actionHeld
       ?Math.min(.6,cuttingStep*this.hammerSpeed/.24):null;
@@ -193,7 +199,7 @@ export class Game {
     if(this.hammerAutoSide&&this.started&&!leveling&&this.selectedTool==='hammer'){
       this.room.brickWall.chiselSideDegrees=this.hammerWorkStance.resolveSide(this.renderer.camera,this.room.brickWall.chiselSideDegrees);
     }
-    this.hammerWorkStance.update(this.renderer.camera, dt, this.room.brickWall.chiselSideDegrees, this.started && !leveling,this.room.brickWall.chiselTiltDegrees,this.selectedTool);
+    this.hammerWorkStance.update(this.renderer.camera, dt, this.room.brickWall.chiselSideDegrees, this.started && !leveling && !blockingWork,this.room.brickWall.chiselTiltDegrees,this.selectedTool);
     this.fpsRig.workStanceSide = this.hammerWorkStance.sideDegrees / 75;
     this.fpsRig.workHeadLeanM = this.hammerWorkStance.headLeanM;
     const requestedSide=this.room.brickWall.chiselSideDegrees;
@@ -201,14 +207,20 @@ export class Game {
     this.fpsRig.workStanceTiltDegrees = this.hammerWorkStance.actualTiltDegrees;
     this.fpsRig.workPositionLocked=this.player.workPosition.locked;
     this.actionCooldown = this.selectedTool==='hammer'?this.actionCooldown-dt:Math.max(0,this.actionCooldown-dt);
-    const requested = this.input.consumeAction();
+    let requested = this.input.consumeAction();
+    const interactionRequested = this.input.consumeInteraction();
+    const handledMixingInteraction = this.started && this.mixing.handleInteractionRequest(interactionRequested);
+    if(handledMixingInteraction)requested=false;
+    this.mixing.update(dt, interactionRequested && !handledMixingInteraction, this.input.interactionHeld);
+    const mixingOwnedInput = this.mixing.blocksWork;
     // Both hammer modes deliver local repeated percussive strikes while held.
     const continuousTool = this.isContinuousAction();
     const repeatable = continuousTool && this.input.actionHeld && this.actionCooldown <= 0;
     const spraying = this.selectedTool === 'spray' && this.input.actionHeld;
     if (this.wasSpraying && !spraying) this.interaction.endSprayStroke();
     this.wasSpraying = spraying;
-    if (this.started && !['measure','drill','driver','trowel','hose'].includes(this.selectedTool) && (this.selectedTool !== 'hammer' || this.hammerSpeed > 0) && (requested || repeatable)) {
+    const permitWallActions = !blockingWork && (!mixingOwnedInput || this.selectedTool === 'laser');
+    if (this.started && permitWallActions && !['measure','drill','driver','trowel','hose'].includes(this.selectedTool) && (this.selectedTool !== 'hammer' || this.hammerSpeed > 0) && (requested || repeatable)) {
       this.performAction(repeatable && !requested);
       const interval=this.selectedTool === 'spray' ? 0.045 : this.selectedTool === 'hammer' ? 0.24 / Math.max(.25, this.hammerSpeed) : 0.18;
       // Carry fractional frame time so 8x is not silently capped to 30 Hz on
@@ -219,7 +231,7 @@ export class Game {
       }
     }
     else if(!this.input.actionHeld)this.actionCooldown=Math.max(0,this.actionCooldown);
-    const mortarTool = this.started && !leveling && (this.selectedTool === 'trowel' || this.selectedTool === 'hose');
+    const mortarTool = this.started && !leveling && !mixingOwnedInput && !blockingWork && (this.selectedTool === 'trowel' || this.selectedTool === 'hose');
     // The player's arms hold tools near the body; aiming does not extend them.
     this.fpsRig.position.z=this.selectedTool==='hammer'?-.22:this.selectedTool==='fitting'?-.32:-.42;
     if(this.selectedTool==='hose'){
@@ -264,7 +276,7 @@ export class Game {
     this.fpsRig.show(this.selectedTool);
     this.fpsRig.visible=this.mission.activePoint?.stage!=='leveling';
     this.heightMeasure.update(this.renderer.camera,this.started&&this.selectedTool==='measure',(point,normal)=>this.fpsRig.canReachPoint(this.renderer.camera,point,.10,normal));
-    this.laserLevel.update(this.renderer.camera,this.selectedTool,this.started&&this.input.actionHeld,dt,(point,normal)=>this.fpsRig.canReachPoint(this.renderer.camera,point,.10,normal));
+    this.laserLevel.update(this.renderer.camera,this.selectedTool,this.started&&!blockingWork&&this.input.actionHeld,dt,(point,normal)=>this.fpsRig.canReachPoint(this.renderer.camera,point,.10,normal));
     setLaserProjection(this.laserLevel.activeHeightM);
     if (this.selectedTool === 'hammer') this.fpsRig.contact(this.renderer.camera, this.room.brickWall);
     else if(this.selectedTool==='trowel')this.fpsRig.poseTrowel(this.renderer.camera,this.mortar.throwFeedback.motion,dt,this.room.brickWall.volume.frontZ);
@@ -320,6 +332,7 @@ export class Game {
     if (this.mission.complete && !this.resultShown) { this.resultShown = true; this.hud.showResult(); if (document.pointerLockElement) void document.exitPointerLock(); }
     this.renderer.eyeYaw = 0;
     this.renderer.eyePitch = 0;
+    this.mixing.present();
     // Catch-up physics may run several times per image. Build wet surfaces
     // only once at presentation, keeping cheap flat patches within one budget.
     if(present)this.mortar.flushWetGeometry(64,3);
@@ -335,6 +348,7 @@ export class Game {
     const point = this.mission.activePoint;
     return JSON.stringify({
       mortar: this.mortar.telemetry,
+      mixing: this.mixing.telemetry,
       boxPlacement:this.boxPlacement.telemetry,
       boxFit:this.boxFitPreview.telemetry,
       measurement:this.heightMeasure.telemetry,
@@ -582,6 +596,8 @@ export class Game {
 
   private selectTool(tool: RigTool): void {
     if (!RIG_TOOLS.includes(tool)) return;
+    if(this.mixing.carrying){this.hud.notify('Άφησε πρώτα τη σύκλα.',false,1600);return;}
+    if(this.mixing.active)this.mixing.setActive(false);
     const changed = this.selectedTool !== tool;
     if(changed&&this.selectedTool==='fitting'&&tool==='hammer')this.boxFitPreview.pin(this.renderer.camera,this.mission.boxPreset);
     if(changed){this.mobileControls.cancelActiveGestures();this.mortar.cancel();const point=this.mission.activePoint;if(point?.stage==='leveling')this.pendingSceneActions.push(()=>this.leveling.cancel(point));}

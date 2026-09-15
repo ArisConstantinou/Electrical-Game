@@ -55,6 +55,9 @@ function mortarClodGeometry(variant:number):THREE.BufferGeometry {
 /** Qualitative wet mortar: finite mass, real surface contact and separate fresh-mortar stability.
  * See docs/MORTAR_APPLICATION_RESEARCH.md; these coefficients are not calibrated. */
 export class MortarSystem {
+  /** Optional physical batch; reservation happens once at the committed wrist release. */
+  reserveScoop?: (requestedKg:number) => number;
+  scoopBond?: () => number;
   readonly group = new THREE.Group();
   readonly field = new MortarField();
   onRunoff?: (event: { point: THREE.Vector3; normal: THREE.Vector3; litres: number; mortarKg: number }) => void;
@@ -222,7 +225,10 @@ export class MortarSystem {
     const late=THREE.MathUtils.clamp((phase-.58)/.42,0,1),backFraction=late*.55;
     // Reserve the whole finite scoop atomically, including its backward share.
     if(this.projectiles.length+(late>0?3:1)>48)return;
-    const origin=this.releaseOrigin(camera,tip),mass=.65,bond=phase<.42?.04+.96*(phase/.42)**2:1;
+    const origin=this.releaseOrigin(camera,tip),quality=this.scoopBond?.()??1;
+    const mass=this.reserveScoop?.(.65)??.65;
+    if(!Number.isFinite(mass)||mass<=0){this.lastOutcome='No ready mortar nearby. Mix a batch and bring the bucket to the work.';return;}
+    const bond=(phase<.42?.04+.96*(phase/.42)**2:1)*quality;
     this.spawnClod(origin,this.velocity(camera,phase,origin),mass*(1-backFraction),false,bond);
     if(late>0){
       const towardFace=camera.getWorldPosition(new THREE.Vector3()).sub(origin);
