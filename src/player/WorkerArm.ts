@@ -26,6 +26,16 @@ function mesh(parent:THREE.Object3D, geometry:THREE.BufferGeometry, material:THR
 
 /** Palm and five separately articulated digits, wrapped around a tool handle. */
 export function workerHand(side:number, style:string):THREE.Group {
+  if(style==='mixer'){
+    const hand=new THREE.Group(),grasp=singleToolHand(side,side>0?'mixer-primary':'mixer-support');
+    hand.name=`${side<0?'Left':'Right'} five-finger mixer hand`;
+    // Transverse handles need an overhand grasp: backs upward, palms down.
+    // Mirror the roll so both thumbs oppose the fingers toward the motor.
+    grasp.rotation.y=side*Math.PI/2;
+    hand.add(grasp);
+    hand.userData={...grasp.userData,gripStyle:style,wristPoint:v(grasp.userData.wristPoint).applyQuaternion(grasp.quaternion).toArray()};
+    return hand;
+  }
   if(!style.startsWith('hammer'))return singleToolHand(side,style);
   const hand=new THREE.Group(); hand.name=`${side<0?'Left':'Right'} five-finger ${style} grip`;
   hand.userData.wristPoint=[side*.018,-.058,.047];
@@ -71,7 +81,7 @@ export function workerHand(side:number, style:string):THREE.Group {
 function singleToolHand(side:number,style:string):THREE.Group {
   const hand=new THREE.Group();hand.name=`${side<0?'Left':'Right'} five-finger ${style} hand`;
   const relaxed=style==='relaxed',pinch=style==='fitting';
-  const sections:Record<string,[number,number]>={spray:[.0335,.0335],spring:[.0082,.0082],level:[.027,.016],cutter:[.035,.014],trowel:[.0145,.0145],hose:[.022,.022],fitting:[.021,.015],relaxed:[.017,.008]};
+  const sections:Record<string,[number,number]>={spray:[.0335,.0335],spring:[.0082,.0082],level:[.027,.016],cutter:[.035,.014],trowel:[.0145,.0145],hose:[.022,.022],'mixer-primary':[.033,.033],'mixer-support':[.028,.028],fitting:[.021,.015],relaxed:[.017,.008]};
   const [rx,rz]=sections[style]??[.022,.022],backZ=relaxed?.012:rz+.010, palmX=pinch?side*.027:0;
   hand.userData.wristPoint=[palmX,-.059,backZ];hand.userData.gripStyle=style;
   hand.userData.gripSection=[rx,rz];

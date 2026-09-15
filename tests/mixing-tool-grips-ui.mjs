@@ -18,7 +18,8 @@ try{
       m.present();
       return {tool:m.tool,activity:m.telemetry.activity,modelPosition:model.position.toArray(),hands:m.arms.filter(a=>a.side>0||model.userData.secondaryGripPoint).map(a=>{
         const grip=a.hand.position.clone().fromArray(a.side===1?model.userData.gripPoint:model.userData.secondaryGripPoint);model.localToWorld(grip);
-        return{side:a.side,gripError:a.hand.getWorldPosition(grip.clone()).distanceTo(grip),reach:a.shoulder.distanceTo(a.wrist),forearmLength:a.elbow.distanceTo(a.wrist),rotation:a.hand.quaternion.toArray()};
+        const back=a.hand.position.clone().set(0,0,1);if(m.tool==='mixer')back.applyQuaternion(a.hand.children[0].quaternion).applyQuaternion(a.hand.quaternion);
+        return{side:a.side,gripError:a.hand.getWorldPosition(grip.clone()).distanceTo(grip),reach:a.shoulder.distanceTo(a.wrist),forearmLength:a.elbow.distanceTo(a.wrist),rotation:a.hand.quaternion.toArray(),backUp:back.y,gripSection:a.hand.userData.gripSection};
       }),overflow:document.documentElement.scrollWidth>innerWidth};
     });
     const shot=async name=>{await page.evaluate(async()=>{const r=window.__wireTheHouse.renderer;await r.waitForFrame();r.render();await r.waitForFrame();});await page.screenshot({path:`${out}/${layout.name}-${name}.png`});};
@@ -27,6 +28,7 @@ try{
       await page.locator(`[data-mix-equip="${tool}"]`).click({force:true});
       const idle=await sample();
       for(const hand of idle.hands){assert(hand.gripError<1e-6,`${tool} hand must seat on authored grip`);assert(hand.reach<.57,`${tool} idle arm stays in reach`);assert(Math.abs(hand.forearmLength-.27)<.001,`${tool} forearm remains connected without stretching`);}
+      if(tool==='mixer')for(const hand of idle.hands){assert(hand.backUp>.98,'Mixer knuckles face upward in a mirrored overhand grasp');assert.equal(hand.gripSection[0],hand.side>0?.033:.028,'Fingers fit the actual mixer handle radius');}
       await shot(`${tool}-held`);cases.push(idle);
       if(tool==='mixer'){
         const inserted=await page.evaluate(()=>{

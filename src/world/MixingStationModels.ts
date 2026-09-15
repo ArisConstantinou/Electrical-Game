@@ -56,7 +56,22 @@ function bucketModel(color: number, name: string): { bucket: THREE.Group; fill: 
     part(bucket, new THREE.BoxGeometry(.027, .004, .003), material(0xb5cbb9), [-.051, .065 + i * .06, .148 + i * .007], `${name}-volume-mark-${i}`);
   }
   label(bucket, '20 L', 'GARDEN / MIX', .11, .047, [.025, .157, .167]);
-  const fill = part(bucket, new THREE.RingGeometry(0, 1, 48, 6), material(0x8b8979, .82), [0, .029, 0], `${name}-contents`);
+  const fillMaterial = material(0x8b8979, .96);
+  if (name === 'mixing-garden-bucket') {
+    // Fine aggregate remains visible after blending; no external texture or canvas is needed.
+    const size = 128, grains = new Uint8Array(size * size * 4);
+    for (let i = 0; i < size * size; i++) {
+      const noise = Math.sin(i * 127.1 + 311.7) * 43758.5453;
+      const shade = 85 + Math.floor((noise - Math.floor(noise)) * 130);
+      grains.set([shade, shade, shade, 255], i * 4);
+    }
+    const texture = new THREE.DataTexture(grains, size, size);
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.magFilter = THREE.LinearFilter; texture.minFilter = THREE.LinearMipmapLinearFilter;
+    texture.generateMipmaps = true; texture.needsUpdate = true;
+    fillMaterial.bumpMap = texture; fillMaterial.bumpScale = 0;
+  }
+  const fill = part(bucket, new THREE.RingGeometry(0, 1, 64, 24), fillMaterial, [0, .029, 0], `${name}-contents`);
   fill.rotation.x = -Math.PI / 2; fill.scale.setScalar(.138); fill.visible = false;
   fill.userData.emptyY = .029; fill.userData.fullY = .289;
   (fill.geometry.getAttribute('position') as THREE.BufferAttribute).setUsage(THREE.DynamicDrawUsage);
@@ -247,19 +262,31 @@ export function setMixerDirty(mixer: THREE.Group, dirty: boolean): void {
 /**
  * Call once per rendered frame, progress in [0,1] and time in seconds. Set
  * models.fill.userData.dryIngredients = true after the first dry scoop (false for water only).
- * No geometry/material allocations; 343 vertices and nine small floating aggregate patches.
+ * No per-frame geometry/material allocations. Mixed paste retains folds when the paddle stops.
  */
 export function updateMixingSurface(models: Pick<MixingStationModels, 'fill'>, progress: number, spinning: boolean, time: number): void {
   const fill = models.fill; if (!fill.visible) return;
   const mixed = THREE.MathUtils.clamp(progress, 0, 1), scale = Math.max(.01, fill.scale.x);
+  const solids = !!fill.userData.dryIngredients;
+  const paste = solids ? .35 + mixed * .65 : 0;
+  const mat = fill.material as THREE.MeshStandardMaterial;
+  mat.roughness = solids ? .97 : .28;
+  mat.bumpScale = solids ? .0016 : 0;
   const depth = Math.min(.017, Math.max(0, fill.position.y - .029) * .42);
   const positions = fill.geometry.getAttribute('position');
   for (let i = 0; i < positions.count; i++) {
     const x = positions.getX(i), y = positions.getY(i), radius = Math.min(1, Math.hypot(x, y)), angle = Math.atan2(y, x);
     // Both depression and crests fade to zero at the rim to preserve containment.
-    const depression = spinning ? -depth * (1 - radius) * (1 - radius) : 0;
-    const ripple = spinning ? Math.sin(angle * 3 + radius * 13 - time * 7) * .0026 * Math.sin(radius * Math.PI) : 0;
-    positions.setZ(i, (depression + ripple) / scale);
+    const envelope = Math.sin(radius * Math.PI);
+    // Stiff mortar holds broad paddle furrows and smaller irregular crests at rest.
+    // Cartesian detail avoids a singular seam or spikes at the disk centre.
+    const folds = paste * (.007 * Math.sin(x * 13 + Math.sin(y * 9) * 1.8) * Math.cos(y * 11 - x * 4) * envelope
+      + .0018 * Math.sin(radius * 19 + angle * 2 + Math.sin(x * 12)) * envelope
+      + .003 * Math.sin(x * 37 + Math.sin(y * 19)) * Math.cos(y * 29) * (1 - radius)
+      + .006 * (1 - radius));
+    const depression = spinning ? -depth * (1 - paste * .72) * (1 - radius) ** 2 : 0;
+    const ripple = spinning ? Math.sin(angle * 3 + radius * 13 - time * (solids ? 2.8 : 7)) * .0026 * envelope : 0;
+    positions.setZ(i, (folds + depression + ripple) / scale);
   }
   positions.needsUpdate = true; fill.geometry.computeVertexNormals();
   const aggregate = fill.getObjectByName('mixing-dry-aggregate');

@@ -81,7 +81,7 @@ export class MixingStation {
     this.heldTools.set('mixer',createMixerModel());
     this.heldTools.set('water',m.water.clone(true));
     this.heldTools.forEach((model,key)=>{this.held.add(model);model.visible=false;
-      this.toolHands.set(key,[1,-1].map(side=>workerHand(side,key==='trowel'?(side===1?'trowel':'relaxed'):'hose')));
+      this.toolHands.set(key,[1,-1].map(side=>workerHand(side,key==='trowel'?(side===1?'trowel':'relaxed'):key==='mixer'?'mixer':'hose')));
     });
     this.toolHands.set('hands',[1,-1].map(side=>workerHand(side,'relaxed')));
     this.stationTrowel=buildToolModel('trowel');this.stationTrowel.name='mixing-station-trowel';this.stationTrowel.userData.studioEntityId='mixing:trowel';this.stationTrowel.position.set(.22,.13,.28);this.stationTrowel.rotation.set(.18,0,-1.18);m.group.add(this.stationTrowel);
@@ -337,7 +337,14 @@ export class MixingStation {
   }
   /** Called only when the wrist actually releases; failed or cancelled throws use no mortar. */
   reserveScoop(requested:number):number{
-    if(!this.finished||!this.customSupply||!this.batch.ready){this.game.hud.notify('Πρέπει πρώτα να ετοιμάσεις και να κάνεις FINISH τον πυλό.',false,2000);return 0;}
+    // Selecting the wall trowel already leaves preparation. A ready batch must
+    // not require a second UI acknowledgement before its first actual cast.
+    // Do not call finishBatch here: its input reset cancels the releasing wrist.
+    if(!this.finished&&this.batch.ready&&!this.blocksWork&&!this.inserted){
+      this.finished=true;this.customSupply=true;this.uiKey='';
+      this.message='Η παρτίδα είναι έτοιμη για εφαρμογή με το μιστρί.';
+    }
+    if(!this.finished||!this.customSupply||!this.batch.ready){this.game.hud.notify('Ετοίμασε πρώτα νερό, τσιμέντο και άμμο και ολοκλήρωσε την ανάμειξη.',false,2000);return 0;}
     return this.batch.consumeKg(requested);
   }
   get bondFactor():number{return this.batch.quality==='balanced'?1:this.batch.quality==='wet'?.45:this.batch.quality==='dry'?.55:.65;}
