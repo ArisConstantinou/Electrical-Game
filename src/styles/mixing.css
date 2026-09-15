@@ -1,4 +1,15 @@
 #mixing-toggle{display:none!important}
+#mixing-receipt{position:absolute;z-index:12;left:22px;top:145px;width:310px;max-width:calc(100% - 44px);padding:11px 13px;border:1px solid #928368;border-left:3px solid #b99a69;border-radius:7px;background:rgba(26,29,25,.9);color:#f2eee4;pointer-events:none;font:400 14px/1.35 Arial,sans-serif}
+#mixing-receipt[hidden]{display:none}
+#mixing-receipt .mix-receipt-title{font-size:12px;letter-spacing:.08em;color:#d9c9aa}
+#mixing-receipt dl{display:grid;grid-template-columns:.8fr 1.15fr 1.15fr;gap:10px;margin:8px 0}
+#mixing-receipt dt{font-size:14px;color:#d6d5cb}
+#mixing-receipt dd{margin:3px 0 0;font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+#mixing-receipt p{min-height:38px;margin:0;font-size:14px;color:#c9cec5}
+#mixing-receipt.has-deposit{border-left-color:#9bc89c}
+#mixing-receipt.has-deposit p{color:#c8eec5}
+@media(max-width:700px),(pointer:coarse){#mixing-receipt{left:10px;top:max(68px,calc(env(safe-area-inset-top) + 62px));width:300px;max-width:calc(100% - 20px);padding:8px 10px}#mixing-receipt dl{margin:5px 0;gap:7px}}
+@media(max-height:540px){#mixing-receipt{left:10px;top:64px;width:285px;padding:7px 10px}#mixing-receipt p{min-height:0}#mixing-receipt dl{margin:4px 0}}
 #mixing-panel{display:none!important}
 #mixing-panel[hidden],#mixing-world-prompt[hidden],#mixing-finish[hidden]{display:none!important}
 #mixing-panel>b{font-size:14px;letter-spacing:.08em;color:#edc77d}
@@ -15,3 +26,4 @@
 .mixing-active #mortar-panel,.mixing-active #tool-status,.mixing-active #aim-quick-controls,.mixing-stage #tool-quick-controls,.mixing-stage #mobile-tool-slider,.mixing-active #chisel-orientation,.mixing-active #desktop-key-guide{visibility:hidden}
 @media(max-width:700px){#mixing-panel{left:8px;bottom:82px;width:calc(100% - 16px);padding:9px 11px}#mixing-panel .mix-readout{font-size:14px}#mixing-panel .mix-feedback{font-size:14px}#mixing-world-prompt{top:42%;font-size:15px}#mixing-finish{bottom:158px;min-width:210px}#mixing-toolbelt{left:8px;right:8px;bottom:7px;transform:none;gap:4px}#mixing-toolbelt button{width:auto;flex:1;min-width:0;min-height:64px;padding:4px 2px}#mixing-toolbelt span{font-size:12px}}
 @media(max-height:540px){#mixing-panel{left:8px;bottom:78px;width:300px;max-width:42vw}#mixing-world-prompt{top:42%;font-size:14px}#mixing-finish{bottom:82px;left:63%}#mixing-toolbelt{left:8px;right:8px;transform:none;justify-content:center}}
+@media(max-height:540px) and (min-width:540px){.mixing-stage #mixing-world-prompt{left:calc(50% + 150px);max-width:calc(100% - 330px)}}

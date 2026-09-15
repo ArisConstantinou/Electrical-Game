@@ -93,6 +93,8 @@ export function createShovelModel(): THREE.Group {
   const load = part(group, new THREE.SphereGeometry(1, 16, 8), material(0xb89a67, 1), [0, .135, .029], 'shovel-sand-load');
   load.scale.set(.081, .077, .026); load.visible = false; load.userData.shovelLoadPart = true;
   group.userData.gripPoint = [0, 1.08, .022]; group.userData.secondaryGripPoint = [0, .60, .022]; group.userData.tipPoint = [0, .055, .022];
+  group.userData.gripQuaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),new THREE.Vector3(-1,0,0)).toArray();
+  group.userData.secondaryGripQuaternion = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),Math.PI).toArray();
   return group;
 }
 
@@ -136,6 +138,8 @@ export function createMixerModel(): THREE.Group {
   }
   rod(coating, [0, .063, 0], [0, .255, 0], .010, paste, 'mixer-shaft-mortar-coating'); paddle.add(coating);
   group.userData.gripPoint = [.156, .780, 0]; group.userData.secondaryGripPoint = [-.20, .706, 0]; group.userData.tipPoint = [0, .08, 0];
+  group.userData.gripQuaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),new THREE.Vector3(-.156,-.026,0).normalize()).toArray();
+  group.userData.secondaryGripQuaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),new THREE.Vector3(1,0,0)).toArray();
   return group;
 }
 

@@ -9,7 +9,7 @@ import { sampleTrowelMotion, TROWEL_CHARGE_SECONDS, TROWEL_FULL_CHARGE_GRACE_SEC
 type WetBatch = { mesh: THREE.Mesh; used: number; live: number; free: Array<{ start: number; count: number }> };
 type WetPatch = { batch: WetBatch; start: number; count: number; alpha: number; pending?:boolean };
 type WaterCell = { pore: number; film: number; patch: WetPatch; position: THREE.Vector3; normal: THREE.Vector3; surfaceRevision?:number };
-type Clod = { mesh: THREE.Mesh; velocity: THREE.Vector3; mass: number; age: number; contacts: number; slurry: boolean; bond: number; variation:number };
+type Clod = { mesh: THREE.Mesh; velocity: THREE.Vector3; mass: number; age: number; contacts: number; slurry: boolean; bond: number; variation:number; impactNormal?:THREE.Vector3 };
 type Deposit = { fieldKey?: string; position: THREE.Vector3; radius: number; mass: number; mesh: THREE.Mesh; age: number; normal: THREE.Vector3; support: number };
 type Contact = { point: THREE.Vector3; normal: THREE.Vector3; distance: number; box: boolean };
 type Opening = { inverse: THREE.Matrix4; halfWidth: number; halfHeight: number; minZ: number; maxZ: number };
@@ -511,6 +511,16 @@ export class MortarSystem {
   }
   private updateClodAppearance(clod:Clod):void {
     const scale=Math.cbrt(clod.mass/.65),speed=clod.velocity.length();
+    if(clod.impactNormal){
+      // Rejected paste has already flattened against its receiver. Keep that
+      // contact frame while gravity carries it down; aligning the skin to the
+      // rebound velocity made it flip beside the adhered bed and inflate again.
+      if(clod.mesh.morphTargetInfluences)clod.mesh.morphTargetInfluences[0]=0;
+      // Preserve the flying skin's scale volume while spreading it tangentially.
+      clod.mesh.scale.set(.075*scale,.066*scale,(.046*.030*.064/(.075*.066))*scale);
+      clod.mesh.quaternion.setFromUnitVectors(Z,clod.impactNormal);
+      return;
+    }
     const stretch=(.3+.7*Math.exp(-clod.age*5))*Math.min(1,speed/4);
     if(clod.mesh.morphTargetInfluences)clod.mesh.morphTargetInfluences[0]=stretch;
     clod.mesh.scale.set(.046*scale,.030*scale,.064*scale);
@@ -760,6 +770,7 @@ export class MortarSystem {
       const clod = this.projectiles[i], a = clod.mesh.position, next = a.clone().addScaledVector(clod.velocity, h); next.y -= .5 * 9.81 * h * h; clod.velocity.y -= 9.81 * h; clod.age += h;
       const d = next.clone().sub(a), hit = this.contact(a, d.clone().normalize(), d.length());
       if (hit) {
+        clod.impactNormal??=hit.normal.clone().negate();
         const fraction = clod.slurry || hit.box || this.insideBox(hit.point) || clod.contacts > 2 ? 0 : this.retention(hit.point, clod.velocity, hit.normal)*clod.bond;
         const held = this.deposit(hit.point, clod.mass * fraction, hit.normal,false,clod.mass,clod.velocity,clod.variation); this.stuckMass += held;
         if(clod.contacts===0&&!clod.slurry){const speed=clod.velocity.length(),incidence=speed>1e-6?Math.abs(clod.velocity.clone().multiplyScalar(1/speed).dot(hit.normal)):0;this.onImpact?.({speed,retainedKg:held,incidence});}
@@ -792,7 +803,7 @@ export class MortarSystem {
         // Clear the newly deposited thickness as well as the old hit surface.
         clod.mesh.position.copy(hit.point).addScaledVector(hit.normal, .030);
         const vn = clod.velocity.dot(hit.normal); clod.velocity.addScaledVector(hit.normal, -vn).multiplyScalar(.3).addScaledVector(hit.normal, .16); clod.velocity.y = Math.min(-.4, clod.velocity.y - .22);
-        const scale = Math.cbrt(clod.mass / .65); clod.mesh.scale.set(.032 * scale, .023 * scale, .045 * scale); continue;
+        continue;
       }
       clod.mesh.position.copy(next);
       if (next.y < .012) { this.settle(clod); this.projectiles.splice(i, 1); }

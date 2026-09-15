@@ -1,15 +1,35 @@
 export type ContinuousConstructionSound='spray'|'hose'|'drill'|'driver'|'trowel'|'mixer';
 export type ConstructionSound='hammer'|'box'|'level'|'spring'|'cutter'|'mark'|'laser'|'trowel-whoosh'|'mortar-splat'|'water-pour'|'sack-tear'|'cement-scrape'|'sand-scoop'|'mixer-insert'|'mixer-rinse';
 
-type LoopNodes={source:AudioScheduledSourceNode;gain:GainNode;filter:BiquadFilterNode};
-const loopSettings:Record<ContinuousConstructionSound,{noise:boolean;frequency:number;filter:number;volume:number}>={
-  spray:{noise:true,frequency:0,filter:4200,volume:.026},hose:{noise:true,frequency:0,filter:1900,volume:.032},
-  drill:{noise:false,frequency:118,filter:2100,volume:.038},driver:{noise:false,frequency:92,filter:1600,volume:.035},
-  trowel:{noise:true,frequency:0,filter:920,volume:.022},mixer:{noise:false,frequency:82,filter:760,volume:.042},
+type LoopNodes={source:AudioBufferSourceNode;gain:GainNode;filter:BiquadFilterNode};
+type SoundLayer={filter:number;duration:number;volume:number;attack?:number;texture?:number;delay?:number};
+const loopSettings:Record<ContinuousConstructionSound,{motor:number;filter:number;volume:number}>={
+  spray:{motor:0,filter:4200,volume:.038},hose:{motor:0,filter:1900,volume:.048},
+  drill:{motor:146,filter:3400,volume:.046},driver:{motor:112,filter:2700,volume:.041},
+  trowel:{motor:0,filter:1800,volume:.028},mixer:{motor:76,filter:1500,volume:.048},
 };
 
-/** Small procedural construction sound bank. It has no downloaded assets and
- * starts only from a real user gesture, which keeps mobile Safari autoplay-safe. */
+// Impacts have a short contact and a quieter material tail. Moving materials
+// sustain a textured noise envelope; a downward-pitched tone makes them drums.
+const soundLayers:Record<ConstructionSound,readonly SoundLayer[]>={
+  hammer:[{filter:4700,duration:.025,volume:.21},{filter:1350,duration:.11,volume:.10,texture:87}],
+  box:[{filter:3600,duration:.022,volume:.12},{filter:2100,duration:.075,volume:.055,delay:.024}],
+  level:[{filter:3900,duration:.025,volume:.075}],
+  spring:[{filter:2900,duration:.26,volume:.067,attack:.012,texture:53}],
+  cutter:[{filter:5600,duration:.018,volume:.14},{filter:2700,duration:.06,volume:.055,delay:.018}],
+  mark:[{filter:3400,duration:.13,volume:.046,attack:.014,texture:61}],
+  laser:[{filter:4200,duration:.019,volume:.047}],
+  'trowel-whoosh':[{filter:2200,duration:.18,volume:.067,attack:.055}],
+  'mortar-splat':[{filter:1150,duration:.055,volume:.17},{filter:2400,duration:.19,volume:.073,attack:.008,texture:43}],
+  'water-pour':[{filter:2800,duration:.52,volume:.090,attack:.055,texture:19},{filter:780,duration:.42,volume:.056,attack:.035}],
+  'sack-tear':[{filter:5700,duration:.35,volume:.10,attack:.016,texture:97}],
+  'cement-scrape':[{filter:3300,duration:.32,volume:.083,attack:.028,texture:73}],
+  'sand-scoop':[{filter:2100,duration:.40,volume:.10,attack:.04,texture:47},{filter:4500,duration:.16,volume:.024,attack:.012}],
+  'mixer-insert':[{filter:3100,duration:.025,volume:.095},{filter:1300,duration:.14,volume:.065,attack:.012,texture:31}],
+  'mixer-rinse':[{filter:3600,duration:.44,volume:.090,attack:.03,texture:23}],
+};
+
+/** Procedural construction textures, unlocked only by a real user gesture. */
 export class ConstructionAudio {
   private context:AudioContext|null=null;
   private noise:AudioBuffer|null=null;
@@ -24,8 +44,8 @@ export class ConstructionAudio {
   unlock():void{
     if(!this.context){
       this.context=new AudioContext();
-      const length=Math.max(1,Math.floor(this.context.sampleRate*1.25));this.noise=this.context.createBuffer(1,length,this.context.sampleRate);
-      const data=this.noise.getChannelData(0);let previous=0;for(let i=0;i<length;i++){const white=this.random()*2-1;previous=previous*.28+white*.72;data[i]=previous;}
+      const length=Math.max(1,Math.floor(this.context.sampleRate*2));this.noise=this.context.createBuffer(1,length,this.context.sampleRate);
+      const data=this.noise.getChannelData(0);for(let i=0;i<length;i++)data[i]=this.random()*2-1;
       for(const kind of Object.keys(loopSettings) as ContinuousConstructionSound[])this.createLoop(kind);
     }
     void this.context.resume().catch(()=>{});
@@ -40,35 +60,55 @@ export class ConstructionAudio {
 
   play(kind:ConstructionSound,intensity=1):void{
     this.events[kind]=(this.events[kind]??0)+1;
-    const context=this.context;if(!context||context.state==='closed')return;
+    const context=this.context;if(!context||context.state==='closed'||!this.noise)return;
     const strength=Math.max(.2,Math.min(1.5,intensity)),now=context.currentTime;
-    const settings:Record<ConstructionSound,{frequency:number;filter:number;duration:number;volume:number;noise:number}>={
-      hammer:{frequency:74,filter:720,duration:.09,volume:.095,noise:.085},box:{frequency:330,filter:2100,duration:.12,volume:.08,noise:.06},
-      level:{frequency:1180,filter:3200,duration:.16,volume:.055,noise:.025},spring:{frequency:155,filter:1000,duration:.28,volume:.065,noise:.045},
-      cutter:{frequency:240,filter:2600,duration:.13,volume:.10,noise:.11},mark:{frequency:980,filter:2500,duration:.09,volume:.035,noise:.02},
-      laser:{frequency:720,filter:2400,duration:.12,volume:.035,noise:.01},'trowel-whoosh':{frequency:145,filter:1450,duration:.20,volume:.04,noise:.07},
-      'mortar-splat':{frequency:92,filter:620,duration:.24,volume:.10,noise:.13},'water-pour':{frequency:210,filter:1700,duration:.42,volume:.025,noise:.07},
-      'sack-tear':{frequency:360,filter:3300,duration:.30,volume:.025,noise:.10},'cement-scrape':{frequency:230,filter:1150,duration:.28,volume:.035,noise:.075},
-      'sand-scoop':{frequency:170,filter:880,duration:.38,volume:.035,noise:.085},'mixer-insert':{frequency:190,filter:1200,duration:.14,volume:.075,noise:.045},
-      'mixer-rinse':{frequency:260,filter:2100,duration:.35,volume:.025,noise:.075},
-    };
-    const s=settings[kind],destination=context.destination;
-    const oscillator=context.createOscillator(),tone=context.createGain();oscillator.type=kind==='level'||kind==='laser'?'sine':'triangle';oscillator.frequency.setValueAtTime(s.frequency*(.94+this.random()*.12),now);oscillator.frequency.exponentialRampToValueAtTime(Math.max(28,s.frequency*.55),now+s.duration);tone.gain.setValueAtTime(Math.max(.0001,s.volume*strength),now);tone.gain.exponentialRampToValueAtTime(.0001,now+s.duration);oscillator.connect(tone).connect(destination);oscillator.start(now);oscillator.stop(now+s.duration+.02);
-    if(this.noise&&s.noise>0){const source=context.createBufferSource(),filter=context.createBiquadFilter(),gain=context.createGain();source.buffer=this.noise;filter.type='lowpass';filter.frequency.value=s.filter;gain.gain.setValueAtTime(Math.max(.0001,s.noise*strength),now);gain.gain.exponentialRampToValueAtTime(.0001,now+s.duration);source.connect(filter).connect(gain).connect(destination);source.start(now,this.random()*.5);source.stop(now+s.duration+.02);}
+    for(const layer of soundLayers[kind]){
+      const source=context.createBufferSource(),filter=context.createBiquadFilter(),highpass=context.createBiquadFilter(),gain=context.createGain();
+      source.buffer=this.noise;source.playbackRate.value=.94+this.random()*.12;
+      filter.type='lowpass';filter.frequency.value=layer.filter;filter.Q.value=.55;
+      // Remove sub-bass and DC: the contact should not sound like a kick drum.
+      highpass.type='highpass';highpass.frequency.value=kind==='mortar-splat'?100:180;highpass.Q.value=.55;
+      const start=now+(layer.delay??0),duration=layer.duration*(.94+this.random()*.12),attack=layer.attack??.0015,peak=layer.volume*strength;
+      const envelope=new Float32Array(64);
+      for(let i=0;i<envelope.length;i++){
+        const t=i/(envelope.length-1)*duration,p=t/duration;
+        const onset=Math.min(1,t/attack),release=layer.attack?Math.pow(1-p,1.15):Math.exp(-p*6)*(1-p);
+        // Uneven grains/crinkles, not a regular percussion rhythm.
+        const texture=layer.texture ? .68+.32*Math.sin(t*layer.texture*6.283+Math.sin(t*137)*1.7)**2:1;
+        envelope[i]=peak*onset*release*texture;
+      }
+      envelope[envelope.length-1]=0;gain.gain.setValueCurveAtTime(envelope,start,duration);
+      source.connect(filter).connect(highpass).connect(gain).connect(context.destination);
+      source.onended=()=>{source.disconnect();filter.disconnect();highpass.disconnect();gain.disconnect();};
+      source.start(start,this.random()*.9);source.stop(start+duration+.005);
+    }
   }
 
   private createLoop(kind:ContinuousConstructionSound):void{
-    const context=this.context!,setting=loopSettings[kind],filter=context.createBiquadFilter(),gain=context.createGain();filter.type=setting.noise?'bandpass':'lowpass';filter.frequency.value=setting.filter;filter.Q.value=setting.noise?1.2:.7;gain.gain.value=0;
-    let source:AudioScheduledSourceNode;
-    if(setting.noise){const node=context.createBufferSource();node.buffer=this.noise;node.loop=true;source=node;}
-    else{const node=context.createOscillator();node.type=kind==='driver'?'square':kind==='drill'?'sawtooth':'triangle';node.frequency.value=setting.frequency;source=node;}
+    const context=this.context!,setting=loopSettings[kind],filter=context.createBiquadFilter(),gain=context.createGain(),source=context.createBufferSource();
+    filter.type=setting.motor?'lowpass':'bandpass';filter.frequency.value=setting.filter;filter.Q.value=.55;gain.gain.value=0;
+    source.buffer=setting.motor?this.createMotorBuffer(setting.motor):this.noise;source.loop=true;
     source.connect(filter).connect(gain).connect(context.destination);source.start();this.loops.set(kind,{source,gain,filter});this.applyLoop(kind,this.requested.get(kind)??0);
+  }
+
+  private createMotorBuffer(frequency:number):AudioBuffer{
+    const context=this.context!,buffer=context.createBuffer(1,context.sampleRate*2,context.sampleRate),data=buffer.getChannelData(0);
+    let air=0;
+    for(let i=0;i<data.length;i++){
+      const t=i/context.sampleRate,phase=2*Math.PI*frequency*t+.09*Math.sin(2*Math.PI*7*t);
+      const white=this.random()*2-1;air=air*.42+white*.58;
+      // Bearing/brush friction and several motor harmonics instead of one pure
+      // bass oscillator. Integer cycles across two seconds avoid pitch seams.
+      const motor=Math.sin(phase)*.12+Math.sin(phase*3)*.12+Math.sin(phase*7)*.075+Math.sin(phase*13)*.04;
+      data[i]=motor+air*(.53+.08*Math.sin(2*Math.PI*13*t));
+    }
+    return buffer;
   }
 
   private applyLoop(kind:ContinuousConstructionSound,intensity:number):void{
     const context=this.context,nodes=this.loops.get(kind);if(!context||!nodes)return;const setting=loopSettings[kind],now=context.currentTime;
     nodes.gain.gain.cancelScheduledValues(now);nodes.gain.gain.setTargetAtTime(setting.volume*intensity,now,intensity?.035:.055);
-    if(nodes.source instanceof OscillatorNode)nodes.source.frequency.setTargetAtTime(setting.frequency*(.96+Math.min(1,intensity)*.08),now,.045);
+    if(setting.motor)nodes.source.playbackRate.setTargetAtTime(.96+Math.min(1,intensity)*.08,now,.045);
   }
 
   get telemetry(){return{contextState:this.context?.state??'locked',activeLoops:Object.fromEntries([...this.requested].map(([key,value])=>[key,value>0])),loopTransitions:this.loopTransitions,events:{...this.events}};}

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {blockPointerLock} from './browser-safety.mjs';
+import {prepareFinishedMortar} from './prepared-mortar-fixture.mjs';
 const url=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/',out=process.argv[3]??'output/mortar-soft-native';await mkdir(out,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:true}),report={url,mobileIsEmulation:true,fixture:'120 × 100 mm real hollow-clay opening, impacts limited to 40 mm requested depth. Actual exposed internal chambers are measured, never replaced by an analytical wall. Native hold/release uses the production hand release point and projectile solver.',cases:[]};
 try{for(const mobile of [false,true]){
@@ -19,12 +20,17 @@ try{for(const mobile of [false,true]){
   return{strikes,columns:window.__softColumns.length,depthRangeMm:[Math.min(...window.__softColumns.map(c=>f-c.back))*1000,Math.max(...window.__softColumns.map(c=>f-c.back))*1000],save:v.serialize()};
  });
  await writeFile(`${out}/${platform}-masonry-save.json`,JSON.stringify(fixture.save));delete fixture.save;
+ await prepareFinishedMortar(page);
  if(mobile)await page.locator('[data-tool="trowel"]').tap();else await page.keyboard.press('Digit7');
  await page.evaluate(()=>{const g=window.__wireTheHouse,c=g.renderer.camera;g.hammerWorkStance.restore(c);c.position.set(0,g.player.eyeHeight,g.room.brickWall.volume.frontZ+.46);c.lookAt(0,1.4,g.room.brickWall.volume.frontZ-.04);g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;});
  const steps=count=>page.evaluate(n=>{for(let i=0;i<n;i++)window.__softStep(1/120);},count);
  const capture=async(name,drain=true)=>{await page.evaluate(async drain=>{const g=window.__wireTheHouse;if(drain)await g.mortar.waitForGeometry();await g.renderer.waitForFrame();g.renderer.render();await g.renderer.waitForFrame();},drain);await page.screenshot({path:`${out}/${platform}-${name}.png`});};
  const boundaries=()=>page.evaluate(()=>{
   const m=window.__wireTheHouse.mortar,map=new Map(m.deposits.map(d=>[d.fieldKey,d.mesh.geometry]));let mismatches=0,maxNormalDelta=0;const mismatchDetails=[];
+  window.__softContactFrames??={};let maxResidueRotation=0;
+  for(const clod of m.projectiles){if(!clod.contacts)continue;const previous=window.__softContactFrames[clod.variation],q=clod.mesh.quaternion;if(previous)maxResidueRotation=Math.max(maxResidueRotation,2*Math.acos(Math.min(1,Math.abs(q.x*previous[0]+q.y*previous[1]+q.z*previous[2]+q.w*previous[3]))));window.__softContactFrames[clod.variation]=q.toArray();}
+  if(maxResidueRotation>1e-7)throw new Error('Contacted paste rotates with rebound velocity');
+  if(m.deposits.some(d=>d.mesh.position.lengthSq()>1e-12||Math.abs(d.mesh.quaternion.w)<1-1e-9))throw new Error('Adhered mortar left its fixed world frame');
   for(const[key,geometry]of map){const cell=key.split(',').map(Number);for(let axis=0;axis<3;axis++){const neighbor=cell.slice();neighbor[axis]++;const other=map.get(neighbor.join(','));if(!other)continue;const plane=neighbor[axis]*m.field.spacing*16;
    const collect=g=>{const values=new Map(),segments=[],p=g.getAttribute('position'),n=g.getAttribute('normal');for(let i=0;i<p.count;i+=3){const triangle=[];for(let j=0;j<3;j++){const v=[p.getX(i+j),p.getY(i+j),p.getZ(i+j)];if(Math.abs(v[axis]-plane)<3e-7){values.set(v.join(','),{p:v,n:[n.getX(i+j),n.getY(i+j),n.getZ(i+j)]});triangle.push(v);}}for(let a=0;a<triangle.length;a++)for(let b=a+1;b<triangle.length;b++)segments.push([triangle[a],triangle[b]]);}return{values:[...values.values()],segments};};
    const a=collect(geometry),b=collect(other);
