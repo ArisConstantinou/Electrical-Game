@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import { blockPointerLock } from './browser-safety.mjs';
+import {prepareFinishedMortar} from './prepared-mortar-fixture.mjs';
 const url=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/';
 const out=process.argv[3]??'output/mortar-stacking-ui';await mkdir(out,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:true});
@@ -19,6 +20,7 @@ try{for(const distance of [.46,.85])for(const mobile of [false,true]){
  await page.goto(url);await page.waitForFunction(()=>window.__wireTheHouse);await page.locator('#start-button')[mobile?'tap':'click']();await page.evaluate(()=>{document.exitPointerLock();const g=window.__wireTheHouse;window.__stackStep=g.step.bind(g);g.step=()=>{};});
  const fixture=await page.evaluate(async()=>{const g=window.__wireTheHouse,w=g.room.brickWall,v=w.volume,front=v.frontZ;let hits=0;const before=v.removedNodeCount;for(let pass=0;pass<10;pass++)for(let x=-.15;x<=.15001;x+=.014)for(let y=1.29;y<=1.51001;y+=.014){const hit=v.raycast({x,y,z:front+.08},{x:0,y:0,z:-1},.3);if(hit&&front-hit.point.z<.066){v.impact({point:hit.point,direction:{x:0,y:0,z:-1},chisel:'flat',widthM:.025,energyJ:18});hits++;}}w.flushGeometry();await w.waitForGeometry();window.__stackColumns=[];for(let x=-.144;x<=.14401;x+=.016)for(let y=1.288;y<=1.51201;y+=.016){const h=v.raycast({x,y,z:front+.03},{x:0,y:0,z:-1},.24);if(h&&front-h.point.z>.012)window.__stackColumns.push({x,y,back:h.point.z});}window.__stackImpacts=[];const deposit=g.mortar.deposit.bind(g.mortar);g.mortar.deposit=(p,m,n,...rest)=>{const held=deposit(p,m,n,...rest);if(m>0)window.__stackImpacts.push({point:p.toArray(),normal:n.toArray(),requestedKg:m,heldKg:held});return held;};return{hits,removed:v.removedNodeCount-before,columns:window.__stackColumns.length};});
  assert(fixture.removed>0&&fixture.columns>50,'fixture exposes an actual broad cavity');
+ await prepareFinishedMortar(page);
  if(mobile)await page.locator('[data-tool="trowel"]').tap();else await page.keyboard.press('Digit7');
  await page.evaluate(distance=>{window.__stackDistance=distance;const g=window.__wireTheHouse,c=g.renderer.camera;g.hammerWorkStance.restore(c);c.position.set(0,g.player.eyeHeight,g.room.brickWall.volume.frontZ+Number(window.__stackDistance));c.lookAt(0,1.4,g.room.brickWall.volume.frontZ-.07);g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;},distance);await steps(page,60);
  const before=await state(page);await shot(page,`${name}-before`);const loads=[];

@@ -14,7 +14,7 @@ const state = page => page.evaluate(() => {
   return { tilt: w.chiselTiltDegrees, impacts: w.impactCount, removedCm3: w.volume.removedVolume * 1e6, locked: g.player.workPosition.locked, camera: g.renderer.camera.position.toArray(), contact: window.__angleContacts.at(-1) ?? null,
     impactsObserved: window.__angleImpacts.length,
     fragments: g.chasing.particles.map(p => ({ actual: p.mesh.userData.actualFractureGeometry, spanCm: Math.max(p.halfWidth, p.halfHeight, p.halfDepth) * 200, volumeCm3: p.mesh.userData.volume * 1e6 })),
-    renderError: g.renderer.renderError, overflow: document.documentElement.scrollWidth > innerWidth };
+    hammerSounds:g.audio.telemetry.events.hammer??0,renderError: g.renderer.renderError, overflow: document.documentElement.scrollWidth > innerWidth };
 });
 async function capture(page, path) {
   await page.evaluate(async () => { const g = window.__wireTheHouse; await g.room.brickWall.waitForGeometry(); await g.renderer.waitForFrame(); window.__angleStep(0); await g.renderer.waitForFrame(); });
@@ -115,6 +115,9 @@ try {
     const scenario = { platform, angle, before, after, impacts };
     report.cases.push(scenario);
     assert(after.impacts >= before.impacts + 8, `${platform}/${angle}: held input did not deliver repeated impacts`);
+    const hammerSoundDelta=after.hammerSounds-before.hammerSounds;
+    const materialImpactDelta=after.impacts-before.impacts;
+    assert(hammerSoundDelta>=materialImpactDelta,`${platform}/${angle}: every registered material impact needs an audible demolition contact`);
     assert(after.removedCm3 > before.removedCm3, `${platform}/${angle}: no actual solid removed`);
     assert(impacts.some(impact => impact.fragments.some(fragment => fragment.actual)), 'No actual removed geometry reached debris');
     const active = impacts.filter(impact => impact.removedCm3 > 0);
@@ -125,6 +128,7 @@ try {
     await step(page, 60);
     const released = await state(page);
     assert.equal(released.impacts, after.impacts, 'Released held input continued striking');
+    assert.equal(released.hammerSounds, after.hammerSounds, 'Released held input continued producing hammer sounds');
     await move(true, true); await step(page, 30); await move(false, true); await step(page, 30);
     await capture(page, `${out}/${platform}-${angle}-inspection.png`);
     assert.equal(after.renderError, ''); assert.equal(after.overflow, false);

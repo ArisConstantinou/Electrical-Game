@@ -2,7 +2,8 @@ import * as THREE from 'three';
 
 interface Node { x: number; y: number; z: number; value: number; age: number; dilution: number }
 export interface MortarFieldChunk { key: string; geometry: THREE.BufferGeometry; mass: number; age: number; dilution: number }
-export interface MortarFillProfile {frontZ:number;supportZ:(x:number,y:number)=>number|null}
+export interface MortarImpactFootprint {majorScale:number;minorScale:number;rotationRadians:number;offsetScale:number;edgePhase:number}
+export interface MortarFillProfile {frontZ:number;supportZ:(x:number,y:number)=>number|null;impact?:MortarImpactFootprint}
 export interface FieldContact { point: THREE.Vector3; normal: THREE.Vector3; distance: number }
 const CORNERS = [[0,0,0],[1,0,0],[1,1,0],[0,1,0],[0,0,1],[1,0,1],[1,1,1],[0,1,1]];
 const TETRA = [[0,5,1,6],[0,1,2,6],[0,2,3,6],[0,3,7,6],[0,7,4,6],[0,4,5,6]];
@@ -101,9 +102,10 @@ export class MortarField {
 
   add(point:THREE.Vector3,normal:THREE.Vector3,mass:number,blocked:(point:THREE.Vector3)=>boolean,profile?:MortarFillProfile,footprintMass=mass):number {
     if(mass<this.nodeMass*5||this.nodes.size>=this.maxNodes)return 0;
-    const axis=normal.clone().normalize(),radius=Math.max(.012,Math.cbrt(footprintMass/.65)*.084);
-    const depth=THREE.MathUtils.clamp(mass/this.density/(Math.PI*radius*radius)*2.5,.018,.075);
-    const center=point.clone().addScaledVector(axis,depth*.3),reach=Math.max(radius,depth),h=this.spacing;
+    const axis=normal.clone().normalize(),radius=Math.max(.012,Math.cbrt(footprintMass/.65)*.084),impact=profile?.impact;
+    const majorRadius=radius*(impact?.majorScale??1),minorRadius=radius*(impact?.minorScale??1);
+    const depth=THREE.MathUtils.clamp(mass/this.density/(Math.PI*majorRadius*minorRadius)*2.5,.012,.082);
+    const center=point.clone().addScaledVector(axis,depth*.3),reach=Math.max(majorRadius,minorRadius,depth),h=this.spacing;
     const candidates:Array<{x:number;y:number;z:number;weight:number;old:number;age:number;dilution:number;capacity:number}>=[];
     const flowCells=new Set<string>();
     const min=[Math.floor((center.x-reach)/h),Math.floor((center.y-reach)/h),Math.floor((center.z-reach)/h)];
@@ -118,7 +120,12 @@ export class MortarField {
     for(let x=min[0];x<=max[0];x++)for(let y=min[1];y<=max[1];y++)for(let z=min[2];z<=max[2];z++){
       q.set(x*h,y*h,z*h);let weight:number,capacity=1;
       if(profile){
-        const metric=((q.x-point.x)**2+(q.y-point.y)**2)/(radius*radius);if(metric>=1)continue;
+        const angle=impact?.rotationRadians??0,c=Math.cos(angle),s=Math.sin(angle),offset=(impact?.offsetScale??0)*radius;
+        const dx=q.x-point.x-Math.cos(angle)*offset,dy=q.y-point.y-Math.sin(angle)*offset;
+        const u=dx*c+dy*s,v=-dx*s+dy*c,theta=Math.atan2(v/Math.max(.001,minorRadius),u/Math.max(.001,majorRadius));
+        const phase=impact?.edgePhase??0;
+        const ragged=1+.105*Math.sin(theta*3+phase)+.065*Math.sin(theta*5-phase*1.7)+.035*Math.cos(theta*7+phase*.6);
+        const metric=(u*u/(majorRadius*majorRadius)+v*v/(minorRadius*minorRadius))/(ragged*ragged);if(metric>=1)continue;
         const key=this.key(x,y,0);let back=columns.get(key);if(back===undefined){back=profile.supportZ(q.x,q.y);columns.set(key,back);}
         // Only the first exposed surviving wall surface backs a column. Sealed
         // chambers behind an intact clay shell cannot receive remote mortar.
@@ -126,7 +133,8 @@ export class MortarField {
         if(z===max[2])capacity=Math.min(1,LEVEL/Math.max(LEVEL,1-(profile.frontZ+.010-q.z)/h));
         const fillDepth=Math.max(0,q.z-back);
         const cavityPriority=profile.frontZ-back>.012?8:.08;
-        weight=(.25+.75*(1-metric)**.8)*Math.exp(-fillDepth/.032)*cavityPriority;
+        const clumps=.91+.09*Math.sin(u/Math.max(h,majorRadius)*11+phase+Math.cos(v/Math.max(h,minorRadius)*9));
+        weight=(.22+.78*(1-metric)**.78)*clumps*Math.exp(-fillDepth/.032)*cavityPriority;
       }else{
         delta.copy(q).sub(center);const axial=delta.dot(axis),radial=Math.max(0,delta.lengthSq()-axial*axial),metric=radial/(radius*radius)+axial*axial/(depth*depth);
         if(metric>=1||blocked(q))continue;weight=(1-metric)**1.4;

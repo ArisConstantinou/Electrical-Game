@@ -29,6 +29,7 @@ import { InteractionSystem } from '../systems/InteractionSystem';
 import type { HammerMode } from '../systems/InteractionSystem';
 import { HUD } from '../ui/HUD';
 import { MobileHUD } from '../ui/MobileHUD';
+import { ConstructionAudio, type ConstructionSound } from '../audio/ConstructionAudio';
 
 const TOOL_HINTS: Record<RigTool, string> = {
   measure: 'TAPE MEASURE · aim to measure from the floor · M to mark',
@@ -73,6 +74,7 @@ export class Game {
   readonly leveling = new LevelingSystem();
   readonly hud: HUD;
   readonly fpsRig = new FPSRig();
+  readonly audio = new ConstructionAudio();
   selectedTool: RigTool = 'spray';
   sprayMode: 'dots' | 'live' = 'live';
   sprayColorIndex = 0;
@@ -105,6 +107,8 @@ export class Game {
     this.hud = new HUD(root);
     const stage = root.querySelector<HTMLElement>('#game-stage');
     if (!stage) throw new Error('Game stage was not created');
+    root.addEventListener('pointerdown',()=>this.audio.unlock(),{capture:true});
+    addEventListener('keydown',()=>this.audio.unlock(),{capture:true});
     this.renderer = new Renderer(stage);
     this.player = new PlayerController(this.renderer.camera, this.input);
     this.renderer.camera.add(this.fpsRig);
@@ -118,8 +122,11 @@ export class Game {
     this.conduit = new ConduitSystem(this.renderer.scene, this.room.brickWall);
     this.mortar = new MortarSystem(this.renderer.scene, this.room.brickWall, this.mission.points);
     this.mixing = new MixingStation(this);
+    this.mixing.onSound=(kind,intensity)=>this.audio.play(kind,intensity);
     this.mortar.reserveScoop = amount => this.mixing.reserveScoop(amount);
     this.mortar.scoopBond = () => this.mixing.bondFactor;
+    this.mortar.onLaunch=({speed})=>this.audio.play('trowel-whoosh',speed/8);
+    this.mortar.onImpact=({speed,retainedKg})=>this.audio.play('mortar-splat',Math.min(1.4,.35+speed/9+retainedKg/.65*.35));
     this.roomWater = new RoomWaterSystem(this.renderer.scene, this.room.brickWall);
     this.boxPlacement = new BoxPlacementSystem(this.room.brickWall,this.mortar,this.mission.points);
     this.boxFitPreview = new BoxFitPreview(this.renderer.scene,this.boxPlacement);
@@ -277,6 +284,12 @@ export class Game {
     this.fpsRig.visible=this.mission.activePoint?.stage!=='leveling';
     this.heightMeasure.update(this.renderer.camera,this.started&&this.selectedTool==='measure',(point,normal)=>this.fpsRig.canReachPoint(this.renderer.camera,point,.10,normal));
     this.laserLevel.update(this.renderer.camera,this.selectedTool,this.started&&!blockingWork&&this.input.actionHeld,dt,(point,normal)=>this.fpsRig.canReachPoint(this.renderer.camera,point,.10,normal));
+    this.audio.setContinuous('spray',this.started&&!blockingWork&&this.selectedTool==='spray'&&this.input.actionHeld);
+    this.audio.setContinuous('hose',waterHeld);
+    this.audio.setContinuous('drill',this.selectedTool==='drill'&&this.laserLevel.working);
+    this.audio.setContinuous('driver',this.selectedTool==='driver'&&this.laserLevel.working);
+    this.audio.setContinuous('trowel',mortarTool&&this.selectedTool==='trowel'&&this.input.actionHeld&&!this.mortar.throwFeedback.overheld,.7+this.mortar.charge*.3);
+    this.audio.setContinuous('mixer',this.mixing.mixerRunning);
     setLaserProjection(this.laserLevel.activeHeightM);
     if (this.selectedTool === 'hammer') this.fpsRig.contact(this.renderer.camera, this.room.brickWall);
     else if(this.selectedTool==='trowel')this.fpsRig.poseTrowel(this.renderer.camera,this.mortar.throwFeedback.motion,dt,this.room.brickWall.volume.frontZ);
@@ -310,7 +323,10 @@ export class Game {
       :this.selectedTool==='fitting'?(aimedBox?'TAP TO PICK UP':this.boxFitPreview.mode==='fits'?'TAP TO PLACE BOX':this.boxFitPreview.mode==='proud'?`PLACE · +${this.boxFitPreview.telemetry.proudDepthMm} mm`:this.boxFitPreview.mode==='blocked'?'POSITION BLOCKED':'MOVE INTO REACH')
       :this.selectedTool==='level'?(this.mission.activePoint?.stage==='leveling'?'ADJUST SELECTED BOX':aimedBox?'TAP TO PLACE LEVEL':'AIM AT A BOX')
       :useHeld?'USING TOOL':'HOLD TO USE';
-    this.hud.updateMobileUseStatus(useStatus,this.selectedTool==='hammer'?hammerReady:true,useHeld&&this.selectedTool!=='measure');
+    // While the preparation bay owns input, MixingStation is the sole writer
+    // of the mobile USE state. Alternating both writers every frame made the
+    // controls visibly flash while INTERACT was held on the mixer.
+    if(!mixingOwnedInput)this.hud.updateMobileUseStatus(useStatus,this.selectedTool==='hammer'?hammerReady:true,useHeld&&this.selectedTool!=='measure');
     const sprayColor = SPRAY_COLORS[this.sprayColorIndex];
     const settingsKey=[this.selectedTool,this.sprayMode,this.sprayColorIndex,this.hammerMode,this.room.brickWall.chiselTiltDegrees<0,this.room.brickWall.chiselWidthM,this.room.brickWall.chiselType,this.aimControlMode,this.aimProfile,this.wallAssistEnabled,this.aimInputMode].join(':');
     if(settingsKey!==this.hudSettingsKey){
@@ -353,6 +369,7 @@ export class Game {
       boxFit:this.boxFitPreview.telemetry,
       measurement:this.heightMeasure.telemetry,
       laser:this.laserLevel.telemetry,
+      audio:this.audio.telemetry,
       water: {...this.roomWater.telemetry,gunMode:WATER_GUN_MODES[this.waterGunModeIndex].id,gunLitres:this.mortar.waterGunLitres},
       hammer: { speedMultiplier: this.hammerSpeed, paused: this.hammerSpeed === 0, impactIntervalSeconds: this.hammerSpeed > 0 ? .24 / this.hammerSpeed : null, contactStatus:this.fpsRig.contactStatus, contactReason:this.fpsRig.reachReason },
       controls: { actionHeld:this.input.actionHeld, move:this.input.mobileMove, look:this.input.mobileLook, aimInput:this.aimInputMode, manualUse:true },
@@ -374,7 +391,7 @@ export class Game {
     if(this.selectedTool==='laser'){
       this.fpsRig.show('laser');
       this.laserLevel.update(this.renderer.camera,'laser',false,0,(point,normal)=>this.fpsRig.canReachPoint(this.renderer.camera,point,.10,normal));
-      const result=this.laserLevel.action();this.hud.notify(result.message,result.success,1800);return;
+      const result=this.laserLevel.action();if(result.success)this.audio.play('laser');this.hud.notify(result.message,result.success,1800);return;
     }
     let active=this.mission.activePoint;
     const placedTarget=['fitting','level','spring','cutter'].includes(this.selectedTool)?this.boxPlacement.target(this.renderer.camera):null;
@@ -404,6 +421,10 @@ export class Game {
     this.mission.select(target);
     const retrieving=this.selectedTool==='fitting'&&target.boxGroup.visible;
     const result=this.interaction.action(target,this.selectedTool,this.renderer.camera,continuing);
+    if(result.success){
+      const sound=({hammer:'hammer',fitting:'box',level:'level',spring:'spring',cutter:'cutter'} as Partial<Record<RigTool,ConstructionSound>>)[this.selectedTool];
+      if(sound)this.audio.play(sound,this.selectedTool==='hammer'?Math.min(1.35,.6+this.room.brickWall.chiselEnergyJ/8):1);
+    }
     if(this.selectedTool==='fitting'){if(result.success)this.boxFitPreview.clearGuide();else this.boxFitPreview.pin(this.renderer.camera,this.mission.boxPreset);this.boxFitPreview.invalidate();}
     if(retrieving&&result.success){this.mission.boxPreset=target.definition.boxes.join('+') as '1G'|'2G'|'2G+1G';this.fpsRig.setFittingBoxKinds(target.definition.boxes);this.hud.updateBoxPreset(this.mission.boxPreset);}
     if(result.success)this.fpsRig.toolAction=1;
@@ -477,6 +498,7 @@ export class Game {
         if(this.selectedTool!=='measure'||document.hidden)return;
         this.heightMeasure.update(this.renderer.camera,true,(point,normal)=>this.fpsRig.canReachPoint(this.renderer.camera,point,.10,normal));
         if(!this.heightMeasure.mark())return;
+        this.audio.play('mark');
         this.fpsRig.poseMeasure(this.renderer.camera,this.heightMeasure.target,this.heightMeasure.targetNormal);
         this.fpsRig.markMeasure();
         const target=this.heightMeasure.target!,point=this.mission.activePoint;

@@ -1,14 +1,15 @@
 import * as THREE from 'three';
 import type { InstallationPoint } from '../electrical/InstallationPoint';
 import type { BrickWall } from '../world/BrickWall';
-import { MortarField, type MortarFieldChunk } from './MortarField';
+import { MortarField, type MortarFieldChunk, type MortarImpactFootprint } from './MortarField';
+import { mortarImpactFootprint } from './MortarImpact';
 import { WATER_GUN_MODES, type WaterGunSetting } from './WaterGun';
 import { sampleTrowelMotion, TROWEL_CHARGE_SECONDS, TROWEL_FULL_CHARGE_GRACE_SECONDS, TROWEL_RELEASE_SECONDS, TROWEL_CAST_SECONDS } from '../player/TrowelMotion';
 
 type WetBatch = { mesh: THREE.Mesh; used: number; live: number; free: Array<{ start: number; count: number }> };
 type WetPatch = { batch: WetBatch; start: number; count: number; alpha: number; pending?:boolean };
 type WaterCell = { pore: number; film: number; patch: WetPatch; position: THREE.Vector3; normal: THREE.Vector3; surfaceRevision?:number };
-type Clod = { mesh: THREE.Mesh; velocity: THREE.Vector3; mass: number; age: number; contacts: number; slurry: boolean; bond: number };
+type Clod = { mesh: THREE.Mesh; velocity: THREE.Vector3; mass: number; age: number; contacts: number; slurry: boolean; bond: number; variation:number };
 type Deposit = { fieldKey?: string; position: THREE.Vector3; radius: number; mass: number; mesh: THREE.Mesh; age: number; normal: THREE.Vector3; support: number };
 type Contact = { point: THREE.Vector3; normal: THREE.Vector3; distance: number; box: boolean };
 type Opening = { inverse: THREE.Matrix4; halfWidth: number; halfHeight: number; minZ: number; maxZ: number };
@@ -62,6 +63,8 @@ export class MortarSystem {
   readonly field = new MortarField();
   onRunoff?: (event: { point: THREE.Vector3; normal: THREE.Vector3; litres: number; mortarKg: number }) => void;
   onWaterEmission?: (event: { origin: THREE.Vector3; velocity: THREE.Vector3; litres: number }) => void;
+  onLaunch?: (event:{speed:number;phase:number})=>void;
+  onImpact?: (event:{speed:number;retainedKg:number;incidence:number})=>void;
   washedMass = 0;
   waterGunLitres = 0;
   readonly waterGunDirection = new THREE.Vector3(0, 0, -1);
@@ -120,6 +123,7 @@ export class MortarSystem {
   private readonly supportColumns = new Map<string,number|null>();
   private readonly coverageCache = new Map<string, { time: number; revision: number; transform: string; value: number }>();
   private readonly streams: Array<{ mesh: THREE.Mesh; speed: number; life: number }> = [];
+  private lastImpactFootprint:MortarImpactFootprint|null=null;
 
   constructor(scene: THREE.Scene, private readonly wall: BrickWall, private readonly points: InstallationPoint[]) {
     this.group.name = 'Wet mortar, water and construction spills';
@@ -229,7 +233,7 @@ export class MortarSystem {
     const mass=this.reserveScoop?.(.65)??.65;
     if(!Number.isFinite(mass)||mass<=0){this.lastOutcome='No ready mortar nearby. Mix a batch and bring the bucket to the work.';return;}
     const bond=(phase<.42?.04+.96*(phase/.42)**2:1)*quality;
-    this.spawnClod(origin,this.velocity(camera,phase,origin),mass*(1-backFraction),false,bond);
+    const launchVelocity=this.velocity(camera,phase,origin);this.spawnClod(origin,launchVelocity,mass*(1-backFraction),false,bond);this.onLaunch?.({speed:launchVelocity.length(),phase});
     if(late>0){
       const towardFace=camera.getWorldPosition(new THREE.Vector3()).sub(origin);
       if(towardFace.lengthSq()<1e-6)camera.getWorldDirection(towardFace).negate();
@@ -499,9 +503,9 @@ export class MortarSystem {
     return group;
   }
   private spawnClod(origin: THREE.Vector3, velocity: THREE.Vector3, mass: number, slurry = false, bond = 1): void {
-    const mesh = new THREE.Mesh(this.clodGeometries[this.clodSequence++%this.clodGeometries.length], this.clodMaterial); mesh.position.copy(origin); mesh.castShadow = true;
+    const variation=this.clodSequence++,mesh = new THREE.Mesh(this.clodGeometries[variation%this.clodGeometries.length], this.clodMaterial); mesh.position.copy(origin); mesh.castShadow = true;
     mesh.name='Cohesive wet mortar with ragged edges';
-    const clod={ mesh, velocity: velocity.clone(), mass, age: 0, contacts: 0, slurry, bond };
+    const clod={ mesh, velocity: velocity.clone(), mass, age: 0, contacts: 0, slurry, bond, variation };
     this.updateClodAppearance(clod);
     this.group.add(mesh); this.projectiles.push(clod);
   }
@@ -573,7 +577,7 @@ export class MortarSystem {
     return pieces;
   }
 
-  private deposit(p: THREE.Vector3, mass: number, normal: THREE.Vector3, sync=true,footprintMass=mass): number {
+  private deposit(p: THREE.Vector3, mass: number, normal: THREE.Vector3, sync=true,footprintMass=mass,impactVelocity?:THREE.Vector3,variation=0): number {
     if (mass <= .001) return 0;
     // An impact facet must not rotate a separate sheet. Wet material joins a
     // fixed-world scalar volume and grows along the working face.
@@ -593,7 +597,8 @@ export class MortarSystem {
     if(supportRevision!==this.supportRevision||this.supportVolume!==volume||this.simulationTime-this.supportCacheTime>.2||this.supportColumns.size>4096){
       this.supportRevision=supportRevision;this.supportVolume=volume;this.supportCacheTime=this.simulationTime;this.supportColumns.clear();
     }
-    const profile=frontZ===undefined?undefined:{frontZ,supportZ:(x:number,y:number):number|null=>{
+    const impact=impactVelocity?mortarImpactFootprint(impactVelocity,normal,variation):undefined;if(impact)this.lastImpactFootprint=impact;
+    const profile=frontZ===undefined?undefined:{frontZ,impact,supportZ:(x:number,y:number):number|null=>{
       const key=`${Math.round(x/this.field.spacing)},${Math.round(y/this.field.spacing)}`;
       if(cacheSupport&&this.supportColumns.has(key))return this.supportColumns.get(key)!;
       const origin=new THREE.Vector3(x,y,frontZ+.016),hit=volume.raycast(origin,new THREE.Vector3(0,0,-1),.22);
@@ -756,7 +761,9 @@ export class MortarSystem {
       const d = next.clone().sub(a), hit = this.contact(a, d.clone().normalize(), d.length());
       if (hit) {
         const fraction = clod.slurry || hit.box || this.insideBox(hit.point) || clod.contacts > 2 ? 0 : this.retention(hit.point, clod.velocity, hit.normal)*clod.bond;
-        const held = this.deposit(hit.point, clod.mass * fraction, hit.normal,false,clod.mass); this.stuckMass += held; clod.contacts++;
+        const held = this.deposit(hit.point, clod.mass * fraction, hit.normal,false,clod.mass,clod.velocity,clod.variation); this.stuckMass += held;
+        if(clod.contacts===0&&!clod.slurry){const speed=clod.velocity.length(),incidence=speed>1e-6?Math.abs(clod.velocity.clone().multiplyScalar(1/speed).dot(hit.normal)):0;this.onImpact?.({speed,retainedKg:held,incidence});}
+        clod.contacts++;
         clod.mass -= held;
         // Rejected weak throws cannot become a second, stronger throw when they
         // hit a lower rib. They flow down under the same contact/gravity solver.
@@ -857,5 +864,5 @@ export class MortarSystem {
     const value = Math.min(...counts) / 12;
     this.coverageCache.set(key, { time: this.simulationTime, revision: this.geometryRevision, transform, value }); return value;
   }
-  get telemetry() { return { angleDegrees: this.angleDegrees, power: this.charge, throwFeedback:this.throwFeedback, recovery: this.recovery, airborne: this.projectiles.length, launchedKg: this.launchedMass, stuckKg: this.stuckMass, restingKg: this.restingMass, restingBatches: this.resting.length, floorKg: this.floorMass, movingKg: this.pendingWashMass + this.projectiles.reduce((sum, clod) => sum + clod.mass, 0), washedKg: this.washedMass, volumeField: this.field.statistics, wetCells: this.water.size, pendingWetGeometry:this.pendingWetGeometry, wetDrawCalls: this.wetBatches.length, patches: this.deposits.length, outcome: this.lastOutcome, initialStabilitySeconds: 1.3, freshWorkingSeconds: 3600, geometryLimit: MAX_PATCHES, coverage: this.points.map(point => ({ id: point.definition.id, fraction: this.coverage(point) })) }; }
+  get telemetry() { return { angleDegrees: this.angleDegrees, power: this.charge, throwFeedback:this.throwFeedback, recovery: this.recovery, airborne: this.projectiles.length, launchedKg: this.launchedMass, stuckKg: this.stuckMass, restingKg: this.restingMass, restingBatches: this.resting.length, floorKg: this.floorMass, movingKg: this.pendingWashMass + this.projectiles.reduce((sum, clod) => sum + clod.mass, 0), washedKg: this.washedMass, volumeField: this.field.statistics, lastImpactFootprint:this.lastImpactFootprint, wetCells: this.water.size, pendingWetGeometry:this.pendingWetGeometry, wetDrawCalls: this.wetBatches.length, patches: this.deposits.length, outcome: this.lastOutcome, initialStabilitySeconds: 1.3, freshWorkingSeconds: 3600, geometryLimit: MAX_PATCHES, coverage: this.points.map(point => ({ id: point.definition.id, fraction: this.coverage(point) })) }; }
 }
