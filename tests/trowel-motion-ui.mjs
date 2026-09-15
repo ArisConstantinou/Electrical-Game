@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { blockPointerLock } from './browser-safety.mjs';
+import { prepareFinishedMortar } from './prepared-mortar-fixture.mjs';
 
 const url = process.argv[2] ?? 'http://127.0.0.1:5362/Electrical-Game/';
 const out = process.argv[3] ?? 'output/trowel-motion';
@@ -26,6 +27,7 @@ try {
     await page.goto(url);
     await page.waitForFunction(() => window.__wireTheHouse?.renderer.renderCamera, null, { timeout: 120000 });
     await page.locator('#start-button')[platform.mobile ? 'tap' : 'click']();
+    await prepareFinishedMortar(page);
     await page.evaluate(async () => {
       const g = window.__wireTheHouse, v = g.room.brickWall.volume;
       window.__trowelStep = g.step.bind(g); g.step = () => {};

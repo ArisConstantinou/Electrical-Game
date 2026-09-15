@@ -189,6 +189,7 @@ export interface MixingStationModels {
   mixer: THREE.Group;
   paddle: THREE.Group;
   rinse: THREE.Group;
+  water: THREE.Group;
 }
 
 export function createMixingStationModels(): MixingStationModels {
@@ -204,13 +205,14 @@ export function createMixingStationModels(): MixingStationModels {
   const water = rinseParts.fill.material as THREE.MeshStandardMaterial; water.color.setHex(0x81bfc9); water.roughness = .17; water.transparent = true; water.opacity = .82;
   group.add(rinse);
   const jug = new THREE.Group(); jug.name = 'mixing-water-jug'; jug.userData.studioEntityId = 'mixing:water-source'; jug.position.set(1.34, 0, -.14); group.add(jug);
+  jug.userData.gripPoint = [.10, .30, 0]; jug.userData.secondaryGripPoint = [-.04, .18, 0]; jug.userData.tipPoint = [-.027, .39, 0];
   const jugPlastic = material(0xb9d4cf, .49), capPlastic = material(0x28798c, .45);
   part(jug, new THREE.BoxGeometry(.205, .30, .14), jugPlastic, [0, .16, 0], 'water-jug-body');
   part(jug, new THREE.CylinderGeometry(.045, .091, .052, 16), jugPlastic, [-.027, .333, 0], 'water-jug-shoulder');
   part(jug, new THREE.CylinderGeometry(.028, .028, .027, 16), capPlastic, [-.027, .372, 0], 'water-jug-screw-cap');
   tube(jug, [new THREE.Vector3(.039, .30, 0), new THREE.Vector3(.077, .358, 0), new THREE.Vector3(.125, .349, 0), new THREE.Vector3(.12, .255, 0), new THREE.Vector3(.097, .235, 0)], .012, jugPlastic, 'water-jug-carry-handle');
   label(jug, 'WATER', '5 L · REFILL', .17, .085, [0, .178, .071], '#28798c');
-  return { group, bucket, fill, sand, sacks, shovel, mixer, paddle, rinse };
+  return { group, bucket, fill, sand, sacks, shovel, mixer, paddle, rinse, water: jug };
 }
 
 /** Contents always remain inside the tapered wall. One disk is reused for water, dry ingredients and mortar. */

@@ -1,0 +1,46 @@
+import assert from 'node:assert/strict';
+import {chromium} from 'playwright';
+import {mkdir,writeFile} from 'node:fs/promises';
+import {blockPointerLock} from './browser-safety.mjs';
+
+const url=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/';
+const out='output/immersive-mixing-ui';await mkdir(out,{recursive:true});
+const browser=await chromium.launch({channel:'chrome',headless:true});
+const report={url,mobileIsEmulation:true,cases:[],errors:[],passed:false};
+const layouts=[{name:'desktop',width:1366,height:768,mobile:false},{name:'portrait',width:390,height:844,mobile:true},{name:'landscape',width:844,height:390,mobile:true}];
+try{
+  for(const layout of layouts){
+    const context=await browser.newContext({viewport:{width:layout.width,height:layout.height},isMobile:layout.mobile,hasTouch:layout.mobile});await blockPointerLock(context);
+    const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
+    await page.goto(url);await page.waitForFunction(()=>window.__wireTheHouse?.mixing,undefined,{timeout:120000});await page.locator('#start-button')[layout.mobile?'tap':'click']();
+    await page.evaluate(()=>{const g=window.__wireTheHouse;window.__mixStep=g.step.bind(g);g.step=()=>{};});
+    const step=(n=1)=>page.evaluate(count=>{for(let i=0;i<count;i++)window.__mixStep(1/60);},n);
+    const state=()=>page.evaluate(()=>{const g=window.__wireTheHouse,m=g.mixing;return{camera:g.renderer.camera.position.toArray(),yaw:g.player.yaw,pitch:g.player.pitch,selected:g.selectedTool,mixing:m.telemetry,launched:g.mortar.telemetry.launchedKg,stuck:g.mortar.telemetry.stuckKg,toolbelt:document.querySelector('#mixing-toolbelt').checkVisibility(),normalTools:getComputedStyle(document.querySelector('#mobile-tool-slider')).visibility,finish:document.querySelector('#mixing-finish').checkVisibility(),overflow:document.documentElement.scrollWidth>innerWidth,renderError:g.renderer.renderError};});
+    const aim=async(kind,index=0)=>{await page.evaluate(({kind,index})=>{const g=window.__wireTheHouse,m=g.mixing,c=g.renderer.camera;const map={water:m.models.water,trowel:m.stationTrowel,shovel:m.models.shovel,mixer:m.models.mixer,bucket:m.models.bucket,sand:m.models.sand,sack:m.models.sacks[index]};const o=map[kind],p=o.getWorldPosition(c.position.clone());const station=m.models.group.getWorldPosition(c.position.clone());c.position.set(station.x,g.player.eyeHeight,station.z-.92);c.lookAt(p.x,p.y+(kind==='sand'?.16:.08),p.z);g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;}, {kind,index});await step(2);};
+    const interact=async(holdFrames=1)=>{if(layout.mobile){const box=await page.locator('#mobile-interact').boundingBox();assert(box,'Object-specific mobile INTERACT must be visible');const cdp=await context.newCDPSession(page),point={x:box.x+box.width/2,y:box.y+box.height/2,id:51};await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[point]});await step(holdFrames);await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});}else{await page.keyboard.down('KeyE');await step(holdFrames);await page.keyboard.up('KeyE');}await step(2);};
+    const shot=async name=>{await page.evaluate(async()=>{const r=window.__wireTheHouse.renderer;await r.waitForFrame();r.render();await r.waitForFrame();});await page.screenshot({path:`${out}/${layout.name}-${name}.png`});};
+    // Wall mortar is unavailable before a player-made finished batch.
+    await page.evaluate(()=>window.dispatchEvent(new CustomEvent('wirehouse:select-tool',{detail:'trowel'})));await step();
+    await page.evaluate(()=>{const g=window.__wireTheHouse,c=g.renderer.camera;c.position.set(0,g.player.eyeHeight,g.room.brickWall.volume.frontZ+.75);c.lookAt(0,1.3,g.room.brickWall.volume.frontZ);g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;});await step();
+    const initial=await state();if(layout.mobile)await page.locator('#look-joystick').tap({position:{x:45,y:45}});else await page.keyboard.press('KeyE');await step(90);assert.equal((await state()).launched,initial.launched,'Wall trowel must begin empty');
+    await aim('water');assert.equal((await state()).toolbelt,true,'Entering the physical bay swaps in its tool belt');await interact();assert.equal((await state()).mixing.tool,'water');
+    await aim('bucket');const beforeWater=await state();await interact();await step(90);const water=await state();assert(Math.abs(water.mixing.batch.waterLitres-20/3)<1e-8,'Visible jug action fills exactly one third');assert.deepEqual(water.camera,beforeWater.camera,'Water animation cannot steer or move the camera');await shot('water-third');
+    await aim('trowel');await interact();assert.equal((await state()).mixing.tool,'trowel');
+    await aim('sack',0);await interact();await step(60);assert.equal((await state()).mixing.batch.sacks[0].open,true,'First trowel interaction visibly tears the sack');await shot('sack-torn');
+    for(let scoop=0;scoop<6;scoop++){await aim('sack',0);const camera=(await state()).camera;await interact();await step(38);const mid=await state();assert.equal(mid.mixing.activity,'cement');assert(mid.mixing.batch.heldTrowel,'Cement is visibly carried on the trowel during the stroke');assert.deepEqual(mid.camera,camera,'Cement stroke cannot steer or move the camera');if(scoop===0)await shot('cement-scoop');await step(70);}
+    assert(Math.abs((await state()).mixing.batch.cementScoops-6)<1e-8);
+    await aim('shovel');await interact();assert.equal((await state()).mixing.tool,'shovel');
+    for(let scoop=0;scoop<12;scoop++){await aim('sand');await interact();await step(35);const mid=await state();assert.equal(mid.mixing.activity,'sand');assert(mid.mixing.batch.heldShovel,'Sand remains on the visible shovel during the stroke');if(scoop===0)await shot('sand-scoop');await step(75);}
+    await aim('mixer');await interact();assert.equal((await state()).mixing.tool,'mixer');await aim('bucket');await interact();assert.equal((await state()).mixing.inserted,true);
+    await aim('bucket');
+    if(layout.mobile){const box=await page.locator('#mobile-interact').boundingBox(),cdp=await context.newCDPSession(page),point={x:box.x+box.width/2,y:box.y+box.height/2,id:57};await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[point]});await step(240);assert((await state()).mixing.mixing);await shot('mixing-held');await step(240);await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});}
+    else{await page.keyboard.down('KeyE');await step(240);assert((await state()).mixing.mixing);await shot('mixing-held');await step(240);await page.keyboard.up('KeyE');}
+    await step(2);const ready=await state();assert.equal(ready.mixing.batch.ready,true);assert.equal(ready.mixing.inserted,false,'Releasing a ready mix lifts the mixer');assert.equal(ready.finish,true,'FINISH appears only after actual mixing');assert.equal(ready.mixing.batch.quality,'balanced');await shot('mixed-ready');
+    await page.locator('#mixing-finish')[layout.mobile?'tap':'click']();await step();const finished=await state();assert.equal(finished.mixing.finished,true);assert.equal(finished.selected,'trowel');assert.equal(finished.toolbelt,false,'Finishing restores the normal tool navigation');
+    await page.evaluate(()=>{const g=window.__wireTheHouse,c=g.renderer.camera;c.position.set(0,g.player.eyeHeight,g.room.brickWall.volume.frontZ+.75);c.lookAt(0,1.3,g.room.brickWall.volume.frontZ);g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;});await step();const beforeThrow=await state();
+    if(layout.mobile){const box=await page.locator('#look-joystick').boundingBox(),cdp=await context.newCDPSession(page),point={x:box.x+box.width/2,y:box.y+box.height/2,id:61};await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[point]});await step(28);await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});}else{await page.keyboard.down('KeyE');await step(28);await page.keyboard.up('KeyE');}await step(100);const afterThrow=await state();assert(afterThrow.launched>beforeThrow.launched,'Finished player-made mortar feeds the wall trowel');assert(afterThrow.stuck>beforeThrow.stuck,'Player-made mortar reaches the masonry');assert.equal(afterThrow.overflow,false);assert.equal(afterThrow.renderError,'');assert.deepEqual(errors,[]);await shot('wall-mortar');
+    report.cases.push({platform:layout.name,water,ready,finished,afterThrow,errors});await context.close();
+  }
+  report.passed=true;
+}finally{await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));await browser.close();}
+console.log(JSON.stringify({passed:report.passed,platforms:report.cases.map(c=>c.platform),report:`${out}/report.json`}));

@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {blockPointerLock} from './browser-safety.mjs';
+import {prepareFinishedMortar} from './prepared-mortar-fixture.mjs';
 const browser=await chromium.launch({channel:'chrome',headless:true});
 try{
  const context=await browser.newContext();await blockPointerLock(context);const page=await context.newPage();
  await page.goto('http://127.0.0.1:5362/Electrical-Game/');await page.waitForFunction(()=>window.__wireTheHouse?.roomWater.waterProActive);await page.locator('#start-button').click();
+ await prepareFinishedMortar(page);
  await page.evaluate(async()=>{
   const g=window.__wireTheHouse,r=g.renderer,c=r.camera;await r.waitForFrame();
   // A visible puddle keeps the real optical boundary active on optimized dry floors.

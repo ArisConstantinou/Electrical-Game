@@ -3,6 +3,7 @@ import { chromium } from 'playwright';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { blockPointerLock } from './browser-safety.mjs';
+import { prepareFinishedMortar } from './prepared-mortar-fixture.mjs';
 
 const url = process.argv[2] ?? 'http://127.0.0.1:5362/Electrical-Game/';
 const out = resolve(process.argv[3] ?? 'output/throw-timing-ui');
@@ -100,6 +101,7 @@ try {
     await page.goto(url, { waitUntil: 'networkidle' });
     await page.waitForFunction(() => Boolean(window.__wireTheHouse));
     await page.locator('#start-button')[config.mobile ? 'tap' : 'click']();
+    await prepareFinishedMortar(page);
     await page.evaluate(() => document.exitPointerLock());
     await page.waitForTimeout(80);
     await page.evaluate(() => {

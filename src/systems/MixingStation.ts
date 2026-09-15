@@ -8,7 +8,8 @@ import '../styles/mixing.css';
 
 type MixingTool = 'trowel'|'shovel'|'mixer'|'water'|'hands';
 type Action = 'water'|'cement'|'sand'|'pour'|'insert'|'rinse'|'carry'|'place'|'work'|'discard';
-type QuickAction = 'water'|'cement'|'sand'|'mixer'|'rinse'|'carry'|'work';
+type Activity = 'water'|'tear'|'cement'|'sand'|null;
+type StationTarget = {kind:'water'|'trowel'|'shovel'|'mixer'|'bucket'|'sand'|'rinse'|'sack';index?:number;object:THREE.Object3D};
 const names:Record<MixingTool,string>={trowel:'Μιστρί',shovel:'Φτυάρι',mixer:'Μίκσερ',water:'Νερό',hands:'Χέρια'};
 const qualityNames:Record<string,string>={empty:'Άδεια σύκλα',incomplete:'Χρειάζεται νερό, τσιμέντο και άμμο',unmixed:'Χρειάζεται ανάμιξη',balanced:'Έτοιμος πυλός · κοντά στη συνταγή σου',wet:'Αραιό μίγμα · πρόσθεσε άμμο',dry:'Στεγνό μίγμα · πρόσθεσε νερό',weak:'Λίγο τσιμέντο · πρόσθεσε μιστριές'};
 
@@ -26,6 +27,9 @@ export class MixingStation {
   message='Νερό πρώτα, μετά τσιμέντο και άμμο. Κάθε δόση τη διαλέγεις εσύ.';
   private readonly panel:HTMLElement;
   private readonly toggle:HTMLButtonElement;
+  private readonly prompt:HTMLElement;
+  private readonly finish:HTMLButtonElement;
+  private readonly toolbelt:HTMLElement;
   private readonly readout:HTMLElement;
   private readonly feedback:HTMLElement;
   private readonly meter:HTMLProgressElement;
@@ -39,7 +43,6 @@ export class MixingStation {
   private readonly actionPoint=new THREE.Vector3();
   private readonly stationPoint=new THREE.Vector3();
   private actionTime=0;
-  private holdPointer=false;
   private mixingNow=false;
   private cleanSeconds=0;
   private uiKey='';
@@ -52,8 +55,14 @@ export class MixingStation {
   private motor:OscillatorNode|null=null;
   private gain:GainNode|null=null;
   private readonly activationDistance=2.8;
-  private suppressInteractionFrame=false;
   private readonly mobileInteract:HTMLButtonElement|null;
+  private readonly stationTrowel:THREE.Group;
+  private activity:Activity=null;
+  private activityTime=0;
+  private activityStep=0;
+  private activitySack=0;
+  private wasHeldInteraction=false;
+  private finished=false;
 
   constructor(private readonly game:Game){
     const m=this.models;
@@ -65,24 +74,27 @@ export class MixingStation {
     this.heldTools.set('trowel',buildToolModel('trowel'));
     this.heldTools.set('shovel',createShovelModel());
     this.heldTools.set('mixer',createMixerModel());
+    this.heldTools.set('water',m.water.clone(true));
     this.heldTools.forEach((model,key)=>{this.held.add(model);model.visible=false;if(key!=='trowel'){model.rotation.x=.6;const grip=new THREE.Vector3().fromArray(model.userData.gripPoint).applyEuler(model.rotation);model.position.set(.18,-.05,-.1).sub(grip);}});
+    this.stationTrowel=buildToolModel('trowel');this.stationTrowel.name='mixing-station-trowel';this.stationTrowel.userData.studioEntityId='mixing:trowel';this.stationTrowel.position.set(.22,.13,.28);this.stationTrowel.rotation.set(.18,0,-1.18);m.group.add(this.stationTrowel);
     const particles=new THREE.BufferGeometry();particles.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(48),3));
     this.pouring=new THREE.Points(particles,new THREE.PointsMaterial({color:0xbda77e,size:.018,transparent:true,opacity:.85}));this.pouring.visible=false;game.renderer.scene.add(this.pouring);
     for(const side of [1,-1]){const hand=workerHand(side,'hose'),arm=workerArm(side,hand,new THREE.Vector3());game.renderer.scene.add(arm.group);this.arms.push(arm);}
     this.toggle=document.createElement('button');this.toggle.id='mixing-toggle';this.toggle.type='button';this.toggle.textContent='ΣΥΚΛΑ · ΦΤΙΑΞΕ ΠΥΛΟ';this.toggle.hidden=true;
     this.mobileInteract=game.hud.shell.querySelector('#mobile-interact');
-    this.panel=document.createElement('section');this.panel.id='mixing-panel';this.panel.hidden=true;this.panel.setAttribute('aria-label','Παρασκευή πυλού');
-    this.panel.innerHTML=`<header class="mix-header"><div><h2>Σταθμός πυλού</h2><p>Πάτησε το μεγάλο εικονίδιο του υλικού.</p></div><button type="button" class="mix-close" aria-label="Κλείσιμο σταθμού">×</button></header><div class="mix-readout"></div><progress max="1" value="0" aria-label="Ανάμιξη"></progress><p class="mix-feedback" role="status" aria-live="polite"></p><div class="mix-grid"><button type="button" class="mix-card" data-mix-quick="water"><span class="mix-icon" aria-hidden="true">💧</span><strong>ΝΕΡΟ</strong><small>+1 λίτρο</small></button>${[0,1,2].map(index=>`<button type="button" class="mix-card" data-mix-quick="cement" data-sack="${index}"><span class="mix-icon mix-sack-icon" aria-hidden="true">${index+1}</span><strong>ΤΣΙΜΕΝΤΟ ${index+1}</strong><small data-sack-state="${index}">Άνοιξε σακούλα</small></button>`).join('')}<button type="button" class="mix-card" data-mix-quick="sand"><span class="mix-icon" aria-hidden="true">⛏️</span><strong>ΑΜΜΟΣ</strong><small>+1 φτυαριά</small></button><button type="button" class="mix-card" data-mix-quick="mixer"><span class="mix-icon" aria-hidden="true">⚙️</span><strong>ΜΙΞΕΡ</strong><small class="mix-mixer-state">Βάλε στη σύκλα</small></button><button type="button" class="mix-card mix-hold-card" id="mixing-hold"><span class="mix-icon" aria-hidden="true">↻</span><strong>ΑΝΑΜΙΞΗ</strong><small>Κράτα πατημένο</small></button><button type="button" class="mix-card" data-mix-quick="rinse"><span class="mix-icon" aria-hidden="true">🚿</span><strong>ΞΕΠΛΥΜΑ</strong><small>Καθάρισε μίξερ</small></button><button type="button" class="mix-card" data-mix-quick="carry"><span class="mix-icon" aria-hidden="true">🪣</span><strong>ΣΥΚΛΑ</strong><small class="mix-bucket-state">Σήκωσε</small></button><button type="button" class="mix-card mix-work-card" data-mix-quick="work"><span class="mix-icon" aria-hidden="true">🔨</span><strong>ΤΟΙΧΟΣ</strong><small>Πιάσε μιστρί τοίχου</small></button></div><input id="mixing-water-step" type="hidden" value="1"><select id="mixing-sack" hidden aria-hidden="true"><option value="0">1</option><option value="1">2</option><option value="2">3</option></select><details><summary>Συνταγή και οδηγίες</summary><p class="mix-recipe">Νερό στο ⅓ της σύκλας, 6–7 μιστριές τσιμέντο και άμμος μέχρι να γεμίσει. Η πρώτη πίεση ανοίγει κάθε σακούλα· κάθε επόμενη ρίχνει αυτόματα μία μιστριά στη σύκλα.</p><button type="button" data-mix-action="discard">Άδειασε την παρτίδα</button><p class="mix-help">Κάθε εικονίδιο ολοκληρώνει ολόκληρη την πράξη. Το κανονικό μιστρί τοίχου είναι ξεχωριστό από το μιστρί μίξης.</p></details>`;
+    this.panel=document.createElement('section');this.panel.id='mixing-panel';this.panel.hidden=true;this.panel.setAttribute('aria-label','Κατάσταση παρασκευής πυλού');
+    this.panel.innerHTML=`<b>ΠΑΡΑΣΚΕΥΗ ΠΥΛΟΥ</b><div class="mix-readout"></div><progress max="1" value="0" aria-label="Ανάμιξη"></progress><p class="mix-feedback" role="status" aria-live="polite"></p><input id="mixing-water-step" type="hidden" value="1"><select id="mixing-sack" hidden aria-hidden="true"><option value="0">1</option><option value="1">2</option><option value="2">3</option></select>`;
     this.readout=this.panel.querySelector('.mix-readout')!;this.feedback=this.panel.querySelector('.mix-feedback')!;this.meter=this.panel.querySelector('progress')!;
-    game.hud.shell.append(this.toggle,this.panel);
-    this.toggle.addEventListener('click',()=>{if(!this.active)this.setActive(true);else this.panel.hidden=!this.panel.hidden;this.holdPointer=false;this.uiKey='';});
+    this.prompt=document.createElement('div');this.prompt.id='mixing-world-prompt';this.prompt.hidden=true;
+    this.finish=document.createElement('button');this.finish.id='mixing-finish';this.finish.type='button';this.finish.innerHTML='<b>FINISH</b><small>Ο ΠΥΛΟΣ ΕΙΝΑΙ ΕΤΟΙΜΟΣ</small>';this.finish.hidden=true;
+    this.toolbelt=document.createElement('nav');this.toolbelt.id='mixing-toolbelt';this.toolbelt.setAttribute('aria-label','Εργαλεία παρασκευής πυλού');this.toolbelt.hidden=true;
+    this.toolbelt.innerHTML='<button type="button" data-mix-equip="water"><b>💧</b><span>ΝΕΡΟ</span></button><button type="button" data-mix-equip="trowel"><b>◢</b><span>ΜΙΣΤΡΙ ΜΙΞΗΣ</span></button><button type="button" data-mix-equip="shovel"><b>♠</b><span>ΦΤΥΑΡΙ</span></button><button type="button" data-mix-equip="mixer"><b>⚙</b><span>ΜΙΞΕΡ</span></button>';
+    game.hud.shell.append(this.toggle,this.panel,this.prompt,this.finish,this.toolbelt);
+    this.toggle.hidden=true;
     this.panel.addEventListener('pointerdown',event=>event.stopPropagation());
-    this.panel.addEventListener('click',event=>{const button=(event.target as HTMLElement).closest<HTMLButtonElement>('button');if(!button)return;if(button.classList.contains('mix-close')){this.setActive(false);return;}const quick=button.dataset.mixQuick as QuickAction;if(quick)this.quickAction(quick,Number(button.dataset.sack));const action=button.dataset.mixAction as Action;if(action)this.action(action);});
-    const hold=this.panel.querySelector<HTMLButtonElement>('#mixing-hold')!;
-    hold.addEventListener('pointerdown',event=>{event.preventDefault();hold.setPointerCapture(event.pointerId);this.holdPointer=true;this.enableSound();});
-    for(const kind of ['pointerup','pointercancel','lostpointercapture'])hold.addEventListener(kind,()=>{this.holdPointer=false;});
-    hold.addEventListener('keydown',event=>{if(event.code==='Space'||event.code==='Enter'){event.preventDefault();this.holdPointer=true;this.enableSound();}});
-    hold.addEventListener('keyup',()=>{this.holdPointer=false;});hold.addEventListener('blur',()=>this.stop());
+    this.finish.addEventListener('click',()=>this.finishBatch());
+    this.toolbelt.addEventListener('pointerdown',event=>event.stopPropagation());
+    this.toolbelt.addEventListener('click',event=>{const button=(event.target as HTMLElement).closest<HTMLButtonElement>('[data-mix-equip]');if(!button||this.activity)return;if(!this.active)this.setActive(true);this.chooseTool(button.dataset.mixEquip as MixingTool);});
     addEventListener('blur',()=>this.stop());document.addEventListener('visibilitychange',()=>{if(document.hidden)this.stop();});
   }
   get blocksWork():boolean{return this.active||this.carrying;}
@@ -96,7 +108,7 @@ export class MixingStation {
     }
     this.panel.hidden=!value;this.game.hud.shell.classList.toggle('mixing-active',value);this.uiKey='';
   }
-  private stop():void{this.holdPointer=false;this.mixingNow=false;if(this.gain&&this.sound)this.gain.gain.setTargetAtTime(0,this.sound.currentTime,.035);}
+  private stop():void{this.mixingNow=false;if(this.gain&&this.sound)this.gain.gain.setTargetAtTime(0,this.sound.currentTime,.035);}
   private enableSound():void{
     if(!this.sound){this.sound=new AudioContext();this.motor=this.sound.createOscillator();this.gain=this.sound.createGain();this.motor.type='triangle';this.motor.frequency.value=86;this.gain.gain.value=0;this.motor.connect(this.gain).connect(this.sound.destination);this.motor.start();}
     void this.sound.resume().catch(()=>{});
@@ -106,50 +118,51 @@ export class MixingStation {
     if(this.inserted&&tool!=='mixer'){this.message='Βγάλε πρώτα το μίκσερ από τη σύκλα.';return;}
     this.tool=tool;this.stop();this.game.input.resetTransientInput();this.message=`${names[tool]} στα χέρια. Τα υλικά που έχεις πάρει παραμένουν στο εργαλείο τους.`;
   }
-  private quickAction(action:QuickAction,sackIndex=0):void{
-    if(action==='work'){this.action('work');return;}
-    if(action==='water'){this.chooseTool('water');this.action('water');return;}
-    if(action==='cement'){
-      this.panel.querySelector<HTMLSelectElement>('#mixing-sack')!.value=String(sackIndex);
-      this.chooseTool('trowel');
-      if(this.action('cement')&&this.batch.getState().heldTrowel)this.action('pour');
-      return;
-    }
-    if(action==='sand'){
-      this.chooseTool('shovel');
-      if(this.action('sand')&&this.batch.getState().heldShovel)this.action('pour');
-      return;
-    }
-    if(action==='mixer'){this.chooseTool('mixer');this.action('insert');return;}
-    if(action==='rinse'){
-      this.chooseTool('mixer');
-      if(this.inserted)this.action('insert');
-      this.action('rinse');
-      return;
-    }
-    this.chooseTool('hands');this.action(this.carrying?'place':'carry');
-  }
   private bucketPosition():THREE.Vector3{return this.models.bucket.getWorldPosition(new THREE.Vector3());}
   private near(object:THREE.Object3D,range=2.2):boolean{
     const point=object.getWorldPosition(new THREE.Vector3()),eye=this.game.renderer.camera.position;
     return Math.hypot(point.x-eye.x,point.z-eye.z)<=range;
   }
   canOpenFromInteract():boolean{
-    if(this.carrying)return false;
-    const c=this.game.renderer.camera;
-    this.models.group.updateMatrixWorld(true);
-    const station=this.models.group.getWorldPosition(this.stationPoint);
-    if(Math.abs(station.y-c.position.y) > 2.0) return false;
-    const dz=station.z-c.position.z,dx=station.x-c.position.x;
-    if(Math.hypot(dx,dz) > this.activationDistance) return false;
-    const direction=c.getWorldDirection(new THREE.Vector3());
-    return direction.dot(new THREE.Vector3(dx,station.y+.35-c.position.y,dz).normalize())>.42;
+    return Boolean(this.aimedObject());
   }
   handleInteractionRequest(requested:boolean):boolean{
-    if(!requested || this.active || this.carrying || !this.canOpenFromInteract()) return false;
-    this.setActive(true);
-    this.suppressInteractionFrame=true;
+    if(!requested||this.activity)return false;
+    const target=this.aimedObject();if(!target)return false;
+    if(!this.active)this.setActive(true);
+    const handled=this.useAimedObject(target);
+    return handled;
+  }
+  private aimedObject():StationTarget|null{
+    if(!this.game.started||this.carrying)return null;
+    const m=this.models,c=this.game.renderer.camera;m.group.updateMatrixWorld(true);this.ray.setFromCamera(new THREE.Vector2(),c);
+    const roots=[m.bucket,m.sand,...m.sacks,m.rinse,m.water,m.mixer,m.shovel,this.stationTrowel].filter(object=>object.visible);
+    const hit=this.ray.intersectObjects(roots,true)[0];if(!hit||hit.distance>3.2)return null;
+    const belongs=(root:THREE.Object3D)=>{let object:THREE.Object3D|null=hit.object;while(object){if(object===root)return true;object=object.parent;}return false;};
+    const sack=m.sacks.findIndex(belongs);if(sack>=0)return{kind:'sack',index:sack,object:m.sacks[sack]};
+    for(const [kind,object] of [['water',m.water],['trowel',this.stationTrowel],['shovel',m.shovel],['mixer',m.mixer],['bucket',m.bucket],['sand',m.sand],['rinse',m.rinse]] as const)if(belongs(object))return{kind,object};
+    return null;
+  }
+  private beginActivity(activity:Exclude<Activity,null>,object:THREE.Object3D,sackIndex=0):boolean{
+    if(this.activity)return false;
+    this.activity=activity;this.activityTime=0;this.activityStep=0;this.activitySack=sackIndex;this.actionPoint.copy(object.getWorldPosition(new THREE.Vector3()));this.stop();
+    this.message=activity==='water'?'Γέρνεις την κανάτα μέχρι το σημάδι ⅓…':activity==='tear'?'Το μιστρί σκίζει τη σακούλα…':activity==='cement'?'Παίρνεις μία μιστριά τσιμέντο και τη ρίχνεις στη σύκλα…':'Το φτυάρι μπαίνει στην άμμο και αδειάζει στη σύκλα…';
     return true;
+  }
+  private updateActivity(dt:number):void{
+    if(!this.activity)return;this.activityTime+=dt;
+    const duration=this.activity==='tear'?.85:this.activity==='water'?1.35:1.55,p=this.activityTime/duration;
+    if(this.activity==='water'&&this.activityStep===0&&p>=.58){const target=this.batch.getState().capacityLitres/3,amount=Math.max(0,target-this.batch.waterLitres);if(amount>0)this.batch.addWater(amount);this.activityStep=1;this.pouringTime=.65;this.customSupply=false;}
+    if(this.activity==='tear'&&this.activityStep===0&&p>=.48){this.batch.openSack(this.activitySack);this.activityStep=1;}
+    if(this.activity==='cement'){
+      if(this.activityStep===0&&p>=.30){if(this.batch.scoopCement(this.activitySack))this.activityStep=1;else{this.message='Δεν μπορείς να πάρεις άλλη μιστριά από αυτή τη σακούλα.';this.activity=null;return;}}
+      if(this.activityStep===1&&p>=.72){if(this.batch.pour('trowel')){this.activityStep=2;this.pouringTime=.6;(this.pouring.material as THREE.PointsMaterial).color.setHex(0xb2aaa0);}else this.message='Η σύκλα γέμισε. Προχώρα στην ανάμιξη.';}
+    }
+    if(this.activity==='sand'){
+      if(this.activityStep===0&&p>=.28){if(this.batch.scoopSand())this.activityStep=1;else{this.message='Δεν μπορείς να πάρεις άλλη φτυαριά.';this.activity=null;return;}}
+      if(this.activityStep===1&&p>=.72){if(this.batch.pour('shovel')){this.activityStep=2;this.pouringTime=.6;(this.pouring.material as THREE.PointsMaterial).color.setHex(0xbda77e);}else this.message='Η σύκλα γέμισε. Προχώρα στην ανάμιξη.';}
+    }
+    if(p>=1){const done=this.activity;this.activity=null;this.activityTime=0;this.activityStep=0;this.message=done==='water'?'Η σύκλα έχει ακριβώς ⅓ νερό. Πιάσε το μιστρί μίξης.':done==='tear'?'Η σακούλα άνοιξε. Πάτησε ξανά πάνω της για μία μιστριά.':done==='cement'?'Η μιστριά τσιμέντου έπεσε στη σύκλα. Βάλε όσες θέλεις.':'Η φτυαριά άμμου έπεσε στη σύκλα. Συνέχισε όσο θέλεις.';}
   }
   private animateAt(object:THREE.Object3D):void{object.getWorldPosition(this.actionPoint);this.actionPoint.y+=object===this.models.bucket?.33:.32;this.actionTime=.65;}
   action(action:Action):boolean{
@@ -207,43 +220,74 @@ export class MixingStation {
   }
   /** Called only when the wrist actually releases; failed or cancelled throws use no mortar. */
   reserveScoop(requested:number):number{
-    if(!this.customSupply)return requested;
-    if(this.blocksWork||!this.near(this.models.bucket,1.85)||!this.batch.ready){this.game.hud.notify('Έτοιμος πυλός χρειάζεται σε σύκλα κοντά σου.',false,1800);return 0;}
+    if(!this.finished||!this.customSupply||!this.batch.ready){this.game.hud.notify('Πρέπει πρώτα να ετοιμάσεις και να κάνεις FINISH τον πυλό.',false,2000);return 0;}
     return this.batch.consumeKg(requested);
   }
-  get bondFactor():number{return !this.customSupply?1:this.batch.quality==='balanced'?1:this.batch.quality==='wet'?.45:this.batch.quality==='dry'?.55:.65;}
+  get bondFactor():number{return this.batch.quality==='balanced'?1:this.batch.quality==='wet'?.45:this.batch.quality==='dry'?.55:.65;}
+  private promptFor(target:StationTarget|null):string{
+    if(!target)return'';
+    const key=matchMedia('(any-pointer: coarse)').matches?'INTERACT':'E';
+    if(target.kind==='water')return`${key} · ΓΕΜΙΣΕ ΝΕΡΟ ΣΤΟ ⅓`;
+    if(target.kind==='trowel')return`${key} · ΠΙΑΣΕ ΜΙΣΤΡΙ ΜΙΞΗΣ`;
+    if(target.kind==='shovel')return`${key} · ΠΙΑΣΕ ΦΤΥΑΡΙ`;
+    if(target.kind==='mixer')return`${key} · ΠΙΑΣΕ ΜΙΞΕΡ`;
+    if(target.kind==='sack')return`${key} · ${this.tool==='trowel'?(this.batch.getState().sacks[target.index??0].open?'ΠΑΡΕ ΜΙΑ ΜΙΣΤΡΙΑ':'ΣΚΙΣΕ ΤΗ ΣΑΚΟΥΛΑ'):'ΧΡΕΙΑΖΕΤΑΙ ΜΙΣΤΡΙ ΜΙΞΗΣ'}`;
+    if(target.kind==='sand')return`${key} · ${this.tool==='shovel'?'ΠΑΡΕ ΜΙΑ ΦΤΥΑΡΙΑ':'ΧΡΕΙΑΖΕΤΑΙ ΦΤΥΑΡΙ'}`;
+    if(target.kind==='bucket'&&this.tool==='water')return`${key} · ΓΕΜΙΣΕ ΝΕΡΟ ΣΤΟ ⅓`;
+    if(target.kind==='bucket'&&this.tool==='mixer')return`${key} · ${this.inserted?'ΚΡΑΤΑ ΓΙΑ ΑΝΑΜΙΞΗ':'ΒΑΛΕ ΤΟ ΜΙΞΕΡ'}`;
+    if(target.kind==='rinse')return`${key} · ΞΕΠΛΥΝΕ ΤΟ ΜΙΞΕΡ`;
+    return`${key} · ΣΤΟΧΕΥΣΕ ΤΟ ΣΩΣΤΟ ΕΡΓΑΛΕΙΟ`;
+  }
+  private finishBatch():void{
+    if(!this.batch.ready||this.inserted)return;
+    this.finished=true;this.customSupply=true;this.message='Η παρτίδα ολοκληρώθηκε. Το μιστρί τοίχου τροφοδοτείται μόνο από αυτόν τον πυλό.';
+    this.setActive(false);window.dispatchEvent(new CustomEvent('wirehouse:select-tool',{detail:'trowel'}));
+  }
   update(dt:number,requested:boolean,heldInteraction:boolean):void{
     dt=Number.isFinite(dt)?Math.min(.05,Math.max(0,dt)):0;
+    this.updateActivity(dt);
     this.elapsed+=dt;this.pouringTime=Math.max(0,this.pouringTime-dt);
     const station=this.models.group.getWorldPosition(this.stationPoint),camera=this.game.renderer.camera.position;
     const distance=Math.hypot(station.x-camera.x,station.z-camera.z);
-    if(this.active&&distance>this.activationDistance+.65)this.setActive(false);
-    const interactAvailable=this.active||this.carrying||this.canOpenFromInteract();
-    if(this.mobileInteract){this.mobileInteract.hidden=!interactAvailable;this.mobileInteract.querySelector('small')!.textContent=this.carrying?'ΑΦΗΣΕ ΣΥΚΛΑ':this.active?'ΣΤΟΧΕΥΣΕ ΑΝΤΙΚΕΙΜΕΝΟ':'ΑΝΟΙΞΕ ΣΤΑΘΜΟ';}
-    this.toggle.hidden=!this.active&&!this.carrying;this.actionTime=Math.max(0,this.actionTime-dt);
+    const stageNearby=this.game.started&&distance<2.35&&!this.finished;this.toolbelt.hidden=!stageNearby;this.game.hud.shell.classList.toggle('mixing-stage',stageNearby);
+    if(this.active&&distance>this.activationDistance+1.2)this.setActive(false);
+    const aimed=this.aimedObject(),interactAvailable=Boolean(aimed)||this.carrying;
+    const prompt=this.promptFor(aimed);this.prompt.hidden=!prompt;this.prompt.textContent=prompt;
+    if(this.mobileInteract){this.mobileInteract.hidden=!interactAvailable;this.mobileInteract.querySelector('small')!.textContent=this.carrying?'ΑΦΗΣΕ ΣΥΚΛΑ':prompt?.replace(/^.* · /,'')||'ΣΤΟΧΕΥΣΕ ΑΝΤΙΚΕΙΜΕΝΟ';}
+    this.toggle.hidden=true;this.actionTime=Math.max(0,this.actionTime-dt);
     if(this.carrying){const c=this.game.renderer.camera,d=c.getWorldDirection(new THREE.Vector3());d.y=0;d.normalize();const p=c.position.clone().addScaledVector(d,.42);p.y=Math.max(.35,c.position.y-.95);this.models.bucket.position.copy(this.models.group.worldToLocal(p));}
     if(this.carrying&&requested)this.placeBucket();
-    else if(this.active&&requested&&!this.holdPointer&&!this.suppressInteractionFrame)this.useAimedObject();
-    this.suppressInteractionFrame=false;
-    const held=this.active&&(this.holdPointer||heldInteraction);
+    const held=this.active&&heldInteraction;
     const direction=this.game.renderer.camera.getWorldDirection(new THREE.Vector3());
     const bucketAim=direction.dot(this.bucketPosition().add(new THREE.Vector3(0,.3,0)).sub(this.game.renderer.camera.position).normalize())>.88||direction.dot(this.bucketPosition().add(new THREE.Vector3(0,.75,0)).sub(this.game.renderer.camera.position).normalize())>.96;
-    this.mixingNow=held&&this.tool==='mixer'&&this.inserted&&this.near(this.models.bucket,1.35)&&(this.holdPointer||bucketAim)&&!document.hidden;
+    this.mixingNow=held&&this.tool==='mixer'&&this.inserted&&this.near(this.models.bucket,1.35)&&bucketAim&&!document.hidden;
     if(this.mixingNow){const before=this.batch.mixProgress;this.batch.mix(dt);if(this.batch.mixProgress>before||this.batch.ready)this.mixerDirty=true;this.message=qualityNames[this.batch.quality];}
     if(held&&this.tool==='mixer'&&this.inserted&&!this.near(this.models.bucket,1.35))this.message='Πλησίασε τη σύκλα για να ανακατέψεις.';
+    if(this.wasHeldInteraction&&!heldInteraction&&this.batch.ready&&this.inserted){this.inserted=false;this.stop();this.message='Ο πηλός είναι έτοιμος. Πάτησε FINISH.';}
+    this.wasHeldInteraction=heldInteraction;
     if(this.cleanSeconds>0){if(this.active&&this.tool==='mixer'&&!this.inserted&&this.near(this.models.rinse,1.8)){this.cleanSeconds=Math.max(0,this.cleanSeconds-dt);if(this.cleanSeconds===0){this.mixerDirty=false;this.message='Το μίκσερ καθάρισε. Μπορείς να σηκώσεις τη σύκλα.';}}else{this.cleanSeconds=0;this.message='Το ξέπλυμα διακόπηκε. Πλησίασε ξανά με το μίκσερ.';}}
     if(this.gain&&this.sound)this.gain.gain.setTargetAtTime(this.mixingNow?.035:0,this.sound.currentTime,.06);
   }
-  private useAimedObject():void{
-    if(this.carrying){this.action('place');return;}
-    const m=this.models,c=this.game.renderer.camera;this.ray.setFromCamera(new THREE.Vector2(),c);m.group.updateMatrixWorld(true);
-    const hit=this.ray.intersectObjects([m.bucket,m.sand,...m.sacks,m.rinse,m.mixer,m.shovel],true)[0];if(!hit||hit.distance>3){this.message='Στόχευσε τη σύκλα ή το υλικό από κοντά.';return;}
-    const belongs=(root:THREE.Object3D)=>{let o:THREE.Object3D|null=hit.object;while(o){if(o===root)return true;o=o.parent;}return false;};
-    const index=m.sacks.findIndex(belongs);
-    if(index>=0){this.panel.querySelector<HTMLSelectElement>('#mixing-sack')!.value=String(index);this.action('cement');}
-    else if(belongs(m.sand))this.action('sand');else if(belongs(m.rinse))this.action('rinse');
-    else if(belongs(m.bucket)){if(this.tool==='mixer'){if(!this.inserted)this.action('insert');}else this.action(this.tool==='water'?'water':this.tool==='hands'?'carry':'pour');}
-    else if(belongs(m.mixer)){if(!this.inserted)this.chooseTool('mixer');}else if(belongs(m.shovel))this.chooseTool('shovel');
+  private useAimedObject(target:StationTarget):boolean{
+    if(this.carrying)return this.placeBucket();
+    if(target.kind==='water'){this.chooseTool('water');this.message='Κανάτα στα χέρια. Κοίταξε τη σύκλα και πάτησε INTERACT.';return true;}
+    if(target.kind==='trowel'){this.chooseTool('trowel');this.message='Μιστρί μίξης στα χέρια. Κοίταξε μία σακούλα και πάτησε INTERACT.';return true;}
+    if(target.kind==='shovel'){this.chooseTool('shovel');this.message='Φτυάρι στα χέρια. Κοίταξε την άμμο και πάτησε INTERACT.';return true;}
+    if(target.kind==='mixer'&&!this.inserted){this.chooseTool('mixer');this.message='Μίξερ στα χέρια. Κοίταξε τη σύκλα και πάτησε INTERACT.';return true;}
+    if(target.kind==='sack'){
+      if(this.tool!=='trowel'){this.message='Πιάσε πρώτα το μιστρί μίξης που βρίσκεται δίπλα στις σακούλες.';return true;}
+      const index=target.index??0;return this.beginActivity(this.batch.getState().sacks[index].open?'cement':'tear',target.object,index);
+    }
+    if(target.kind==='sand'){
+      if(this.tool!=='shovel'){this.message='Πιάσε πρώτα το φτυάρι που είναι πάνω στην άμμο.';return true;}
+      return this.beginActivity('sand',target.object);
+    }
+    if(target.kind==='bucket'&&this.tool==='mixer'){
+      if(!this.inserted){this.inserted=true;this.stop();this.enableSound();this.message='Το μίξερ μπήκε στη σύκλα. Κράτα πατημένο INTERACT όσο θέλεις.';}return true;
+    }
+    if(target.kind==='bucket'&&this.tool==='water')return this.beginActivity('water',target.object);
+    if(target.kind==='rinse'&&this.tool==='mixer'&&this.mixerDirty&&!this.inserted){this.cleanSeconds=2;this.message='Ξεπλένεις τη φτερωτή…';return true;}
+    this.message=`${target.kind==='bucket'?'Η σύκλα':'Αυτό το αντικείμενο'} δεν χρησιμοποιείται με το εργαλείο που κρατάς.`;return true;
   }
   present():void{
     const m=this.models,b=this.batch,state=b.getState();
@@ -254,28 +298,37 @@ export class MixingStation {
     setShovelLoaded(this.heldTools.get('shovel')!,Boolean(state.heldShovel));setShovelLoaded(m.shovel,Boolean(state.heldShovel));
     this.pouring.visible=this.pouringTime>0;
     if(this.pouring.visible){this.pouring.position.copy(this.bucketPosition());const p=this.pouring.geometry.getAttribute('position');for(let i=0;i<p.count;i++){const fall=(this.elapsed*1.8+i/p.count)%1;p.setXYZ(i,Math.sin(i*2.4)*.04,.3+(1-fall)*.35,Math.cos(i*2.4)*.04);}p.needsUpdate=true;}
-    m.sacks.forEach((sack,i)=>setCementSackOpen(sack,state.sacks[i].open));
+    const activeSack=state.sacks.findIndex(sack=>sack.remainingKg>1e-6);
+    m.sacks.forEach((sack,i)=>{setCementSackOpen(sack,state.sacks[i].open);sack.visible=i===activeSack;});
     m.sand.scale.setScalar(Math.max(.1,Math.cbrt(state.sandRemainingKg/600)));
     if(this.inserted||this.cleanSeconds>0){m.mixer.position.copy(this.inserted?m.bucket.position:m.rinse.position);m.mixer.position.y+=.06;m.mixer.rotation.set(0,0,0);m.paddle.rotation.y+=this.mixingNow||this.cleanSeconds>0?.31:0;}
     else{m.mixer.position.copy(this.mixerHome);m.mixer.rotation.copy(this.mixerRotation);}
     m.mixer.visible=this.inserted||this.cleanSeconds>0||this.tool!=='mixer'||!this.active;m.shovel.visible=this.tool!=='shovel'||!this.active;
     this.game.fpsRig.visible=!this.blocksWork;
     if(this.blocksWork)this.game.hud.updateMobileUseStatus(this.carrying?'ΑΦΗΣΕ ΤΗ ΣΥΚΛΑ':this.tool==='mixer'?(this.mixingNow?'ΑΝΑΚΑΤΕΜΑ':'ΚΡΑΤΑ ΓΙΑ ΑΝΑΜΙΞΗ'):'ΧΡΗΣΗ ΣΤΟΝ ΣΤΑΘΜΟ',true,this.mixingNow);
+    this.stationTrowel.visible=this.tool!=='trowel'||!this.active;
+    m.water.visible=this.tool!=='water'||!this.active;
     this.held.visible=this.active&&!this.carrying;
     this.heldTools.forEach((model,key)=>{model.visible=this.held.visible&&key===this.tool&&!(key==='mixer'&&(this.inserted||this.cleanSeconds>0));});
     const trowel=this.heldTools.get('trowel')!,load=trowel.getObjectByName('trowel-load');if(load){load.visible=Boolean(state.heldTrowel);(load as THREE.Mesh<THREE.BufferGeometry,THREE.MeshStandardMaterial>).material.color.setHex(0xb2aaa0);}
     this.held.position.set(0,-.22,-.35);this.held.rotation.set(0,0,0);
+    if(this.activity){
+      const duration=this.activity==='tear'?.85:this.activity==='water'?1.35:1.55,p=THREE.MathUtils.clamp(this.activityTime/duration,0,1),reach=Math.sin(p*Math.PI);
+      const object=this.activity==='water'||p>.57?m.bucket:this.activity==='sand'?m.sand:m.sacks[this.activitySack];
+      const target=object.getWorldPosition(new THREE.Vector3());target.y+=this.activity==='sand'&&p<.57?.18:.34;
+      const local=this.game.renderer.camera.worldToLocal(target.clone());this.held.position.lerp(local,.76*reach);
+      if(this.activity==='water')this.held.rotation.z=-1.35*reach;
+      else if(p>.57)this.held.rotation.z=(this.activity==='cement'?-1.5:-.95)*reach;
+      else this.held.rotation.x=(this.activity==='tear'?.55:-.72)*reach;
+    }
     if(this.actionTime>0){const phase=Math.sin((1-this.actionTime/.65)*Math.PI);this.held.position.y-=phase*.15;this.held.rotation.x=phase*.3;}
     this.poseHands();
-    const key=JSON.stringify([this.active,this.tool,this.carrying,this.inserted,this.mixerDirty,this.message,b.volumeLitres,b.waterLitres,b.cementScoops,b.sandScoops,Math.floor(b.mixProgress*100),b.quality,Boolean(state.heldTrowel),Boolean(state.heldShovel)]);
+    const key=JSON.stringify([this.active,this.tool,this.carrying,this.inserted,this.mixerDirty,this.finished,this.activity,this.message,b.volumeLitres,b.waterLitres,b.cementScoops,b.sandScoops,Math.floor(b.mixProgress*100),b.quality,Boolean(state.heldTrowel),Boolean(state.heldShovel)]);
     if(key===this.uiKey)return;this.uiKey=key;
-    this.toggle.textContent=this.active?(this.panel.hidden?'ΑΝΟΙΞΕ ΠΑΝΕΛ':'ΚΛΕΙΣΕ ΠΑΝΕΛ'):this.carrying?'ΜΕΤΑΦΟΡΑ ΣΥΚΛΑΣ':'ΣΥΚΛΑ · ΦΤΙΑΞΕ ΠΥΛΟ';
-    this.readout.innerHTML=`<b>${b.waterLitres.toFixed(1)} L</b> νερό · <b>${b.cementScoops.toFixed(0)}</b> μιστριές · <b>${b.sandScoops.toFixed(0)}</b> φτυαριές<br><b>${b.volumeLitres.toFixed(1)} / 20 L</b> · Ανάμιξη <b>${Math.round(b.mixProgress*100)}%</b><br><span class="mix-help">${qualityNames[b.quality]}${state.heldTrowel?' · Φορτωμένο μιστρί':''}${state.heldShovel?' · Γεμάτο φτυάρι':''}</span>`;
+    this.readout.innerHTML=`<b>${b.waterLitres.toFixed(1)} L</b> νερό · <b>${b.cementScoops.toFixed(0)}</b> μιστριές · <b>${b.sandScoops.toFixed(0)}</b> φτυαριές<br><b>${b.volumeLitres.toFixed(1)} / 20 L</b> · Ανάμιξη <b>${Math.round(b.mixProgress*100)}%</b><br><span class="mix-help">${qualityNames[b.quality]}</span>`;
     this.meter.value=b.mixProgress;this.feedback.textContent=this.message;
-    state.sacks.forEach((sack,index)=>{const label=this.panel.querySelector<HTMLElement>(`[data-sack-state="${index}"]`);if(label)label.textContent=sack.open?'+1 μιστριά στη σύκλα':'Άνοιξε σακούλα';});
-    const mixerState=this.panel.querySelector<HTMLElement>('.mix-mixer-state');if(mixerState)mixerState.textContent=this.inserted?'Βγάλε από τη σύκλα':'Βάλε στη σύκλα';
-    const bucketState=this.panel.querySelector<HTMLElement>('.mix-bucket-state');if(bucketState)bucketState.textContent=this.carrying?'Άφησε εδώ':'Σήκωσε';
-    this.panel.querySelector<HTMLElement>('#mixing-hold')!.hidden=!this.inserted;
+    this.finish.hidden=!b.ready||this.inserted||this.finished;
+    this.toolbelt.querySelectorAll<HTMLButtonElement>('[data-mix-equip]').forEach(button=>button.setAttribute('aria-pressed',String(this.active&&button.dataset.mixEquip===this.tool)));
   }
   private poseHands():void{
     const c=this.game.renderer.camera,active=this.active||this.carrying,right=new THREE.Vector3(1,0,0).applyQuaternion(c.quaternion);
@@ -291,5 +344,5 @@ export class MixingStation {
       poseWorkerArm(arm,shoulder,wrist,right);
     }
   }
-  get telemetry(){return{active:this.active,tool:this.tool,carrying:this.carrying,customSupply:this.customSupply,inserted:this.inserted,mixerDirty:this.mixerDirty,mixing:this.mixingNow,cleaningSeconds:this.cleanSeconds,bucketPosition:this.bucketPosition().toArray(),batch:this.batch.getState(),hint:this.message};}
+  get telemetry(){return{active:this.active,tool:this.tool,carrying:this.carrying,customSupply:this.customSupply,finished:this.finished,activity:this.activity,activityProgress:this.activity?this.activityTime/(this.activity==='tear'?.85:this.activity==='water'?1.35:1.55):0,inserted:this.inserted,mixerDirty:this.mixerDirty,mixing:this.mixingNow,cleaningSeconds:this.cleanSeconds,bucketPosition:this.bucketPosition().toArray(),batch:this.batch.getState(),hint:this.message};}
 }
