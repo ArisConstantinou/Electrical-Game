@@ -1,5 +1,5 @@
 #mixing-toggle{display:none!important}
-#mixing-panel{position:absolute;left:18px;bottom:18px;width:330px;z-index:34;padding:12px 14px;background:rgba(20,29,26,.9);border-left:4px solid #d0a95f;border-radius:5px;color:#f9f5e9;pointer-events:none;box-shadow:0 8px 28px #0006}
+#mixing-panel{display:none!important}
 #mixing-panel[hidden],#mixing-world-prompt[hidden],#mixing-finish[hidden]{display:none!important}
 #mixing-panel>b{font-size:14px;letter-spacing:.08em;color:#edc77d}
 #mixing-panel .mix-readout{margin-top:5px;font-size:15px;line-height:1.45;font-variant-numeric:tabular-nums}
