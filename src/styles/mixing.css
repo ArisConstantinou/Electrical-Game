@@ -1,19 +1,21 @@
 #mixing-toggle{position:absolute;right:16px;top:126px;z-index:35;padding:10px 14px;border:1px solid #ceb17c;border-radius:8px;background:#263932;color:#fff5dd;font-size:14px;font-weight:700;pointer-events:auto}
-#mixing-panel{position:absolute;left:18px;top:120px;width:318px;max-height:calc(100% - 218px);overflow:auto;z-index:34;padding:16px;background:rgba(24,34,30,.96);border:1px solid #899280;border-radius:12px;color:#f9f5e9;pointer-events:auto;touch-action:pan-y;box-shadow:0 12px 36px #0004}
+#mixing-panel{position:absolute;left:18px;top:92px;width:410px;max-height:calc(100% - 118px);overflow:auto;z-index:34;padding:16px;background:rgba(20,29,26,.97);border:2px solid #bca46f;border-radius:16px;color:#f9f5e9;pointer-events:auto;touch-action:pan-y;box-shadow:0 18px 48px #0008}
 #mixing-panel[hidden],#mixing-toggle[hidden]{display:none}
 #mixing-panel [hidden]{display:none!important}
-#mixing-panel details{font-size:14px;color:#e4d3ad;margin:6px 0}#mixing-panel summary{cursor:pointer;min-height:24px}
-#mixing-panel .mix-tools{grid-template-columns:repeat(5,1fr);gap:4px}#mixing-panel .mix-tools button{padding:8px 3px;font-size:12px}
-#mixing-panel h2{font-size:20px;margin:0 0 8px}#mixing-panel p{font-size:14px;line-height:1.4;margin:8px 0}
+#mixing-panel details{font-size:14px;color:#e4d3ad;margin:10px 0 0}#mixing-panel summary{cursor:pointer;min-height:34px;padding:7px 0}
+#mixing-panel .mix-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}#mixing-panel h2{font-size:22px;margin:0}#mixing-panel .mix-header p{margin:3px 0 8px;color:#d8d4c6;font-size:14px}#mixing-panel .mix-close{width:44px;min-width:44px;min-height:44px;padding:0;font-size:28px;line-height:1}
+#mixing-panel p{font-size:14px;line-height:1.4;margin:8px 0}
 #mixing-panel .mix-recipe{color:#d6d0ba}#mixing-panel .mix-readout{font-size:16px;line-height:1.6;font-variant-numeric:tabular-nums}
-#mixing-panel .mix-tools,#mixing-panel .mix-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0}
-#mixing-panel .mix-tools{grid-template-columns:repeat(5,1fr);gap:4px}
 #mixing-panel button,#mixing-panel select,#mixing-panel input{min-height:40px;padding:8px;border:1px solid #788575;border-radius:6px;background:#34473d;color:#fff8e8;font-size:14px;max-width:100%}
-#mixing-panel button[aria-pressed=true]{background:#efd092;color:#252b24;border-color:#ffe7b6}
 #mixing-panel button:disabled{opacity:.48}#mixing-panel label{font-size:14px;display:flex;align-items:center;justify-content:space-between;gap:8px;margin:6px 0}
 #mixing-panel input{width:82px}#mixing-panel progress{width:100%;height:12px;accent-color:#e5bc71}
-#mixing-panel #mixing-hold{width:100%;min-height:46px;background:#a44435;font-size:16px;touch-action:none}
-#mixing-panel .mix-feedback{min-height:40px;color:#ffe0a2;font-size:14px}#mixing-panel .mix-help{font-size:12px;color:#c5cabb}
+#mixing-panel .mix-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-top:10px}
+#mixing-panel .mix-card{min-width:0;min-height:96px;padding:9px 6px;border:2px solid #64766a;border-radius:13px;background:linear-gradient(#3b5146,#2c3d35);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;box-shadow:inset 0 1px #ffffff1a;touch-action:manipulation;overflow-wrap:anywhere}
+#mixing-panel .mix-card:hover,#mixing-panel .mix-card:focus-visible{border-color:#f2d495;background:#435f50;outline:none}#mixing-panel .mix-card:active{transform:scale(.97);background:#577361}
+#mixing-panel .mix-card strong{font-size:14px;letter-spacing:.03em}#mixing-panel .mix-card small{font-size:12px;line-height:1.2;color:#e6ddc8}
+#mixing-panel .mix-icon{height:38px;display:grid;place-items:center;font-size:32px;line-height:1}.mix-sack-icon{width:34px;border:3px solid #e9dec2;border-radius:5px;color:#222;background:#ddd0ab;font-size:20px;font-weight:900;transform:skew(-3deg)}
+#mixing-panel #mixing-hold{background:linear-gradient(#ad513f,#7f3228);border-color:#ed9e82;touch-action:none}#mixing-panel .mix-work-card{background:linear-gradient(#756038,#55462c);border-color:#d7bd7e}
+#mixing-panel .mix-feedback{min-height:42px;padding:8px 10px;border-radius:8px;background:#18231f;color:#ffe0a2;font-size:14px}#mixing-panel .mix-help{font-size:14px;color:#c5cabb}
 .mixing-active #mortar-panel,.mixing-active #tool-hud,.mixing-active #aim-quick-controls,.mixing-active #tool-quick-controls,.mixing-active #chisel-orientation,.mixing-active #desktop-key-guide{visibility:hidden}
-@media(max-width:700px){#mixing-toggle{top:60px;right:10px;font-size:12px;padding:8px}#mixing-panel{top:102px;left:8px;width:calc(100% - 16px);padding:10px;max-height:285px}#mixing-panel h2{font-size:18px;margin:0 0 4px}#mixing-panel .mix-recipe{font-size:14px}#mixing-panel .mix-tools{grid-template-columns:repeat(5,1fr);margin:6px 0}#mixing-panel button{font-size:12px}#mixing-panel .mix-actions{gap:5px;margin:6px 0}#mixing-panel .mix-readout{font-size:14px;line-height:1.45}#mixing-panel details{margin:2px 0}#mixing-panel label{margin:3px 0}#mixing-panel .mix-feedback{min-height:0}}
-@media(max-height:540px){#mixing-toggle{top:12px;right:170px}#mixing-panel{left:8px;top:70px;width:265px;max-height:calc(100% - 156px);padding:10px}}
+@media(max-width:700px){#mixing-toggle{top:60px;right:10px;font-size:12px;padding:8px}#mixing-panel{top:auto;bottom:8px;left:8px;width:calc(100% - 16px);padding:12px;max-height:68svh}#mixing-panel h2{font-size:20px}#mixing-panel .mix-grid{gap:7px}#mixing-panel .mix-card{min-height:94px}#mixing-panel .mix-readout{font-size:14px;line-height:1.45}#mixing-panel details{margin:4px 0 0}}
+@media(max-height:540px){#mixing-toggle{top:12px;right:170px}#mixing-panel{left:8px;top:8px;bottom:8px;width:430px;max-width:calc(100% - 16px);max-height:none;padding:10px}#mixing-panel .mix-grid{grid-template-columns:repeat(4,minmax(0,1fr))}#mixing-panel .mix-card{min-height:88px}#mixing-panel .mix-feedback{min-height:34px;margin:4px 0}}

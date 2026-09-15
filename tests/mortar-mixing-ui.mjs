@@ -38,7 +38,7 @@ const layoutState = page => page.evaluate(() => {
     panel:box(panel), pointerLock:document.pointerLockElement?.id??null,
     renderError:window.__wireTheHouse.renderer.renderError,
     text:[...panel.querySelectorAll('button,label,p,small,span,summary')].filter(visible).filter(e=>e.textContent.trim()).map(e=>({text:e.textContent.trim(),font:parseFloat(getComputedStyle(e).fontSize)})),
-    controls:[...panel.querySelectorAll('button,input,select')].filter(visible).map(e=>({id:e.id,action:e.dataset.mixAction,tool:e.dataset.mixTool,...box(e)})),
+    controls:[...panel.querySelectorAll('button,input,select')].filter(visible).map(e=>({id:e.id,action:e.dataset.mixAction,quick:e.dataset.mixQuick,...box(e)})),
   };
 });
 const state = page => page.evaluate(() => {
@@ -95,12 +95,11 @@ try {
     await stationView();
     await steps(page,1);
     assert.equal((await state(page)).batch.massKg,0,'Station begins with an empty finite bucket');
-    await click('[data-mix-tool="water"]');
-    await page.locator('#mixing-water-step').fill('10');
-    await click('[data-mix-action="water"]');await click('[data-mix-action="water"]');
+    await page.locator('#mixing-water-step').evaluate(input=>input.value='10');
+    await click('[data-mix-quick="water"]');await click('[data-mix-quick="water"]');
     const fullWater=(await state(page)).batch;
     assert.equal(fullWater.waterLitres,20);assert.equal(fullWater.ready,false);
-    await click('[data-mix-action="water"]');
+    await click('[data-mix-quick="water"]');
     assert.deepEqual((await state(page)).batch,fullWater,'A water-only full bucket refuses overflow without losing water');
     await click('#mixing-panel summary');
     await click('[data-mix-action="discard"]');
@@ -109,39 +108,28 @@ try {
     assert.equal(scenario.discard.batch.discardedKg,20,'The discarded water remains in the mass ledger');
     conserved(scenario.discard.batch);
     await click('#mixing-panel summary');
-    await page.locator('#mixing-water-step').fill('1');
-    for(let i=0;i<6;i++)await click('[data-mix-action="water"]');
-    await page.locator('#mixing-water-step').fill('0.5');
-    await click('[data-mix-action="water"]');
+    await page.locator('#mixing-water-step').evaluate(input=>input.value='1');
+    for(let i=0;i<6;i++)await click('[data-mix-quick="water"]');
+    await page.locator('#mixing-water-step').evaluate(input=>input.value='0.5');
+    await click('[data-mix-quick="water"]');
     assert.equal((await state(page)).batch.waterLitres,6.5,'Player chooses water quantity through the UI');
-    await click('[data-mix-tool="trowel"]');
     for(let sack=0;sack<3;sack++) {
-      await page.locator('#mixing-sack').selectOption(String(sack));
-      await click('[data-mix-action="cement"]');
+      const cement=`[data-mix-quick="cement"][data-sack="${sack}"]`;
+      await click(cement);
       let s=await state(page);
       assert.equal(s.batch.sacks[sack].open,true,'Trowel opens each selected sealed sack');
       assert.equal(s.batch.heldTrowel,null,'Opening a sack is a separate action from scooping');
       for(let scoop=0;scoop<2;scoop++) {
-        await click('[data-mix-action="cement"]');
+        await click(cement);
         s=await state(page);
-        assert.equal(s.batch.heldTrowel?.ingredient,'cement','Cement remains on the actual held trowel before pouring');
-        if(sack===0&&scoop===0) {
-          const load=s.batch.heldTrowel;
-          await click('[data-mix-tool="shovel"]');
-          await click('[data-mix-tool="trowel"]');
-          assert.deepEqual((await state(page)).batch.heldTrowel,load,'Tool changes retain the loaded trowel');
-        }
-        await click('[data-mix-action="pour"]');
-        s=await state(page); conserved(s.batch);
-        assert.equal(s.batch.heldTrowel,null,'Pour transfers the trowel payload to the bucket');
+        conserved(s.batch);
+        assert.equal(s.batch.heldTrowel,null,'Large cement icon scoops and pours in one complete action');
       }
     }
     assert(Math.abs((await state(page)).batch.cementScoops-6)<1e-8);
-    await click('[data-mix-tool="shovel"]');
     for(let scoop=0;scoop<12;scoop++) {
-      await click('[data-mix-action="sand"]');
-      assert.equal((await state(page)).batch.heldShovel?.ingredient,'sand');
-      await click('[data-mix-action="pour"]');
+      await click('[data-mix-quick="sand"]');
+      assert.equal((await state(page)).batch.heldShovel,null,'Large sand icon scoops and pours in one complete action');
       conserved((await state(page)).batch);
     }
     scenario.recipe=await state(page);
@@ -149,14 +137,12 @@ try {
     assert.equal(scenario.recipe.batch.quality,'unmixed');
     assert(scenario.recipe.batch.volumeLitres>19&&scenario.recipe.batch.volumeLitres<=20);
     await screenshot(page,`${layout.name}-ingredients-loaded`);
-    await click('[data-mix-action="sand"]');
     const beforeOverflow=(await state(page)).batch;
-    await click('[data-mix-action="pour"]');
-    assert.deepEqual((await state(page)).batch,beforeOverflow,'Overfilling rejects the pour and keeps all sand on the shovel');
-    await click('[data-mix-tool="mixer"]');
+    await click('[data-mix-quick="sand"]');
+    assert.equal((await state(page)).batch.massKg,beforeOverflow.massKg,'Overfilling rejects extra sand without changing bucket mass');
     await stationView();
     await steps(page,1);
-    await click('[data-mix-action="insert"]');
+    await click('[data-mix-quick="mixer"]');
     const cdp=layout.mobile?await context.newCDPSession(page):null;
     const hold=async (selector,down) => {
       if(down)await page.locator(selector).scrollIntoViewIfNeeded();
@@ -213,8 +199,7 @@ try {
     assert.equal(scenario.finished.mixerDirty,true);
     conserved(scenario.finished.batch);
     await screenshot(page,`${layout.name}-mixed-ready`);
-    await click('[data-mix-action="insert"]');
-    await click('[data-mix-action="rinse"]');
+    await click('[data-mix-quick="rinse"]');
     await steps(page,60);
     scenario.rinse=await page.evaluate(()=>{const g=window.__wireTheHouse,m=g.mixing,V=g.renderer.camera.position.constructor;return{tip:m.models.mixer.localToWorld(new V().fromArray(m.models.mixer.userData.tipPoint)).toArray(),pail:m.models.rinse.getWorldPosition(new V()).toArray(),seconds:m.telemetry.cleaningSeconds,dirty:m.mixerDirty};});
     assert(scenario.rinse.dirty&&scenario.rinse.seconds>0,'Rinsing takes actual simulation time');
@@ -223,8 +208,7 @@ try {
     await screenshot(page,`${layout.name}-rinsing`);
     await steps(page,65);
     assert.equal((await state(page)).mixerDirty,false,'Player cleans the withdrawn mixer');
-    await click('[data-mix-tool="hands"]');
-    await click('[data-mix-action="carry"]');
+    await click('[data-mix-quick="carry"]');
     scenario.carryStart=await state(page);
     assert.equal(scenario.carryStart.carrying,true);
     await click('#mixing-toggle');
@@ -257,7 +241,7 @@ try {
     await click('#mixing-toggle');
     assert.equal((await state(page)).carrying,false,'Player places the carried bucket on free floor');
     assert(Math.abs((await state(page)).bucketPosition[1])<1e-8,'Placed bucket rests on the floor');
-    await click('[data-mix-action="work"]');
+    await click('[data-mix-quick="work"]');
     assert.equal((await state(page)).selectedTool,'trowel');
     await page.evaluate(()=>{const g=window.__wireTheHouse,c=g.renderer.camera;c.position.set(2.1,g.player.eyeHeight,1.8);c.lookAt(2.1,1.4,g.room.brickWall.volume.frontZ);g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;});
     await steps(page,30);

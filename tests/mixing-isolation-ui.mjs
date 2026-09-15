@@ -30,11 +30,11 @@ try{
     await page.screenshot({path:`${out}/${layout.name}-station-ready.png`});
     if(layout.mobile){assert.equal((await state()).interactVisible,true);await page.locator('#mobile-interact').tap();}else await page.keyboard.press('KeyE');
     await step(2);const opened=await state();assert.equal(opened.active,true,'Only contextual INTERACT opens the station');assert(near(opened.camera,initial.camera),'Opening station must not teleport the camera');
-    await page.locator('[data-mix-tool="trowel"]').click();await step();await page.locator('[data-mix-action="cement"]').click();await step();
+    await page.locator('[data-mix-quick="cement"][data-sack="0"]').click();await step();
     const mixingTrowel=await state();assert.equal(mixingTrowel.mixTool,'trowel');assert.equal(mixingTrowel.batch.sacks[0].open,true);assert(near(mixingTrowel.camera,initial.camera),'Mixing trowel animation must not move the player');
-    await page.locator('[data-mix-tool="mixer"]').click();await step();await page.locator('[data-mix-action="insert"]').click();await step();
+    await page.locator('[data-mix-quick="mixer"]').click();await step();
     const inserted=await state();assert.equal(inserted.active,true);assert(near(inserted.camera,initial.camera),'Inserting mixer must not teleport or lock the player');
-    if(layout.mobile)await page.locator('[data-tool="trowel"]').tap();else await page.keyboard.press('Digit7');
+    await page.locator('[data-mix-quick="work"]')[layout.mobile?'tap':'click']();
     await step();const wallMode=await state();assert.equal(wallMode.active,false);assert.equal(wallMode.selected,'trowel');assert(near(wallMode.camera,initial.camera),'Selecting wall trowel must not move back to the station');
     await page.evaluate(()=>{const g=window.__wireTheHouse,c=g.renderer.camera;c.position.set(0,g.player.eyeHeight,g.room.brickWall.volume.frontZ+.72);c.lookAt(0,1.35,g.room.brickWall.volume.frontZ);g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;});await step();
     const beforeWall=await state();

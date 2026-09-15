@@ -11,6 +11,9 @@ Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web gam
 
 ## Current
 
+- Mixing-station usability repair after physical feedback that its tool/action matrix appeared dead: replaced the small two-stage buttons and sack selector with nine 94–100 px icon cards for water, each cement sack, sand, mixer, rinse, bucket and wall return. Cement and sand now perform scoop + bucket pour in one press; a sealed sack clearly changes from “Άνοιξε σακούλα” to “+1 μιστριά στη σύκλα”, and the inserted mixer reveals a dedicated large hold surface.
+- Desktop, 390×844 portrait and 844×390 landscape preparation flows now exercise real icon presses through water, all three sacks, sand, mixer hold/release, rinse, carry/drop and native wall-mortar use. Focused isolation QA confirms the station still opens only through desktop E/mobile INTERACT and that returning to the wall neither teleports nor reactivates station animations. Screenshots were inspected; the landscape grid was corrected from five compressed columns to four readable columns.
+
 - Mixing-station isolation follow-up: room expanded from 6×5 m to 7.6×7.2 m and the full sand/cement/water/bucket/shovel/mixer bay moved to the rear perimeter, over 4.5 m behind the installation wall.
 - Desktop `E` and a new dedicated mobile `INTERACT` input now own all station activation/use. Ordinary LMB/mobile `USE + AIM` cannot open or operate the station; legacy desktop E remains an alternate wall-tool input only when the station does not claim the interaction.
 - Removed every mixing camera teleport (first station visit, mixer insertion and rinse). Walking away auto-closes mixing mode, and selecting any regular tool closes it immediately. The station's `Μιστρί μίξης` is explicitly separate from the regular wall `TROWEL`.
