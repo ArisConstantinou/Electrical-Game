@@ -64,7 +64,6 @@ export class MixingStation {
   private activitySack=0;
   private wasHeldInteraction=false;
   private finished=false;
-  private toolbarSelection=false;
   private pendingTool:MixingTool|null=null;
   private mixerApproach:{object:THREE.Object3D;from:THREE.Vector3;to:THREE.Vector3;elapsed:number;yaw:number;pitch:number}|null=null;
   private mixerControlHint='ΒΑΛΕ ΤΟ ΜΙΞΕΡ';
@@ -98,6 +97,8 @@ export class MixingStation {
     this.finish=document.createElement('button');this.finish.id='mixing-finish';this.finish.type='button';this.finish.innerHTML='<b>FINISH</b><small>Ο ΠΥΛΟΣ ΕΙΝΑΙ ΕΤΟΙΜΟΣ</small>';this.finish.hidden=true;
     this.toolbelt=document.createElement('nav');this.toolbelt.id='mixing-toolbelt';this.toolbelt.setAttribute('aria-label','Εργαλεία παρασκευής πυλού');this.toolbelt.hidden=true;
     this.toolbelt.innerHTML='<button type="button" data-mix-equip="water"><b>💧</b><span>ΝΕΡΟ</span></button><button type="button" data-mix-equip="trowel"><b>◢</b><span>ΜΙΣΤΡΙ ΜΙΞΗΣ</span></button><button type="button" data-mix-equip="shovel"><b>♠</b><span>ΦΤΥΑΡΙ</span></button><button type="button" data-mix-equip="mixer"><b>⚙</b><span>ΜΙΞΕΡ</span></button>';
+    this.toolbelt.insertAdjacentHTML('beforeend','<button type="button" id="mixing-put-down" aria-label="Άφησε το εργαλείο"><b>↓</b><span>ΑΦΗΣΕ</span></button>');
+    this.toolbelt.querySelector('#mixing-put-down')!.addEventListener('click',()=>this.chooseTool('hands'));
     this.toolbelt.insertAdjacentHTML('beforeend','<button type="button" id="mixing-stance" aria-label="Σκύψε για εργασία στη σύκλα" aria-pressed="false"><b>↧</b><span>ΣΚΥΨΕ</span></button>');
     this.toolbelt.querySelector('#mixing-stance')!.addEventListener('click',()=>window.dispatchEvent(new CustomEvent('wirehouse:work-height')));
     game.hud.shell.append(this.toggle,this.panel,this.prompt,this.finish,this.toolbelt);
@@ -111,10 +112,7 @@ export class MixingStation {
       const selected=button.dataset.mixEquip as MixingTool;
       const next=this.active&&(this.pendingTool??this.tool)===selected?'hands':selected;
       if(!this.active)this.setActive(true);
-      // Finish the finite deposit first, then honour the last toolbar request.
-      // Dropping clicks during the pour made the jug appear stuck in the hand.
-      if(this.activity){this.pendingTool=next;return;}
-      this.chooseTool(next,true);
+      this.chooseTool(next);
     });
     addEventListener('blur',()=>this.stop());document.addEventListener('visibilitychange',()=>{if(document.hidden)this.stop();});
   }
@@ -130,10 +128,13 @@ export class MixingStation {
     this.panel.hidden=!value;this.game.hud.shell.classList.toggle('mixing-active',value);this.uiKey='';
   }
   private stop():void{this.mixingNow=false;this.mixerApproach=null;}
-  chooseTool(tool:MixingTool,fromToolbar=false):void{
+  chooseTool(tool:MixingTool):void{
     if(this.carrying&&tool!=='hands'){this.message='Άφησε πρώτα τη σύκλα στο δάπεδο.';return;}
+    // World pickups and toolbar actions both finish the current finite deposit,
+    // then apply the last explicit selection without starting another scoop.
+    if(this.activity){this.pendingTool=tool;this.game.input.resetTransientInput();return;}
     if(tool!=='mixer'){this.inserted=false;this.cleanSeconds=0;}
-    this.pendingTool=null;this.tool=tool;this.toolbarSelection=fromToolbar;this.stop();this.game.input.resetTransientInput();
+    this.pendingTool=null;this.tool=tool;this.stop();this.game.input.resetTransientInput();
     this.message=tool==='hands'?'Άφησες το εργαλείο στη θέση του. Διάλεξε το επόμενο.':`${names[tool]} στα χέρια. Τα υλικά που έχεις πάρει παραμένουν στο εργαλείο τους.`;
   }
   private bucketPosition():THREE.Vector3{return this.models.bucket.getWorldPosition(new THREE.Vector3());}
@@ -208,13 +209,15 @@ export class MixingStation {
     return Boolean(this.aimedObject());
   }
   handleInteractionRequest(requested:boolean):boolean{
-    if(!requested||this.activity)return false;
+    if(!requested)return false;
     const target=this.aimedObject();
     if(!target){
       if(this.active){this.message=this.guidanceForTool();return true;}
       return false;
     }
     if(!this.active)this.setActive(true);
+    // Keep ingredient strokes atomic, but never discard a visible tool pickup.
+    if(this.activity&&!['water','trowel','shovel','mixer'].includes(target.kind))return true;
     const handled=this.useAimedObject(target);
     return handled;
   }
@@ -241,7 +244,9 @@ export class MixingStation {
   private aimedObject():StationTarget|null{
     if(!this.game.started||this.carrying)return null;
     const m=this.models,c=this.game.renderer.camera;m.group.updateMatrixWorld(true);
-    const preferred=this.preferredTarget();if(this.toolbarSelection&&preferred&&this.targetInWorkCone(preferred))return preferred;
+    // The exact visible object always wins. The forgiving cone is only a
+    // fallback for empty space, never permission to work on a different object.
+    const preferred=this.preferredTarget();
     this.ray.setFromCamera(new THREE.Vector2(),c);
     const roots=[m.bucket,m.sand,...m.sacks,m.rinse,m.water,m.mixer,m.shovel,this.stationTrowel].filter(object=>object.visible);
     const hit=this.ray.intersectObjects(roots,true)[0];if(!hit||hit.distance>3.2)return preferred&&this.targetInWorkCone(preferred)?preferred:null;
@@ -341,7 +346,7 @@ export class MixingStation {
     if(this.activity&&this.pendingTool!==null)return this.pendingTool==='hands'?'ΟΛΟΚΛΗΡΩΝΕΤΑΙ Η ΚΙΝΗΣΗ · ΑΦΗΝΕΙΣ ΤΟ ΕΡΓΑΛΕΙΟ':`ΟΛΟΚΛΗΡΩΝΕΤΑΙ Η ΚΙΝΗΣΗ · ΜΕΤΑ ${names[this.pendingTool]}`;
     if(!target)return this.active?`${matchMedia('(any-pointer: coarse)').matches?'INTERACT':'E'} · ${this.guidanceForTool()}`:'';
     const key=matchMedia('(any-pointer: coarse)').matches?'INTERACT':'E';
-    if(target.kind==='water')return`${key} · ΓΕΜΙΣΕ ΝΕΡΟ ΣΤΟ ⅓`;
+    if(target.kind==='water')return`${key} · ΠΙΑΣΕ ΚΑΝΑΤΑ ΝΕΡΟΥ`;
     if(target.kind==='trowel')return`${key} · ΠΙΑΣΕ ΜΙΣΤΡΙ ΜΙΞΗΣ`;
     if(target.kind==='shovel')return`${key} · ΠΙΑΣΕ ΦΤΥΑΡΙ`;
     if(target.kind==='mixer')return`${key} · ΠΙΑΣΕ ΜΙΞΕΡ`;
@@ -369,7 +374,7 @@ export class MixingStation {
     dt=Number.isFinite(dt)?Math.min(.05,Math.max(0,dt)):0;
     this.updateMixerApproach(dt);
     this.updateActivity(dt);
-    if(!this.activity&&this.pendingTool!==null)this.chooseTool(this.pendingTool,true);
+    if(!this.activity&&this.pendingTool!==null)this.chooseTool(this.pendingTool);
     this.elapsed+=dt;this.pouringTime=Math.max(0,this.pouringTime-dt);
     const station=this.models.group.getWorldPosition(this.stationPoint),camera=this.game.renderer.camera.position;
     const distance=Math.hypot(station.x-camera.x,station.z-camera.z);
@@ -443,11 +448,14 @@ export class MixingStation {
     // The removed recipe panel needs no per-percent DOM refresh. Updating its
     // controls through 100 progress values caused needless mobile repaints
     // beside a continuously held INTERACT pointer.
-    const key=JSON.stringify([this.active,this.tool,this.carrying,this.inserted,this.mixerDirty,this.finished,this.activity,this.message,this.game.player.crouched,b.volumeLitres,b.waterLitres,b.cementScoops,b.sandScoops,b.quality,Boolean(state.heldTrowel),Boolean(state.heldShovel)]);
+    const key=JSON.stringify([this.active,this.tool,this.pendingTool,this.carrying,this.inserted,this.mixerDirty,this.finished,this.activity,this.message,this.game.player.crouched,b.volumeLitres,b.waterLitres,b.cementScoops,b.sandScoops,b.quality,Boolean(state.heldTrowel),Boolean(state.heldShovel)]);
     if(key===this.uiKey)return;this.uiKey=key;
     this.readout.innerHTML=`<b>${b.waterLitres.toFixed(1)} L</b> νερό · <b>${b.cementScoops.toFixed(0)}</b> μιστριές · <b>${b.sandScoops.toFixed(0)}</b> φτυαριές<br><b>${b.volumeLitres.toFixed(1)} / 20 L</b> · Ανάμιξη <b>${Math.round(b.mixProgress*100)}%</b><br><span class="mix-help">${qualityNames[b.quality]}</span>`;
     this.meter.value=b.mixProgress;this.feedback.textContent=this.message;
     this.finish.hidden=!b.ready||this.inserted||this.finished;
+    const putDown=this.toolbelt.querySelector<HTMLButtonElement>('#mixing-put-down')!;
+    putDown.disabled=!this.active||this.carrying||(this.pendingTool??this.tool)==='hands';
+    putDown.setAttribute('aria-label',this.pendingTool==='hands'?'Αφήνεις το εργαλείο μετά την κίνηση':`Άφησε ${names[this.pendingTool??this.tool]}`);
     const stance=this.toolbelt.querySelector<HTMLButtonElement>('#mixing-stance')!,crouched=this.game.player.crouched;
     if(stance.getAttribute('aria-pressed')!==String(crouched)){stance.setAttribute('aria-pressed',String(crouched));stance.setAttribute('aria-label',crouched?'Σήκω όρθιος':'Σκύψε για εργασία στη σύκλα');stance.querySelector('b')!.textContent=crouched?'↥':'↧';stance.querySelector('span')!.textContent=crouched?'ΣΗΚΩ':'ΣΚΥΨΕ';}
     this.toolbelt.querySelectorAll<HTMLButtonElement>('[data-mix-equip]').forEach(button=>{
@@ -521,5 +529,5 @@ export class MixingStation {
     }
   }
   get mixerRunning():boolean{return this.mixingNow;}
-  get telemetry(){return{active:this.active,tool:this.tool,approaching:Boolean(this.mixerApproach),approachTarget:this.mixerApproach?(this.mixerApproach.object===this.models.bucket?'bucket':'rinse'):null,carrying:this.carrying,customSupply:this.customSupply,finished:this.finished,activity:this.activity,activityProgress:this.activity?this.activityTime/(this.activity==='tear'?.85:this.activity==='water'?1.35:1.55):0,inserted:this.inserted,mixerDirty:this.mixerDirty,mixing:this.mixingNow,cleaningSeconds:this.cleanSeconds,bucketPosition:this.bucketPosition().toArray(),heldToolVisible:this.heldTools.get(this.tool)?.visible??false,aimedTarget:this.aimedObject()?.kind??null,batch:this.batch.getState(),hint:this.message};}
+  get telemetry(){return{active:this.active,tool:this.tool,pendingTool:this.pendingTool,approaching:Boolean(this.mixerApproach),approachTarget:this.mixerApproach?(this.mixerApproach.object===this.models.bucket?'bucket':'rinse'):null,carrying:this.carrying,customSupply:this.customSupply,finished:this.finished,activity:this.activity,activityProgress:this.activity?this.activityTime/(this.activity==='tear'?.85:this.activity==='water'?1.35:1.55):0,inserted:this.inserted,mixerDirty:this.mixerDirty,mixing:this.mixingNow,cleaningSeconds:this.cleanSeconds,bucketPosition:this.bucketPosition().toArray(),heldToolVisible:this.heldTools.get(this.tool)?.visible??false,aimedTarget:this.aimedObject()?.kind??null,batch:this.batch.getState(),hint:this.message};}
 }

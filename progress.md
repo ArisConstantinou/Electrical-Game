@@ -1,5 +1,13 @@
 Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web game named WIRE THE HOUSE, based on real Cyprus residential first-fix practices, editable in Web Game Studio, playable on desktop/mobile, deployed to arisconstantinou/Electrical-Game via GitHub Pages, and ending at FIRST FIX COMPLETE without cable pulling.
 
+## 2026-09-15 · World shovel pickup and explicit jug put-down
+
+- User reports aiming at the shovel keeps adding cement, and the water jug cannot be put down. Reproduced against committed source `7fa74e9` using browser module routing without changing the checkout: in desktop, portrait and landscape, a direct shovel ray hit inside the trowel's material cone resolves to the sack, retains the trowel and adds cement from 1 to 2 scoops.
+- Exact visible object hits now precede the forgiving material fallback. World pickups and toolbar selections share a last-request queue during finite ingredient strokes; the ongoing dose finishes once, then the requested tool is equipped. Added a dedicated accessible `↓ ΑΦΗΣΕ` button, retaining the existing selected-tool toggle. Corrected jug pickup wording and updated the stale preparation guide.
+- Focused native browser regression verifies shovel pickup without extra cement, actual sand scooping, world pickups during cement/water strokes, and jug put-down during/after pouring. Tests use camera/time fixtures and real mouse/keyboard/touch events; mobile evidence is Chromium emulation, with physical iPhone/Safari still unverified.
+- Existing full preparation/FINISH/native wall throw, mixer grip/reach, standing mixer workflow, USE/INTERACT recovery, finite batch/supply and queued work tests pass. Typecheck/build pass; production startup verifies unmodified compiled WebGPU/WebGL hammer/hose. The bundled browser client runs with Pointer Lock blocked and closes its owned processes. Visual review caught and shortened an overflowing portrait drop label to `ΑΦΗΣΕ` at 12px.
+- Existing `artifacts/` is preserved. Reuse the verified Vite server at http://127.0.0.1:5362/Electrical-Game/. Scoped commit/push and public asset verification follow final screenshot/bounds checks.
+
 ## Completed
 
 - GitHub repository created and remote connected.
