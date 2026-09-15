@@ -31,13 +31,13 @@ try{
       if(tool==='mixer'){
         const inserted=await page.evaluate(()=>{
           const g=window.__wireTheHouse,m=g.mixing,c=g.renderer.camera;
-          const rejected=!m.action('insert');
-          m.useAimedObject({kind:'bucket',object:m.models.bucket});const aimedRejected=!m.inserted;
+          const acceptedRequest=m.action('insert');const pending=Boolean(m.mixerApproach)&&!m.inserted;m.chooseTool('mixer');
+          m.useAimedObject({kind:'bucket',object:m.models.bucket});const aimedPending=Boolean(m.mixerApproach)&&!m.inserted;m.chooseTool('mixer');
           g.player.crouched=true;c.position.set(-.75,.95,1.88);c.lookAt(-.75,.3,2.28);c.updateMatrixWorld(true);
           const accepted=m.action('insert');m.present();
-          return{rejected,aimedRejected,accepted,hands:m.arms.map(a=>({reach:a.shoulder.distanceTo(a.wrist),forearm:a.elbow.distanceTo(a.wrist)}))};
+          return{acceptedRequest,pending,aimedPending,accepted,hands:m.arms.map(a=>({reach:a.shoulder.distanceTo(a.wrist),forearm:a.elbow.distanceTo(a.wrist)}))};
         });
-        assert(inserted.rejected&&inserted.aimedRejected,'Both insertion paths reject unreachable standing work');
+        assert(inserted.acceptedRequest&&inserted.pending&&inserted.aimedPending,'Both paths prepare the stance before seating unreachable mixer');
         assert(inserted.accepted,'A crouched worker beside the bucket can insert the mixer');
         assert(inserted.hands.every(hand=>hand.reach<.57&&Math.abs(hand.forearm-.27)<.001),'Inserted mixer keeps both forearms connected');
         await shot('mixer-inserted');

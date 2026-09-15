@@ -22,7 +22,7 @@ export class MixingReceipt {
     shell.append(this.panel);
   }
 
-  update(batch: MortarBatch, visible: boolean, dt: number): void {
+  update(batch: MortarBatch, visible: boolean, dt: number, context?:string): void {
     const values = [batch.waterLitres, batch.cementScoops, batch.sandScoops];
     this.remaining = Math.max(0, this.remaining - dt);
     const additions: string[] = [];
@@ -45,7 +45,7 @@ export class MixingReceipt {
     const labels = [`${this.number.format(values[0])} L`,
       `${this.number.format(values[1])} ${Math.abs(values[1] - 1) < 1e-6 ? 'μιστριά' : 'μιστριές'}`,
       `${this.number.format(values[2])} ${Math.abs(values[2] - 1) < 1e-6 ? 'φτυαριά' : 'φτυαριές'}`];
-    const status = this.remaining > 0 ? this.message : batch.ready ? 'Έτοιμο · η ανάμιξη ολοκληρώθηκε' : 'Οι ποσότητες ενημερώνονται όταν αδειάσεις το εργαλείο.';
+    const status = this.remaining > 0 ? this.message : context ?? (batch.ready ? 'Έτοιμο · η ανάμιξη ολοκληρώθηκε' : 'Οι ποσότητες ενημερώνονται όταν αδειάσεις το εργαλείο.');
     const key = JSON.stringify([...labels, status, this.remaining > 0]);
     if (key === this.key) return;
     this.key = key;
