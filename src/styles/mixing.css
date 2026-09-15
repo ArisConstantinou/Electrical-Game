@@ -1,4 +1,5 @@
 #mixing-toggle{display:none!important}
+.mixing-active #mobile-use-status{max-width:100%}
 #mixing-receipt{position:absolute;z-index:12;left:22px;top:145px;width:310px;max-width:calc(100% - 44px);padding:11px 13px;border:1px solid #928368;border-left:3px solid #b99a69;border-radius:7px;background:rgba(26,29,25,.9);color:#f2eee4;pointer-events:none;font:400 14px/1.35 Arial,sans-serif}
 #mixing-receipt[hidden]{display:none}
 #mixing-receipt .mix-receipt-title{font-size:12px;letter-spacing:.08em;color:#d9c9aa}

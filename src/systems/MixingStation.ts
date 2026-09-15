@@ -64,6 +64,7 @@ export class MixingStation {
   private wasHeldInteraction=false;
   private finished=false;
   private toolbarSelection=false;
+  private pendingTool:MixingTool|null=null;
   onSound?:(kind:'water-pour'|'sack-tear'|'cement-scrape'|'sand-scoop'|'mixer-insert'|'mixer-rinse',intensity?:number)=>void;
 
   constructor(private readonly game:Game){
@@ -80,6 +81,7 @@ export class MixingStation {
     this.heldTools.forEach((model,key)=>{this.held.add(model);model.visible=false;
       this.toolHands.set(key,[1,-1].map(side=>workerHand(side,key==='trowel'?(side===1?'trowel':'relaxed'):'hose')));
     });
+    this.toolHands.set('hands',[1,-1].map(side=>workerHand(side,'relaxed')));
     this.stationTrowel=buildToolModel('trowel');this.stationTrowel.name='mixing-station-trowel';this.stationTrowel.userData.studioEntityId='mixing:trowel';this.stationTrowel.position.set(.22,.13,.28);this.stationTrowel.rotation.set(.18,0,-1.18);m.group.add(this.stationTrowel);
     const particles=new THREE.BufferGeometry();particles.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(48),3));
     this.pouring=new THREE.Points(particles,new THREE.PointsMaterial({color:0xbda77e,size:.018,transparent:true,opacity:.85}));this.pouring.visible=false;game.renderer.scene.add(this.pouring);
@@ -101,7 +103,16 @@ export class MixingStation {
     this.panel.addEventListener('pointerdown',event=>event.stopPropagation());
     this.finish.addEventListener('click',()=>this.finishBatch());
     this.toolbelt.addEventListener('pointerdown',event=>event.stopPropagation());
-    this.toolbelt.addEventListener('click',event=>{const button=(event.target as HTMLElement).closest<HTMLButtonElement>('[data-mix-equip]');if(!button||this.activity)return;if(!this.active)this.setActive(true);this.chooseTool(button.dataset.mixEquip as MixingTool,true);});
+    this.toolbelt.addEventListener('click',event=>{
+      const button=(event.target as HTMLElement).closest<HTMLButtonElement>('[data-mix-equip]');if(!button)return;
+      const selected=button.dataset.mixEquip as MixingTool;
+      const next=this.active&&(this.pendingTool??this.tool)===selected?'hands':selected;
+      if(!this.active)this.setActive(true);
+      // Finish the finite deposit first, then honour the last toolbar request.
+      // Dropping clicks during the pour made the jug appear stuck in the hand.
+      if(this.activity){this.pendingTool=next;return;}
+      this.chooseTool(next,true);
+    });
     addEventListener('blur',()=>this.stop());document.addEventListener('visibilitychange',()=>{if(document.hidden)this.stop();});
   }
   get blocksWork():boolean{return this.active||this.carrying;}
@@ -118,8 +129,9 @@ export class MixingStation {
   private stop():void{this.mixingNow=false;}
   chooseTool(tool:MixingTool,fromToolbar=false):void{
     if(this.carrying&&tool!=='hands'){this.message='Άφησε πρώτα τη σύκλα στο δάπεδο.';return;}
-    if(this.inserted&&tool!=='mixer'){this.message='Βγάλε πρώτα το μίκσερ από τη σύκλα.';return;}
-    this.tool=tool;this.toolbarSelection=fromToolbar;this.stop();this.game.input.resetTransientInput();this.message=`${names[tool]} στα χέρια. Τα υλικά που έχεις πάρει παραμένουν στο εργαλείο τους.`;
+    if(tool!=='mixer'){this.inserted=false;this.cleanSeconds=0;}
+    this.pendingTool=null;this.tool=tool;this.toolbarSelection=fromToolbar;this.stop();this.game.input.resetTransientInput();
+    this.message=tool==='hands'?'Άφησες το εργαλείο στη θέση του. Διάλεξε το επόμενο.':`${names[tool]} στα χέρια. Τα υλικά που έχεις πάρει παραμένουν στο εργαλείο τους.`;
   }
   private bucketPosition():THREE.Vector3{return this.models.bucket.getWorldPosition(new THREE.Vector3());}
   private near(object:THREE.Object3D,range=2.2):boolean{
@@ -185,7 +197,10 @@ export class MixingStation {
     const hit=this.ray.intersectObjects(roots,true)[0];if(!hit||hit.distance>3.2)return preferred&&this.targetInWorkCone(preferred)?preferred:null;
     const belongs=(root:THREE.Object3D)=>{let object:THREE.Object3D|null=hit.object;while(object){if(object===root)return true;object=object.parent;}return false;};
     const sack=m.sacks.findIndex(belongs);if(sack>=0)return{kind:'sack',index:sack,object:m.sacks[sack]};
-    for(const [kind,object] of [['water',m.water],['trowel',this.stationTrowel],['shovel',m.shovel],['mixer',m.mixer],['bucket',m.bucket],['sand',m.sand],['rinse',m.rinse]] as const)if(belongs(object))return{kind,object};
+    for(const [kind,object] of [['water',m.water],['trowel',this.stationTrowel],['shovel',m.shovel],['mixer',m.mixer],['bucket',m.bucket],['sand',m.sand],['rinse',m.rinse]] as const)if(belongs(object)){
+      if(kind==='mixer'&&this.inserted)return{kind:'bucket',object:m.bucket};
+      return{kind,object};
+    }
     return null;
   }
   private beginActivity(activity:Exclude<Activity,null>,object:THREE.Object3D,sackIndex=0):boolean{
@@ -273,6 +288,7 @@ export class MixingStation {
   }
   get bondFactor():number{return this.batch.quality==='balanced'?1:this.batch.quality==='wet'?.45:this.batch.quality==='dry'?.55:.65;}
   private promptFor(target:StationTarget|null):string{
+    if(this.activity&&this.pendingTool!==null)return this.pendingTool==='hands'?'ΟΛΟΚΛΗΡΩΝΕΤΑΙ Η ΚΙΝΗΣΗ · ΑΦΗΝΕΙΣ ΤΟ ΕΡΓΑΛΕΙΟ':`ΟΛΟΚΛΗΡΩΝΕΤΑΙ Η ΚΙΝΗΣΗ · ΜΕΤΑ ${names[this.pendingTool]}`;
     if(!target)return this.active?`${matchMedia('(any-pointer: coarse)').matches?'INTERACT':'E'} · ${this.guidanceForTool()}`:'';
     const key=matchMedia('(any-pointer: coarse)').matches?'INTERACT':'E';
     if(target.kind==='water')return`${key} · ΓΕΜΙΣΕ ΝΕΡΟ ΣΤΟ ⅓`;
@@ -302,6 +318,7 @@ export class MixingStation {
   update(dt:number,requested:boolean,heldInteraction:boolean):void{
     dt=Number.isFinite(dt)?Math.min(.05,Math.max(0,dt)):0;
     this.updateActivity(dt);
+    if(!this.activity&&this.pendingTool!==null)this.chooseTool(this.pendingTool,true);
     this.elapsed+=dt;this.pouringTime=Math.max(0,this.pouringTime-dt);
     const station=this.models.group.getWorldPosition(this.stationPoint),camera=this.game.renderer.camera.position;
     const distance=Math.hypot(station.x-camera.x,station.z-camera.z);
@@ -364,7 +381,7 @@ export class MixingStation {
     else{m.mixer.position.copy(this.mixerHome);m.mixer.rotation.copy(this.mixerRotation);}
     m.mixer.visible=this.inserted||this.cleanSeconds>0||this.tool!=='mixer'||!this.active;m.shovel.visible=this.tool!=='shovel'||!this.active;
     this.game.fpsRig.visible=!this.blocksWork;
-    if(this.blocksWork)this.game.hud.updateMobileUseStatus(this.carrying?'ΑΦΗΣΕ ΤΗ ΣΥΚΛΑ':this.tool==='mixer'?(this.mixingNow?'ΑΝΑΚΑΤΕΜΑ':'ΚΡΑΤΑ ΓΙΑ ΑΝΑΜΙΞΗ'):'ΧΡΗΣΗ ΣΤΟΝ ΣΤΑΘΜΟ',true,this.mixingNow);
+    if(this.blocksWork)this.game.hud.updateMobileUseStatus(this.carrying?'ΑΦΗΣΕ ΤΗ ΣΥΚΛΑ':this.tool==='hands'?'ΠΙΑΣΕ ΕΡΓΑΛΕΙΟ':this.tool==='mixer'?(this.mixingNow?'ΑΝΑΚΑΤΕΜΑ':this.inserted?'ΚΡΑΤΑ ΓΙΑ ΑΝΑΜΙΞΗ':'ΒΑΛΕ ΤΟ ΜΙΞΕΡ'):'ΧΡΗΣΗ',this.tool!=='hands',this.mixingNow);
     this.stationTrowel.visible=this.tool!=='trowel'||!this.active;
     m.water.visible=this.tool!=='water'||!this.active;
     this.held.visible=this.active&&!this.carrying;
@@ -382,7 +399,14 @@ export class MixingStation {
     this.finish.hidden=!b.ready||this.inserted||this.finished;
     const stance=this.toolbelt.querySelector<HTMLButtonElement>('#mixing-stance')!,crouched=this.game.player.crouched;
     if(stance.getAttribute('aria-pressed')!==String(crouched)){stance.setAttribute('aria-pressed',String(crouched));stance.setAttribute('aria-label',crouched?'Σήκω όρθιος':'Σκύψε για εργασία στη σύκλα');stance.querySelector('b')!.textContent=crouched?'↥':'↧';stance.querySelector('span')!.textContent=crouched?'ΣΗΚΩ':'ΣΚΥΨΕ';}
-    this.toolbelt.querySelectorAll<HTMLButtonElement>('[data-mix-equip]').forEach(button=>{const pressed=String(this.active&&button.dataset.mixEquip===this.tool);if(button.getAttribute('aria-pressed')!==pressed)button.setAttribute('aria-pressed',pressed);});
+    this.toolbelt.querySelectorAll<HTMLButtonElement>('[data-mix-equip]').forEach(button=>{
+      const tool=button.dataset.mixEquip as MixingTool,pressed=this.active&&tool===this.tool;
+      if(button.getAttribute('aria-pressed')===String(pressed))return;
+      button.setAttribute('aria-pressed',String(pressed));
+      const label=tool==='water'?'ΝΕΡΟ':tool==='trowel'?'ΜΙΣΤΡΙ':tool==='shovel'?'ΦΤΥΑΡΙ':'ΜΙΞΕΡ';
+      button.querySelector('span')!.innerHTML=pressed?`ΑΦΗΣΕ<br>${label}`:tool==='trowel'?'ΜΙΣΤΡΙ ΜΙΞΗΣ':label;
+      button.setAttribute('aria-label',pressed?`Άφησε ${names[tool]}`:`Πιάσε ${names[tool]}`);
+    });
   }
   private poseHeldTool():void{
     const model=this.heldTools.get(this.tool);if(!model)return;

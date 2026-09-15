@@ -216,9 +216,12 @@ export class Game {
     this.actionCooldown = this.selectedTool==='hammer'?this.actionCooldown-dt:Math.max(0,this.actionCooldown-dt);
     let requested = this.input.consumeAction();
     const interactionRequested = this.input.consumeInteraction();
-    const handledMixingInteraction = this.started && this.mixing.handleInteractionRequest(interactionRequested);
+    // The station exposes both USE (mouse/touch action) and INTERACT. Route
+    // both through the same stroke/hold path while it owns the player's tools.
+    const stationRequested = interactionRequested || (this.mixing.blocksWork && requested);
+    const handledMixingInteraction = this.started && this.mixing.handleInteractionRequest(stationRequested);
     if(handledMixingInteraction)requested=false;
-    this.mixing.update(dt, interactionRequested && !handledMixingInteraction, this.input.interactionHeld);
+    this.mixing.update(dt, stationRequested && !handledMixingInteraction, this.input.interactionHeld || this.input.actionHeld);
     const mixingOwnedInput = this.mixing.blocksWork;
     // Both hammer modes deliver local repeated percussive strikes while held.
     const continuousTool = this.isContinuousAction();
