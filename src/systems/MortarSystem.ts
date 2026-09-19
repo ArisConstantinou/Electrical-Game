@@ -657,8 +657,8 @@ export class MortarSystem {
     if(maxChunks===Infinity)this.cancelFieldMeshBatch();
     if(!this.pendingFieldMesh){
       if(!this.field.dirty.size)return;
-      const snapshot=this.field.createMeshSnapshot(),keys=[...snapshot.dirty];
-      for(const key of keys)this.field.dirty.delete(key);
+      const snapshot=maxChunks===Infinity?this.field:this.field.createMeshSnapshot(),keys=[...snapshot.dirty];
+      if(snapshot!==this.field)for(const key of keys)this.field.dirty.delete(key);
       this.pendingFieldMesh={snapshot,keys,chunks:[],openings:this.openings()};
     }
     const batch=this.pendingFieldMesh;
@@ -817,6 +817,13 @@ export class MortarSystem {
           }
         }
         this.stuckMass += held;
+        if(held>0){
+          this.field.finishImpact();
+          // Contact and its final union skin belong to the same presented
+          // frame. Do not retire the flying scoop while an older snapshot is
+          // still waiting to publish, then expand the adhered bed later.
+          this.syncFieldGeometry();
+        }
         if(clod.contacts===0&&!clod.slurry){const speed=clod.velocity.length(),incidence=speed>1e-6?Math.abs(clod.velocity.clone().multiplyScalar(1/speed).dot(hit.normal)):0;this.onImpact?.({speed,retainedKg:held,incidence});}
         clod.contacts++;
         clod.mass -= held;

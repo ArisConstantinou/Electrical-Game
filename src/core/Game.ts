@@ -201,7 +201,7 @@ export class Game {
     this.player.handWorkTargetY=handWork?this.boxWorkAim()?.y??null:null;
     if (this.started && !leveling) this.player.update(Math.min(dt, 0.05));
     this.fpsRig.beginFrame(dt, this.selectedTool==='hammer' && this.input.actionHeld && Math.abs(this.player.velocity.x)>1e-6
-      ? this.player.velocity.x*Math.min(dt,.05) : null);
+      ? this.player.velocity.x*Math.min(dt,.05) : null,this.selectedTool==='hammer'&&(this.input.actionHeld||this.input.actionRequested));
     this.renderer.camera.rotation.set(this.player.pitch, this.player.yaw, 0);
     for(const action of this.pendingSceneActions.splice(0))action();
     if(this.hammerAutoSide&&this.started&&!leveling&&this.selectedTool==='hammer'){
@@ -304,7 +304,7 @@ export class Game {
     const waterHit = this.selectedTool === 'spray' || mortarTool ? this.room.brickWall.aim(this.renderer.camera) : null;
     const wallAim = Boolean(waterHit);
     const aimedBox=['fitting','level','spring','cutter'].includes(this.selectedTool)?this.boxPlacement.target(this.renderer.camera):null;
-    this.boxFitPreview.update(this.renderer.camera,this.mission.boxPreset,this.started&&(this.selectedTool==='fitting'||this.selectedTool==='hammer'&&this.boxFitPreview.hasGuide),Boolean(aimedBox),dt,point=>this.fpsRig.canReachPoint(this.renderer.camera,point),this.selectedTool==='hammer',aimedBox?.boxGroup.position.z??0);
+    this.boxFitPreview.update(this.renderer.camera,this.mission.boxPreset,this.started&&!mixingOwnedInput&&this.selectedTool==='fitting'&&this.fpsRig.fittingBoxAvailable,Boolean(aimedBox),dt,point=>this.fpsRig.canReachPoint(this.renderer.camera,point),false,aimedBox?.boxGroup.position.z??0);
     this.hud.updateBoxFit(this.boxFitPreview.telemetry);
     const pointAim=this.selectedTool==='fitting'?Boolean(aimedBox||this.boxWorkAim()):Boolean(aimedBox||this.mission.target(this.renderer.camera));
     const aimed = this.selectedTool==='measure'?Boolean(this.heightMeasure.target):this.selectedTool === 'hammer' ? this.fpsRig.reachable && !this.fpsRig.chiselInAir : this.selectedTool === 'spray' ? wallAim : pointAim;

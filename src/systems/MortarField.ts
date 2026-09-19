@@ -115,26 +115,33 @@ export class MortarField {
     // Admit the first exterior row for a thin coat, with density capped below
     // so its interpolated skin still ends at most 10 mm outside the wall.
     if(profile){min[2]=Math.floor((profile.frontZ-.20)/h);max[2]=Math.floor(profile.frontZ/h)+1;}
-    const columns=new Map<string,number|null>();
     const q=new THREE.Vector3(),delta=new THREE.Vector3();
-    for(let x=min[0];x<=max[0];x++)for(let y=min[1];y<=max[1];y++)for(let z=min[2];z<=max[2];z++){
-      q.set(x*h,y*h,z*h);let weight:number,capacity=1;
+    const angle=impact?.rotationRadians??0,c=Math.cos(angle),s=Math.sin(angle),offset=(impact?.offsetScale??0)*radius,phase=impact?.edgePhase??0;
+    for(let x=min[0];x<=max[0];x++)for(let y=min[1];y<=max[1];y++){
+      let back=0,columnWeight=0,cavityPriority=0,firstZ=min[2];
       if(profile){
-        const angle=impact?.rotationRadians??0,c=Math.cos(angle),s=Math.sin(angle),offset=(impact?.offsetScale??0)*radius;
-        const dx=q.x-point.x-Math.cos(angle)*offset,dy=q.y-point.y-Math.sin(angle)*offset;
+        const dx=x*h-point.x-c*offset,dy=y*h-point.y-s*offset;
         const u=dx*c+dy*s,v=-dx*s+dy*c,theta=Math.atan2(v/Math.max(.001,minorRadius),u/Math.max(.001,majorRadius));
-        const phase=impact?.edgePhase??0;
         const ragged=1+.105*Math.sin(theta*3+phase)+.065*Math.sin(theta*5-phase*1.7)+.035*Math.cos(theta*7+phase*.6);
         const metric=(u*u/(majorRadius*majorRadius)+v*v/(minorRadius*minorRadius))/(ragged*ragged);if(metric>=1)continue;
-        const key=this.key(x,y,0);let back=columns.get(key);if(back===undefined){back=profile.supportZ(q.x,q.y);columns.set(key,back);}
+        const support=profile.supportZ(x*h,y*h);if(support===null)continue;back=support;
+        // Footprint and backing are column properties, not depth samples.
+        // Keep the same checked rows while avoiding 26 repeated trig/profile
+        // evaluations and the solid interior behind every facade column.
+        firstZ=Math.max(firstZ,Math.floor(back/h)-1);
+        cavityPriority=profile.frontZ-back>.012?8:.08;
+        const clumps=.91+.09*Math.sin(u/Math.max(h,majorRadius)*11+phase+Math.cos(v/Math.max(h,minorRadius)*9));
+        columnWeight=(.22+.78*(1-metric)**.78)*clumps;
+      }
+      for(let z=firstZ;z<=max[2];z++){
+      q.set(x*h,y*h,z*h);let weight:number,capacity=1;
+      if(profile){
         // Only the first exposed surviving wall surface backs a column. Sealed
         // chambers behind an intact clay shell cannot receive remote mortar.
-        if(back===null||q.z<back||blocked(q))continue;
+        if(q.z<back||blocked(q))continue;
         if(z===max[2])capacity=Math.min(1,LEVEL/Math.max(LEVEL,1-(profile.frontZ+.010-q.z)/h));
         const fillDepth=Math.max(0,q.z-back);
-        const cavityPriority=profile.frontZ-back>.012?8:.08;
-        const clumps=.91+.09*Math.sin(u/Math.max(h,majorRadius)*11+phase+Math.cos(v/Math.max(h,minorRadius)*9));
-        weight=(.22+.78*(1-metric)**.78)*clumps*Math.exp(-fillDepth/.032)*cavityPriority;
+        weight=columnWeight*Math.exp(-fillDepth/.032)*cavityPriority;
       }else{
         delta.copy(q).sub(center);const axial=delta.dot(axis),radial=Math.max(0,delta.lengthSq()-axial*axial),metric=radial/(radius*radius)+axial*axial/(depth*depth);
         if(metric>=1||blocked(q))continue;weight=(1-metric)**1.4;
@@ -146,11 +153,17 @@ export class MortarField {
       if(capacity===1)flowCells.add(key);
       const old=this.nodes.get(key);if((old?.value??0)>=capacity-.0001||(old?.age??0)>=FRESH_SECONDS)continue;
       candidates.push({x,y,z,weight,old:old?.value??0,age:old?.age??0,dilution:old?.dilution??0,capacity});
+      }
     }
     if(!candidates.length)return 0;
     const target=mass/this.nodeMass;
-    const volume=(scale:number):number=>{let added=0;for(const c of candidates)added+=Math.max(0,Math.min(c.capacity,c.weight*scale)-c.old);return added;};
-    let low=0,high=128;for(let i=0;i<22;i++){const middle=(low+high)*.5;if(volume(middle)>target)high=middle;else low=middle;}
+    const volume=(scale:number):number=>{let added=0;for(const c of candidates){added+=Math.max(0,Math.min(c.capacity,c.weight*scale)-c.old);if(added>target)return added;}return added;};
+    let low=0,high=128;
+    // A nearly full coat cannot accept this quantity even at maximum pressure.
+    // Preserve the exact old 22-step lower bound without rescanning every cell
+    // 22 times for each progressively wider PERFECT footprint.
+    if(volume(high)<=target)low=high-high/2**22;
+    else for(let i=0;i<22;i++){const middle=(low+high)*.5;if(volume(middle)>target)high=middle;else low=middle;}
     let added=0;
     for(const c of candidates){const value=Math.max(c.old,Math.min(c.capacity,c.weight*low)),increment=value-c.old;if(increment<1e-8)continue;if(!this.nodes.has(this.key(c.x,c.y,c.z))&&this.nodes.size>=this.maxNodes)break;
       added+=increment;this.set(c.x,c.y,c.z,value,c.age*c.old/value,c.dilution*c.old/value);
@@ -191,12 +204,24 @@ export class MortarField {
     this.settleFresh(dt);
   }
 
+  /** Resolve a thrown scoop's plastic compression at contact, before its
+   * first visible skin. The same bounded transfers conserve mass and never
+   * remobilize cured cells; no later growth animation trails the projectile. */
+  finishImpact():void {
+    // Geometry and box occupancy cannot change between these synchronous
+    // compression passes. Check each candidate once, rather than repeatedly
+    // tracing the same masonry voxels in all four passes.
+    const occupancy=new Map<(p:THREE.Vector3)=>boolean,Map<string,boolean>>();
+    for(let step=0;step<4&&this.settling.length;step++)this.settleFresh(.06,occupancy);
+  }
+
   /** Short plastic settling, not an endlessly flowing fluid. Transfers change
    * the collision field and its union skin together, conserving mass and age. */
-  private settleFresh(dt:number):void {
+  private settleFresh(dt:number,occupancy?:Map<(p:THREE.Vector3)=>boolean,Map<string,boolean>>):void {
     const q=new THREE.Vector3(),h=this.spacing;
     for(let batchIndex=this.settling.length-1;batchIndex>=0;batchIndex--){
       const batch=this.settling[batchIndex],step=Math.min(Math.max(0,dt),batch.remaining);
+      let checked=occupancy?.get(batch.blocked);if(occupancy&&!checked){checked=new Map();occupancy.set(batch.blocked,checked);}
       if(step<=0)continue;batch.remaining-=step;
       // Only cells present at the start can emit this step; newly reached cells
       // wait until the next step before they can carry material onward.
@@ -209,7 +234,8 @@ export class MortarField {
         let best:{x:number;y:number;z:number;value:number;score:number}|null=null;
         for(const [dx,dy,dz] of [[0,-1,0],[0,0,-1],[-1,0,0],[1,0,0]]){
           const x=node.x+dx,y=node.y+dy,z=node.z+dz,k=this.key(x,y,z);if(!batch.cells.has(k))continue;
-          const target=this.nodes.get(k);if((!target&&this.nodes.size>=this.maxNodes)||(target?.age??0)>=FRESH_SECONDS||batch.blocked(q.set(x*h,y*h,z*h)))continue;
+          const target=this.nodes.get(k);if((!target&&this.nodes.size>=this.maxNodes)||(target?.age??0)>=FRESH_SECONDS)continue;
+          let blocked=checked?.get(k);if(blocked===undefined){blocked=batch.blocked(q.set(x*h,y*h,z*h));checked?.set(k,blocked);}if(blocked)continue;
           const value=target?.value??0,score=node.value-value+(dy<0?.20:dz<0?.12:0);
           if(score>.3&&(!best||score>best.score))best={x,y,z,value,score};
         }
@@ -311,9 +337,11 @@ export class MortarField {
   remesh(clip:(triangle:THREE.Vector3[])=>THREE.Vector3[][],maxChunks=Infinity):MortarFieldChunk[] {
     const results:MortarFieldChunk[]=[];
     const normalCache=new Map<string,THREE.Vector3>();
+    const cubeNormals=new Map<THREE.Vector3,THREE.Vector3>();
     const vertexNormal=(p:THREE.Vector3):THREE.Vector3=>{
+      const known=cubeNormals.get(p);if(known)return known;
       const key=`${Math.round(p.x*1e8)},${Math.round(p.y*1e8)},${Math.round(p.z*1e8)}`;
-      let normal=normalCache.get(key);if(!normal){normal=this.normal(p);normalCache.set(key,normal);}return normal;
+      let normal=normalCache.get(key);if(!normal){normal=this.normal(p);normalCache.set(key,normal);}cubeNormals.set(p,normal);return normal;
     };
     try { for(const key of this.dirty){
       if(results.length>=maxChunks)break;
@@ -329,28 +357,39 @@ export class MortarField {
         }
       }
       this.meshSamples=samples;
-      const cubes=new Set<string>();
+      const cubes=new Set<number>();
       for(let dx=0;dx<=1;dx++)for(let dy=0;dy<=1;dy++)for(let dz=0;dz<=1;dz++){
         const entries=this.chunkNodes.get(this.key(cx+dx,cy+dy,cz+dz));if(!entries)continue;
         for(const entry of entries){const node=this.nodes.get(entry)!;if(node.value<LEVEL*.3)continue;
-          for(let ox=-1;ox<=0;ox++)for(let oy=-1;oy<=0;oy++)for(let oz=-1;oz<=0;oz++){const x=node.x+ox,y=node.y+oy,z=node.z+oz;if(x>=x0&&x<x0+CHUNK&&y>=y0&&y<y0+CHUNK&&z>=z0&&z<z0+CHUNK)cubes.add(this.key(x,y,z));}
+          for(let ox=-1;ox<=0;ox++)for(let oy=-1;oy<=0;oy++)for(let oz=-1;oz<=0;oz++){const x=node.x+ox,y=node.y+oy,z=node.z+oz;if(x>=x0&&x<x0+CHUNK&&y>=y0&&y<y0+CHUNK&&z>=z0&&z<z0+CHUNK)cubes.add(((x-x0)*CHUNK+y-y0)*CHUNK+z-z0);}
         }
       }
-      const edge=(a:number,b:number,points:THREE.Vector3[],values:number[]):THREE.Vector3=>points[a].clone().lerp(points[b],(LEVEL-values[a])/(values[b]-values[a]));
+      // A tetrahedral face reuses the cube's intersections. Scratch vectors
+      // survive the chunk, but no emitted geometry retains their references.
+      const edgePoints=Array.from({length:64},()=>new THREE.Vector3()),edgeGeneration=new Int32Array(64);
+      let generation=0;
+      const edge=(a:number,b:number,points:THREE.Vector3[],values:number[]):THREE.Vector3=>{
+        // Preserve directed interpolation, including its floating-point order.
+        const key=a*8+b;
+        if(edgeGeneration[key]!==generation){edgeGeneration[key]=generation;edgePoints[key].copy(points[a]).lerp(points[b],(LEVEL-values[a])/(values[b]-values[a]));}
+        return edgePoints[key];
+      };
+      const ab=new THREE.Vector3(),ac=new THREE.Vector3(),cross=new THREE.Vector3();
       const emit=(a:THREE.Vector3,b:THREE.Vector3,c:THREE.Vector3,outward:THREE.Vector3):void=>{
-        if(new THREE.Vector3().crossVectors(b.clone().sub(a),c.clone().sub(a)).dot(outward)<0)[b,c]=[c,b];
+        if(cross.crossVectors(ab.subVectors(b,a),ac.subVectors(c,a)).dot(outward)<0)[b,c]=[c,b];
         for(const polygon of clip([a,b,c]))for(let i=1;i<polygon.length-1;i++){
           // Preserve tiny but real triangles where a settling isosurface
           // crosses a chunk edge. Dropping them independently opened pinholes
           // against the neighboring chunk's surviving boundary segment.
-          const aa=polygon[0],bb=polygon[i],cc=polygon[i+1];if(new THREE.Vector3().crossVectors(bb.clone().sub(aa),cc.clone().sub(aa)).lengthSq()<1e-24)continue;
+          const aa=polygon[0],bb=polygon[i],cc=polygon[i+1];if(cross.crossVectors(ab.subVectors(bb,aa),ac.subVectors(cc,aa)).lengthSq()<1e-24)continue;
           for(const p of [aa,bb,cc]){positions.push(p.x,p.y,p.z);const n=vertexNormal(p);normals.push(n.x,n.y,n.z);}
         }
       };
-      for(const cube of cubes){const[x,y,z]=cube.split(',').map(Number),values=CORNERS.map(([dx,dy,dz])=>this.at(x+dx,y+dy,z+dz));if(values.every(v=>v<LEVEL)||values.every(v=>v>=LEVEL))continue;
-        const points=CORNERS.map(([dx,dy,dz])=>new THREE.Vector3((x+dx)*this.spacing,(y+dy)*this.spacing,(z+dz)*this.spacing));
+      const points=CORNERS.map(()=>new THREE.Vector3()),outward=new THREE.Vector3();
+      for(const cube of cubes){const x=x0+Math.floor(cube/(CHUNK*CHUNK)),y=y0+Math.floor(cube/CHUNK)%CHUNK,z=z0+cube%CHUNK,values=CORNERS.map(([dx,dy,dz])=>this.at(x+dx,y+dy,z+dz));if(values.every(v=>v<LEVEL)||values.every(v=>v>=LEVEL))continue;
+        generation++;cubeNormals.clear();CORNERS.forEach(([dx,dy,dz],i)=>points[i].set((x+dx)*this.spacing,(y+dy)*this.spacing,(z+dz)*this.spacing));
         for(const tetra of TETRA){const inside=tetra.filter(i=>values[i]>=LEVEL),outside=tetra.filter(i=>values[i]<LEVEL);if(!inside.length||!outside.length)continue;
-          const outward=points[outside[0]].clone().sub(points[inside[0]]);
+          outward.subVectors(points[outside[0]],points[inside[0]]);
           if(inside.length===1){const a=inside[0];emit(edge(a,outside[0],points,values),edge(a,outside[1],points,values),edge(a,outside[2],points,values),outward);}
           else if(outside.length===1){const a=outside[0];emit(edge(a,inside[0],points,values),edge(a,inside[1],points,values),edge(a,inside[2],points,values),outward);}
           else {const[a,b]=inside,[c,d]=outside,ac=edge(a,c,points,values),ad=edge(a,d,points,values),bc=edge(b,c,points,values),bd=edge(b,d,points,values);emit(ac,bc,bd,outward);emit(ac,bd,ad,outward);}

@@ -110,10 +110,13 @@ export class PlayerController {
       // Forward force is absorbed by the stance; sideways walking remains free.
       if(y>=0)this.velocity.z=0;
     }
-    work.distanceM=this.camera.position.z-GAME_CONFIG.room.wallFrontZ;
     const radius = GAME_CONFIG.player.radius;
     this.camera.position.x = THREE.MathUtils.clamp(this.camera.position.x, -GAME_CONFIG.room.width / 2 + radius, GAME_CONFIG.room.width / 2 - radius);
-    this.camera.position.z = THREE.MathUtils.clamp(this.camera.position.z, -GAME_CONFIG.room.depth / 2 + radius + 0.25, GAME_CONFIG.room.depth / 2 - radius);
+    // The masonry facade stands inside the room's architectural bounds.
+    // Apply body clearance independently of tool bracing and view direction:
+    // looking along the wall must not disable the player's collision barrier.
+    this.camera.position.z = THREE.MathUtils.clamp(this.camera.position.z, GAME_CONFIG.room.wallFrontZ + radius, GAME_CONFIG.room.depth / 2 - radius);
+    work.distanceM=this.camera.position.z-GAME_CONFIG.room.wallFrontZ;
     this.camera.position.y = THREE.MathUtils.damp(this.camera.position.y, this.eyeHeight, 14, dt);
     if(handFocus){handFocus.x+=this.camera.position.x-previousX;this.camera.lookAt(handFocus);this.pitch=this.camera.rotation.x;this.yaw=this.camera.rotation.y;}
   }

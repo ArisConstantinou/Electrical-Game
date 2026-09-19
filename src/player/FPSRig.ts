@@ -79,10 +79,17 @@ export class FPSRig extends THREE.Group {
   private hammerLeftMain=false;
   private readonly hammerFeedOffset = new THREE.Vector3();
   private hammerPostureY=0;
+  private hammerWasWorking=false;
+  private holdHammerFeed=false;
+  private readonly lastHammerEntry=new THREE.Vector3(Infinity,Infinity,Infinity);
+  private readonly lastHammerDirection=new THREE.Vector3();
   readonly hammerFit={housingCameraZ:0,wristReachM:[] as number[],feedM:0,postureY:0};
 
   /** Contact can be queried several times per impact; advance the pose once per frame. */
-  beginFrame(dt: number, wallTravelM: number | null = null): void {
+  beginFrame(dt: number, wallTravelM: number | null = null, working=true): void {
+    if(this.hammerWasWorking&&!working)this.holdHammerFeed=true;
+    if(working)this.holdHammerFeed=false;
+    this.hammerWasWorking=working;
     this.contactFeedBudgetM = .24 * Math.min(Math.max(dt, 0), .05);
     // While feeding A/D along the wall, a new shell may retract the shaft, but
     // must not drag the visible bit backwards against the worker's movement.
@@ -133,6 +140,11 @@ export class FPSRig extends THREE.Group {
     // The actual wrist spheres below decide reach, rather than ray length.
     if (!Number.isFinite(distance) || distance < 0 || direction.z >= -.04) { this.restHammer(camera); return null; }
     const entry = eye.clone().addScaledVector(view,distance);
+    // Releasing percussion parks the bit at its presented depth. The newly
+    // exposed shell must not keep pulling it sideways/down through a cavity.
+    // A deliberate change of aim/attack resumes normal contact positioning.
+    if(entry.distanceToSquared(this.lastHammerEntry)>1e-10||direction.distanceToSquared(this.lastHammerDirection)>1e-10)this.holdHammerFeed=false;
+    this.lastHammerEntry.copy(entry);this.lastHammerDirection.copy(direction);
     if (Math.abs(entry.x)>2.54 || entry.y<0 || entry.y>3) { this.restHammer(camera); return null; }
     // Follow the CHISEL axis through the aperture. Empty chambers consume no
     // impact and no energy: the next contact is a surviving rib or rear shell.
@@ -191,7 +203,7 @@ export class FPSRig extends THREE.Group {
     const desiredFeed=target.clone().sub(entry);
     if(this.workPositionLocked&&this.presentedFeedOffset!==null){
       const advance=desiredFeed.clone().sub(this.presentedFeedOffset);
-      advance.clampLength(0,this.contactFeedBudgetM);
+      advance.clampLength(0,this.holdHammerFeed?0:this.contactFeedBudgetM);
       advance.x=THREE.MathUtils.clamp(advance.x,-this.lateralFeedBudgetM,this.lateralFeedBudgetM);
       this.contactFeedBudgetM=Math.max(0,this.contactFeedBudgetM-advance.length());
       this.lateralFeedBudgetM=Math.max(0,this.lateralFeedBudgetM-Math.abs(advance.x));

@@ -540,3 +540,11 @@ Original follow-up request: boxes should place on free mortar without breaking b
 - Native mouse/touch placement already works over mortar on intact masonry. Fixed misleading blocked-outline depth and overlap legend while preserving real casing collisions.
 - Kept the final debris correction narrow: shared collision/support probes and removal of artificial repeated chamber impulses. An explored full inter-fragment solver was discarded because it was expensive and unnecessary for the verified cause; none of it remains in the delivered source.
 - Added reusable protected-source before/after physics/browser cases and a queued-release regression. Evidence, measured performance and limitations are in `docs/MORTAR_FOLLOWUP.md`.
+
+## 2026-09-19 · Overlay, release drift, wall collision, station prompt and impact shape
+
+- Continued isolated `codex/mortar-mixing-fixes` from `f882c74` on the existing 5364 listener; main `27361e8` and its dirty work remain protected.
+- Reproduced the hammer guide, 66 cm behind-wall movement, 72.6 mm post-release feed, and sand-target theft by decorative trowel lines with a 1 m raycast threshold. Fixed each cause and verified native inputs.
+- Native mortar now completes conservative compression and coherent skin publication in the impact frame. Removed repeated column calculations and mesher allocations without changing pressure results, geometry buffers, resolution or material quantity.
+- Ten logic suites, targeted desktop/touch gameplay, 36 chisel releases, compiled WebGPU/WebGL smoke, safe skill client and build pass. Legacy box-preview red-pixel assertion fails identically on protected baseline; no assertion was relaxed.
+- Measured RAF throughput remains comparable. Final heavy-impact peak is 74.5 ms versus baseline 62.4 ms; no claim of hitch-free 60 FPS or physical-phone validation. Full comparison and local evidence: `docs/REPORTED_INTERACTIONS.md`.

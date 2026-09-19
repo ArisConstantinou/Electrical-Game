@@ -18,7 +18,7 @@ try{
  const page=await context.newPage();page.on('pageerror',e=>report.errors.push(e.message));page.on('console',m=>{if(m.text().includes('vite')||m.type()==='error')report.console.push(m.text());});
  if(process.argv.includes('--baseline')){
   report.baseline=report.head;
-  for(const path of ['src/player/FPSRig.ts','src/systems/MortarSystem.ts']){
+  for(const path of ['src/player/FPSRig.ts','src/systems/MortarSystem.ts','src/systems/MortarField.ts']){
    const original=execFileSync('git',['show',`HEAD:${path}`],{encoding:'utf8'});
    await page.route(`**/${path}*`,async route=>{
     const response=await route.fetch(),live=await response.text(),three=live.match(/import \* as THREE from ["']([^"']+)["']/)?.[1];
@@ -34,7 +34,7 @@ try{
   const g=window.__wireTheHouse,c=g.renderer.camera;c.position.set(.3,g.player.eyeHeight,g.room.brickWall.volume.frontZ+.8);g.player.pitch=-.2;g.player.yaw=0;c.rotation.set(-.2,0,0,'YXZ');
   const p=window.__trowelRAF={active:false,stage:'idle',frames:[],renders:[],methods:{},rafs:[],start:0};
   const raf=t=>{if(p.active)p.rafs.push({t,pending:g.renderer.framePending});requestAnimationFrame(raf);};requestAnimationFrame(raf);
-  for(const [o,prefix,names]of [[g,'game',['step']],[g.mortar,'mortar',['swing','update','preview','syncFieldGeometry','deposit']],[g.mortar.field,'field',['remesh','add']],[g.fpsRig,'rig',['update','poseTrowel']],[g.renderer,'renderer',['render','prepareMaterials']],[g.renderer.gpu.backend,'backend',['createRenderPipeline','_completeCompile','createAttribute','createTexture','updateTexture','createBindings','updateBindings']]])for(const name of names){
+  for(const [o,prefix,names]of [[g,'game',['step']],[g.mortar,'mortar',['swing','update','preview','syncFieldGeometry','deposit']],[g.mortar.field,'field',['remesh','add','finishImpact']],[g.fpsRig,'rig',['update','poseTrowel']],[g.renderer,'renderer',['render','prepareMaterials']],[g.renderer.gpu.backend,'backend',['createRenderPipeline','_completeCompile','createAttribute','createTexture','updateTexture','createBindings','updateBindings']]])for(const name of names){
    const original=o[name];if(typeof original!=='function')continue;
    o[name]=function(...args){const t=performance.now();try{return original.apply(this,args);}finally{if(p.active){const d=performance.now()-t,label=prefix+'.'+name,a=p.methods[label]??=[];a.push({t,d,stage:g.mortar.throwFeedback.stage});if(prefix==='game'){const f=g.mortar.throwFeedback,tool=g.fpsRig.tools.get('trowel');p.frames.push({t,dt:args[0],cpu:d,stage:f.stage,castElapsed:f.castElapsed,holding:f.holding,roll:f.motion.rollDegrees,pitch:g.player.pitch,cameraPitch:g.renderer.camera.rotation.x,renderPitch:g.renderer.renderCamera.rotation.x,tool:tool.position.toArray(),projectiles:g.mortar.projectiles.length});}}}};
   }

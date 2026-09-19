@@ -118,6 +118,9 @@ function trowel(): THREE.Group {
   scratchGeometry.setAttribute('position', new THREE.Float32BufferAttribute(scratches, 3));
   const abrasion = new THREE.LineSegments(scratchGeometry, new THREE.LineBasicMaterial({ color: 0x79837d, transparent: true, opacity: .22, depthWrite: false }));
   abrasion.name = 'Fine working-face abrasion'; group.add(abrasion);
+  // Decorative scratches are not pickup surfaces. THREE's default line
+  // threshold is one metre and otherwise steals rays aimed at the sand/bucket.
+  abrasion.raycast = () => {};
   const heel = part(group, new THREE.SphereGeometry(1, 20, 10), forgedSteel, [.183, -.167, -.062], 'Integral forged neck root');
   heel.scale.set(.016, .004, .022);
   tube(group, [[.183, -.166, -.066], [.183, -.161, -.047], [.183, -.145, -.033], [.183, -.112, -.023], [.183, -.108, -.003]], .0058, forgedSteel, 'Continuous forged swan neck');
