@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "dev:mortar-preview": "node scripts/start-mortar-preview.mjs",
     "dev": "vite --host 127.0.0.1 --port 5362 --strictPort",
     "studio:webgame": "vite --host 127.0.0.1 --port 5362 --strictPort",
     "build": "tsc -b && vite build",

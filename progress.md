@@ -558,3 +558,9 @@ Original follow-up request: boxes should place on free mortar without breaking b
 - Build and production WebGPU/WebGL checks pass, including normal hammer/hose and new equipment. New stock/cancellation/depletion/refresh/aisle tests and material mass-transfer tests pass. Actual screenshot inspection completed. Physical mobile/Safari remains unverified.
 - Editable Blender source and two GLBs supplied; saved Blender file reopened successfully with 266 editable meshes. Runtime source, reproduction scripts, instructions, evidence and bounded performance figures are documented in docs/SITE_EQUIPMENT.md. No pushing/refill/tipping animation; wheelbarrow is a parked ready supply.
 - Final targeting checks passed on desktop/portrait/landscape; owned test browser cleanup left no processes. Validation is complete for scoped delivery on the task branch. Main/public release is untouched.
+
+## 2026-09-19 · Repeated wall-crossing report: wrong preview checkout
+
+- User still crossed the wall with TOOL LEFT. The 5364 listener had been replaced by PID 50000 serving main's old controller: served source-map hash matched protected main, not this worktree. Reproduced 66 cm behind the wall in eight native-input combinations.
+- Restored only the identified preview listener to this checkout, preserving main and dirty files. Added an explicit-root strict-port launcher with source verification and refusal of mismatched occupied ports. Tested starting it from the wrong terminal directory and verified source-correct reuse.
+- Identical regression now stops at 28 cm front clearance for left/right, standing/crouched and walking/sprinting, while retreat remains possible. Bundled game-client smoke and actual before/after screenshot inspection passed. No runtime geometry, physics or dependencies changed. Evidence and measurement limits: docs/WALL_PREVIEW_RECOVERY.md.
