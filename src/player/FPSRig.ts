@@ -333,30 +333,31 @@ export class FPSRig extends THREE.Group {
     const arm=this.armSets.get('trowel')!.find(candidate=>candidate.side===1)!;
     const {right,forward}=this.bodyFrame(camera),shoulder=this.shoulder(camera,1);
     const view=camera.getWorldDirection(new THREE.Vector3());
-    const offWallCarry=motion.stage==='ready'&&view.z>-.25;
+    const carryWeight=motion.stage==='ready'?THREE.MathUtils.smoothstep(view.z,-.65,-.05):0;
     // Away from the installation wall the loaded trowel rests low beside the
     // body. Keeping the wall-casting pose while looking toward the sand put
     // the blade, paste and forearm across the centre of the screen.
-    let axis:THREE.Vector3,wrist:THREE.Vector3;
-    if(offWallCarry){
-      wrist=camera.localToWorld(new THREE.Vector3(.24,-.23,-.40));
-      const direction=wrist.clone().sub(shoulder),distance=THREE.MathUtils.clamp(direction.length(),.045,MAX_WRIST_REACH_M);direction.normalize();
-      wrist.copy(shoulder).addScaledVector(direction,distance);
+    const cameraFrame=camera.getWorldQuaternion(new THREE.Quaternion());
+    const axis=new THREE.Vector3(-.82,.20,-.54).normalize().applyQuaternion(cameraFrame);
+    const wallDistance=camera.getWorldPosition(new THREE.Vector3()).z-wallFrontZ;
+    const feed=.24+.32*THREE.MathUtils.smoothstep(wallDistance,.55,1)-motion.offset.z;
+    const upper=right.clone().multiplyScalar(.96).addScaledVector(forward,feed).add(new THREE.Vector3(0,.08,0)).normalize();
+    if(carryWeight>0){
+      const carryWrist=camera.localToWorld(new THREE.Vector3(.24,-.23,-.40));
+      const direction=carryWrist.clone().sub(shoulder),distance=THREE.MathUtils.clamp(direction.length(),.045,MAX_WRIST_REACH_M);direction.normalize();
+      carryWrist.copy(shoulder).addScaledVector(direction,distance);
       const along=(UPPER_ARM_M**2-FOREARM_M**2+distance**2)/(2*distance),height=Math.sqrt(Math.max(0,UPPER_ARM_M**2-along**2));
       const pole=new THREE.Vector3(0,-1,0).addScaledVector(right,.65);pole.addScaledVector(direction,-pole.dot(direction)).normalize();
-      this.trowelElbow.copy(shoulder).addScaledVector(direction,along).addScaledVector(pole,height);
-      axis=wrist.clone().sub(this.trowelElbow).normalize();
-    }else{
-      // The forearm and hand share one axis throughout the short stroke. The
-      // elbow moves on the upper-arm sphere; neither arm segment stretches.
-      axis=new THREE.Vector3(-.82,.20,-.54).normalize().applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion()));
-      const wallDistance=camera.getWorldPosition(new THREE.Vector3()).z-wallFrontZ;
-      const feed=.24+.32*THREE.MathUtils.smoothstep(wallDistance,.55,1)-motion.offset.z;
-      const upper=right.clone().multiplyScalar(.96).addScaledVector(forward,feed).add(new THREE.Vector3(0,.08,0)).normalize();
-      this.trowelElbow.copy(shoulder).addScaledVector(upper,UPPER_ARM_M);
-      wrist=this.trowelElbow.clone().addScaledVector(axis,FOREARM_M);
+      const carryElbow=shoulder.clone().addScaledVector(direction,along).addScaledVector(pole,height);
+      axis.lerp(carryWrist.sub(carryElbow).normalize(),carryWeight).normalize();
+      upper.lerp(carryElbow.sub(shoulder).normalize(),carryWeight).normalize();
     }
-    const orientation=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1),axis)
+    this.trowelElbow.copy(shoulder).addScaledVector(upper,UPPER_ARM_M);
+    const wrist=this.trowelElbow.clone().addScaledVector(axis,FOREARM_M);
+    // Resolve wrist roll in the player's view frame. A shortest-arc rotation
+    // from world -Z flips around its antipode when the player turns around.
+    const localAxis=axis.clone().applyQuaternion(cameraFrame.clone().invert());
+    const orientation=cameraFrame.clone().multiply(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1),localAxis))
       .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),THREE.MathUtils.degToRad(motion.rollDegrees)));
     tool.quaternion.copy(this.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(orientation));
     const wristLocal=new THREE.Vector3().fromArray(arm.hand.userData.wristPoint).applyQuaternion(arm.hand.quaternion).add(arm.hand.position);

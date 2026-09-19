@@ -125,6 +125,7 @@ export class Game {
     this.mixing.onSound=(kind,intensity)=>this.audio.play(kind,intensity);
     this.mortar.reserveScoop = amount => this.mixing.reserveScoop(amount);
     this.mortar.scoopBond = () => this.mixing.bondFactor;
+    this.mortar.hasScoop = () => this.mixing.canSupplyScoop;
     this.mortar.onLaunch=({speed})=>this.audio.play('trowel-whoosh',speed/8);
     this.mortar.onImpact=({speed,retainedKg})=>this.audio.play('mortar-splat',Math.min(1.4,.35+speed/9+retainedKg/.65*.35));
     this.roomWater = new RoomWaterSystem(this.renderer.scene, this.room.brickWall);

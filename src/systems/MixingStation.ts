@@ -354,6 +354,7 @@ export class MixingStation {
     this.carrying=false;this.game.input.resetTransientInput();this.models.bucket.position.copy(this.models.group.worldToLocal(p));this.models.bucket.rotation.set(0,0,0);this.message='Η σύκλα έμεινε εδώ. Εργάσου με μιστρί κοντά της.';return true;
   }
   /** Called only when the wrist actually releases; failed or cancelled throws use no mortar. */
+  get canSupplyScoop():boolean{return this.batch.ready&&this.batch.massKg>0&&!this.blocksWork&&!this.inserted;}
   reserveScoop(requested:number):number{
     // Selecting the wall trowel already leaves preparation. A ready batch must
     // not require a second UI acknowledgement before its first actual cast.

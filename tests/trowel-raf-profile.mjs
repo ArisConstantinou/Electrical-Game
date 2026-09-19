@@ -4,6 +4,8 @@ import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import assert from 'node:assert/strict';
 import {blockPointerLock} from './browser-safety.mjs';
+import {prepareFinishedMortar} from './prepared-mortar-fixture.mjs';
+import ts from 'typescript';
 
 const url=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/?renderer=webgl',out=process.argv[3]??'output/trowel-raf-profile';
 await mkdir(out,{recursive:true});
@@ -14,8 +16,20 @@ const browser=await chromium.launch({channel:'chrome',headless:true});
 try{
  const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:3});await blockPointerLock(context);
  const page=await context.newPage();page.on('pageerror',e=>report.errors.push(e.message));page.on('console',m=>{if(m.text().includes('vite')||m.type()==='error')report.console.push(m.text());});
+ if(process.argv.includes('--baseline')){
+  report.baseline=report.head;
+  for(const path of ['src/player/FPSRig.ts','src/systems/MortarSystem.ts']){
+   const original=execFileSync('git',['show',`HEAD:${path}`],{encoding:'utf8'});
+   await page.route(`**/${path}*`,async route=>{
+    const response=await route.fetch(),live=await response.text(),three=live.match(/import \* as THREE from ["']([^"']+)["']/)?.[1];
+    const body=ts.transpileModule(original,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText.replace(/(from\s+|import\s+)(["'])([^"']+)\2/g,(all,prefix,quote,specifier)=>{
+     const resolved=specifier==='three'?three:specifier.startsWith('.')?new URL(specifier+'.ts',route.request().url()).pathname:specifier;return `${prefix}${quote}${resolved}${quote}`;
+    });await route.fulfill({response,body,contentType:'application/javascript'});
+   });
+  }
+ }
  await page.routeWebSocket('**',()=>{});
- await page.goto(url);await page.locator('#start-button').tap({timeout:120000});await page.locator('[data-tool="trowel"]').tap();
+ await page.goto(url);await page.locator('#start-button').tap({timeout:120000});await prepareFinishedMortar(page);await page.locator('[data-tool="trowel"]').tap();
  await page.evaluate(()=>{
   const g=window.__wireTheHouse,c=g.renderer.camera;c.position.set(.3,g.player.eyeHeight,g.room.brickWall.volume.frontZ+.8);g.player.pitch=-.2;g.player.yaw=0;c.rotation.set(-.2,0,0,'YXZ');
   const p=window.__trowelRAF={active:false,stage:'idle',frames:[],renders:[],methods:{},rafs:[],start:0};

@@ -59,6 +59,7 @@ export class MortarSystem {
   /** Optional physical batch; reservation happens once at the committed wrist release. */
   reserveScoop?: (requestedKg:number) => number;
   scoopBond?: () => number;
+  hasScoop?: () => boolean;
   readonly group = new THREE.Group();
   readonly field = new MortarField();
   onRunoff?: (event: { point: THREE.Vector3; normal: THREE.Vector3; litres: number; mortarKg: number }) => void;
@@ -187,6 +188,7 @@ export class MortarSystem {
     const castElapsed=this.pendingCast?.elapsed??(recovering?TROWEL_CAST_SECONDS-this.recovery:null);
     // Expiring the throwing bar does not move or reload the held trowel.
     const motion=sampleTrowelMotion({holding:this.wasHeld,charge:this.overheld?1:phase,castElapsed});
+    motion.loadVisible=motion.loadVisible&&(this.hasScoop?.()??true);
     return {holding:this.wasHeld,overheld:this.overheld,phase,quality,swingDegrees:motion.rollDegrees,strength:phase,splash:this.faceSplash,lastRelease:this.releaseCount,casting,castElapsed,stage:motion.stage,motion};
   }
   swing(held: boolean, dt: number, camera: THREE.Camera, origin: THREE.Vector3 | (() => THREE.Vector3)): void {
@@ -488,7 +490,10 @@ export class MortarSystem {
     const confined=incoming>.2&&depth>.012&&depth<(volume.depth??.2)+.008
       ? THREE.MathUtils.smoothstep(depth,.012,.035) : 0;
     if(confined>0)prepared=Math.max(prepared,.88*confined);
-    const effectiveIncidence=Math.max(incidence,confined*(.65+.25*incoming));
+    // Judge a sighted transfer by its approach to the wall, not the tiny rib
+    // or fresh-mortar facet first touched. Capacity still clips the real void.
+    const wallApproach=cleanRelease&&depth>=-.012&&depth<(volume.depth??.2)+.008?incoming:0;
+    const effectiveIncidence=Math.max(incidence,wallApproach,confined*(.65+.25*incoming));
     // A correctly timed wrist transfer seats a cohesive scoop against the
     // receiver. Dry brick must not reject a compulsory 5% of every perfect
     // scoop before the volume solver checks available room. Oblique,
@@ -496,7 +501,7 @@ export class MortarSystem {
     // authoritative and poor batch quality is applied separately below.
     if(cleanRelease){
       prepared=Math.max(prepared,1-Math.min(.65,receiver.dilution*.3));
-      const seating=THREE.MathUtils.smoothstep(effectiveIncidence,.45,.85);
+      const seating=THREE.MathUtils.smoothstep(effectiveIncidence,.35,.70);
       const incidenceTransfer=THREE.MathUtils.lerp(effectiveIncidence**1.3,1,seating);
       return THREE.MathUtils.clamp(prepared*(1-.8*wet.film)*Math.min(1,speed/2)*incidenceTransfer/(1+Math.max(0,speed-6)*.12),0,1);
     }

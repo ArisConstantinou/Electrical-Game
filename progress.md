@@ -522,3 +522,12 @@ User reported invisible/non-adhering casts, a twisted loaded trowel near the san
 - Passed actionable prompts, full preparation, input recovery, world tool switching, standing photo workflow, ready-batch wall casts, repeated PERFECT casts, cast-then-box, trowel pose, downward arms, grips, volume/contact regressions, typecheck/build and compiled WebGPU/WebGL startup. Trowel pose comparison is 0.198 ms baseline / 0.185 ms current with zero normal rebuilds. Dedicated screenshots were inspected.
 - `mortar-mesh-performance.mjs` remains a pre-existing failure on both protected `27361e8` and this worktree: it byte-compares current `MortarField` geometry against historical `9a4b9dd` and gets 26,568 versus 26,505 floats. This task does not modify `MortarField.ts`; functional volume/contact suites pass.
 - Isolated worktree URL is http://127.0.0.1:5364/Electrical-Game/. Mobile evidence is Chromium touch emulation; physical iPhone/Safari remains unverified. Unrelated `artifacts/` from the main checkout is excluded.
+
+## 2026-09-19 · Six mortar / trowel reports
+
+Original request for this follow-up: fill irregular brick gaps; stop loss despite PERFECT, rotating/flickering residue, and hand/trowel rotation near sand; show shovel sand across the pile; start with an empty trowel.
+- Continued the clean isolated `codex/mortar-mixing-fixes` checkout from `1f8c2a5` on existing strict port 5364. Main checkout dirty work remains untouched.
+- Reproduced phantom load at startup/depletion and 50–63 degree per-degree-view wrist snaps. Ready finite supply now controls the visible load; camera-frame orientation and continuous carry blending remove those snaps while preserving arm lengths.
+- Reproduced failed small-cavity mobile fill. PERFECT retention now uses the actual wall approach as well as the local microfacet normal, preventing good transfers from being treated as glancing strikes on rough clay or fresh mortar.
+- New native box-perimeter test fills every sampled accessible gap in desktop/mobile, with stable geometry after waiting. Dedicated ordinary-cast residue test and existing contact/atomic mesh suites pass. Existing actionable sand targeting is retained and passes.
+- Typecheck/build, native PERFECT, full preparation in three layouts, finite batch supply, volume/timing, pose, compiled WebGPU/WebGL startup and safe bundled client pass. Full evidence and boundaries: `docs/SIX_MORTAR_ISSUES.md`.
