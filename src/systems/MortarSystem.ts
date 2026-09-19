@@ -111,6 +111,7 @@ export class MortarSystem {
   private recoveringThrow = false;
   private pendingCast: { phase: number; elapsed: number } | null = null;
   private rearmOnRelease = false;
+  private queuedRelease: number | null = null;
   private recoverySkipSeconds = 0;
   private releaseCount = 0;
   private faceSplash = 0;
@@ -118,6 +119,7 @@ export class MortarSystem {
   private simulationTime = 0;
   private geometryRevision = 0;
   private openingSignature = '';
+  private previousOpenings: Opening[] = [];
   private supportRevision = '';
   private supportCacheTime = -Infinity;
   private supportVolume: unknown;
@@ -177,6 +179,7 @@ export class MortarSystem {
     this.wasHeld = false; this.charge = 0; this.heldSeconds = 0; this.overheld = false;
     if (this.pendingCast) { this.pendingCast = null; this.releasedPhase = 0; this.recoveringThrow = false; }
     this.rearmOnRelease = false;
+    this.queuedRelease = null;
   }
   /** Timing controls one finite scoop; the committed wrist motion releases it
    * later, at the actual blade position rather than at the button-up pose. */
@@ -187,14 +190,16 @@ export class MortarSystem {
     const quality:'ready'|'early'|'perfect'|'late'=this.overheld||!active?'ready':phase<.42?'early':phase<=.58?'perfect':'late';
     const castElapsed=this.pendingCast?.elapsed??(recovering?TROWEL_CAST_SECONDS-this.recovery:null);
     // Expiring the throwing bar does not move or reload the held trowel.
-    const motion=sampleTrowelMotion({holding:this.wasHeld,charge:this.overheld?1:phase,castElapsed});
+    const motion=sampleTrowelMotion({holding:this.wasHeld,charge:casting?(this.pendingCast?.phase??this.releasedPhase):this.overheld?1:phase,castElapsed});
     motion.loadVisible=motion.loadVisible&&(this.hasScoop?.()??true);
     return {holding:this.wasHeld,overheld:this.overheld,phase,quality,swingDegrees:motion.rollDegrees,strength:phase,splash:this.faceSplash,lastRelease:this.releaseCount,casting,castElapsed,stage:motion.stage,motion};
   }
   swing(held: boolean, dt: number, camera: THREE.Camera, origin: THREE.Vector3 | (() => THREE.Vector3)): void {
     dt=Math.max(0,Number.isFinite(dt)?dt:0);
+    // A cast already required button-up. Any new hold is a new gesture, even
+    // while the wrist returns. Charge it now and retain at most one release.
+    this.chargeInput(held,dt);
     if (this.pendingCast) {
-      if(held)this.rearmOnRelease=true;else this.rearmOnRelease=false;
       this.pendingCast.elapsed=Math.min(TROWEL_CAST_SECONDS,this.pendingCast.elapsed+dt);
       if(this.pendingCast.elapsed+1e-9<TROWEL_RELEASE_SECONDS)return;
       const phase=this.pendingCast.phase,elapsed=this.pendingCast.elapsed;
@@ -208,7 +213,13 @@ export class MortarSystem {
       this.recoverySkipSeconds=dt;
       return;
     }
-    if (this.recovery > 0) { if(held)this.rearmOnRelease=true;else this.rearmOnRelease=false; return; }
+    if (this.recovery > 0) return;
+    if(this.queuedRelease!==null){
+      this.releasedPhase=this.queuedRelease;this.pendingCast={phase:this.queuedRelease,elapsed:0};this.queuedRelease=null;
+    }
+  }
+  private chargeInput(held:boolean,dt:number):void {
+    if(this.queuedRelease!==null)return;
     if(this.rearmOnRelease){if(!held){this.rearmOnRelease=false;if(this.overheld)this.wasHeld=false;this.overheld=false;}return;}
     if (held) {
       this.heldSeconds += dt;
@@ -223,7 +234,7 @@ export class MortarSystem {
       this.wasHeld = true; this.charge = Math.min(1, this.heldSeconds / TROWEL_CHARGE_SECONDS);
     }
     else if (this.wasHeld) {
-      this.releasedPhase=this.charge;this.pendingCast={phase:this.charge,elapsed:0};
+      this.queuedRelease=this.charge;
       this.wasHeld=false;this.charge=0;this.heldSeconds=0;
     }
   }
@@ -641,8 +652,8 @@ export class MortarSystem {
 
   private syncFieldGeometry(maxChunks=Infinity): void {
     // Explicit synchronous callers need the latest field (e.g. offline setup).
-    // During play, freeze one immutable generation and prepare one chunk per
-    // frame. Live settling/washing may continue without restarting that batch.
+    // During play, freeze one immutable generation and prepare bounded chunks.
+    // Live settling/washing may continue without restarting that batch.
     if(maxChunks===Infinity)this.cancelFieldMeshBatch();
     if(!this.pendingFieldMesh){
       if(!this.field.dirty.size)return;
@@ -693,7 +704,7 @@ export class MortarSystem {
     this.stuckMass+=held;
     const loose=Math.max(0,removed-held);
     if(loose)this.queueSlurry(point.boxGroup.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0,0,.015)),Z,loose);
-    this.openingSignature='';this.field.invalidateGeometry();this.geometryRevision++;
+    this.openingSignature='';this.geometryRevision++;
     return{displacedKg:removed,repackedKg:held,looseKg:loose};
   }
 
@@ -703,7 +714,15 @@ export class MortarSystem {
     this.cancelFieldMeshBatch();
     const removed=this.field.removeWhere(q=>boxes.some(box=>{const local=q.clone().applyMatrix4(box.inverse);return Math.abs(local.x)<box.halfWidth&&Math.abs(local.y)<box.halfHeight && local.z>box.minZ && local.z<box.maxZ;}));
     if(removed>0){this.stuckMass=Math.max(0,this.stuckMass-removed);const point=this.deposits[0]?.position??new THREE.Vector3(0,1,0);this.queueSlurry(point,Z,removed);}
-    this.field.invalidateGeometry();this.geometryRevision++;
+    // Clipping only changes in the old/new opening prisms. Invalidating the
+    // whole bed delayed a small insertion by more than a second on large beds.
+    const changed=[...boxes.filter(box=>!this.previousOpenings.some(old=>old.inverse.equals(box.inverse))),...this.previousOpenings.filter(old=>!boxes.some(box=>box.inverse.equals(old.inverse)))];
+    for(const box of changed){
+      const transform=box.inverse.clone().invert(),bounds=new THREE.Box3();
+      for(const x of [-box.halfWidth,box.halfWidth])for(const y of [-box.halfHeight,box.halfHeight])for(const z of [box.minZ,box.maxZ])bounds.expandByPoint(new THREE.Vector3(x,y,z).applyMatrix4(transform));
+      this.field.invalidateRegion(bounds.min,bounds.max);
+    }
+    this.previousOpenings=boxes;this.geometryRevision++;
   }
 
   private queueSlurry(point:THREE.Vector3,normal:THREE.Vector3,mass:number):void {
@@ -735,6 +754,7 @@ export class MortarSystem {
   }
 
   update(dt: number): void {
+    const updateStart=performance.now();
     dt = Math.min(.12, Math.max(0, dt)); this.simulationTime += dt;
     const recoveryDt=Math.max(0,dt-this.recoverySkipSeconds);
     this.recoverySkipSeconds=Math.max(0,this.recoverySkipSeconds-dt);
@@ -775,10 +795,6 @@ export class MortarSystem {
       }
     }
     for(const deposit of this.deposits)deposit.age+=dt;
-    // Field collision changes immediately. Only the visible skin is rebuilt
-    // one spatial chunk per frame, so a scoop cannot pause every tool for a
-    // full-cavity synchronous remesh.
-    if(this.pendingGeometryChunks)this.syncFieldGeometry(1);
     if(this.pendingWashMass>.002&&this.projectiles.length<48){this.spawnClod(this.pendingWashPoint.clone().addScaledVector(this.pendingWashNormal,.025),new THREE.Vector3(0,-.25,.08),this.pendingWashMass,true);this.pendingWashMass=0;}
     if (this.maintenanceTime > .4) { this.maintenanceTime = 0; this.updateStages(); }
     const steps = Math.max(1, Math.ceil(dt / .012)), h = dt / steps;
@@ -838,6 +854,15 @@ export class MortarSystem {
       // No age-based teleport to floor: trajectories continue falling under gravity.
     }
     for(const clod of this.projectiles)this.updateClodAppearance(clod);
+    // Include this frame's impacts. Keep coherent seam publication, but use
+    // the available frame budget instead of waiting one frame for every chunk.
+    // Deposition itself shares this budget: do not add a remesh spike to an
+    // expensive impact. A pending batch still gets one chunk after 100 ms so
+    // sustained work cannot starve presentation indefinitely.
+    for(let count=0;this.pendingGeometryChunks&&count<12;count++){
+      if(performance.now()-updateStart>=8&&(count>0||this.fieldMeshTime<.1))break;
+      this.syncFieldGeometry(1);
+    }
   }
   /** Low-energy residue rests on the ledge it actually hit. It is neither glued
    * mortar nor floor waste, and contributes no installation coverage by itself. */

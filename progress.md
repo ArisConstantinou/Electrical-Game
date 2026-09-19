@@ -531,3 +531,12 @@ Original request for this follow-up: fill irregular brick gaps; stop loss despit
 - Reproduced failed small-cavity mobile fill. PERFECT retention now uses the actual wall approach as well as the local microfacet normal, preventing good transfers from being treated as glancing strikes on rough clay or fresh mortar.
 - New native box-perimeter test fills every sampled accessible gap in desktop/mobile, with stable geometry after waiting. Dedicated ordinary-cast residue test and existing contact/atomic mesh suites pass. Existing actionable sand targeting is retained and passes.
 - Typecheck/build, native PERFECT, full preparation in three layouts, finite batch supply, volume/timing, pose, compiled WebGPU/WebGL startup and safe bundled client pass. Full evidence and boundaries: `docs/SIX_MORTAR_ISSUES.md`.
+
+## 2026-09-19 · Four follow-up reports on confirmed port 5364
+
+Original follow-up request: boxes should place on free mortar without breaking bricks; remove indefinite spinning/floating brick debris; eliminate delayed mortar/box fill; accept the first new throw hold after a PERFECT cast.
+- Continued isolated branch from protected `d8bd3a8`; the main dirty checkout and PID 33284 / strict port 5364 provenance were checked.
+- Reproduced dropped input, 70-frame full-bed remesh publication and 16 indefinitely dynamic cavity fragments. Final fixture has immediate charging, 4-frame publication and zero indefinitely dynamic/unsupported fragments; all 50 legitimately supported chips fall when support is removed.
+- Native mouse/touch placement already works over mortar on intact masonry. Fixed misleading blocked-outline depth and overlap legend while preserving real casing collisions.
+- Kept the final debris correction narrow: shared collision/support probes and removal of artificial repeated chamber impulses. An explored full inter-fragment solver was discarded because it was expensive and unnecessary for the verified cause; none of it remains in the delivered source.
+- Added reusable protected-source before/after physics/browser cases and a queued-release regression. Evidence, measured performance and limitations are in `docs/MORTAR_FOLLOWUP.md`.

@@ -114,11 +114,34 @@ report.push({check:'Actual early, ideal and late contact, gravity, adhesion and 
   assert(Math.abs(system.throwFeedback.castElapsed-.16)<1e-8,'Swing and update double-advanced the release slice');
   for(let i=0;i<70;i++){system.swing(true,.01,camera,sample);system.update(.01);}
   assert.equal(samples,1);assert.equal(system.throwFeedback.lastRelease,1,'Holding during recovery auto-launched another scoop');
-  assert.equal(system.throwFeedback.holding,false,'A held recovery input automatically rearmed charging');
-  system.swing(false,0,camera,sample);system.swing(true,.2,camera,sample);
-  assert(system.throwFeedback.holding,'A fresh released-then-held input cannot rearm');
+  assert.equal(system.throwFeedback.holding,true,'The first new press during recovery must charge');
+  assert(Math.abs(system.throwFeedback.phase-.7/.95)<1e-8,'Recovery lost part of the new hold');
   assert.equal(samples,1,'Charging samples a release origin prematurely');
-  report.push({check:'Delayed release samples the closed moving blade once; clocks and recovery rearm are bounded',releasePose});
+  system.swing(false,0,camera,sample);system.swing(false,.16,camera,sample);
+  assert.equal(samples,2,'The charged second gesture must cast on its first release');
+  report.push({check:'Delayed release samples the closed moving blade once; a fresh recovery press charges immediately',releasePose});
+}
+{
+  const {system,camera,origin}=fixture();
+  system.swing(true,.475,camera,origin);system.swing(false,0,camera,origin);
+  // Complete another click before the first animation finishes. Preserve its
+  // release phase and reserve exactly one additional scoop when the wrist resets.
+  for(let i=0;i<20;i++){system.swing(true,.01,camera,origin);system.update(.01);}
+  system.swing(false,0,camera,origin);
+  for(let i=0;i<180;i++){system.swing(false,.01,camera,origin);system.update(.01);}
+  assert.equal(system.throwFeedback.lastRelease,2);assert(Math.abs(system.launchedMass-1.3)<1e-9);
+  assert(Math.abs(system.releasedPhase-.2/.95)<1e-8,'Queued click timing changed while waiting for the wrist');
+  report.push({check:'A complete click during recovery queues one finite scoop with its original release timing'});
+}
+{
+  const {system,camera,origin}=fixture();
+  system.swing(true,.475,camera,origin);system.swing(false,0,camera,origin);
+  for(let i=0;i<20;i++){system.swing(true,.01,camera,origin);system.update(.01);}
+  system.swing(false,0,camera,origin);system.cancel();
+  for(let i=0;i<180;i++){system.swing(false,.01,camera,origin);system.update(.01);}
+  assert.equal(system.throwFeedback.lastRelease,1,'Tool switch/blur must cancel the queued second scoop');
+  assert(Math.abs(system.launchedMass-.65)<1e-9);assert.equal(system.throwFeedback.holding,false);
+  report.push({check:'Cancellation drops a queued gesture without consuming or launching another scoop'});
 }
 {
   for(const elapsed of [0,.08,.159]){

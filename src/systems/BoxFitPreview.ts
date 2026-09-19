@@ -63,7 +63,7 @@ export class BoxFitPreview {
     const positions:number[]=[];
     const segment=(a:number[],b:number[])=>positions.push(...a,...b);
     for(const box of ghost.boxGroup.boxes){
-      const x=target.x+box.position.x,w=box.width/2,h=box.height/2,y=target.y,seat=target.wallFrontZ+(fit.canPlace?fit.proudDepthM:0),z=seat+.007,back=seat-fit.required.depth;
+      const x=target.x+box.position.x,w=box.width/2,h=box.height/2,y=target.y,seat=target.wallFrontZ+fit.proudDepthM,z=seat+.007,back=seat-fit.required.depth;
       const corners=[[x-w,y-h,z],[x+w,y-h,z],[x+w,y+h,z],[x-w,y+h,z]];
       for(let i=0;i<4;i++){segment(corners[i],corners[(i+1)%4]);segment(corners[i],[corners[i][0],corners[i][1],back]);}
       for(let i=0;i<4;i++)segment([corners[i][0],corners[i][1],back],[corners[(i+1)%4][0],corners[(i+1)%4][1],back]);

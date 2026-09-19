@@ -229,6 +229,14 @@ export class MortarField {
     }
   }
   invalidateGeometry():void {for(const node of this.nodes.values())this.changed(node);}
+  invalidateRegion(min:THREE.Vector3,max:THREE.Vector3):void {
+    const width=this.spacing*CHUNK,halo=this.spacing*2;
+    for(const key of this.chunkNodes.keys()){
+      const [x,y,z]=key.split(',').map(Number);
+      if((x+1)*width+halo<min.x||x*width-halo>max.x||(y+1)*width+halo<min.y||y*width-halo>max.y||(z+1)*width+halo<min.z||z*width-halo>max.z)continue;
+      this.dirty.add(key);
+    }
+  }
 
   /** A remesh may span several frames while fresh material continues yielding.
    * Copy one coherent field revision, including the interpolation/normal halo,

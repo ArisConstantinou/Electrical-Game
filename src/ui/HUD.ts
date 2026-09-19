@@ -393,7 +393,8 @@ export class HUD {
     if(!this.displayChanged('box-fit',key))return;
     const status=this.shell.querySelector<HTMLElement>('#box-fit-status')!;
     status.dataset.fit=fit.mode;
-    const obstruction=fit.reason==='other-box'?'ANOTHER BOX BLOCKS THIS SPOT':`REMOVE MARKED · +${fit.extraDepthMm} mm DEPTH`;
+    const obstruction=fit.reason==='other-box'?'BOX OVERLAP · SHIFT AIM':`REMOVE MARKED · +${fit.extraDepthMm} mm DEPTH`;
+    this.shell.querySelector('#box-fit-legend')!.innerHTML=fit.reason==='other-box'?'<i></i> RED: BOX OVERLAP · LEAVE ROOM FOR RIMS':'<i></i> RED: REMOVE <i></i> AMBER: DEPTH';
     const protrusion=`PROTRUDES ${proud} mm`;
     status.textContent=fit.mode==='retrieve'?(proud>2?`${protrusion} · TAP TO PICK UP`:'TAP TO PICK UP THIS BOX'):fit.mode==='fits'?'FITS FLUSH · TAP TO PLACE':fit.mode==='proud'?`${protrusion} · TAP TO PLACE`:fit.mode==='out-of-reach'?(fit.reason==='fits'?'CAVITY FITS · MOVE CLOSER':fit.reason==='out-of-reach'?'AIM AT A CLOSER WALL AREA':fit.reason==='other-box'?`${obstruction} · MOVE CLOSER`:`${protrusion} · MOVE CLOSER`):obstruction;
     this.shell.querySelector('#box-fit-size')!.textContent=fit.mode==='retrieve'?'BOX AT CROSSHAIR':dimensions?`RECESS ${dimensions}`:'AIM AT THE WALL';

@@ -541,18 +541,16 @@ export class ChasingSystem {
           particle.velocity.z *= .985;
           continue;
         }
-        if (!this.hasSettledOverlap(particle)) {
-          particle.settled = true;
-          particle.wallSupported = true;
-          particle.support = null;
-          particle.velocity.set(0, 0, 0);
-          particle.angularVelocity.set(0, 0, 0);
-        } else {
-          // A chamber shelf is already occupied. Keep the chip dynamic so it
-          // slips along the shelf instead of sleeping inside another fragment.
-          particle.velocity.x = (particle.mesh.id % 2 ? 1 : -1) * .045;
-          particle.velocity.z = (particle.mesh.userData.inward ? -1 : 1) * .035;
-        }
+        // A floor footprint is a conservative rectangle, not the solid outline
+        // of a concave wall fragment. Treating overlapping rectangles as a
+        // failed rest injected new sideways velocity forever. A chamber rest
+        // is established by the actual wall contact above; floor stacking keeps
+        // its separate footprint/coverage and overlap checks.
+        particle.settled = true;
+        particle.wallSupported = true;
+        particle.support = null;
+        particle.velocity.set(0, 0, 0);
+        particle.angularVelocity.set(0, 0, 0);
       }
     }
     const side = GAME_CONFIG.room.width / 2 - particle.halfWidth;
@@ -710,21 +708,20 @@ export class ChasingSystem {
         this.probePosition.y-=.004;
         if(this.wall.isSolidAt(this.probePosition.x,this.probePosition.y,this.probePosition.z))return true;
       }
+      // The same real triangle samples that stop downward motion must also
+      // recognise support on narrow webs and irregular chamber ledges.
+      for(const probe of particle.collisionProbes){
+        this.probePosition.copy(probe).applyQuaternion(particle.mesh.quaternion).add(p);
+        if(this.wall.isSolidAt(this.probePosition.x,this.probePosition.y,this.probePosition.z))continue;
+        this.probePosition.y-=.004;
+        if(this.wall.isSolidAt(this.probePosition.x,this.probePosition.y,this.probePosition.z))return true;
+      }
       return false;
     }
     const y = p.y - particle.halfHeight - 0.004;
     return this.wall.isSolidAt(p.x, y, p.z)
       || this.wall.isSolidAt(p.x - particle.halfWidth * 0.7, y, p.z)
       || this.wall.isSolidAt(p.x + particle.halfWidth * 0.7, y, p.z);
-  }
-
-  private hasSettledOverlap(particle: Particle): boolean {
-    const p=particle.mesh.position, a=this.floorFootprint(particle);
-    return this.particles.some(other=>{
-      if(other===particle || !other.settled) return false;
-      const q=other.mesh.position,b=this.floorFootprint(other);
-      return Math.abs(p.x-q.x)<a.x+b.x-.0001 && Math.abs(p.y-q.y)<particle.halfHeight+other.halfHeight-.0001 && Math.abs(p.z-q.z)<a.y+b.y-.0001;
-    });
   }
 
   private supportContact(particle: Particle, maximumCenterY: number): { height: number; particle: Particle | null } {
