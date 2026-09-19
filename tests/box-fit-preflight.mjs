@@ -11,6 +11,7 @@ try{
  const {MortarSystem}=await server.ssrLoadModule('/src/systems/MortarSystem.ts');
  const {InstallationPoint}=await server.ssrLoadModule('/src/electrical/InstallationPoint.ts');
  const {BoxPlacementSystem}=await server.ssrLoadModule('/src/systems/BoxPlacementSystem.ts');
+ const {GAME_CONFIG}=await server.ssrLoadModule('/src/data/gameConfig.ts');
  let id=0;
  function fixture(kinds=['2G','1G']){
   const points=[],scene=new THREE.Scene(),wall={volume:new MasonryVolume({seed:190319,solidMaterial:1})};
@@ -71,7 +72,7 @@ try{
  report.checks.push('fresh mortar previews do not displace; accepted fresh bed conserves mass; cured mortar previews its proud stop without mutation');
  {
   const f=fixture();f.camera.position.z=f.front+3;f.camera.updateMatrixWorld(true);assert.equal(noMutation(f,'Unreachable wall').reason,'out-of-reach');
-  f.camera.position.set(2.99,1.2,f.front+.42);f.camera.lookAt(2.99,1.2,f.front);f.camera.updateMatrixWorld(true);assert.equal(noMutation(f,'Group crosses wall boundary').reason,'out-of-reach');
+  const edge=GAME_CONFIG.room.width/2-.01;f.camera.position.set(edge,1.2,f.front+.42);f.camera.lookAt(edge,1.2,f.front);f.camera.updateMatrixWorld(true);assert.equal(noMutation(f,'Group crosses wall boundary').reason,'out-of-reach');
  }
  report.passed=true;console.log(JSON.stringify(report,null,2));
 }finally{await writeFile('output/box-fit-preflight.json',JSON.stringify(report,null,2));await server.close();}

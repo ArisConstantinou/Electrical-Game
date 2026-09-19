@@ -2,12 +2,13 @@ import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {blockPointerLock} from './browser-safety.mjs';
+const url=process.argv.find(arg=>/^https?:/.test(arg))??'http://127.0.0.1:5362/Electrical-Game/';
 const out='output/mixing-downward-arms';await mkdir(out,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:true});const results=[];
 try{
  for(const viewport of [{width:1366,height:768},{width:390,height:844},{width:844,height:390}]){
   const context=await browser.newContext({viewport,isMobile:viewport.width<900,hasTouch:viewport.width<900});await blockPointerLock(context);
-  const page=await context.newPage();await page.goto('http://127.0.0.1:5362/Electrical-Game/');await page.waitForFunction(()=>window.__wireTheHouse?.mixing);await page.locator('#start-button').click();
+  const page=await context.newPage();await page.goto(url);await page.waitForFunction(()=>window.__wireTheHouse?.mixing);await page.locator('#start-button').click();
   await page.evaluate(()=>{const g=window.__wireTheHouse;g.step=()=>{};g.mixing.setActive(true);});
   for(const angle of [55,75,88])for(const tool of ['trowel','shovel','mixer']){
    const sample=await page.evaluate(({angle,tool})=>{const g=window.__wireTheHouse,m=g.mixing,c=g.renderer.camera;

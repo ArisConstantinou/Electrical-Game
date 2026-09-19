@@ -403,7 +403,7 @@ export class Game {
     if(['fitting','level','spring','cutter'].includes(this.selectedTool)){
       const aim=this.selectedTool==='fitting'?this.boxWorkAim():active!.boxGroup.getWorldPosition(new THREE.Vector3());
       if(!aim||!this.fpsRig.canReachPoint(this.renderer.camera,aim)){
-        if(this.selectedTool==='fitting')this.boxFitPreview.invalidate();
+        if(this.selectedTool==='fitting'){this.boxFitPreview.invalidate();this.hud.notify('Πλησίασε τον τοίχο για να τοποθετήσεις το κουτί με το χέρι.',false,2500);}
         else this.hud.notify('Out of reach. Move closer or crouch for low work.',false,3500);
         return;
       }
@@ -449,6 +449,8 @@ export class Game {
     const distance=(this.room.brickWall.volume.frontZ-origin.z)/direction.z;
     if(distance<=0||distance>2.35)return null;
     const point=origin.addScaledVector(direction,distance);
+    const fit=this.boxFitPreview.assessment;
+    if(fit?.canPlace&&fit.target&&Math.hypot(point.x-fit.target.x,point.y-fit.target.y)<.01)point.z+=fit.proudDepthM;
     return Math.abs(point.x)<=3&&point.y>=0&&point.y<=3?point:null;
   }
 

@@ -3,6 +3,7 @@ import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {blockPointerLock} from './browser-safety.mjs';
 
+const url=process.argv.find(arg=>/^https?:/.test(arg))??'http://127.0.0.1:5362/Electrical-Game/';
 const repro=process.argv.includes('--repro'),out='output/ready-mortar-wall';
 await mkdir(out,{recursive:true});
 const report={repro,cases:[],errors:[],fixtures:'Recipe ingredients, camera, deterministic clock and cavity impacts; real mouse/touch tool selection and casts. No FINISH click.'};
@@ -10,7 +11,7 @@ const browser=await chromium.launch({channel:'chrome',headless:true});
 try{for(const mobile of [false,true]){
  const context=await browser.newContext({viewport:mobile?{width:390,height:844}:{width:1366,height:768},isMobile:mobile,hasTouch:mobile});await blockPointerLock(context);
  const page=await context.newPage();page.on('pageerror',e=>report.errors.push(e.message));
- await page.goto('http://127.0.0.1:5362/Electrical-Game/');await page.waitForFunction(()=>window.__wireTheHouse?.mixing);await page.locator('#start-button')[mobile?'tap':'click']();
+ await page.goto(url);await page.waitForFunction(()=>window.__wireTheHouse?.mixing);await page.locator('#start-button')[mobile?'tap':'click']();
  await page.evaluate(()=>{const g=window.__wireTheHouse;window.__readyStep=g.step.bind(g);g.step=()=>{};const m=g.mixing,b=m.batch;b.addWater(20/3);b.openSack(0);for(let i=0;i<6;i++){b.scoopCement(0);b.pour('trowel');}for(let i=0;i<12;i++){b.scoopSand();b.pour('shovel');}b.mix(8);m.setActive(true);});
  const step=n=>page.evaluate(n=>{for(let i=0;i<n;i++)window.__readyStep(1/60);},n);
  const state=()=>page.evaluate(()=>{const g=window.__wireTheHouse;return{mixing:g.mixing.telemetry,mortar:g.mortar.telemetry,fieldMass:g.mortar.field.mass,finish:!document.querySelector('#mixing-finish').hidden,overflow:document.documentElement.scrollWidth>innerWidth,renderError:g.renderer.renderError};});

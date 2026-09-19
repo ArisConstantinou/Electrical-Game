@@ -225,4 +225,26 @@ report.push({check:'Actual early, ideal and late contact, gravity, adhesion and 
  report.push({check:'Perfect first contact has no compulsory waste; flooding and poor batches still shed',cases});
 }
 
+// Sample the non-repeating footprint phase and lattice offsets on fresh dry
+// masonry; a good finite scoop must not create one floor clod per cast.
+{
+ const samples=[];
+ for(let variation=0;variation<32;variation++){
+  const wall={volume:{frontZ:0,isOccupied:(_x,_y,z)=>z<0,raycast(origin,direction,max){
+   if(direction.z>=0)return null;const distance=-origin.z/direction.z;
+   return distance>=0&&distance<=max?{point:origin.clone().addScaledVector(direction,distance),normal:normal.clone()}:null;
+  }}};
+  const system=new MortarSystem(new THREE.Scene(),wall,[]),camera=new THREE.PerspectiveCamera();
+  system.clodSequence=variation;
+  const x=(variation%7)*.0011,y=1.2+(variation%5)*.0013;
+  camera.position.set(x,y,.85);camera.lookAt(x,y,0);camera.updateMatrixWorld(true);
+  const origin=new THREE.Vector3(x-.08,y-.04,.35);
+  system.swing(true,.475,camera,origin);system.swing(false,0,camera,origin);system.swing(false,TROWEL_RELEASE_SECONDS,camera,origin);
+  advance(system,10);const result=ledger(system);
+  assert(result.heldKg>.65-1e-5,`Footprint ${variation} still rejects mortar: ${JSON.stringify(result)}`);
+  assert(result.floorKg<1e-5);assert.equal(system.settled.length,0,'Visible floor clod after PERFECT contact');
+  samples.push({variation,...result});
+ }
+ report.push({check:'32 dry intact footprint phases preserve complete PERFECT scoop after ten seconds, without floor meshes',samples});
+}
 console.log(JSON.stringify({suite:'throw-timing-physics',passed:true,checks:report},null,2));

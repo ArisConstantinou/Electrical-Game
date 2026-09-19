@@ -490,12 +490,12 @@ export class MortarSystem {
     if(confined>0)prepared=Math.max(prepared,.88*confined);
     const effectiveIncidence=Math.max(incidence,confined*(.65+.25*incoming));
     // A correctly timed wrist transfer seats a cohesive scoop against the
-    // receiver. Do not impose the old guaranteed 7% waste (or 65% on dry
-    // brick) before the volume solver even checks available room. Oblique,
+    // receiver. Dry brick must not reject a compulsory 5% of every perfect
+    // scoop before the volume solver checks available room. Oblique,
     // flooded and low-energy contacts still lose material; capacity remains
     // authoritative and poor batch quality is applied separately below.
     if(cleanRelease){
-      prepared=Math.max(prepared,(.95+.05*Math.max(confined,Math.min(1,wet.pore/.45)))*(1-Math.min(.65,receiver.dilution*.3)));
+      prepared=Math.max(prepared,1-Math.min(.65,receiver.dilution*.3));
       const seating=THREE.MathUtils.smoothstep(effectiveIncidence,.45,.85);
       const incidenceTransfer=THREE.MathUtils.lerp(effectiveIncidence**1.3,1,seating);
       return THREE.MathUtils.clamp(prepared*(1-.8*wet.film)*Math.min(1,speed/2)*incidenceTransfer/(1+Math.max(0,speed-6)*.12),0,1);
@@ -784,9 +784,18 @@ export class MortarSystem {
         clod.impactNormal??=hit.normal.clone().negate();
         const fraction = clod.slurry || hit.box || this.insideBox(hit.point) || clod.contacts > 2 ? 0 : this.retention(hit.point, clod.velocity, hit.normal,clod.cleanRelease&&clod.contacts===0)*clod.bond;
         // A clean wrist transfer spreads the same scoop over a wider receiving
-        // area. The old footprint could hold only ~0.41 kg of a 0.65 kg scoop
-        // within the 10 mm surface coat limit, even on an empty flat wall.
-        const held = this.deposit(hit.point, clod.mass * fraction, hit.normal,false,clod.mass*(clod.cleanRelease?1.9:1),clod.velocity,clod.variation,clod.cleanRelease); this.stuckMass += held;
+        // area. If nearby fresh mortar already fills that first footprint,
+        // continue feathering the PERFECT transfer outward instead of turning
+        // the still cohesive remainder into an artificial floor clod.
+        const targetMass=clod.mass*fraction;
+        let held=this.deposit(hit.point,targetMass,hit.normal,false,clod.mass*(clod.cleanRelease?2.6:1),clod.velocity,clod.variation,clod.cleanRelease);
+        if(clod.cleanRelease&&clod.contacts===0&&fraction>.999){
+          for(const spread of [4.5,7,11]){
+            const remaining=targetMass-held;if(remaining<.001)break;
+            held+=this.deposit(hit.point,remaining,hit.normal,false,clod.mass*spread,clod.velocity,clod.variation,true);
+          }
+        }
+        this.stuckMass += held;
         if(clod.contacts===0&&!clod.slurry){const speed=clod.velocity.length(),incidence=speed>1e-6?Math.abs(clod.velocity.clone().multiplyScalar(1/speed).dot(hit.normal)):0;this.onImpact?.({speed,retainedKg:held,incidence});}
         clod.contacts++;
         clod.mass -= held;

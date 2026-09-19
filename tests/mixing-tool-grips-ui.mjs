@@ -37,11 +37,12 @@ try{
           m.useAimedObject({kind:'bucket',object:m.models.bucket});const aimedPending=Boolean(m.mixerApproach)&&!m.inserted;m.chooseTool('mixer');
           g.player.crouched=true;c.position.set(-.75,.95,1.88);c.lookAt(-.75,.3,2.28);c.updateMatrixWorld(true);
           const accepted=m.action('insert');m.present();
-          return{acceptedRequest,pending,aimedPending,accepted,hands:m.arms.map(a=>({reach:a.shoulder.distanceTo(a.wrist),forearm:a.elbow.distanceTo(a.wrist)}))};
+          return{acceptedRequest,pending,aimedPending,accepted,hands:m.arms.map(a=>({reach:a.shoulder.distanceTo(a.wrist),forearm:a.elbow.distanceTo(a.wrist),upperVisible:a.upper.visible}))};
         });
         assert(inserted.acceptedRequest&&inserted.pending&&inserted.aimedPending,'Both paths prepare the stance before seating unreachable mixer');
         assert(inserted.accepted,'A crouched worker beside the bucket can insert the mixer');
         assert(inserted.hands.every(hand=>hand.reach<.57&&Math.abs(hand.forearm-.27)<.001),'Inserted mixer keeps both forearms connected');
+        assert(inserted.hands.every(hand=>!hand.upperVisible),'Mounted mixer keeps hidden shoulder caps behind the first-person camera');
         await shot('mixer-inserted');
         const left=await page.evaluate(()=>{const g=window.__wireTheHouse,m=g.mixing;g.renderer.camera.position.z-=1;m.update(1/60,false,true);m.present();return{inserted:m.inserted,running:m.mixerRunning,held:m.telemetry.heldToolVisible};});
         assert(!left.inserted&&!left.running&&left.held,'Walking away lifts the mixer into reachable hands and stops motor');cases.push({inserted,left});continue;

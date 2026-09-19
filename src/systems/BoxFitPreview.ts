@@ -57,7 +57,7 @@ export class BoxFitPreview {
     this.extraDepthMm=Math.ceil(Math.max(0,...fit.blockedCells.map(cell=>cell.extraDepthM))*1000);
     this.proudDepthMm=Math.ceil(fit.proudDepthM*1000);
     if(!target){this.root.visible=false;this.mode='out-of-reach';return;}
-    const reachable=canReach(new THREE.Vector3(target.x,target.y,target.wallFrontZ));
+    const reachable=canReach(new THREE.Vector3(target.x,target.y,target.wallFrontZ+fit.proudDepthM));
     this.mode=!reachable||fit.reason==='out-of-reach'?'out-of-reach':fit.fits?'fits':fit.canPlace?'proud':'blocked';
     this.root.visible=true;
     const positions:number[]=[];
@@ -77,7 +77,7 @@ export class BoxFitPreview {
     if(!fit.fits&&fit.reason!=='other-box')for(const cell of fit.blockedCells){
       if(count>=4096)break;
       this.matrix.makeTranslation(cell.x,cell.y,cell.surfaceZ+.0018);this.blockedMesh.setMatrixAt(count,this.matrix);
-      this.color.set(cell.surfaceZ<target.wallFrontZ-.006?0xffae32:0xff3429);this.blockedMesh.setColorAt(count++,this.color);
+      this.color.set(fit.canPlace?0xffae32:0xff3429);this.blockedMesh.setColorAt(count++,this.color);
     }
     this.blockedMesh.count=count;this.blockedMesh.instanceMatrix.needsUpdate=true;
     if(this.blockedMesh.instanceColor)this.blockedMesh.instanceColor.needsUpdate=true;

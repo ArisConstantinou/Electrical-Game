@@ -217,46 +217,37 @@ export class MixingStation {
     if(!requested)return false;
     const target=this.aimedObject();
     if(!target){
-      if(this.active){this.message=this.guidanceForTool();return true;}
+      if(this.active)return true;
       return false;
     }
+    if(!this.promptFor(target))return this.active;
     if(!this.active)this.setActive(true);
     // Keep ingredient strokes atomic, but never discard a visible tool pickup.
     if(this.activity&&!['water','trowel','shovel','mixer'].includes(target.kind))return true;
     const handled=this.useAimedObject(target);
     return handled;
   }
-  private preferredTarget():StationTarget|null{
-    if(!this.active)return null;
-    const m=this.models,state=this.batch.getState();
-    if(this.tool==='water')return{kind:'bucket',object:m.bucket};
-    if(this.tool==='shovel')return{kind:'sand',object:m.sand};
-    if(this.tool==='mixer')return this.mixerDirty&&!this.inserted?{kind:'rinse',object:m.rinse}:{kind:'bucket',object:m.bucket};
-    if(this.tool==='trowel'){
-      const index=state.sacks.findIndex(sack=>sack.remainingKg>1e-6);
-      if(index>=0)return{kind:'sack',index,object:m.sacks[index]};
-    }
-    return null;
-  }
-  private targetInWorkCone(target:StationTarget):boolean{
-    if(!target.object.visible)return false;
-    const camera=this.game.renderer.camera,point=target.object.getWorldPosition(new THREE.Vector3());
-    point.y+=target.kind==='bucket'?.3:target.kind==='sand'?.18:target.kind==='sack'?.32:.2;
-    const offset=point.sub(camera.position),distance=offset.length();
-    if(distance>3.35||distance<.01)return false;
-    return camera.getWorldDirection(new THREE.Vector3()).dot(offset.multiplyScalar(1/distance))>.91;
+  private visibleForInteraction(object:THREE.Object3D):boolean{
+    for(let item:THREE.Object3D|null=object;item;item=item.parent)if(!item.visible)return false;
+    return true;
   }
   private aimedObject():StationTarget|null{
     if(!this.game.started||this.carrying)return null;
     const m=this.models,c=this.game.renderer.camera;m.group.updateMatrixWorld(true);
+    // Player movement/look is applied before this station update, while the
+    // rendered hand rig updates matrices later. Raycast the current view.
+    c.updateWorldMatrix(true,false);
     // Exact tools and ingredients win. Sand beside the narrow shovel gets a
     // small pickup margin so the blade does not require pixel-perfect aim.
-    const preferred=this.preferredTarget();
     this.ray.setFromCamera(new THREE.Vector2(),c);
     const roots=[m.bucket,m.sand,...m.sacks,m.rinse,m.water,m.mixer,m.shovel,this.stationTrowel].filter(object=>object.visible);
-    const hit=this.ray.intersectObjects(roots,true)[0];
+    const hit=this.ray.intersectObjects(roots,true).find(hit=>this.visibleForInteraction(hit.object));
     const shovelPickup=()=>this.nearbyVisibleShovel(roots);
-    if(!hit||hit.distance>3.2)return shovelPickup()??(preferred&&this.targetInWorkCone(preferred)?preferred:null);
+    if(!hit||hit.distance>3.2)return shovelPickup();
+    // Only inspect room occlusion for a reachable station hit; distant wall
+    // gameplay must not pay for another complete room raycast every frame.
+    const blocker=this.ray.intersectObject(this.game.room,true).find(hit=>this.visibleForInteraction(hit.object));
+    if(blocker&&blocker.distance<hit.distance-.001)return null;
     const belongs=(root:THREE.Object3D)=>{let object:THREE.Object3D|null=hit.object;while(object){if(object===root)return true;object=object.parent;}return false;};
     const sack=m.sacks.findIndex(belongs);if(sack>=0)return{kind:'sack',index:sack,object:m.sacks[sack]};
     for(const [kind,object] of [['water',m.water],['trowel',this.stationTrowel],['shovel',m.shovel],['mixer',m.mixer],['bucket',m.bucket],['sand',m.sand],['rinse',m.rinse]] as const)if(belongs(object)){
@@ -378,26 +369,18 @@ export class MixingStation {
   private promptFor(target:StationTarget|null):string{
     if(this.mixerApproach)return'ΠΑΙΡΝΕΙΣ ΘΕΣΗ';
     if(this.activity&&this.pendingTool!==null)return this.pendingTool==='hands'?'ΟΛΟΚΛΗΡΩΝΕΤΑΙ Η ΚΙΝΗΣΗ · ΑΦΗΝΕΙΣ ΤΟ ΕΡΓΑΛΕΙΟ':`ΟΛΟΚΛΗΡΩΝΕΤΑΙ Η ΚΙΝΗΣΗ · ΜΕΤΑ ${names[this.pendingTool]}`;
-    if(!target)return this.active?`${matchMedia('(any-pointer: coarse)').matches?'INTERACT':'E'} · ${this.guidanceForTool()}`:'';
     const key=matchMedia('(any-pointer: coarse)').matches?'INTERACT':'E';
+    if(!target)return this.carrying?`${key} · ΑΦΗΣΕ ΤΗ ΣΥΚΛΑ`:'';
     if(target.kind==='water')return`${key} · ΠΙΑΣΕ ΚΑΝΑΤΑ ΝΕΡΟΥ`;
     if(target.kind==='trowel')return`${key} · ΠΙΑΣΕ ΜΙΣΤΡΙ ΜΙΞΗΣ`;
     if(target.kind==='shovel')return`${key} · ΠΙΑΣΕ ΦΤΥΑΡΙ`;
     if(target.kind==='mixer')return`${key} · ΠΙΑΣΕ ΜΙΞΕΡ`;
-    if(target.kind==='sack')return`${key} · ${this.tool==='trowel'?(this.batch.getState().sacks[target.index??0].open?'ΠΑΡΕ ΜΙΑ ΜΙΣΤΡΙΑ':'ΣΚΙΣΕ ΤΗ ΣΑΚΟΥΛΑ'):'ΧΡΕΙΑΖΕΤΑΙ ΜΙΣΤΡΙ ΜΙΞΗΣ'}`;
-    if(target.kind==='sand')return`${key} · ${this.tool==='shovel'?'ΠΑΡΕ ΜΙΑ ΦΤΥΑΡΙΑ':'ΧΡΕΙΑΖΕΤΑΙ ΦΤΥΑΡΙ'}`;
+    if(target.kind==='sack'&&this.tool==='trowel')return`${key} · ${this.batch.getState().sacks[target.index??0].open?'ΠΑΡΕ ΜΙΑ ΜΙΣΤΡΙΑ':'ΣΚΙΣΕ ΤΗ ΣΑΚΟΥΛΑ'}`;
+    if(target.kind==='sand'&&this.tool==='shovel')return`${key} · ΠΑΡΕ ΜΙΑ ΦΤΥΑΡΙΑ`;
     if(target.kind==='bucket'&&this.tool==='water')return`${key} · ΓΕΜΙΣΕ ΝΕΡΟ ΣΤΟ ⅓`;
     if(target.kind==='bucket'&&this.tool==='mixer')return`${key} · ${this.mixerInstruction(this.models.bucket)}`;
-    if(target.kind==='rinse')return`${key} · ${this.tool==='mixer'?this.mixerInstruction(this.models.rinse):'ΞΕΠΛΥΝΕ ΤΟ ΜΙΞΕΡ'}`;
-    return`${key} · ΣΤΟΧΕΥΣΕ ΤΟ ΣΩΣΤΟ ΕΡΓΑΛΕΙΟ`;
-  }
-  private guidanceForTool():string{
-    if(this.carrying)return'ΑΦΗΣΕ ΤΗ ΣΥΚΛΑ';
-    if(this.tool==='water')return'ΚΟΙΤΑΞΕ ΤΗ ΣΥΚΛΑ';
-    if(this.tool==='trowel')return'ΚΟΙΤΑΞΕ ΤΗ ΣΑΚΟΥΛΑ';
-    if(this.tool==='shovel')return'ΚΟΙΤΑΞΕ ΤΗΝ ΑΜΜΟ';
-    if(this.tool==='mixer')return this.mixerDirty&&!this.inserted?'ΚΟΙΤΑΞΕ ΤΟ ΝΕΡΟ ΞΕΠΛΥΜΑΤΟΣ':'ΚΟΙΤΑΞΕ ΤΗ ΣΥΚΛΑ';
-    return'ΣΤΟΧΕΥΣΕ ΑΝΤΙΚΕΙΜΕΝΟ';
+    if(target.kind==='rinse'&&this.tool==='mixer'&&this.mixerDirty&&!this.inserted)return`${key} · ${this.mixerInstruction(this.models.rinse)}`;
+    return '';
   }
   private finishBatch():void{
     if(!this.batch.ready||this.inserted)return;
@@ -415,8 +398,7 @@ export class MixingStation {
     const stageNearby=this.game.started&&distance<2.35&&!this.finished;this.toolbelt.hidden=!stageNearby;this.game.hud.shell.classList.toggle('mixing-stage',stageNearby);
     this.receipt.update(this.batch,this.game.started&&(this.active||stageNearby),dt,this.recipeHint());
     if(this.active&&distance>this.activationDistance+1.2)this.setActive(false);
-    const aimed=this.aimedObject(),interactAvailable=Boolean(aimed)||this.carrying||(this.active&&stageNearby);
-    const prompt=this.promptFor(aimed);this.prompt.hidden=!prompt;this.prompt.textContent=prompt;
+    const aimed=this.aimedObject(),prompt=this.promptFor(aimed),interactAvailable=Boolean(prompt);this.prompt.hidden=!prompt;this.prompt.textContent=prompt;
     this.mixerControlHint=prompt.replace(/^.*? · /,'');
     if(this.mobileInteract){this.mobileInteract.hidden=!interactAvailable;this.mobileInteract.querySelector('small')!.textContent=this.carrying?'ΑΦΗΣΕ ΣΥΚΛΑ':prompt?.replace(/^.*? · /,'')||'ΣΤΟΧΕΥΣΕ ΑΝΤΙΚΕΙΜΕΝΟ';}
     this.toggle.hidden=true;this.actionTime=Math.max(0,this.actionTime-dt);
@@ -558,10 +540,16 @@ export class MixingStation {
       arm.hand.quaternion.fromArray(gripRotation??[0,0,0,1]);
       if(gripModel===this.models.mixer)arm.hand.quaternion.premultiply(this.models.mixer.quaternion);
       arm.hand.updateWorldMatrix(true,true);
-      const shoulder=model?.visible
-        ?c.localToWorld(new THREE.Vector3(arm.side*.18,-.30,.08))
-        :c.position.clone().addScaledVector(right,arm.side*.18).add(new THREE.Vector3(0,-.3,0));
+      // The torso stays in the camera frame for every mixing pose. Once the
+      // mixer was seated in the bucket, this used a world-down offset instead;
+      // looking down then swung both shoulder caps in front of the eyes.
+      const mountedMixer=!model?.visible&&(this.inserted||this.cleanSeconds>0);
+      const shoulder=c.localToWorld(new THREE.Vector3(arm.side*.18,mountedMixer?-.10:-.30,mountedMixer?.03:.08));
       const wrist=arm.hand.localToWorld(new THREE.Vector3().fromArray(arm.hand.userData.wristPoint));
+      // When both hands are fixed above the bucket, the shirt shoulder itself
+      // is behind the first-person camera. Drawing that hidden proximal piece
+      // produced the detached sleeve caps seen at the screen edges.
+      arm.upper.visible=!mountedMixer;
       poseWorkerArm(arm,shoulder,wrist,right);
     }
   }

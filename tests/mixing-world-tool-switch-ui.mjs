@@ -41,7 +41,7 @@ try{
         for(const dz of [-.92,-1.4,-1.8,-2.1,-.55])for(const dx of [0,-.4,.4,-.8,.8,-1.2,1.2])for(const height of [1.65,.95])for(const p of points){
           if(Math.hypot(dx,dz)>=2.3)continue;
           c.position.set(origin.x+dx,height,origin.z+dz);c.lookAt(p);c.updateMatrixWorld(true);m.ray.setFromCamera({x:0,y:0},c);
-          const hit=m.ray.intersectObjects(roots,true)[0],preferred=m.preferredTarget(),inCone=Boolean(preferred&&m.targetInWorkCone(preferred));
+          const hit=m.ray.intersectObjects(roots,true)[0],preferred={kind:'sack'},sackPoint=models.sacks[0].getWorldPosition(c.position.clone()).add({x:0,y:.32,z:0}).sub(c.position),inCone=sackPoint.length()<=3.35&&c.getWorldDirection(c.position.clone()).dot(sackPoint.normalize())>.91;
           if(hit&&hit.distance<=3.2&&belongs(hit.object)&&(!cone||inCone)){
             g.player.crouched=height===.95;g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;
             return{kind,directHit:hit.object.name||hit.object.type,distance:hit.distance,preferred:preferred?.kind,inCone,camera:c.position.toArray(),point:p.toArray()};

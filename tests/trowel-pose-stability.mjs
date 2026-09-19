@@ -71,6 +71,12 @@ for(const viewport of [[1366,768],[390,844],[844,390]]){
  f.player.update(1/60);const expectedPitch=f.player.pitch;assert(expectedPitch>-.3);
  f.input.mobileLook={x:0,y:0};const afterLook=f.camera.quaternion.clone();
  for(let i=0;i<90;i++){f.player.update(1/60);f.pose(sampleTrowelMotion({holding:false,charge:.5,castElapsed:Math.min(.82,i/60)}),1/60);assert.equal(f.player.pitch,expectedPitch);assert(f.camera.quaternion.angleTo(afterLook)<1e-7);}
- report.cases.push({viewport,poses,castCameraStable:true,manualAimAfterReleaseStable:true});
+ // Looking back toward the material bay uses a low carry pose instead of
+ // turning the loaded wall trowel and the whole arm across the reticle.
+ f.camera.rotation.set(-.72,Math.PI,0,'YXZ');f.camera.updateMatrixWorld(true);f.pose(sampleTrowelMotion({holding:false,charge:0,castElapsed:null}),0);
+ const carryArm=f.rig.debugPose().arms.find(a=>a.side===1),carryWrist=f.camera.worldToLocal(new THREE.Vector3().fromArray(carryArm.wrist));
+ assert(carryWrist.y<-.18&&carryWrist.z<-.34,'Off-wall loaded trowel stays in a low carry pose');
+ const carryDistance=(a,b)=>Math.hypot(...a.map((v,i)=>v-b[i]));assert(Math.abs(carryDistance(carryArm.shoulder,carryArm.elbow)-.31)<1e-7);assert(Math.abs(carryDistance(carryArm.elbow,carryArm.wrist)-.27)<1e-7);
+ report.cases.push({viewport,poses,castCameraStable:true,manualAimAfterReleaseStable:true,offWallCarryWrist:carryWrist.toArray()});
 }
 report.passed=true;await writeFile('output/trowel-pose-stability.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
