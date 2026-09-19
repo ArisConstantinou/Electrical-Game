@@ -54,6 +54,13 @@ try {
     assert.equal(state.renderError, ''); assert.deepEqual(report.errors, []);
     report.checks.push({ backend: state.water.backend, viewport: page.viewportSize(), impacts: state.workSurface.impactCount, water: state.water, renderError: state.renderError });
     await page.screenshot({ path: `${out}/${fallback ? 'webgl-mobile' : 'webgpu-desktop'}.png` });
+    await page.keyboard.press('Digit7');
+    await page.evaluate(()=>{const g=window.__wireTheHouse,c=g.renderer.camera;c.position.set(0,1.65,-1.25);c.lookAt(0,.55,2.2);g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;});
+    await page.waitForTimeout(300);
+    const equipment=await page.evaluate(async()=>{const g=window.__wireTheHouse,m=g.mixing;m.drum.toggle();const before=m.drum.telemetry.angle;await window.advanceTime(250);await g.renderer.waitForFrame();g.renderer.render();await g.renderer.waitForFrame();return{barrow:m.telemetry.wheelbarrow,drum:m.drum.telemetry,rotated:m.drum.telemetry.angle!==before,loaded:g.fpsRig.tools.get('trowel').getObjectByName('trowel-load').visible,renderError:g.renderer.renderError};});
+    assert.equal(equipment.barrow.massKg,114);assert.equal(equipment.loaded,true);assert(equipment.rotated);assert.equal(equipment.renderError,'');assert.deepEqual(report.errors,[]);
+    report.checks.at(-1).equipment=equipment;
+    await page.screenshot({path:`${out}/${fallback?'webgl-mobile':'webgpu-desktop'}-equipment.png`});
     await context.close();
   }
 } finally { await writeFile(`${out}/report.json`, JSON.stringify(report, null, 2)); await browser.close(); }

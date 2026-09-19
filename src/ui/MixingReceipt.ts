@@ -9,6 +9,7 @@ export class MixingReceipt {
   private remaining = 0;
   private message = '';
   private key = '';
+  private observedBatch:MortarBatch|null=null;
   private readonly number = new Intl.NumberFormat('el-GR', { maximumFractionDigits: 1 });
 
   constructor(shell: HTMLElement) {
@@ -22,8 +23,9 @@ export class MixingReceipt {
     shell.append(this.panel);
   }
 
-  update(batch: MortarBatch, visible: boolean, dt: number, context?:string): void {
+  update(batch: MortarBatch, visible: boolean, dt: number, context?:string, vessel='ΣΤΗ ΣΥΚΛΑ'): void {
     const values = [batch.waterLitres, batch.cementScoops, batch.sandScoops];
+    if(this.observedBatch!==batch){this.observedBatch=batch;this.previous=values;this.remaining=0;this.key='';this.panel.querySelector('.mix-receipt-title')!.textContent=vessel;}
     this.remaining = Math.max(0, this.remaining - dt);
     const additions: string[] = [];
     values.forEach((value, index) => {
@@ -35,7 +37,7 @@ export class MixingReceipt {
         : `${amount} ${Math.abs(added - 1) < 1e-6 ? 'φτυαριά' : 'φτυαριές'} άμμο`);
     });
     if (additions.length) {
-      this.message = `✓ Στη σύκλα: +${additions.join(' · +')}`;
+      this.message = `✓ ${vessel==='ΣΤΗ ΣΥΚΛΑ'?'Στη σύκλα':'Στη μπετονιέρα'}: +${additions.join(' · +')}`;
       this.remaining = 4.5;
     } else if (values.some((value, index) => value < this.previous[index] - 1e-6)) {
       this.remaining = 0;

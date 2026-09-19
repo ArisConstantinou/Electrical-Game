@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createConcreteMixer, createWheelbarrow, type WheelbarrowModel } from './SiteEquipmentModels';
 
 type Point = readonly [number, number, number];
 const material = (color: number, roughness = .8, metalness = 0): THREE.MeshStandardMaterial => new THREE.MeshStandardMaterial({ color, roughness, metalness });
@@ -199,6 +200,8 @@ function cementSack(index: number): THREE.Group {
 }
 
 export interface MixingStationModels {
+  wheelbarrow: WheelbarrowModel;
+  concreteMixer: THREE.Group;
   group: THREE.Group;
   bucket: THREE.Group;
   fill: THREE.Mesh;
@@ -213,17 +216,21 @@ export interface MixingStationModels {
 
 export function createMixingStationModels(): MixingStationModels {
   const group = new THREE.Group(); group.name = 'mortar-mixing-station'; group.userData.studioEntityId = 'mixing:station';
-  const { bucket, fill } = bucketModel(0x344b37, 'mixing-garden-bucket'); group.add(bucket);
-  const sand = sandMound(); sand.position.set(-1.36, 0, .67); group.add(sand);
-  const sacks = Array.from({ length: 3 }, (_, i) => { const sack = cementSack(i); sack.position.set(.52 + i * .28, i === 1 ? .19 : 0, .69); sack.rotation.y = -.10 + i * .17; group.add(sack); return sack; });
-  const shovel = createShovelModel(); shovel.position.set(-.68, .13, .42); shovel.rotation.set(-.13, -.3, -.32); group.add(shovel);
-  const mixer = createMixerModel(); mixer.position.set(.56, .016, -.05); mixer.rotation.z = -.12; group.add(mixer);
+  const wheelbarrow=createWheelbarrow();wheelbarrow.group.position.set(-1.15,0,-1.85);group.add(wheelbarrow.group);
+  // Open horseshoe: paired mixers at the back, sand left, cement/water right.
+  // Keep the middle aisle clear for the worker and a wheelbarrow.
+  const concreteMixer=createConcreteMixer();concreteMixer.position.set(-.55,0,.73);concreteMixer.rotation.y=0;concreteMixer.scale.x=-1;group.add(concreteMixer);
+  const { bucket, fill } = bucketModel(0x344b37, 'mixing-garden-bucket'); bucket.position.set(.90,0,.08);group.add(bucket);
+  const sand = sandMound(); sand.position.set(-2.40, 0, 0); group.add(sand);
+  const sacks = Array.from({ length: 3 }, (_, i) => { const sack = cementSack(i); sack.position.set(2.05 + i * .28, i === 1 ? .19 : 0, .65); sack.rotation.y = -.10 + i * .17; group.add(sack); return sack; });
+  const shovel = createShovelModel(); shovel.position.set(-1.55, .13, -.25); shovel.rotation.set(-.13, -.3, -.32); group.add(shovel);
+  const mixer = createMixerModel(); mixer.position.set(.90, .016, .73); mixer.rotation.z = -.12; group.add(mixer);
   const paddle = mixer.getObjectByName('mixing-paddle') as THREE.Group;
-  const rinseParts = bucketModel(0x548492, 'mixing-rinse-pail'); const rinse = rinseParts.bucket; rinse.position.set(1.00, 0, -.20); rinse.scale.setScalar(.8);
+  const rinseParts = bucketModel(0x548492, 'mixing-rinse-pail'); const rinse = rinseParts.bucket; rinse.position.set(2.20, 0, -.03); rinse.scale.setScalar(.8);
   rinseParts.fill.visible = true; rinseParts.fill.position.y = .23; rinseParts.fill.scale.setScalar(.162);
   const water = rinseParts.fill.material as THREE.MeshStandardMaterial; water.color.setHex(0x81bfc9); water.roughness = .17; water.transparent = true; water.opacity = .82;
   group.add(rinse);
-  const jug = new THREE.Group(); jug.name = 'mixing-water-jug'; jug.userData.studioEntityId = 'mixing:water-source'; jug.position.set(1.34, 0, -.14); group.add(jug);
+  const jug = new THREE.Group(); jug.name = 'mixing-water-jug'; jug.userData.studioEntityId = 'mixing:water-source'; jug.position.set(2.15, 0, -.65); group.add(jug);
   jug.userData.gripPoint = [.10, .30, 0]; jug.userData.secondaryGripPoint = [-.04, .18, 0]; jug.userData.tipPoint = [-.027, .39, 0];
   const jugPlastic = material(0xb9d4cf, .49), capPlastic = material(0x28798c, .45);
   part(jug, new THREE.BoxGeometry(.205, .30, .14), jugPlastic, [0, .16, 0], 'water-jug-body');
@@ -231,7 +238,7 @@ export function createMixingStationModels(): MixingStationModels {
   part(jug, new THREE.CylinderGeometry(.028, .028, .027, 16), capPlastic, [-.027, .372, 0], 'water-jug-screw-cap');
   tube(jug, [new THREE.Vector3(.039, .30, 0), new THREE.Vector3(.077, .358, 0), new THREE.Vector3(.125, .349, 0), new THREE.Vector3(.12, .255, 0), new THREE.Vector3(.097, .235, 0)], .012, jugPlastic, 'water-jug-carry-handle');
   label(jug, 'WATER', '5 L · REFILL', .17, .085, [0, .178, .071], '#28798c');
-  return { group, bucket, fill, sand, sacks, shovel, mixer, paddle, rinse, water: jug };
+  return { group, bucket, fill, sand, sacks, shovel, mixer, paddle, rinse, water: jug, wheelbarrow, concreteMixer };
 }
 
 /** Contents always remain inside the tapered wall. One disk is reused for water, dry ingredients and mortar. */

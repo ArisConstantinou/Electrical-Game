@@ -347,7 +347,7 @@ export class Game {
     this.hud.updateHammerSide(this.room.brickWall.chiselSideDegrees,this.hammerAutoSide);
     const wet=mortarTool && waterHit ? this.mortar.moistureAt(waterHit.point) : {pore:0,film:0};
     const waterTelemetry=this.roomWater.telemetry;
-    this.hud.updateMortar(this.selectedTool,this.mortar.charge,this.mortar.angleDegrees,wet,mortarTool && active ? this.mortar.coverage(active):0,this.mortar.recovery,this.mortar.lastOutcome,waterTelemetry.floorLitres,this.mortar.throwFeedback);
+    this.hud.updateMortar(mixingOwnedInput?'spray':this.selectedTool,this.mortar.charge,this.mortar.angleDegrees,wet,mortarTool && active ? this.mortar.coverage(active):0,this.mortar.recovery,this.mortar.lastOutcome,waterTelemetry.floorLitres,this.mortar.throwFeedback);
     this.hud.updateWaterGun(waterSetting,waterTelemetry.floorLitres,waterTelemetry.meanDepthMm);
     if (this.mission.complete && !this.resultShown) { this.resultShown = true; this.hud.showResult(); if (document.pointerLockElement) void document.exitPointerLock(); }
     this.renderer.eyeYaw = 0;

@@ -16,7 +16,7 @@ try{for(const mobile of [false,true]){
  const step=()=>page.evaluate(()=>{for(let i=0;i<3;i++)window.__supplyStep(1/60);});
  const read=()=>page.evaluate(()=>{const g=window.__wireTheHouse;return{visible:g.fpsRig.tools.get('trowel').getObjectByName('trowel-load').visible,ready:g.mixing.batch.ready,launched:g.mortar.telemetry.launchedKg};});
  const capture=async name=>{await page.evaluate(async()=>{const r=window.__wireTheHouse.renderer;await r.waitForFrame();r.render();await r.waitForFrame();});await page.screenshot({path:`${out}/${mobile?'mobile':'desktop'}-${name}.png`});};
- await step();const initial=await read();await capture('empty');
+ await step();const initial=await read();await capture('ready-wheelbarrow');
  await prepareFinishedMortar(page);await step();const prepared=await read();
  const yaw=await page.evaluate(()=>{
   const g=window.__wireTheHouse,c=g.renderer.camera,rig=g.fpsRig,tool=rig.tools.get('trowel'),Q=c.quaternion.constructor;
@@ -31,9 +31,10 @@ try{for(const mobile of [false,true]){
   c.rotation.set(-.45,Math.PI*.75,0);g.player.yaw=c.rotation.y;c.updateMatrixWorld(true);rig.poseTrowel(c,g.mortar.throwFeedback.motion,0,g.room.brickWall.volume.frontZ);
   return{maximumStep,samples};
  });await capture('carry');
- await page.evaluate(()=>window.__wireTheHouse.mixing.batch.consumeKg(1e6));await step();const depleted=await read();await capture('depleted');
- report.cases.push({mobile,initial,prepared,depleted,yaw,errors});
- if(!baseline){assert(!initial.visible,'Fresh game trowel must be empty');assert(prepared.visible,'Prepared batch must appear on the blade');assert(!depleted.visible,'Exhausted batch must not create a phantom load');assert(yaw.maximumStep<.08,'Camera yaw flips the wrist or snaps between carry and work poses');assert.deepEqual(errors,[]);}
+ await page.evaluate(()=>window.__wireTheHouse.mixing.batch.consumeKg(1e6));await step();const fallback=await read();
+ await page.evaluate(()=>window.__wireTheHouse.mixing.reserveScoop(1e6));await step();const depleted=await read();await capture('depleted');
+ report.cases.push({mobile,initial,prepared,fallback,depleted,yaw,errors});
+ if(!baseline){assert(initial.visible,'Fresh game starts loaded from the ready wheelbarrow');assert(prepared.visible,'Prepared batch must appear on the blade');assert(fallback.visible,'Empty bucket falls back to the ready wheelbarrow');assert(!depleted.visible,'Exhausting both supplies removes the load');assert(yaw.maximumStep<.08,'Camera yaw flips the wrist or snaps between carry and work poses');assert.deepEqual(errors,[]);}
  await page.close();
 }}finally{await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));await browser.close();}
 console.log(JSON.stringify(report.cases.map(({yaw,...s})=>({...s,maximumYawStep:yaw.maximumStep}))));

@@ -32,11 +32,16 @@ export class MortarBatch {
   private usedKg = 0;
   private discardedMass = 0;
   private suppliedWater = 0;
+  private transferredMass = 0;
+  private receivedMass = 0;
+  readonly capacityLitres:number;
   private trowel: MortarPayload | null = null;
   private shovel: MortarPayload | null = null;
 
-  constructor(options: { sackKg?: number; sandKg?: number } = {}) {
+  constructor(options: { sackKg?: number; sandKg?: number; capacityLitres?:number } = {}) {
     const sackKg = options.sackKg ?? 25, sandKg = options.sandKg ?? 600;
+    this.capacityLitres=options.capacityLitres??MORTAR_RECIPE.capacityLitres;
+    if(!Number.isFinite(this.capacityLitres)||this.capacityLitres<=0)throw new RangeError('Capacity must be positive and finite.');
     if (!Number.isFinite(sackKg) || sackKg < 0 || !Number.isFinite(sandKg) || sandKg < 0 || !Number.isFinite(sackKg * 3 + sandKg)) {
       throw new RangeError('Mortar stocks must be finite nonnegative masses.');
     }
@@ -91,24 +96,25 @@ export class MortarBatch {
     return true;
   }
 
-  pour(tool: MortarBatchTool): boolean {
+  pour(tool: MortarBatchTool, destination:MortarBatch=this): boolean {
     if (tool !== 'trowel' && tool !== 'shovel') return false;
     const payload = tool === 'trowel' ? this.trowel : this.shovel;
     if (!payload) return false;
-    const cement = this.cementKg + (payload.ingredient === 'cement' ? payload.kg : 0);
-    const sand = this.sandKg + (payload.ingredient === 'sand' ? payload.kg : 0);
-    if (this.volume(this.waterKg, cement, sand) > MORTAR_RECIPE.capacityLitres + 1e-9) return false;
-    this.cementKg = cement;
-    this.sandKg = sand;
+    const cement = destination.cementKg + (payload.ingredient === 'cement' ? payload.kg : 0);
+    const sand = destination.sandKg + (payload.ingredient === 'sand' ? payload.kg : 0);
+    if (this.volume(destination.waterKg, cement, sand) > destination.capacityLitres + 1e-9) return false;
+    destination.cementKg = cement;
+    destination.sandKg = sand;
+    if(destination!==this){this.transferredMass+=payload.kg;destination.receivedMass+=payload.kg;}
     if (tool === 'trowel') this.trowel = null; else this.shovel = null;
-    this.mixingTime = 0;
+    destination.mixingTime = 0;
     return true;
   }
 
   /** Refuse the entire addition on overflow, so no hidden spill destroys material. */
   addWater(litres: number): number {
     if (!Number.isFinite(litres) || litres <= 0) return 0;
-    if (this.volume(this.waterKg + litres, this.cementKg, this.sandKg) > MORTAR_RECIPE.capacityLitres + 1e-9) return 0;
+    if (this.volume(this.waterKg + litres, this.cementKg, this.sandKg) > this.capacityLitres + 1e-9) return 0;
     this.waterKg += litres;
     this.suppliedWater += litres;
     this.mixingTime = 0;
@@ -148,7 +154,7 @@ export class MortarBatch {
 
   getState() {
     return {
-      capacityLitres: MORTAR_RECIPE.capacityLitres,
+      capacityLitres: this.capacityLitres,
       waterLitres: this.waterLitres, cementKg: this.cementKg, sandKg: this.sandKg,
       cementScoops: this.cementScoops, sandScoops: this.sandScoops,
       massKg: this.massKg, volumeLitres: this.volumeLitres,
@@ -157,6 +163,7 @@ export class MortarBatch {
       heldTrowel: this.trowel ? { ...this.trowel } : null,
       heldShovel: this.shovel ? { ...this.shovel } : null,
       consumedKg: this.usedKg, discardedKg: this.discardedMass, addedWaterLitres: this.suppliedWater, initialStockKg: this.initialStockKg,
+      transferredKg:this.transferredMass,receivedKg:this.receivedMass,
     };
   }
 

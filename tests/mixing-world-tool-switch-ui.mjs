@@ -27,6 +27,10 @@ try{
     });
     await page.goto(url);await page.waitForFunction(()=>window.__wireTheHouse?.mixing,undefined,{timeout:120000});await page.locator('#start-button')[layout.mobile?'tap':'click']();await page.waitForTimeout(350);
     await page.evaluate(()=>{const g=window.__wireTheHouse;window.__switchStep=g.step.bind(g);g.step=()=>{};window.__wallCalls=0;const perform=g.performAction.bind(g);g.performAction=(...args)=>{window.__wallCalls++;return perform(...args);};});
+    // The production horseshoe deliberately separates the sacks and shovel.
+    // Retain the original competing-target regression with an explicit nearby
+    // sack fixture; normal-layout access is covered by immersive/drum UI tests.
+    await page.evaluate(()=>{const m=window.__wireTheHouse.mixing.models;m.sacks[0].position.copy(m.shovel.position).add({x:.35,y:-.13,z:.28});m.group.updateMatrixWorld(true);});
     const step=(n=1)=>page.evaluate(count=>{for(let i=0;i<count;i++)window.__switchStep(1/60);},n);
     const state=()=>page.evaluate(()=>{const g=window.__wireTheHouse,m=g.mixing;return{mixing:m.telemetry,pendingTool:m.pendingTool,prompt:document.querySelector('#mixing-world-prompt').textContent,interactLabel:document.querySelector('#mobile-interact small')?.textContent,wallCalls:window.__wallCalls,waterVisible:m.models.water.visible,shovelVisible:m.models.shovel.visible,launched:g.mortar.telemetry.launchedKg,overflow:document.documentElement.scrollWidth>innerWidth,renderError:g.renderer.renderError};});
     const aim=async(kind,cone=false)=>{
