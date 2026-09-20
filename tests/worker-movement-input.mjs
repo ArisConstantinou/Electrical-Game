@@ -9,11 +9,14 @@ try{
  await page.evaluate(()=>{const g=window.__wireTheHouse;g.__testStep=g.step.bind(g);g.step=()=>{};g.mixing.setActive(false);g.selectTool('spray');});
  const cases=[],inputs=[['w',['w']],['a',['a']],['s',['s']],['d',['d']],['w+a',['w','a']],['w+d',['w','d']],['s+a',['s','a']],['s+d',['s','d']]];
  for(const [name,keys] of inputs){
-  await page.evaluate(()=>{const g=window.__wireTheHouse;g.player.yaw=.6;g.player.pitch=-.35;g.player.crouched=false;g.renderer.camera.position.set(0,1.65,.5);g.workerBody.travelTurn=0;});
+  // Keep the native-input fixture in the clear aisle; the old centre start
+  // now intersects the solid wheelbarrow on W+A and measures collision.
+  await page.evaluate(()=>{const g=window.__wireTheHouse;g.player.yaw=.6;g.player.pitch=-.35;g.player.crouched=false;g.renderer.camera.position.set(1,1.65,-.6);g.workerBody.travelTurn=0;});
   for(const key of keys)await page.keyboard.down(key);
-  const moving=await page.evaluate(()=>{const g=window.__wireTheHouse;const frames=[];for(let i=0;i<24;i++){g.__testStep(1/60,0,false);frames.push({velocity:g.player.velocity.toArray(),position:g.renderer.camera.position.toArray(),phase:g.workerBody.phase,head:g.workerBody.headParts.every(p=>p.visible)});}return frames;});
+  const moving=await page.evaluate(()=>{const g=window.__wireTheHouse;const frames=[];for(let i=0;i<24;i++){g.__testStep(1/60,0,false);frames.push({velocity:g.player.velocity.toArray(),position:g.renderer.camera.position.toArray(),contacts:[...g.player.collisionContacts],phase:g.workerBody.phase,head:g.workerBody.headParts.every(p=>p.visible)});}return frames;});
   for(const key of keys)await page.keyboard.up(key);
   const stopped=await page.evaluate(()=>{const g=window.__wireTheHouse;for(let i=0;i<90;i++)g.__testStep(1/60,0,false);return {velocity:g.player.velocity.toArray(),blend:g.workerBody.gaitBlend,visible:g.workerBody.visible,bodyTurn:g.workerBody.travelTurn};});
+  assert(moving.every(f=>f.contacts.length===0),`${name}: fixture must not hit equipment`);
   assert(Math.hypot(moving.at(-1).velocity[0],moving.at(-1).velocity[2])>1,`${name}: native movement missing`);
   assert(moving.at(-1).phase>moving[0].phase,`${name}: gait not advancing`);assert(moving.every(f=>f.head),`${name}: shadow head disappeared`);
   assert(stopped.blend<.001&&Math.hypot(...stopped.velocity)<.001,`${name}: gait continues after release`);assert(stopped.visible);

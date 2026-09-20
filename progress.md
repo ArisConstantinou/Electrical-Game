@@ -1,5 +1,11 @@
 Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web game named WIRE THE HOUSE, based on real Cyprus residential first-fix practices, editable in Web Game Studio, playable on desktop/mobile, deployed to arisconstantinou/Electrical-Game via GitHub Pages, and ending at FIRST FIX COMPLETE without cable pulling.
 
+## 2026-09-21 · Walking direction while carrying tools
+
+- Reproduced carried-tool A/D shuffle and diagonal body-axis mismatch on the verified shared 5365 checkout. Any active grip suppressed travel yaw; low walking speeds also disabled it. No port replacement caused this behavior.
+- Narrow WorkerBody correction allows walking turns with carried tools while preserving seated contact/cart body constraints. Before/after captures, 16 carried-pose cases, 24 directional cases, eight native inputs, 24 moving-tool cases, cart grip checks and build passed. Native fixture moved to a verified clear aisle after the old start hit the solid wheelbarrow; collisions stay active and are asserted absent in that fixture.
+- Compared motion benchmark: pose P95 1.3 to 1.2 ms; frame P95 7.9 to 9.4 ms; no frames over 50 ms in either small headless desktop sample. No mobile/perfect-rig claim. Details and local visual evidence: docs/worker-carry-gait-fix.md. Coordinated PVC commit 67b7fb1 remains separate.
+
 ## 2026-09-21 · Corrected PVC marking input and close bend view
 
 - User rejected the distant full-body bending camera and clarified that E performs the marker stroke; it is not a post-stroke confirmation.

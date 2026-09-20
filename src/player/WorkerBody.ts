@@ -153,15 +153,15 @@ export class WorkerBody extends THREE.Group {
     const yawQ=new THREE.Quaternion().setFromAxisAngle(Y,player.yaw),forward=new THREE.Vector3(0,0,-1).applyQuaternion(yawQ),right=new THREE.Vector3(1,0,0).applyQuaternion(yawQ);
     this.gaitBlend=THREE.MathUtils.damp(this.gaitBlend,speed>.025?1:0,12,Math.min(dt,.05));
     if(speed>.025)this.travel.set(player.velocity.x,0,player.velocity.z).normalize();
-    // Slow work uses short side steps. At jogging speed the torso and feet
-    // turn into travel while the player's gaze and tool aim stay independent.
-    // This avoids either crossed legs or an implausibly fast lateral shuffle.
+    // Walking turns the hips, knees and boots into the travel axis at every
+    // walking speed. A carried tool is not a world-space body constraint.
     const along=this.travel.dot(forward),sideways=this.travel.dot(right);
     const turn=-Math.atan2(sideways*(along<-.05?-1:1),Math.abs(along));
-    const travelYaw=speed>.025?turn*THREE.MathUtils.smoothstep(speed,.8,2.2)*.85:0;
-    // Loaded hands constrain the shoulders: strafe with short steps instead
-    // of turning the whole torso away from camera-mounted tool handles.
-    const desiredTurn=grips.some(g=>g.active)?0:travelYaw;
+    const travelYaw=speed>.025?turn*THREE.MathUtils.smoothstep(speed,.025,.35)*.85:0;
+    // Only a seated contact or shared cart frame constrains the body. Keeping
+    // all carried tools facing forward forced A/D into a 9-steps/s shuffle.
+    const anchored=grips.some(g=>g.active&&(g.contactLocked||g.bodyFrame))||(station&&working);
+    const desiredTurn=anchored?0:travelYaw;
     this.travelTurn=THREE.MathUtils.damp(this.travelTurn,desiredTurn,10,Math.min(dt,.05));
     const cartFrame=grips.find(g=>g.active&&g.bodyFrame)?.bodyFrame;
     const bodyYaw=player.yaw+this.travelTurn,bodyQ=cartFrame?.quaternion.clone()??new THREE.Quaternion().setFromAxisAngle(Y,bodyYaw),bodyForward=new THREE.Vector3(0,0,-1).applyQuaternion(bodyQ),bodyRight=new THREE.Vector3(1,0,0).applyQuaternion(bodyQ);
