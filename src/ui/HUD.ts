@@ -332,7 +332,7 @@ export class HUD {
     bindHammerButton('#settings-toggle',()=>setSettingsOpen(settingsToggle?.getAttribute('aria-expanded')!=='true'));
     bindHammerButton('#settings-close',()=>setSettingsOpen(false));
     root.querySelector('#settings-scrim')?.addEventListener('click', () => setSettingsOpen(false));
-    addEventListener('keydown', event => { if (event.key === 'Escape' && settingsToggle?.getAttribute('aria-expanded') === 'true') setSettingsOpen(false); });
+    addEventListener('keydown', event => { if (event.key === 'Escape' && settingsToggle?.getAttribute('aria-expanded') === 'true') { event.preventDefault(); setSettingsOpen(false); } });
   }
 
   updateWorkReticle(point: { x: number; y: number; z: number } | null): void {

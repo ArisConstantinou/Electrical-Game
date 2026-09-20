@@ -733,3 +733,11 @@ Original prompt for this task: Selecting BOX should show an initial box in the l
 - Esc now returns to the tool selected before entering BOX, cancels held actions and resets wheel gesture accumulation. The in-hand box draft is retained when returning with Digit5. Settings and inspector Escape handling retain precedence.
 - Extended native-input box regression failed before the change (selected fitting instead of spray) and passes after: Esc, repeat Esc outside assembly, wheel switching, Digit1, re-entry with preserved nine-box draft, placement/reset, plus unchanged touch assembly/placement. Pointer Lock is blocked in automated verification.
 - Typecheck/production build passed; existing chunk-size warning unchanged. No geometry or animation changes.
+
+## 2026-09-20 · Escape correction for browser-owned pointer unlock
+
+- Previous Escape test disabled Pointer Lock and missed unlock without a delivered keydown. Source on 5365 was verified against this checkout; this was a missing input path, not evidence of stale server code.
+- DesktopControls now observes a real locked-to-unlocked transition as well as Escape key/code. Both routes clear held actions and wheel accumulation and return to the prior tool without losing the draft. Settings/inspector unlocks are excluded. Settings consumes its Escape before gameplay handling.
+- New box-escape-pointerlock regression reproduces the prior failure and passes after: unlock with no keydown, settings unlock and Escape, inspector unlock and Escape, key-only Escape, normal Escape and retained draft. Lock state/events are emulated with OS cursor capture blocked; this is not physical Pointer Lock proof in the user's embedded browser.
+- Existing desktop/touch assembly/placement regression, build and bundled client pass. Before/after screenshots: output/box-escape-lock-before and output/box-escape-lock-after. Current IAB tab reloaded. No geometry/animation/per-frame render changes.
+- API reference checked: https://www.w3.org/TR/pointerlock-2/#requirements (default unlock gesture and pointer-lock lifecycle).
