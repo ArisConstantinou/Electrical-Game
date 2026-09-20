@@ -434,7 +434,7 @@ export class FPSRig extends THREE.Group {
     // viewmodels: rear casing faces must not overwrite their own front rim.
     const box=new ElectricalBox(module.kind,`held-assembly:${module.id}`);
     box.rotation.z=module.rotation*Math.PI/2;box.userData.assemblyModuleId=module.id;box.userData.boxKind=module.kind;box.userData.quarterTurn=module.rotation;
-    box.traverse(object=>{if(object instanceof THREE.Mesh){object.material=(Array.isArray(object.material)?object.material:[object.material]).map(entry=>{const copy=entry.clone();copy.depthTest=true;copy.depthWrite=true;return copy;});if((object.material as THREE.Material[]).length===1)object.material=(object.material as THREE.Material[])[0];object.renderOrder=20;object.castShadow=false;object.receiveShadow=false;}});
+    box.traverse(object=>{object.frustumCulled=false;if(object instanceof THREE.Mesh){object.material=(Array.isArray(object.material)?object.material:[object.material]).map(entry=>{const copy=entry.clone();copy.depthTest=true;copy.depthWrite=true;return copy;});if((object.material as THREE.Material[]).length===1)object.material=(object.material as THREE.Material[])[0];object.renderOrder=20;object.castShadow=false;object.receiveShadow=false;}});
     return box;
   }
   private rebuildFittingAssembly():void{
@@ -450,7 +450,7 @@ export class FPSRig extends THREE.Group {
       const box=this.viewBox(module);box.position.set(module.x-bounds.centerX,module.y-bounds.centerY,0);this.fittingAssemblyRoot.add(box);
       if(module.id===snapshot.activeId){
         const size=boxModuleSize(module),edge=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(size.width+.010,size.height+.010,.010)),new THREE.LineBasicMaterial({color:0x62e5ff,depthTest:false,transparent:true,opacity:.9}));
-        edge.name='Active box cyan outline';edge.userData.assemblyModuleId=`active-${module.id}`;edge.renderOrder=22;edge.position.copy(box.position);this.fittingAssemblyRoot.add(edge);
+        edge.name='Active box cyan outline';edge.userData.assemblyModuleId=`active-${module.id}`;edge.renderOrder=22;edge.frustumCulled=false;edge.position.copy(box.position);this.fittingAssemblyRoot.add(edge);
       }
     }
   }
@@ -465,7 +465,7 @@ export class FPSRig extends THREE.Group {
     context.fillStyle=available?'#12343c':'#3b2d2b';context.strokeStyle=available?'#a8f2ff':'#9d7771';context.lineWidth=6;context.beginPath();context.roundRect(5,5,86,86,18);context.fill();context.stroke();
     context.fillStyle=available?'#ffffff':'#c7aaa5';context.font='bold 56px Arial';context.textAlign='center';context.textBaseline='middle';context.fillText(String(value),48,52);
     const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
-    const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,depthTest:false,depthWrite:false,transparent:true}));sprite.scale.set(.030,.030,1);sprite.renderOrder=24;return sprite;
+    const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,depthTest:false,depthWrite:false,transparent:true}));sprite.scale.set(.030,.030,1);sprite.renderOrder=24;sprite.frustumCulled=false;return sprite;
   }
   private rebuildFittingZones():void{
     this.clearFittingRoot(this.fittingZonesRoot);
@@ -475,7 +475,7 @@ export class FPSRig extends THREE.Group {
     this.fittingZonesRoot.scale.setScalar(this.fittingPresentationScale);
     for(const zone of this.fittingZones){
       const size=boxModuleSize(zone.module),group=new THREE.Group();group.name=`Box attachment zone ${zone.zone}`;group.userData.zone=zone.zone;group.userData.available=zone.available;
-      const edge=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(size.width+.006,size.height+.006,.008)),new THREE.LineBasicMaterial({color:zone.available?0x58dff5:0x7b5d58,transparent:true,opacity:zone.available?.82:.42,depthTest:false}));edge.renderOrder=21;group.add(edge);
+      const edge=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(size.width+.006,size.height+.006,.008)),new THREE.LineBasicMaterial({color:zone.available?0x58dff5:0x7b5d58,transparent:true,opacity:zone.available?.82:.42,depthTest:false}));edge.renderOrder=21;edge.frustumCulled=false;group.add(edge);
       const label=this.zoneLabel(zone.zone,zone.available);label.position.z=.012;group.add(label);
       group.position.set(zone.module.x-bounds.centerX,zone.module.y-bounds.centerY,.004);
       this.fittingZonesRoot.add(group);
