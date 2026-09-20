@@ -175,6 +175,23 @@ export class MortarSystem {
     for(let i=0;i<p.count;i++){const sum=sums.get(keys[i])!;n.setXYZ(i,sum.x,sum.y,sum.z);}
   }
   ready(point:InstallationPoint):boolean {this.refreshOpeningGeometry();return this.evaluateCoverage(point,true)>=.68;}
+  /** Seed the actual mortar field around an installed box group. This is the
+   * same finite collision/coverage volume produced by player trowel casts. */
+  prepareInstalledBox(point:InstallationPoint):number {
+    point.updateWorldMatrix(true,true);
+    const width=point.boxGroup.groupWidth/2+.026,height=point.boxGroup.groupHeight/2+.024;
+    let added=0;
+    for(let side=0;side<4;side++)for(let i=0;i<20;i++){
+      const t=-.9+1.8*i/19;
+      const local=new THREE.Vector3(side<2?t*width:side===2?-width:width,side<2?side===0?-height:height:t*height,-.025);
+      added+=this.deposit(local.applyMatrix4(point.boxGroup.matrixWorld),.08,Z,false,.18,undefined,side*.19+i*.07,true);
+    }
+    this.stuckMass+=added;
+    this.field.finishImpact();
+    this.field.tick(1.4);
+    this.syncFieldGeometry();
+    return added;
+  }
   cancel(): void {
     this.wasHeld = false; this.charge = 0; this.heldSeconds = 0; this.overheld = false;
     if (this.pendingCast) { this.pendingCast = null; this.releasedPhase = 0; this.recoveringThrow = false; }

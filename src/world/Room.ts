@@ -7,6 +7,7 @@ import { matteMaterial, siteMaterial } from './SiteMaterials';
 
 export class Room extends THREE.Group {
   readonly brickWall: BrickWall;
+  readonly intactPracticeWall: BrickWall;
   readonly referenceWalls: THREE.Object3D[] = [];
 
   constructor(scene: THREE.Scene) {
@@ -15,6 +16,16 @@ export class Room extends THREE.Group {
     this.userData.studioEntityId = 'world:living-room';
     this.brickWall = new BrickWall(INSTALLATION_POINTS);
     this.add(this.brickWall);
+
+    // Preserve the former untouched masonry as a separate right-hand practice
+    // surface while the main installation wall starts at the PVC phase.
+    this.intactPracticeWall = new BrickWall([]);
+    this.intactPracticeWall.name = 'Untouched right-hand masonry practice wall';
+    this.intactPracticeWall.userData.studioEntityId = 'world:intact-practice-wall';
+    this.intactPracticeWall.rotation.y = -Math.PI / 2;
+    this.intactPracticeWall.position.x = GAME_CONFIG.room.width / 2 - Math.abs(GAME_CONFIG.room.wallFrontZ) - .002;
+    this.referenceWalls.push(this.intactPracticeWall);
+    this.add(this.intactPracticeWall);
 
     const floor = new THREE.Mesh(new THREE.BoxGeometry(GAME_CONFIG.room.width, 0.12, GAME_CONFIG.room.depth), siteMaterial('floor', 0xa39d90, 4, 3.4));
     floor.position.y = -0.06;

@@ -29,6 +29,25 @@ export class BoxPlacementSystem {
   constructor(private readonly wall:BrickWall,private readonly mortar:MortarSystem,private readonly points:InstallationPoint[]){}
   get fitRevision():string{return `${this.wall.volume.options.hollowProfile}:${this.wall.volume.impactCount}:${this.wall.volume.removedNodeCount}:${this.mortar.field.revision}:${this.boxesRevision}`;}
 
+  /** Place a supplied box group in an authored, already-cleared cavity. The
+   * mortar field is populated immediately afterwards by Game construction. */
+  prepareInstalled(point:InstallationPoint):void {
+    point.boxGroup.visible=true;
+    point.boxGroup.levelBar.visible=false;
+    point.boxGroup.position.set(0,0,0);
+    point.boxGroup.rotation.set(0,0,0);
+    point.updateWorldMatrix(true,true);
+    const placement:Placement={state:'bonded',velocityY:0,secured:true,contactMaterial:'mortar',checkTime:.12,displacedKg:0,repackedKg:0,looseKg:0};
+    this.placements.set(point,placement);
+    point.boxGroup.userData.placement=placement;
+    point.boxGroup.userData.minimumDepth=-.058;
+    point.boxGroup.userData.finishDepth=0;
+    this.boxesRevision++;
+    point.chaseHits=1;
+    point.pipeStep='measure';
+    point.setStage('leveled');
+  }
+
   /** Select the nearest visible casing, including boxes dropped to the floor. */
   target(camera:THREE.Camera):InstallationPoint|null{
     const ray=new THREE.Raycaster(camera.getWorldPosition(new THREE.Vector3()),camera.getWorldDirection(new THREE.Vector3()),0,GAME_CONFIG.interaction.maxDistance);

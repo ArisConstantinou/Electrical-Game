@@ -222,8 +222,8 @@ export class HUD {
           <section id="start-screen" class="screen-panel">
             <div class="eyebrow">CYPRUS · RESIDENTIAL FIRST FIX</div>
             <h1>WIRE<br><span>THE HOUSE</span></h1>
-            <p>Measure from the floor and pencil the working height. Chase real masonry, throw mortar into the recess and set each box level and flush. Finish the PVC routes before plastering.</p>
-            <div class="brief-grid"><span>3 installation points</span><span>No cable pulling</span><span>Desktop + mobile</span></div>
+            <p>The main wall is already chased with wide multi-pipe routes. All three boxes are level, flush and secured in mortar. Start directly with the 20 mm rigid PVC routes; the untouched masonry is now on the right.</p>
+            <div class="brief-grid"><span>200 mm clear chases</span><span>Boxes ready for PVC</span><span>Desktop + mobile</span></div>
             <button id="start-button">ENTER THE SITE</button>
             <small>WASD · MOUSE LOOK · LEFT CLICK USE TOOL · E INTERACT / ALT USE · 9 MEASURE · M MARK · 0 DRILL · B DRIVER · L LASER · WHEEL SWITCH TOOL</small>
           </section>

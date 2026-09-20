@@ -128,6 +128,7 @@ export class Game {
     this.renderer.scene.add(this.room);
     this.mission = new MissionSystem(this.renderer.scene);
     this.room.brickWall.registerInstallations(this.mission.points);
+    this.room.brickWall.prepareMultiPipeChases(this.mission.points);
     this.room.brickWall.contactProvider = camera => this.fpsRig.contact(camera, this.room.brickWall);
     this.chasing = new ChasingSystem(this.renderer.scene, this.room.brickWall);
     this.conduit = new ConduitSystem(this.renderer.scene, this.room.brickWall);
@@ -141,6 +142,10 @@ export class Game {
     this.mortar.onImpact=({speed,retainedKg})=>this.audio.play('mortar-splat',Math.min(1.4,.35+speed/9+retainedKg/.65*.35));
     this.roomWater = new RoomWaterSystem(this.renderer.scene, this.room.brickWall);
     this.boxPlacement = new BoxPlacementSystem(this.room.brickWall,this.mortar,this.mission.points);
+    for(const point of this.mission.points){
+      this.boxPlacement.prepareInstalled(point);
+      this.mortar.prepareInstalledBox(point);
+    }
     this.boxFitPreview = new BoxFitPreview(this.renderer.scene,this.boxPlacement);
     this.heightMeasure = new HeightMeasureSystem(this.renderer.scene,this.room.brickWall,this.room.referenceWalls);
     this.laserLevel = new LaserLevelSystem(this.renderer.scene,this.heightMeasure,this.room.brickWall,this.room.referenceWalls);

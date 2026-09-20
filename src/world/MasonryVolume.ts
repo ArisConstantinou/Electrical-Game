@@ -224,6 +224,29 @@ export class MasonryVolume {
     }
   }
   isOccupied(x: number, y: number, z: number): boolean { return this.sampleMaterial(x, y, z) !== MaterialId.Air; }
+  /** Author a deterministic construction opening in the same material lattice
+   * used by hammer damage, box fit and conduit clearance. */
+  carveBox(min: Vec3, max: Vec3): number {
+    const low={x:Math.min(min.x,max.x),y:Math.min(min.y,max.y),z:Math.min(min.z,max.z)};
+    const high={x:Math.max(min.x,max.x),y:Math.max(min.y,max.y),z:Math.max(min.z,max.z)};
+    const removed:Node[]=[];
+    for(let y=1;y<=this.ny;y++){
+      const py=this.nodePosition(1,y,1).y;if(py<low.y||py>high.y)continue;
+      for(let x=1;x<=this.nx;x++){
+        const px=this.nodePosition(x,y,1).x;if(px<low.x||px>high.x)continue;
+        for(let z=1;z<=this.nz;z++){
+          const p=this.nodePosition(x,y,z);
+          if(p.z<low.z||p.z>high.z||!this.nodeMaterial(x,y,z))continue;
+          this.remove({x,y,z,id:this.index(x,y,z),material:this.baseMaterial(x,y,z)},removed);
+        }
+      }
+    }
+    if(!removed.length)return 0;
+    this.sequence++;
+    this.totalRemovedVolume+=removed.length*this.nodeVolume;
+    this.exposeCavities(removed);
+    return removed.length;
+  }
   materialColor(material: number, x: number, y: number, z: number): readonly number[] {
     const p = this.nodePosition(x, y, 1), row = Math.floor(p.y / (this.height / 23));
     const col = Math.floor((p.x + this.width / 2) / (this.width / 21) - (row % 2 ? .5 : 0));

@@ -1,5 +1,15 @@
 Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web game named WIRE THE HOUSE, based on real Cyprus residential first-fix practices, editable in Web Game Studio, playable on desktop/mobile, deployed to arisconstantinou/Electrical-Game via GitHub Pages, and ending at FIRST FIX COMPLETE without cable pulling.
 
+## 2026-09-20 · Prepared multi-pipe wall
+
+- Current request: start directly at the PVC phase. The main wall must have real wide chases and boxes already secured with mortar; preserve an untouched masonry wall on the right side.
+- Implementation uses 200 mm clear vertical masonry openings for multiple parallel 20 mm conduits. Cavities, mortar coverage and bonded box state use the existing physical volume systems.
+- Work is isolated in the `prepared-multi-pipe-wall` managed worktree from active preview commit `8e0c26c`; the existing port 5365 server remains untouched.
+- Focused browser QA verifies three physically clear 200 mm lanes, retained masonry outside them, complete chase telemetry, real stable mortar coverage, bonded/level/flush boxes, the first PVC action gate, and the untouched right wall. Main/right screenshots were inspected.
+- Final desktop WebGL headless comparison against the active 5365 baseline: 1.19 ms mean / 2.70 ms p95 / 42 calls / 322,837 triangles before; 1.87 ms mean / 2.90 ms p95 / 132 calls / 492,461 triangles for the prepared scene. This is not physical-phone evidence.
+- User screenshot caught a surviving bottom brick course at all three chase mouths. The authored carve now continues below the wall's first lattice row, and QA samples the complete 200 mm opening from 6 mm above the floor plus a dedicated 0–25 mm floor-mouth volume.
+- A 390×844 touch-emulated startup check confirms no horizontal overflow, readable prepared-wall copy and the same three leveled/mortar-bonded PVC-ready points. Physical iPhone/Safari remains unverified.
+
 ## 2026-09-20 · Full-body WASD locomotion, editable rig and exports
 
 - Added continuous full-body movement for W/A/S/D and every diagonal: normalized input, eight travel directions, walk/jog/crouch modes, planted-foot cancellation, non-crossing side steps, toe lift, pelvis weight transfer, rib-cage/head counter-motion and unloaded-arm swing. Loaded hands quiet upper-body sway while preserving leg stride and exact tool contact.

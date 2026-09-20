@@ -140,6 +140,34 @@ export class BrickWall extends THREE.Group {
   }
 
   registerInstallations(points: InstallationPoint[]): void { for (const point of points) this.installations.set(point.definition.id, point); }
+  /** Prepare the main work wall for the PVC phase. Each 200 mm chase is a real
+   * cleared volume, wide enough for several parallel 20 mm conduits. */
+  prepareMultiPipeChases(points: readonly InstallationPoint[], width=.20): {widthM:number;removedNodes:number} {
+    let removedNodes=0;
+    for(const point of points){
+      const centre=point.position;
+      const chaseHalfWidth=width/2+.008;
+      const cavityHalfWidth=point.boxGroup.groupWidth/2+.024;
+      const boxHalfHeight=point.boxGroup.groupHeight/2+.022;
+      removedNodes+=this.volume.carveBox(
+        {x:centre.x-chaseHalfWidth,y:-.01,z:this.volume.frontZ-.058},
+        {x:centre.x+chaseHalfWidth,y:centre.y-boxHalfHeight,z:this.volume.frontZ+.002},
+      );
+      removedNodes+=this.volume.carveBox(
+        {x:centre.x-cavityHalfWidth,y:centre.y-boxHalfHeight,z:this.volume.frontZ-.058},
+        {x:centre.x+cavityHalfWidth,y:centre.y+boxHalfHeight,z:this.volume.frontZ+.002},
+      );
+      const samples:THREE.Vector3[]=[];
+      for(let y=.012;y<=centre.y-boxHalfHeight-.008;y+=.04)
+        for(const offset of [-width*.375,0,width*.375])samples.push(new THREE.Vector3(centre.x+offset,y,this.volume.frontZ-.02));
+      this.samples.set(point.definition.id,samples);
+    }
+    this.removedNodes=this.volume.removedNodeCount;
+    this.removedVolume=this.volume.removedVolume;
+    this.maxDepth=Math.max(this.maxDepth,.058);
+    this.flushGeometry();
+    return{widthM:width,removedNodes};
+  }
   aim(camera: THREE.Camera, maxDistance:number = GAME_CONFIG.interaction.maxDistance): { point: THREE.Vector3 } | null {
     // This ray needs only the camera transform, not every finger/tool child.
     camera.updateWorldMatrix(true, false);
