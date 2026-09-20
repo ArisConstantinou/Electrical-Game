@@ -114,19 +114,19 @@ export class WorkerBody extends THREE.Group {
     const b=this.bone(name),q=b.getWorldQuaternion(new THREE.Quaternion()),direction=target.clone().sub(b.getWorldPosition(new THREE.Vector3())).normalize();
     this.worldRotation(b,new THREE.Quaternion().setFromUnitVectors(Y.clone().applyQuaternion(q),direction).multiply(q));
   }
-  private limb(upper:string,lower:string,end:string,target:THREE.Vector3,pole:THREE.Vector3):void{
+  private limb(upper:string,lower:string,end:string,target:THREE.Vector3,pole:THREE.Vector3,margin=.006):void{
     const a=this.point(upper),b=this.point(lower),c=this.point(end),l1=a.distanceTo(b),l2=b.distanceTo(c);
-    const axis=target.clone().sub(a),d=THREE.MathUtils.clamp(axis.length(),Math.abs(l1-l2)+.006,l1+l2-.006);axis.normalize();
+    const axis=target.clone().sub(a),d=THREE.MathUtils.clamp(axis.length(),Math.abs(l1-l2)+.006,l1+l2-margin);axis.normalize();
     const along=(l1*l1-l2*l2+d*d)/(2*d),height=Math.sqrt(Math.max(0,l1*l1-along*along));
     pole=pole.clone().addScaledVector(axis,-pole.dot(axis)).normalize();
     const elbow=a.clone().addScaledVector(axis,along).addScaledVector(pole,height);
     this.orient(upper,elbow);this.orient(lower,a.clone().addScaledVector(axis,d));
   }
-  private reachWithShoulder(side:string,target:THREE.Vector3):void{
+  private reachWithShoulder(side:string,target:THREE.Vector3,margin=.012):void{
     const clavicle=this.bone('clavicle.'+side),origin=clavicle.getWorldPosition(new THREE.Vector3());
     const restQ=clavicle.parent!.getWorldQuaternion(new THREE.Quaternion()).multiply(this.rest.get(clavicle)!.q);
     const offset=this.point('upper_arm.'+side).sub(origin).applyQuaternion(clavicle.getWorldQuaternion(new THREE.Quaternion()).invert()).applyQuaternion(restQ);
-    const reach=this.point('upper_arm.'+side).distanceTo(this.point('forearm.'+side))+this.point('forearm.'+side).distanceTo(this.point('hand.'+side))-.012;
+    const reach=this.point('upper_arm.'+side).distanceTo(this.point('forearm.'+side))+this.point('forearm.'+side).distanceTo(this.point('hand.'+side))-margin;
     const toward=new THREE.Quaternion().setFromUnitVectors(offset.clone().normalize(),target.clone().sub(origin).normalize());
     const angle=2*Math.acos(THREE.MathUtils.clamp(toward.w,-1,1)),limit=Math.min(1,THREE.MathUtils.degToRad(25)/Math.max(.001,angle));
     const rotation=new THREE.Quaternion(),distance=(t:number)=>origin.clone().add(offset.clone().applyQuaternion(rotation.identity().slerp(toward,t))).distanceTo(target);
@@ -146,7 +146,8 @@ export class WorkerBody extends THREE.Group {
     this.fingerFit={};
     this.clock+=dt;
     for(const [b,r]of this.rest){b.quaternion.copy(r.q);b.position.copy(r.p);}
-    const crouch=player.eyeHeight<1.1?1:0;this.bend=THREE.MathUtils.damp(this.bend,crouch,14,Math.min(dt,.05));
+    const cartGrip=stationGrips.some(g=>g.palmDirection);
+    const crouch=cartGrip?0:player.eyeHeight<1.1?1:0;this.bend=THREE.MathUtils.damp(this.bend,crouch,14,Math.min(dt,.05));
     const speed=Math.hypot(player.velocity.x,player.velocity.z);
     const grips=station?stationGrips:fps.anatomicalGrips();
     const yawQ=new THREE.Quaternion().setFromAxisAngle(Y,player.yaw),forward=new THREE.Vector3(0,0,-1).applyQuaternion(yawQ),right=new THREE.Vector3(1,0,0).applyQuaternion(yawQ);
@@ -162,8 +163,11 @@ export class WorkerBody extends THREE.Group {
     // of turning the whole torso away from camera-mounted tool handles.
     const desiredTurn=grips.some(g=>g.active)?0:travelYaw;
     this.travelTurn=THREE.MathUtils.damp(this.travelTurn,desiredTurn,10,Math.min(dt,.05));
-    const bodyYaw=player.yaw+this.travelTurn,bodyQ=new THREE.Quaternion().setFromAxisAngle(Y,bodyYaw),bodyForward=new THREE.Vector3(0,0,-1).applyQuaternion(bodyQ),bodyRight=new THREE.Vector3(1,0,0).applyQuaternion(bodyQ);
-    this.position.set(camera.position.x+Math.sin(player.yaw)*.17,0,camera.position.z+Math.cos(player.yaw)*.17);this.rotation.set(0,bodyYaw,0);
+    const cartFrame=grips.find(g=>g.active&&g.bodyFrame)?.bodyFrame;
+    const bodyYaw=player.yaw+this.travelTurn,bodyQ=cartFrame?.quaternion.clone()??new THREE.Quaternion().setFromAxisAngle(Y,bodyYaw),bodyForward=new THREE.Vector3(0,0,-1).applyQuaternion(bodyQ),bodyRight=new THREE.Vector3(1,0,0).applyQuaternion(bodyQ);
+    const bodyOffset=.17;
+    this.position.set(camera.position.x+Math.sin(player.yaw)*bodyOffset,0,camera.position.z+Math.cos(player.yaw)*bodyOffset);this.rotation.set(0,bodyYaw,0);
+    if(cartFrame){this.position.copy(cartFrame.position);this.quaternion.copy(cartFrame.quaternion);}
     this.updateMatrixWorld(true);
     const pelvis=this.bone('pelvis'),position=pelvis.getWorldPosition(new THREE.Vector3());position.y-=this.bend*.44;
     position.x+=Math.sin(player.yaw)*this.bend*.15;position.z+=Math.cos(player.yaw)*this.bend*.15;
@@ -176,7 +180,7 @@ export class WorkerBody extends THREE.Group {
     // become deliberately quieter while a hand is loaded so the shoulder IK
     // cannot cross its reach boundary during a crouch transition.
     const activeGrip=grips.some(g=>g.active),contactGrip=grips.some(g=>g.active&&g.contactLocked);
-    const upperMotion=motion*(contactGrip?.18:activeGrip?.45:1);
+    const upperMotion=cartFrame?0:motion*(contactGrip?.18:activeGrip?.45:1);
     const pelvisBob=.013*doubleStep*upperMotion,pelvisSway=.018*step*upperMotion*(.72+.28*Math.abs(along));
     position.y+=pelvisBob;position.addScaledVector(bodyRight,pelvisSway);
     pelvis.position.copy(pelvis.parent!.worldToLocal(position));
@@ -188,9 +192,9 @@ export class WorkerBody extends THREE.Group {
     // The rib cage counter-rotates against the pelvis and leans into travel.
     // Crouch keeps its existing forward fold, now layered with the gait rather
     // than replacing every standing movement with a rigid torso.
-    const spineDirection=Y.clone().addScaledVector(forward,1.1*this.bend).addScaledVector(this.travel,.050*upperMotion).addScaledVector(bodyRight,-step*.018*upperMotion).normalize();
+    const spineDirection=Y.clone().applyQuaternion(cartFrame?.quaternion??new THREE.Quaternion()).addScaledVector(forward,1.1*this.bend).addScaledVector(this.travel,.050*upperMotion).addScaledVector(bodyRight,-step*.018*upperMotion).normalize();
     this.orient('spine',this.point('spine').add(spineDirection));this.rotateWorld('spine',Y,-pelvisYaw*.72);
-    const chestDirection=Y.clone().addScaledVector(forward,.24*this.bend).addScaledVector(this.travel,.026*upperMotion).addScaledVector(bodyRight,step*.014*upperMotion).normalize();
+    const chestDirection=Y.clone().applyQuaternion(cartFrame?.quaternion??new THREE.Quaternion()).addScaledVector(forward,.24*this.bend).addScaledVector(this.travel,.026*upperMotion).addScaledVector(bodyRight,step*.014*upperMotion).normalize();
     this.orient('chest',this.point('chest').add(chestDirection));this.rotateWorld('chest',Y,-pelvisYaw*.52);
     const headCounter=-this.travelTurn-pelvisYaw*.22;
     this.rotateWorld('neck',Y,headCounter*.72);this.rotateWorld('head',Y,headCounter*.28);
@@ -209,7 +213,7 @@ export class WorkerBody extends THREE.Group {
       const foot=this.position.clone().addScaledVector(bodyRight,sign*.187).addScaledVector(bodyForward,-.055).addScaledVector(this.travel,stride);
       foot.y=.09+Math.max(0,Math.sin(phase))*.065*moving;
       this.limb('thigh.'+side,'shin.'+side,'foot.'+side,foot,bodyForward.clone().addScaledVector(bodyRight,sign*.12));
-      this.worldRotation(this.bone('foot.'+side),bodyQ.clone().multiply(this.footRest.get(side)!));
+      this.worldRotation(this.bone('foot.'+side),(cartFrame?yawQ:bodyQ).clone().multiply(this.footRest.get(side)!));
       // Lift the toe during swing, then return the complete boot to the flat
       // planted rest frame. This is deliberately absent during support so the
       // existing analytic plant cancellation remains exact.
@@ -217,7 +221,26 @@ export class WorkerBody extends THREE.Group {
       this.rotateWorld('foot.'+side,bodyRight,-THREE.MathUtils.degToRad(8)*swing);
       this.rotateWorld('toe.'+side,bodyRight,THREE.MathUtils.degToRad(11)*swing);
     }
+    const raisedCart=cartFrame?THREE.MathUtils.smoothstep(cartFrame.position.y,.003,.06):0;
+    if(cartFrame&&cartFrame.position.y>.003){
+      // Raised handles need a longer horizontal reach, not a floating worker.
+      // Keep the feet on the floor and step the torso back into arm's reach.
+      const drop=cartFrame.position.y;this.position.y-=drop;this.updateMatrixWorld(true);
+      const back=forward.clone().negate();let retreat=0;
+      for(const grip of grips.filter(g=>g.active&&g.bodyFrame)){
+        const side=grip.side>0?'R':'L',axis=Y.clone().applyQuaternion(grip.rotation),long=grip.palmDirection!.clone().normalize();
+        const across=long.clone().addScaledVector(axis,-long.dot(axis)).normalize().multiplyScalar(-grip.side),away=across.clone().cross(axis).normalize();
+        const radial=axis.clone().addScaledVector(long,-axis.dot(long)).normalize(),q=this.handOrientation(side,radial,long);
+        const wrist=grip.center.clone().addScaledVector(across,-grip.side*grip.section[0]*.6).addScaledVector(away,-grip.section[1]-.012).sub(this.handFrames.get(side)!.knuckle.clone().applyQuaternion(q));
+        const d=wrist.sub(this.point('upper_arm.'+side)),reach=this.lengths.get('upper_arm.'+side)!+this.lengths.get('forearm.'+side)!-.002;
+        const projection=d.dot(back);retreat=Math.max(retreat,projection+Math.sqrt(Math.max(0,projection*projection+reach*reach-d.lengthSq())));
+      }
+      this.position.addScaledVector(back,retreat);this.updateMatrixWorld(true);
+      // Ground the boots again after the stance shift; arm solving follows.
+      for(const [side,sign]of [['R',1],['L',-1]] as const){const foot=this.point('foot.'+side);foot.y=.09;this.limb('thigh.'+side,'shin.'+side,'foot.'+side,foot,forward.clone().addScaledVector(right,sign*.12));this.worldRotation(this.bone('foot.'+side),yawQ.clone().multiply(this.footRest.get(side)!));}
+    }
     const fixedHands=this.poseReferenceGrasps(grips,camera,fps,station,right,frontForBounds);
+    if(cartFrame){this.poseCartHandles(grips,right,raisedCart,working);fixedHands.add('R');fixedHands.add('L');}
     for(const [side,sign]of [['R',1],['L',-1]] as const){
       if(fixedHands.has(side))continue;
       const grip=grips.find(g=>g.side===sign&&g.active);
@@ -273,6 +296,26 @@ export class WorkerBody extends THREE.Group {
         const finalDirection=Y.clone().applyQuaternion(this.bone('index.03.R').getWorldQuaternion(new THREE.Quaternion()));
         const finalPlanar=finalDirection.clone().addScaledVector(axis,-finalDirection.dot(axis)).normalize();
         this.fingerFit.sprayForward={dot:finalPlanar.dot(nozzleDirection),wristBendDegrees:THREE.MathUtils.radToDeg(alignedLong.angleTo(this.point('hand.R').sub(this.point('forearm.R')).normalize())),long:alignedLong.toArray(),wrist:this.point('hand.R').toArray(),elbow:this.point('forearm.R').toArray(),shoulder:shoulder.toArray()};
+      }else if(!station&&grip&&side==='R'&&(tool==='trowel'||tool==='hose')){
+        // Carry one rigid forearm/palm/grip unit. Rotating only the palm to an
+        // aimed handle folded the hose wrist backwards at downward views.
+        const axis=Y.clone().applyQuaternion(grip.rotation),inverse=grip.rotation.clone().invert();
+        const long=camera.getWorldDirection(new THREE.Vector3());long.addScaledVector(axis,-long.dot(axis)).normalize();
+        const across=long.clone().negate(),back=across.clone().cross(axis).normalize();
+        const handQ=this.handOrientation(side,axis,long);
+        const middle=grip.center.clone().addScaledVector(across,-grip.section[0]*.6).addScaledVector(back,-grip.section[1]-.012);
+        const wrist=middle.sub(this.handFrames.get(side)!.knuckle.clone().applyQuaternion(handQ));
+        const shoulder=this.point('upper_arm.R'),foreLength=this.point('hand.R').distanceTo(this.point('forearm.R'));
+        const elbow=wrist.clone().addScaledVector(long,-foreLength),upperLength=shoulder.distanceTo(this.point('forearm.R'));
+        const bounds=fps.heldToolBoundsWorld(),corners:THREE.Vector3[]=[];
+        for(const x of [bounds.min.x,bounds.max.x])for(const y of [bounds.min.y,bounds.max.y])for(const z of [bounds.min.z,bounds.max.z])corners.push(new THREE.Vector3(x,y,z).sub(grip.center).applyQuaternion(inverse));
+        const pose=solveRigidGrasp(grip.center,grip.rotation,{shoulder,upperLength,handSign:1,lockRotation:true,screenRegion:{minX:.02,maxX:.90},elbow:elbow.clone().sub(grip.center).applyQuaternion(inverse),wrist:wrist.clone().sub(grip.center).applyQuaternion(inverse)},camera,corners,frontForBounds);
+        const shift=pose.center.clone().sub(grip.center);
+        this.orient('upper_arm.R',elbow.add(shift));this.orient('forearm.R',wrist.add(shift));this.setHandOrientation(side,axis,long);
+        fps.transformAnatomicalGrasp(grip.center,pose.center,new THREE.Quaternion());
+        const rotation=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(across,axis,back));
+        this.wrapGrip(side,pose.center,rotation,grip.section,false,working,grip.shape,grip.trigger?.clone().add(shift));
+        this.gripErrors.R=this.point('hand.R').distanceTo(wrist);
       }else if(tool==='laser'&&grip&&side==='R'){
         const axis=Y.clone().applyQuaternion(grip.rotation),oldAcross=new THREE.Vector3(1,0,0).applyQuaternion(grip.rotation),oldBack=new THREE.Vector3(0,0,1).applyQuaternion(grip.rotation);
         let long=grip.center.clone().sub(this.point('upper_arm.R')).addScaledVector(axis,-grip.center.clone().sub(this.point('upper_arm.R')).dot(axis)).normalize();
@@ -346,6 +389,38 @@ export class WorkerBody extends THREE.Group {
     // visited this skeleton earlier; tools and skin must use the same pose.
     this.updateMatrixWorld(true);
     for(const skeleton of this.skeletons)skeleton.update();
+  }
+  private poseCartHandles(grips:WorkerGripTarget[],right:THREE.Vector3,raised:number,working:boolean):void {
+    const contacts=grips.filter(g=>g.active&&g.bodyFrame),back=right.clone().cross(Y).normalize();
+    const poses=new Map<string,{rotation:THREE.Quaternion;section:[number,number]}>();
+    // Solve contact and stance together: an elevated handle is reached by
+    // stepping back, while shoulders, elbows and wrists retain their lengths.
+    for(let stance=0;stance<6;stance++){
+      for(const grip of contacts){
+        const side=grip.side>0?'R':'L',axis=Y.clone().applyQuaternion(grip.rotation);let long=grip.palmDirection!.clone().normalize();
+        // Keep space for the thumb web: aligning the palm with the shaft
+        // buries its base in the grip even when the fingertip can reach.
+        const limitPalm=()=>{const along=THREE.MathUtils.clamp(long.dot(axis),-.80,.80),across=long.clone().addScaledVector(axis,-long.dot(axis)).normalize();long.copy(across).multiplyScalar(Math.sqrt(1-along*along)).addScaledVector(axis,along);};
+        for(let pass=0;pass<4;pass++){
+          limitPalm();
+          const across=long.clone().addScaledVector(axis,-long.dot(axis)).normalize().multiplyScalar(-grip.side),away=across.clone().cross(axis).normalize();
+          const rotation=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(across,axis,away));
+          const radial=axis.clone().addScaledVector(long,-axis.dot(long)).normalize(),q=this.handOrientation(side,radial,long);
+          const wrist=grip.center.clone().addScaledVector(across,-grip.side*grip.section[0]*.6).addScaledVector(away,-grip.section[1]-.012).sub(this.handFrames.get(side)!.knuckle.clone().applyQuaternion(q));
+          this.reachWithShoulder(side,wrist,.0005);this.limb('upper_arm.'+side,'forearm.'+side,'hand.'+side,wrist,long.clone().negate(),.0005);this.setHandOrientation(side,radial,long);
+          this.gripErrors[side]=this.point('hand.'+side).distanceTo(wrist);poses.set(side,{rotation,section:grip.section});
+          long=grip.palmDirection!.clone().normalize().lerp(this.point('hand.'+side).sub(this.point('forearm.'+side)).normalize(),raised).normalize();
+        }
+      }
+      if(raised===0||stance===5)break;
+      let retreat=0;
+      for(const grip of contacts){const side=grip.side>0?'R':'L',d=this.point('hand.'+side).sub(this.point('upper_arm.'+side)),reach=this.lengths.get('upper_arm.'+side)!+this.lengths.get('forearm.'+side)!-.001;
+        const projection=d.dot(back);retreat=Math.max(retreat,projection+Math.sqrt(Math.max(0,projection*projection+reach*reach-d.lengthSq())));
+      }
+      if(retreat<.0005)break;this.position.addScaledVector(back,Math.min(retreat,.12));this.updateMatrixWorld(true);
+    }
+    for(const grip of contacts){const side=grip.side>0?'R':'L',pose=poses.get(side)!;this.wrapGrip(side,grip.center,pose.rotation,pose.section,false,working,'round',undefined,undefined,true);}
+    if(raised>0)for(const [side,sign]of [['R',1],['L',-1]] as const){const foot=this.point('foot.'+side),phase=this.phase+(side==='R'?0:Math.PI);foot.y=.09+Math.max(0,Math.sin(phase))*.065*this.gaitBlend;this.limb('thigh.'+side,'shin.'+side,'foot.'+side,foot,back.clone().negate().addScaledVector(right,sign*.12));}
   }
   private boxGraspHistory=new Map<THREE.Object3D,GraspHistory>();
   private boxUnitScreenBounds(object:THREE.Object3D,side:number,camera:THREE.PerspectiveCamera):THREE.Box2 {
@@ -547,7 +622,7 @@ export class WorkerBody extends THREE.Group {
     this.worldRotation(upper,upperQ);
     this.worldRotation(fore,foreQ);this.worldRotation(this.bone('hand.'+side),q);
   }
-  private wrapGrip(side:string,center:THREE.Vector3,rotation:THREE.Quaternion,section:[number,number],spray:boolean,working:boolean,shape:'round'|'box'='round',trigger?:THREE.Vector3,buttonTarget?:THREE.Vector3):void {
+  private wrapGrip(side:string,center:THREE.Vector3,rotation:THREE.Quaternion,section:[number,number],spray:boolean,working:boolean,shape:'round'|'box'='round',trigger?:THREE.Vector3,buttonTarget?:THREE.Vector3,contactCylinder=false):void {
     const sign=side==='R'?1:-1,axis=Y.clone().applyQuaternion(rotation),across=new THREE.Vector3(1,0,0).applyQuaternion(rotation),back=new THREE.Vector3(0,0,1).applyQuaternion(rotation);
     for(const digit of spray||trigger?['middle','ring','little']:['index','middle','ring','little'])this.closeFinger(digit,side,center,rotation,section,shape);
     if(trigger)this.fitFinger('index',side,trigger);
@@ -556,7 +631,15 @@ export class WorkerBody extends THREE.Group {
       this.fitFinger('index',side,actuator,true);
     }
     const tip=center.clone().addScaledVector(across,sign*(spray?.043:section[0]+.005)).addScaledVector(back,spray?.018:.008).addScaledVector(axis,spray?.067:.018);
-    this.fitThumb(side,tip,spray?{center,axis,radius:section[0]}:undefined);
+    if(contactCylinder){
+      // Approach the near surface with the thumb's pad. A fixed far-side
+      // target exceeds the thumb's range and buckles its knuckle into the palm.
+      const thumb=this.bone('thumb.03.'+side),offset=this.point('thumb.03.'+side).addScaledVector(Y.clone().applyQuaternion(thumb.getWorldQuaternion(new THREE.Quaternion())),this.lengths.get('thumb.03.'+side)!).sub(center);
+      const height=THREE.MathUtils.clamp(offset.dot(axis),-.07,.07);
+      offset.addScaledVector(axis,-offset.dot(axis)).normalize();
+      tip.copy(center).addScaledVector(axis,height).addScaledVector(offset,section[0]+.012);
+    }
+    this.fitThumb(side,tip,spray||contactCylinder?{center,axis,radius:section[0]}:undefined,contactCylinder);
     const thumbEnd=this.bone('thumb.03.'+side),end=this.point('thumb.03.'+side).add(Y.clone().applyQuaternion(thumbEnd.getWorldQuaternion(new THREE.Quaternion())).multiplyScalar(this.lengths.get('thumb.03.'+side)!));
     this.fingerFit['thumbContact'+side]={center:center.toArray(),axis:axis.toArray(),across:across.toArray(),back:back.toArray(),tip:end.toArray(),section};
   }
@@ -581,7 +664,7 @@ export class WorkerBody extends THREE.Group {
       this.orient(name,outline(angle-sign*(low+high)/2));
     }
   }
-  private fitThumb(side:string,target:THREE.Vector3,cylinder?:{center:THREE.Vector3;axis:THREE.Vector3;radius:number}):void {
+  private fitThumb(side:string,target:THREE.Vector3,cylinder?:{center:THREE.Vector3;axis:THREE.Vector3;radius:number},reuseSurfaceContact=false):void {
     const sign=side==='R'?1:-1,names=[1,2,3].map(j=>`thumb.0${j}.${side}`),angles=[0,0,.3,.3];
     const axes=[this.thumbOpposition.get(side)!,this.fingerAxes.get(names[0])!,this.fingerAxes.get(names[1])!,this.fingerAxes.get(names[2])!],indices=[0,0,1,2],limits=[[-.85,.85],[-.65,.65],[0,cylinder?.95:.70],[0,cylinder?.12:.35]];
     const pose=()=>{for(let j=0;j<3;j++){const b=this.bone(names[j]);b.quaternion.copy(this.rest.get(b)!.q);if(j===0)b.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(axes[0],angles[0])).multiply(new THREE.Quaternion().setFromAxisAngle(axes[1],angles[1]));else b.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(axes[j+1],sign*angles[j+1]));b.updateWorldMatrix(false,true);}};
@@ -591,6 +674,27 @@ export class WorkerBody extends THREE.Group {
     const hand=this.bone('hand.'+side),key=cylinder?[...hand.worldToLocal(target.clone()).toArray(),...hand.worldToLocal(cylinder.center.clone()).toArray(),...cylinder.axis.clone().applyQuaternion(hand.getWorldQuaternion(new THREE.Quaternion()).invert()).toArray()].map(n=>Math.round(n*10000)/10000).join(','):'';
     const cached=this.thumbPoseCache.get(side);
     if(cylinder&&cached?.key===key){angles.splice(0,4,...cached.angles);pose();this.fingerFit['thumb'+side]={error:tip().distanceTo(target),angles:angles.map(a=>a*180/Math.PI)};return;}
+    if(cylinder&&cached&&reuseSurfaceContact){
+      // A moving cart changes world transforms continuously, but its thumb
+      // contact usually remains valid. Verify the actual skin once before
+      // running the much more expensive full surface fit again.
+      angles.splice(0,4,...cached.angles);pose();const vertex=new THREE.Vector3();
+      const surfaceGap=()=>{let gap=Infinity;for(const sample of this.thumbSurface.get(side)!){sample.mesh.getVertexPosition(sample.index,vertex);vertex.applyMatrix4(sample.mesh.matrixWorld).sub(cylinder.center);const h=vertex.dot(cylinder.axis);if(Math.abs(h)>.08)continue;vertex.addScaledVector(cylinder.axis,-h);gap=Math.min(gap,vertex.length()-cylinder.radius);}return gap;};
+      let gap=surfaceGap();
+      // Follow the previous contact with a small bounded correction. A full
+      // fit from rest is reserved for acquisition or a large discontinuity.
+      if(Math.abs(gap)<.025)for(let pass=0;pass<3&&(gap<-.001||gap>.003);pass++){
+        let best=gap,bestAxis=-1,bestAngle=0;
+        for(let j=0;j<3;j++){
+          const original=angles[j],probe=.012;angles[j]=THREE.MathUtils.clamp(original+probe,limits[j][0],limits[j][1]);pose();const slope=(surfaceGap()-gap)/probe;
+          angles[j]=original;if(Math.abs(slope)<.002)continue;
+          const candidate=THREE.MathUtils.clamp(original+THREE.MathUtils.clamp((.001-gap)/slope,-.12,.12),limits[j][0],limits[j][1]);angles[j]=candidate;pose();const next=surfaceGap();angles[j]=original;
+          if(Math.abs(next-.001)<Math.abs(best-.001)){best=next;bestAxis=j;bestAngle=candidate;}
+        }
+        if(bestAxis<0){pose();break;}angles[bestAxis]=bestAngle;pose();gap=best;
+      }
+      if(gap>=-.001&&gap<=.003){this.thumbPoseCache.set(side,{key,angles:[...angles]});this.fingerFit['thumb'+side]={error:tip().distanceTo(target),angles:angles.map(a=>a*180/Math.PI),solver:'retained-surface-contact'};return;}
+    }
     pose();
     for(let pass=0;pass<10;pass++)for(let j=3;j>=0;j--){
       const b=this.bone(names[indices[j]]),origin=this.point(names[indices[j]]),axis=axes[j].clone().applyQuaternion(j===0?b.parent!.getWorldQuaternion(new THREE.Quaternion()).multiply(this.rest.get(b)!.q):b.getWorldQuaternion(new THREE.Quaternion())),from=tip().sub(origin),to=target.clone().sub(origin);

@@ -153,17 +153,17 @@ export class DesktopControls {
       // The initial Start press must complete in this exact user gesture.
       // Falling back from an async raw-input rejection can otherwise require
       // a second click in browsers that do not support unadjustedMovement.
-      void this.lockTarget.requestPointerLock();
+      void this.lockTarget.requestPointerLock()?.catch(() => {});
       return;
     }
     try {
       const request = this.lockTarget.requestPointerLock({ unadjustedMovement: true });
       if (request) void request.catch(error => {
-        if (error instanceof DOMException && error.name === 'NotSupportedError') void this.lockTarget.requestPointerLock();
+        if (error instanceof DOMException && error.name === 'NotSupportedError') void this.lockTarget.requestPointerLock()?.catch(() => {});
       });
     } catch (error) {
       if (error instanceof DOMException && error.name !== 'NotSupportedError') return;
-      void this.lockTarget.requestPointerLock();
+      void this.lockTarget.requestPointerLock()?.catch(() => {});
     }
   }
 

@@ -46,6 +46,7 @@ export class PvcWorkshop {
   private elapsed=0;
   private feedTime=0;
   private pressHeld=false;
+  private waitForActionRelease=false;
   private toolbarHold=false;
   private shapeKey='';
   private message='';
@@ -193,8 +194,16 @@ export class PvcWorkshop {
       if(this.phase==='bending'&&direction&&this.feedTime<=0){this.bend.move(direction);this.feedTime=.16;}
       if(!direction)this.feedTime=0;
       if(this.phase==='bending'&&this.pressHeld)this.bend.press(dt);
-      if(this.phase==='marking'&&this.pressHeld)this.markingProgress=Math.min(1,this.markingProgress+dt/.85);
-      if(this.phase==='spring'&&this.pressHeld){this.transition('inserting');}
+      if(this.phase==='marking'&&this.pressHeld){
+        this.markingProgress=Math.min(1,this.markingProgress+dt/.85);
+        if(this.markingProgress===1){
+          this.transition('spring');
+          this.waitForActionRelease=true;
+          this.message='Το σημάδι ολοκληρώθηκε. Άφησε το mouse και πάτησε ξανά για να βάλεις το spring.';
+        }
+      }
+      if(this.waitForActionRelease){if(!this.pressHeld)this.waitForActionRelease=false;}
+      else if(this.phase==='spring'&&this.pressHeld){this.transition('inserting');}
       if(animated.includes(this.phase))this.animate(dt);
     }
     return wasBlocking||this.blocksWork;
@@ -427,7 +436,7 @@ export class PvcWorkshop {
     this.game.hud.shell.classList.toggle('pvc-focused',this.focused);
     this.prompt.hidden=!this.game.started||(!show&&!near&&this.phase!=='carrying');
     const tips:Partial<Record<Phase,string>>={
-      marking:'Mouse: γωνία · LMB: μαρκαδόρος · E: συνέχεια · P: αποθήκευση preset · Tab: επόμενο',
+      marking:'Mouse: γωνία · Κράτα LMB: γραμμή · μετά περνά αυτόματα στο spring · P: preset · Tab: επόμενο',
       spring:'LMB: βάλε το spring · R: διαφάνεια · ESC: πίσω',
       bending:'A / D: χέρι · LMB: λύγισε εδώ · Z: διόρθωση · E: έλεγχος · R: διαφάνεια',
       review:'Ροδέλα ή − / +: ποσότητα · E: παραγωγή · R: διαφάνεια',

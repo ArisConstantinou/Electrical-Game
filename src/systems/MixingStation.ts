@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { PlayerObstacle } from '../player/EquipmentCollision';
-import { setWheelbarrowFill } from '../world/SiteEquipmentModels';
+import { Wheelbarrow } from './Wheelbarrow';
 import type { Game } from '../core/Game';
 import { MortarBatch } from './MortarBatch';
 import { DrumMixer } from './DrumMixer';
@@ -15,7 +15,7 @@ type MixingTool = 'trowel'|'shovel'|'mixer'|'water'|'hands';
 type WorldMixingTool = Exclude<MixingTool,'hands'>;
 type Action = 'water'|'cement'|'sand'|'pour'|'insert'|'rinse'|'carry'|'place'|'work'|'discard';
 type Activity = 'water'|'tear'|'cement'|'sand'|'pour'|null;
-type StationTarget = {kind:'water'|'trowel'|'shovel'|'mixer'|'bucket'|'drum'|'sand'|'rinse'|'sack';index?:number;object:THREE.Object3D};
+type StationTarget = {kind:'water'|'trowel'|'shovel'|'mixer'|'bucket'|'drum'|'sand'|'rinse'|'sack'|'wheelbarrow'|'spill';index?:number;object:THREE.Object3D};
 const names:Record<MixingTool,string>={trowel:'Μιστρί',shovel:'Φτυάρι',mixer:'Μίκσερ',water:'Νερό',hands:'Χέρια'};
 const qualityNames:Record<string,string>={empty:'Άδεια σύκλα',incomplete:'Χρειάζεται νερό, τσιμέντο και άμμο',unmixed:'Χρειάζεται ανάμιξη',balanced:'Έτοιμος πυλός · κοντά στη συνταγή σου',wet:'Αραιό μίγμα · πρόσθεσε άμμο',dry:'Στεγνό μίγμα · πρόσθεσε νερό',weak:'Λίγο τσιμέντο · πρόσθεσε μιστριές'};
 
@@ -77,7 +77,7 @@ export class MixingStation {
   private finished=false;
   /** A fresh session includes 60 L of ready wet mortar for rapid wall testing. */
   readonly wheelbarrowCapacityKg=114;
-  private wheelbarrowMassKg=this.wheelbarrowCapacityKg;
+  readonly wheelbarrow:Wheelbarrow;
   private pendingTool:MixingTool|null=null;
   private mixerApproach:{object:THREE.Object3D;from:THREE.Vector3;to:THREE.Vector3;elapsed:number;yaw:number;pitch:number}|null=null;
   private mixerControlHint='ΒΑΛΕ ΤΟ ΜΙΞΕΡ';
@@ -89,6 +89,7 @@ export class MixingStation {
     // The preparation bay lives at the rear perimeter, leaving the full wall
     // approach and side-to-side working lane clear.
     m.group.position.set(0,0,2.10);game.renderer.scene.add(m.group);
+    this.wheelbarrow=new Wheelbarrow(m.wheelbarrow,game);
     this.bucketHome.copy(m.bucket.position);this.mixerHome.copy(m.mixer.position);this.mixerRotation.copy(m.mixer.rotation);
     game.renderer.camera.add(this.held);this.held.name='Mixing tools held in worker hands';
     this.heldTools.set('trowel',buildToolModel('trowel'));
@@ -141,7 +142,7 @@ export class MixingStation {
     });
     addEventListener('blur',()=>{this.stop();this.drum.running=false;});document.addEventListener('visibilitychange',()=>{if(document.hidden){this.stop();this.drum.running=false;}});
   }
-  get blocksWork():boolean{return this.active||this.carrying;}
+  get blocksWork():boolean{return this.active||this.carrying||this.wheelbarrow.busy;}
   private localBounds(root:THREE.Object3D):THREE.Box3{
     root.updateWorldMatrix(true,true);const inverse=root.matrixWorld.clone().invert(),bounds=new THREE.Box3(),point=new THREE.Vector3(),corner=new THREE.Vector3(),instance=new THREE.Matrix4(),world=new THREE.Matrix4();
     root.traverse(object=>{
@@ -160,6 +161,7 @@ export class MixingStation {
     this.models.group.updateWorldMatrix(true,true);const obstacles:PlayerObstacle[]=[],point=new THREE.Vector3();
     for(const {id,object,bounds} of this.collisionSources){
       const portable=id==='shovel'||id==='cordless-mixer'||id==='water-jug'||id==='mixing-trowel'||id.startsWith('cement-sack-');
+      if(id==='wheelbarrow'&&this.wheelbarrow.driving)continue;
       if(portable&&!object.visible||id==='mixing-bucket'&&this.carrying)continue;
       object.updateWorldMatrix(true,false);let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity;
       for(const x of [bounds.min.x,bounds.max.x])for(const y of [bounds.min.y,bounds.max.y])for(const z of [bounds.min.z,bounds.max.z]){
@@ -189,6 +191,7 @@ export class MixingStation {
     this.game.input.resetTransientInput();
   }
   chooseTool(tool:MixingTool):void{
+    if(this.wheelbarrow.busy||this.wheelbarrow.recovering)return;
     if(this.carrying&&tool!=='hands'){this.message='Άφησε πρώτα τη σύκλα στο δάπεδο.';return;}
     // World pickups and toolbar actions both finish the current finite deposit,
     // then apply the last explicit selection without starting another scoop.
@@ -269,7 +272,9 @@ export class MixingStation {
   canOpenFromInteract():boolean{
     return Boolean(this.aimedObject());
   }
-  handleInteractionRequest(requested:boolean):boolean{
+  handleInteractionRequest(requested:boolean,explicitInteract=true):boolean{
+    if(this.wheelbarrow.driving){if(requested&&explicitInteract)this.wheelbarrow.release();return true;}
+    if(this.wheelbarrow.busy||this.wheelbarrow.recovering)return true;
     if(!requested)return false;
     const target=this.aimedObject();
     if(!target){
@@ -277,6 +282,10 @@ export class MixingStation {
       return false;
     }
     if(!this.promptFor(target))return this.active;
+    if(target.kind==='wheelbarrow'&&(this.wheelbarrow.state==='flipped'||!(this.active&&this.tool==='shovel'&&this.wheelbarrow.shovelKg>0))){
+      if(this.activity||this.carrying)return true;
+      this.chooseTool('hands');this.setActive(false);this.wheelbarrow.enter();return true;
+    }
     if(!this.active)this.setActive(true);
     // Keep ingredient strokes atomic, but never discard a visible tool pickup.
     if(this.activity&&!['water','trowel','shovel','mixer'].includes(target.kind))return true;
@@ -316,7 +325,7 @@ export class MixingStation {
     // Exact tools and ingredients win. Sand beside the narrow shovel gets a
     // small pickup margin so the blade does not require pixel-perfect aim.
     this.ray.setFromCamera(new THREE.Vector2(),c);
-    const roots=[m.bucket,m.sand,...m.sacks,m.rinse,m.water,m.mixer,m.shovel,this.stationTrowel,m.concreteMixer,m.wheelbarrow.group].filter(object=>object.visible);
+    const roots=[m.bucket,m.sand,...m.sacks,m.rinse,m.water,m.mixer,m.shovel,this.stationTrowel,m.concreteMixer,m.wheelbarrow.group,this.wheelbarrow.spills].filter(object=>object.visible);
     const hit=this.ray.intersectObjects(roots,true).find(hit=>this.visibleForInteraction(hit.object));
     const shovelPickup=()=>this.nearbyVisibleShovel(roots);
     if(!hit||hit.distance>3.2)return shovelPickup();
@@ -325,6 +334,8 @@ export class MixingStation {
     const blocker=this.ray.intersectObject(this.game.room,true).find(hit=>this.visibleForInteraction(hit.object));
     if(blocker&&blocker.distance<hit.distance-.001)return null;
     const belongs=(root:THREE.Object3D)=>{let object:THREE.Object3D|null=hit.object;while(object){if(object===root)return true;object=object.parent;}return false;};
+    if(belongs(this.wheelbarrow.spills))return{kind:'spill',object:this.wheelbarrow.spills,index:hit.instanceId};
+    if(belongs(m.wheelbarrow.group))return{kind:'wheelbarrow',object:m.wheelbarrow.group};
     const sack=m.sacks.findIndex(belongs);if(sack>=0)return{kind:'sack',index:sack,object:m.sacks[sack]};
     for(const [kind,object] of [['drum',m.concreteMixer],['water',m.water],['trowel',this.stationTrowel],['shovel',m.shovel],['mixer',m.mixer],['bucket',m.bucket],['sand',m.sand],['rinse',m.rinse]] as const)if(belongs(object)){
       if(kind==='mixer'&&this.inserted)return{kind:'bucket',object:m.bucket};
@@ -434,18 +445,21 @@ export class MixingStation {
     this.carrying=false;this.game.input.resetTransientInput();this.models.bucket.position.copy(this.models.group.worldToLocal(p));this.models.bucket.rotation.set(0,0,0);this.message='Η σύκλα έμεινε εδώ. Εργάσου με μιστρί κοντά της.';return true;
   }
   /** Called only when the wrist actually releases; failed or cancelled throws use no mortar. */
-  get canSupplyScoop():boolean{return Boolean(this.supplyBatch||this.wheelbarrowMassKg>0)&&!this.blocksWork&&!this.inserted;}
+  get canSupplyScoop():boolean{return Boolean(this.supplyBatch||this.wheelbarrow.massKg>0&&this.wheelbarrow.state==='parked')&&!this.blocksWork&&!this.inserted;}
   reserveScoop(requested:number):number{
     if(!Number.isFinite(requested)||requested<=0||this.blocksWork||this.inserted)return 0;
     const batch=this.supplyBatch;
     if(batch){this.finished=true;this.customSupply=true;this.uiKey='';return batch.consumeKg(requested);}
-    const amount=Math.min(requested,this.wheelbarrowMassKg);this.wheelbarrowMassKg-=amount;
-    setWheelbarrowFill(this.models.wheelbarrow,this.wheelbarrowMassKg/this.wheelbarrowCapacityKg);
+    const amount=this.wheelbarrow.consume(requested);
     if(amount===0)this.game.hud.notify('Το καρότσι άδειασε. Ετοίμασε νέα παρτίδα στη σύκλα ή στη μπετονιέρα.',false,2000);
     return amount;
   }
   get bondFactor():number{const b=this.supplyBatch;return !b||b.quality==='balanced'?1:b.quality==='wet'?.45:b.quality==='dry'?.55:.65;}
   private promptFor(target:StationTarget|null):string{
+    if(this.wheelbarrow.driving)return'E · ΑΦΗΣΕ ΤΟ ΚΑΡΟΤΣΙ';
+    if(this.wheelbarrow.state==='righting')return'ΕΠΑΝΑΦΟΡΑ ΚΑΡΟΤΣΙΟΥ';
+    if(target?.kind==='wheelbarrow')return this.wheelbarrow.state==='tipping'?'':this.wheelbarrow.state==='flipped'?'E · ΣΗΚΩΣΕ ΤΟ ΚΑΡΟΤΣΙ':this.active&&this.tool==='shovel'&&this.wheelbarrow.shovelKg>0?'E · ΡΙΞΕ ΤΟΝ ΠΥΛΟ ΣΤΟ ΚΑΡΟΤΣΙ':'E · ΠΙΑΣΕ ΤΟ ΚΑΡΟΤΣΙ';
+    if(target?.kind==='spill')return this.active&&this.tool==='shovel'?(this.wheelbarrow.shovelKg>0?'ΦΟΡΤΩΜΕΝΟ ΦΤΥΑΡΙ · ΣΤΟΧΕΥΣΕ ΤΟ ΚΑΡΟΤΣΙ':'E · ΜΑΖΕΨΕ ΤΟΝ ΠΥΛΟ'):'';
     if(this.mixerApproach)return'ΠΑΙΡΝΕΙΣ ΘΕΣΗ';
     if(this.activity&&this.pendingTool!==null)return this.pendingTool==='hands'?'ΟΛΟΚΛΗΡΩΝΕΤΑΙ Η ΚΙΝΗΣΗ · ΑΦΗΝΕΙΣ ΤΟ ΕΡΓΑΛΕΙΟ':`ΟΛΟΚΛΗΡΩΝΕΤΑΙ Η ΚΙΝΗΣΗ · ΜΕΤΑ ${names[this.pendingTool]}`;
     const key=matchMedia('(any-pointer: coarse)').matches?'INTERACT':'E';
@@ -471,6 +485,7 @@ export class MixingStation {
   }
   update(dt:number,requested:boolean,heldInteraction:boolean):void{
     dt=Number.isFinite(dt)?Math.min(.05,Math.max(0,dt)):0;
+    this.wheelbarrow.update(this.game.started?dt:0);
     this.drum.update(document.hidden?0:dt);
     this.updateMixerApproach(dt);
     this.updateActivity(dt);
@@ -479,10 +494,10 @@ export class MixingStation {
     const station=this.models.group.getWorldPosition(this.stationPoint),camera=this.game.renderer.camera.position;
     const distance=Math.hypot(station.x-camera.x,station.z-camera.z);
     const stageNearby=this.game.started&&distance<2.35&&!this.finished;
-    if(this.active&&distance>this.activationDistance+1.2)this.setActive(false);
+    if(this.active&&this.tool!=='shovel'&&distance>this.activationDistance+1.2)this.setActive(false);
     this.receipt.update(this.workingBatch,this.game.started&&this.active,dt,this.destination==='drum'?this.drum.running?`Μπετονιέρα σε λειτουργία · ${Math.round(this.drum.batch.mixProgress*100)}%`:this.drum.batch.ready?'Έτοιμο · FINISH για χρήση':'20 L νερό · 18 μιστριές τσιμέντο · 36 φτυαριές άμμο':this.recipeHint(),this.destination==='drum'?'ΣΤΗ ΜΠΕΤΟΝΙΕΡΑ':'ΣΤΗ ΣΥΚΛΑ');
     const aimed=this.aimedObject();this.updateToolHighlights(aimed);const prompt=this.promptFor(aimed),interactAvailable=Boolean(prompt);this.prompt.hidden=!prompt;this.prompt.textContent=prompt;
-    const mixingUiAvailable=stageNearby&&(!this.game.boxAssemblyActive||interactAvailable);
+    const mixingUiAvailable=!this.wheelbarrow.busy&&stageNearby&&(!this.game.boxAssemblyActive||interactAvailable);
     this.toolbelt.hidden=!mixingUiAvailable;
     this.game.hud.shell.classList.toggle('mixing-stage',mixingUiAvailable);
     this.game.hud.shell.classList.toggle('mixing-target',interactAvailable);
@@ -506,6 +521,12 @@ export class MixingStation {
     if(this.cleanSeconds>0){if(this.active&&this.tool==='mixer'&&!this.inserted&&this.near(this.models.rinse,1.8)){this.cleanSeconds=Math.max(0,this.cleanSeconds-dt);if(this.cleanSeconds===0){this.mixerDirty=false;this.message='Το μίκσερ καθάρισε. Μπορείς να σηκώσεις τη σύκλα.';}}else{this.cleanSeconds=0;this.message='Το ξέπλυμα διακόπηκε. Πλησίασε ξανά με το μίκσερ.';}}
   }
   private useAimedObject(target:StationTarget):boolean{
+    if(target.kind==='spill'&&this.tool==='shovel'){
+      if(this.batch.getState().heldShovel){this.game.hud.notify('Άδειασε πρώτα την άμμο από το φτυάρι.',false,1500);return true;}
+      const hit=this.ray.intersectObject(this.wheelbarrow.spills)[0];if(hit)this.wheelbarrow.scoop(hit.point);return true;
+    }
+    if(target.kind==='wheelbarrow'&&this.tool==='shovel'){this.wheelbarrow.deposit();return true;}
+    if(this.tool==='shovel'&&this.wheelbarrow.shovelKg>0){this.game.hud.notify('Ο πυλός στο φτυάρι επιστρέφει στο καρότσι.',false,1800);return true;}
     if(this.carrying)return this.placeBucket();
     if((target.kind==='drum'||target.kind==='bucket')&&((this.tool==='shovel'&&this.batch.getState().heldShovel)||(this.tool==='trowel'&&this.batch.getState().heldTrowel))){this.destination=target.kind;return this.beginActivity('pour',target.object);}
     if(target.kind==='drum'){
@@ -541,7 +562,8 @@ export class MixingStation {
     m.fill.userData.dryIngredients=b.cementScoops>0||b.sandScoops>0;
     updateMixingSurface(m,b.mixProgress,this.mixingNow,this.elapsed);
     for(const mixer of [m.mixer,this.heldTools.get('mixer')!])setMixerDirty(mixer,this.mixerDirty);
-    setShovelLoaded(this.heldTools.get('shovel')!,Boolean(state.heldShovel));setShovelLoaded(m.shovel,Boolean(state.heldShovel));
+    setShovelLoaded(this.heldTools.get('shovel')!,Boolean(state.heldShovel)||this.wheelbarrow.shovelKg>0);setShovelLoaded(m.shovel,Boolean(state.heldShovel)||this.wheelbarrow.shovelKg>0);
+    for(const shovel of [this.heldTools.get('shovel')!,m.shovel]){const load=shovel.getObjectByName('shovel-sand-load') as THREE.Mesh<THREE.BufferGeometry,THREE.MeshStandardMaterial>;load.material.color.setHex(this.wheelbarrow.shovelKg>0?0x858171:0xb89a67);}
     this.pouring.visible=this.pouringTime>0;
     if(this.pouring.visible){this.pouring.position.copy(this.vesselPosition(this.activityDestination==='drum')).add(new THREE.Vector3(0,-.3,0));const p=this.pouring.geometry.getAttribute('position');for(let i=0;i<p.count;i++){const fall=(this.elapsed*1.8+i/p.count)%1;p.setXYZ(i,Math.sin(i*2.4)*.04,.3+(1-fall)*.35,Math.cos(i*2.4)*.04);}p.needsUpdate=true;}
     const activeSack=state.sacks.findIndex(sack=>sack.remainingKg>1e-6);
@@ -554,7 +576,7 @@ export class MixingStation {
     if(this.blocksWork)this.game.hud.updateMobileUseStatus(this.carrying?'ΑΦΗΣΕ ΤΗ ΣΥΚΛΑ':this.tool==='hands'?'ΠΙΑΣΕ ΕΡΓΑΛΕΙΟ':this.tool==='mixer'?this.mixerControlHint:'ΧΡΗΣΗ',this.tool!=='hands',this.mixingNow);
     this.stationTrowel.visible=this.tool!=='trowel'||!this.active;this.stationTrowel.getObjectByName('trowel-load')!.visible=Boolean(state.heldTrowel);
     m.water.visible=this.tool!=='water'||!this.active;
-    this.held.visible=this.active&&!this.carrying;
+    this.held.visible=this.active&&!this.carrying&&!this.wheelbarrow.busy;
     this.heldTools.forEach((model,key)=>{model.visible=this.held.visible&&key===this.tool&&!(key==='mixer'&&(this.inserted||this.cleanSeconds>0));});
     const trowel=this.heldTools.get('trowel')!,load=trowel.getObjectByName('trowel-load');if(load){load.visible=Boolean(state.heldTrowel);(load as THREE.Mesh<THREE.BufferGeometry,THREE.MeshStandardMaterial>).material.color.setHex(0xb2aaa0);}
     this.poseHeldTool();
@@ -610,6 +632,12 @@ export class MixingStation {
       else model.rotation.z+=(this.tool==='trowel'?-1.1:-.65)*smooth((p-.58)/.13)*reach;
       model.position.copy(restTip.lerp(c.worldToLocal(target),reach)).sub(tip.applyQuaternion(model.quaternion));
     }
+    const recovery=this.wheelbarrow.recoveryPose;
+    if(recovery&&this.tool==='shovel'){
+      const p=recovery.progress,reach=Math.sin(Math.PI*p),tip=new THREE.Vector3().fromArray(model.userData.tipPoint),rest=tip.clone().applyQuaternion(model.quaternion).add(model.position);
+      model.rotation.z-=Math.sin(p*Math.PI)*.55;
+      model.position.copy(rest.lerp(c.worldToLocal(recovery.point.clone()),reach)).sub(tip.applyQuaternion(model.quaternion));
+    }
     if(this.actionTime>0)model.position.y-=Math.sin((1-this.actionTime/.65)*Math.PI)*.035;
     // A world target can be farther away than the worker's arm span. Limit
     // translation before solving elbows so forearms cannot detach from wrists.
@@ -652,6 +680,7 @@ export class MixingStation {
     }
   }
   anatomicalGrips():WorkerGripTarget[] {
+    if(this.wheelbarrow.driving)return this.wheelbarrow.anatomicalGrips();
     if(!this.active&&!this.carrying)return [];
     return this.arms.map(arm=>{
       const active=this.carrying||this.inserted||this.cleanSeconds>0||(this.tool!=='hands'&&!(this.tool==='trowel'&&arm.side<0));
@@ -667,5 +696,5 @@ export class MixingStation {
       for(const child of hand.children)child.visible=!active;
   }
   get mixerRunning():boolean{return this.mixingNow||this.drum.running;}
-  get telemetry(){return{destination:this.destination,drum:this.drum.telemetry,wheelbarrow:{massKg:this.wheelbarrowMassKg,capacityKg:this.wheelbarrowCapacityKg,litres:this.wheelbarrowMassKg/1.9},active:this.active,tool:this.tool,pendingTool:this.pendingTool,approaching:Boolean(this.mixerApproach),approachTarget:this.mixerApproach?(this.mixerApproach.object===this.models.bucket?'bucket':'rinse'):null,carrying:this.carrying,customSupply:this.customSupply,finished:this.finished,activity:this.activity,activityProgress:this.activity?this.activityTime/(this.activity==='pour'?1:this.activity==='tear'?.85:this.activity==='water'?1.35:1.55):0,inserted:this.inserted,mixerDirty:this.mixerDirty,mixing:this.mixingNow,cleaningSeconds:this.cleanSeconds,bucketPosition:this.bucketPosition().toArray(),heldToolVisible:this.heldTools.get(this.tool)?.visible??false,aimedTarget:this.aimedObject()?.kind??null,toolHighlights:[...this.toolHighlights].map(([tool,h])=>({tool,color:h.material.color.getHex()===0x36a8ff?'blue':'yellow',visible:h.root.visible,shells:h.shells.length})),batch:this.batch.getState(),hint:this.message};}
+  get telemetry(){return{destination:this.destination,drum:this.drum.telemetry,wheelbarrow:this.wheelbarrow.telemetry,active:this.active,tool:this.tool,pendingTool:this.pendingTool,approaching:Boolean(this.mixerApproach),approachTarget:this.mixerApproach?(this.mixerApproach.object===this.models.bucket?'bucket':'rinse'):null,carrying:this.carrying,customSupply:this.customSupply,finished:this.finished,activity:this.activity,activityProgress:this.activity?this.activityTime/(this.activity==='pour'?1:this.activity==='tear'?.85:this.activity==='water'?1.35:1.55):0,inserted:this.inserted,mixerDirty:this.mixerDirty,mixing:this.mixingNow,cleaningSeconds:this.cleanSeconds,bucketPosition:this.bucketPosition().toArray(),heldToolVisible:this.heldTools.get(this.tool)?.visible??false,aimedTarget:this.aimedObject()?.kind??null,toolHighlights:[...this.toolHighlights].map(([tool,h])=>({tool,color:h.material.color.getHex()===0x36a8ff?'blue':'yellow',visible:h.root.visible,shells:h.shells.length})),batch:this.batch.getState(),hint:this.message};}
 }

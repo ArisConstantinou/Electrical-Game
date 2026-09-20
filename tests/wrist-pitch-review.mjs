@@ -35,7 +35,7 @@ try{
   },{tool,pitch,yaw});report.cases.push(data);
   if(process.env.REVIEW_ALL_SHOTS||pitch===-1.15||tool==='drill')await p.screenshot({path:`${out}/${tool.replace(':','-')}-${pitch}${yaw?'-yaw'+yaw:''}.png`});
  }
- const trowelCases=report.cases.filter(c=>c.tool==='trowel');
- for(const c of trowelCases){const bend=c.arms.R?.bend??Infinity;assert(bend<(Math.abs(c.pitch)<=.6?15:35),`Trowel wrist bends ${bend.toFixed(1)}° at pitch ${c.pitch}`);}
+ const trowelCases=report.cases.filter(c=>c.tool==='trowel'||c.tool==='hose');
+ for(const c of trowelCases){const bend=c.arms.R?.bend??Infinity;assert(bend<(Math.abs(c.pitch)<=.6?15:35),`${c.tool} wrist bends ${bend.toFixed(1)}° at pitch ${c.pitch}`);}
  console.log(JSON.stringify(report.cases.map(c=>({tool:c.tool,pitch:c.pitch,wrists:Object.fromEntries(Object.entries(c.arms).map(([k,v])=>[k,Math.round(v.bend)]))})),null,2));
 }finally{await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));await browser.close();}

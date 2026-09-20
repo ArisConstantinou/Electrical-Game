@@ -21,7 +21,7 @@ try{
  const use=async(n=2)=>{await page.mouse.down();await step(n);await page.mouse.up();await step(2);};
  let cutMouseY=400;
  const cutAt=async cm=>{const current=(await state()).cutCm;cutMouseY+=(cm-current)/.06;await page.mouse.move(1000,cutMouseY);await step(2);};
- await aim([.9,1.65,.75],[3.45,1.25,1.2]);await snap('01-stock');
+ await aim([.9,1.65,.75],[3.58,1.25,1.15]);await snap('01-stock');
  await page.keyboard.press('Digit1');await step(2);await snap('02-spring');
  report.state=JSON.parse(await page.evaluate(()=>window.render_game_to_text()));
  report.workshopPresent=await page.evaluate(()=>Boolean(window.__wireTheHouse.pvc));
@@ -38,8 +38,10 @@ try{
   assert(await page.evaluate(()=>window.__wireTheHouse.pvc.stock.liveMarks.visible));await snap('04b-live-mark');
   await page.mouse.move(1000,400);await step(2);
   for(let i=0;i<5&&(await state()).markCm!==50;i++)await key('Tab');
-  assert.equal((await state()).markCm,50);await page.mouse.down();await step(60);await page.mouse.up();await step(2);
-  assert.equal((await state()).markingProgress,1);await snap('05-marked');await key('KeyE');assert.equal((await state()).phase,'spring');await snap('06-spring-ready');
+  assert.equal((await state()).markCm,50);await page.mouse.down();await step(60);
+  assert.equal((await state()).markingProgress,1);assert.equal((await state()).phase,'spring','Finishing the line must advance without a second E');
+  assert.equal((await state()).springInsertion,0);await step(30);assert.equal((await state()).phase,'spring','Held marker click must not also insert the spring');
+  await page.mouse.up();await step(2);await snap('05-marked-spring-ready');
   await use();await step(100);assert.equal((await state()).phase,'bending');assert.equal((await state()).springInsertion,1);
   assert.equal(await page.evaluate(()=>window.__wireTheHouse.pvc.pipe.material.opacity),1);await key('KeyR');assert.equal(await page.evaluate(()=>window.__wireTheHouse.pvc.pipe.material.opacity),.4);await snap('07-spring-inside');
   await key('KeyE');assert.equal((await state()).phase,'bending','E must not bend automatically');
@@ -79,6 +81,7 @@ try{
   await key('KeyR');assert.equal(await page.evaluate(()=>window.__wireTheHouse.mission.points[0].conduit.children[0].material.opacity),.4);
   report.checks.push('prepared bonded box -> fit -> long cut -> re-cut -> blocked-lane rejection -> actual formed pipe installed; R toggles held and installed PVC');report.pvc=await state();
  }
+ report.errors=report.errors.filter(message=>message!=='Pointer Lock disabled for automated verification');
  assert.equal(report.errors.length,0,report.errors.join('\n'));
 }finally{await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));await browser.close();}
 console.log(JSON.stringify({url,baseline,errors:report.errors,checks:report.checks,workshopPresent:report.workshopPresent}));

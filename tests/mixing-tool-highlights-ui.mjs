@@ -3,7 +3,7 @@ import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {blockPointerLock} from './browser-safety.mjs';
 
-const url=process.argv.find(value=>/^https?:/.test(value))??'http://127.0.0.1:5362/Electrical-Game/';
+const url=process.argv.find(value=>/^https?:/.test(value))??'http://127.0.0.1:5365/Electrical-Game/';
 const out='output/mixing-tool-highlights';await mkdir(out,{recursive:true});
 const report={url,cases:[],errors:[],passed:false};
 const browser=await chromium.launch({channel:'chrome',headless:true});

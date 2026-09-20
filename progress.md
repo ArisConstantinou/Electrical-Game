@@ -857,3 +857,28 @@ Original prompt for this task: Selecting BOX should show an initial box in the l
 - Desktop and touch buttons use the same events. The narrow portrait layout keeps the two-button rail beside the panel without horizontal overflow or covering the mobile USE control.
 - Verified builder history, desktop/mobile input isolation, undo/reset, draft preservation, re-entry and placement. The 40-case desktop/portrait box visibility suite and 12-case wrist/performance suite pass; current headless WebGL submit P95 was 24.0 ms desktop and 15.8 ms portrait. TypeScript and production build pass with the existing large-chunk warning.
 - Evidence: output/box-history-actions-final, output/box-history-visibility-final and output/box-history-wrist-performance. Preview remains http://127.0.0.1:5365/Electrical-Game/.
+
+## 2026-09-20 Wheelbarrow transport, integrated 5365, tool grips (in progress)
+
+- User approved E transport/parking/righting, multidirectional movement, wheel rotation, slosh, inertia-driven tipping, conserved spills and shovel return, stability/speed HUD. Later required current PVC + mixing highlights on 5365 and trowel/hose + cart grip fixes.
+- Verified previous 5365 listener served prepared-multi-pipe-wall (not manual-pvc-current). Protected originals; created wheelbarrow-physics checkout from the PVC dirty snapshot and merged prepared branch. Highlights imported from main without modifying original. Working branch codex/wheelbarrow-physics; preview 5365 now explicitly resolves this checkout. Inherited source images are untracked references only.
+- Integrated PVC and highlights regressions passed. Fixed rejected initial pointer-lock promise. Wheelbarrow native E/move/tip/right/3.5kg shovel return passes and conserves 114kg; expanded per-direction loaded tests and camera-independent grip tests pending. Hose 12 nozzle cases and trowel pose tests pass.
+- Wheelbarrow physics is bounded 120Hz gameplay dynamics, not a general rigidbody engine. Each spilled parcel keeps mass and impact-dependent volume-preserving footprint; rendering has a 240-instance budget.
+- Remaining: moving grip assertions, per-direction loaded spills, visual/mobile/performance checks, full integration regressions/build, provenance, commit/push.
+
+### 2026-09-20 shared preview coordination and cart anatomy
+
+- User now requires one stable port per project across every chat; Electrical-Game is exclusively 5365. Added root AGENTS.md in the main project and integration checkout. The other PVC task explicitly handed over its listener and agreed not to replace the shared preview.
+- Imported its four final files: PvcModels, PvcWorkshop, manual-pvc-ui, pvc-stock-bundle-ui. This includes round stock and automatic marking-to-spring with release gate.
+- Diagnosed reversed cart grip axis (about 86 degrees residual forearm roll) plus incorrect bent-arm stance. Corrected thumb-facing direction, actual thumb-skin contact, and explicit cart-relative stance. User then required straight elbows: stationary elbows now approximately 175 degrees, wrists approximately 12 degrees. Movement regression currently has elbows >=171.8 degrees, wrists <=12.9 degrees, contact error <0.001 mm; camera pitch does not change grasp.
+- Raised handles initially lifted the body; fixed by grounding the stance and stepping back using the fixed arm lengths. Normal-motion boot-height test range is 0.09–0.155 m, including gait lift, instead of the erroneous 0.409 m.
+- Native per-direction loaded flip, 114 kg conservation and 3.5 kg recovery passed before final pose changes. Current expanded native shovel pickup, gameplay, active-motion performance and refreshed PVC regressions are running.
+- Remaining: inspect new final screenshots/performance, collision/highlight/hose/trowel regressions, skill client, final build/provenance/diff, commit/push. No release claim yet.
+
+### Final verification (2026-09-20)
+
+- Final cart grasp passes four camera pitches and 100 moving samples: elbows approximately 175 degrees at rest and at least 171.8 degrees moving; moving wrists remain below 24.3 degrees. Actual thumb skin clearance is 0.438–2.403 mm. Whole-arm and close hand screenshots inspected. The earlier 12.9-degree moving wrist measurement above was superseded by natural wrist articulation during raised-handle movement.
+- Native E entry/parking/righting, LMB isolation, rotating wheel, all four loaded tip directions plus diagonal tip, physical shovel pickup and 3.5 kg recovery/deposit pass. A completely occupied 240-parcel pool still empties the tipped tray and conserves all 114 kg by merging nearby settled footprints.
+- Integrated manual PVC workflow, round PVC stock, yellow/blue mixing highlights, all ten equipment collision footprints, twelve hose nozzle cases and trowel/hose wrist review pass. The develop-web-game client completes startup with a inspected screenshot and no retained browser processes.
+- Active-transport CPU P95 improved from 36.6 ms before the contact-cache correction to 7.3 ms; thumb-fit P95 is 0.2 ms. Frame interval P95 is 15.4 ms in the measured PC headless Chrome/WebGL run. Cold render spikes remain outside this warmed measurement; this is not physical-mobile performance evidence. Portrait HUD fits 390x844.
+- Production build and diff checks pass (existing Vite large-chunk and runtime-resolved image URL warnings). Existing preview provenance matches this checkout; only Electrical-Game port 5365 is listening. Related files are ready for branch commit/push; unrelated source-image references remain untracked.

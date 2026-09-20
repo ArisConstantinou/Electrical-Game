@@ -216,7 +216,7 @@ export class Game {
     const leveling = active?.stage === 'leveling';
     if (leveling && !this.wasLeveling && document.pointerLockElement) void document.exitPointerLock();
     this.wasLeveling = leveling;
-    const blockingWork=this.pvc.blocksWork||this.mixing.blocksWork&&!['drill','laser','driver'].includes(this.selectedTool);
+    const blockingWork=this.mixing.wheelbarrow.busy||this.pvc.blocksWork||this.mixing.blocksWork&&!['drill','laser','driver'].includes(this.selectedTool);
     const handWork=!blockingWork&&['fitting','level','measure','drill','driver','laser'].includes(this.selectedTool);
     this.player.wallWorkEnabled=(this.selectedTool==='hammer'||handWork)&&!leveling&&!blockingWork;
     const cuttingStep=(this.room.brickWall.chiselType==='flat'?this.room.brickWall.chiselWidthM:.01)*.36;
@@ -250,12 +250,12 @@ export class Game {
     this.actionCooldown = this.selectedTool==='hammer'?this.actionCooldown-dt:Math.max(0,this.actionCooldown-dt);
     let requested = this.input.consumeAction();
     const interactionRequested = this.input.consumeInteraction();
-    const pvcOwnedInput=this.pvc.handleInput(dt,requested,interactionRequested);
+    const pvcOwnedInput=(!this.mixing.wheelbarrow.busy&&this.pvc.handleInput(dt,requested,interactionRequested));
     if(pvcOwnedInput)requested=false;
     // The station exposes both USE (mouse/touch action) and INTERACT. Route
     // both through the same stroke/hold path while it owns the player's tools.
     const stationRequested = !pvcOwnedInput && (interactionRequested || (this.mixing.blocksWork && requested));
-    const handledMixingInteraction = this.started && !pvcOwnedInput && this.mixing.handleInteractionRequest(stationRequested);
+    const handledMixingInteraction = this.started && !pvcOwnedInput && this.mixing.handleInteractionRequest(stationRequested,interactionRequested);
     if(handledMixingInteraction)requested=false;
     this.mixing.update(dt, stationRequested && !handledMixingInteraction, this.input.interactionHeld || this.input.actionHeld);
     const mixingOwnedInput = this.mixing.blocksWork;
@@ -289,11 +289,13 @@ export class Game {
       if(direction.y<-.001){const floorDistance=(this.roomWater.field.surfaceAt(origin.x,origin.z)-origin.y)/direction.y;if(floorDistance>0)distance=Math.min(distance,floorDistance);}
       this.fpsRig.aimWaterGun(camera,origin.addScaledVector(direction,distance));
       this.fpsRig.poseArms(camera);
+      if(!mixingOwnedInput&&!pvcOwnedInput)this.workerBody.update(dt,camera,this.player,this.fpsRig,'hose',this.input.actionHeld,false,[],this.workSurfaces.frontForBounds);
     }
     const releaseOrigin = this.fpsRig.toolTipWorld(this.renderer.camera, this.selectedTool);
     if (mortarTool && this.selectedTool === 'trowel') this.mortar.swing(this.input.actionHeld,dt,this.renderer.camera,()=>{
       this.fpsRig.poseTrowel(this.renderer.camera,this.mortar.throwFeedback.motion,0,this.room.brickWall.volume.frontZ);
       this.fpsRig.constrainWorkSurfaces(this.renderer.camera,this.workSurfaces.frontForBounds);
+      this.workerBody.update(0,this.renderer.camera,this.player,this.fpsRig,'trowel',this.input.actionHeld,false,[],this.workSurfaces.frontForBounds);
       return this.fpsRig.trowelReleaseWorld(this.renderer.camera);
     });
     else this.mortar.cancel();
@@ -391,9 +393,9 @@ export class Game {
     this.mixing.present();
     this.pvc.present();
     this.workerBody.overview=this.frontBodyView||this.modelInspector.live;
-    const bodyPlayer=this.pvc.focused?{eyeHeight:this.renderer.camera.position.y,velocity:this.player.velocity,yaw:this.player.yaw,pitch:this.player.pitch}:this.player;
+    const bodyPlayer=this.mixing.wheelbarrow.driving?{eyeHeight:1.65,velocity:this.player.velocity,yaw:this.mixing.wheelbarrow.telemetry.yaw+Math.PI,pitch:-.60}:this.pvc.focused?{eyeHeight:this.renderer.camera.position.y,velocity:this.player.velocity,yaw:this.player.yaw,pitch:this.player.pitch}:this.player;
     const overheadPvc=this.pvc.focused&&['marking','spreading'].includes(this.pvc.phase)&&!this.workerBody.overview;
-    if(!overheadPvc)this.workerBody.update(dt,this.renderer.camera,bodyPlayer,this.fpsRig,this.selectedTool,this.input.actionHeld,mixingOwnedInput||this.pvc.blocksWork,this.pvc.blocksWork?this.pvc.anatomicalGrips():this.mixing.anatomicalGrips(),this.workSurfaces.frontForBounds);
+    if(!overheadPvc&&(this.selectedTool!=='hose'||mixingOwnedInput||pvcOwnedInput))this.workerBody.update(dt,this.renderer.camera,bodyPlayer,this.fpsRig,this.selectedTool,this.input.actionHeld,mixingOwnedInput||this.pvc.blocksWork,this.pvc.blocksWork?this.pvc.anatomicalGrips():this.mixing.anatomicalGrips(),this.workSurfaces.frontForBounds);
     this.mixing.useAnatomicalBody(this.workerBody.loaded);
     this.pvc.useAnatomicalBody();
     // Dedicated overhead measuring view: the authored worker stays intact,
@@ -747,6 +749,7 @@ export class Game {
 
   private selectTool(tool: RigTool): void {
     if (!RIG_TOOLS.includes(tool)) return;
+    if(this.mixing.wheelbarrow.busy){this.hud.notify('Πάτησε E για να αφήσεις πρώτα το καρότσι.',false,1300);return;}
     if(!this.pvc.allowTool(tool))return;
     if(this.mixing.carrying){this.hud.notify('Άφησε πρώτα τη σύκλα.',false,1600);return;}
     if(this.mixing.active)this.mixing.setActive(false);

@@ -167,6 +167,8 @@ export interface WorkerGripTarget {
   object?:THREE.Object3D;
   contactLocked?:boolean;
   straightWrist?:boolean;
+  palmDirection?:THREE.Vector3;
+  bodyFrame?:{position:THREE.Vector3;quaternion:THREE.Quaternion};
 }
 export function workerGripTarget(arm:WorkerArm,active=arm.hand.userData.gripRole!=='resting'):WorkerGripTarget {
   const frame=arm.hand.children.find(o=>String(o.userData.gripStyle).startsWith('mixer-'))??arm.hand;

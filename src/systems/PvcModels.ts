@@ -2,6 +2,14 @@ import * as THREE from 'three';
 import { PvcBend, PVC } from './PvcBend';
 import type { PvcPreset } from './PvcPresets';
 export const pvcMaterial=new THREE.MeshStandardMaterial({color:0xe1e2d8,roughness:.57});
+const STOCK_CENTER=new THREE.Vector3(3.46,.02,1.15);
+const STOCK_LEAN=.095;
+const STOCK_DIRECTION=new THREE.Vector3(Math.sin(STOCK_LEAN),Math.cos(STOCK_LEAN),0);
+const STOCK_BUNDLE_OFFSETS=[
+  new THREE.Vector2(0,0),
+  ...Array.from({length:6},(_,i)=>new THREE.Vector2(Math.cos(i*Math.PI/3)*.022,Math.sin(i*Math.PI/3)*.022)),
+  ...Array.from({length:13},(_,i)=>{const angle=i*Math.PI*2/13+Math.PI/13;return new THREE.Vector2(Math.cos(angle)*.044,Math.sin(angle)*.044);}),
+];
 export function part(parent:THREE.Object3D,g:THREE.BufferGeometry,m:THREE.Material,name:string,p=[0,0,0]):THREE.Mesh{
   const mesh=new THREE.Mesh(g,m);mesh.name=name;mesh.position.fromArray(p);mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);return mesh;
 }
@@ -58,9 +66,16 @@ export class PvcStock extends THREE.Group{
     }
     const bandMaterial=new THREE.MeshStandardMaterial({color:0x1b7e78,roughness:.45});
     for(const y of [.4,1.5,2.6]){
-      const strap=part(this,new THREE.BoxGeometry(.132,.026,.112),bandMaterial,'Factory plastic strap',[3.46,y,1.15]);this.straps.push(strap);
+      const strap=part(this,new THREE.TorusGeometry(.055,.004,5,32),bandMaterial,'Rounded factory plastic strap');
+      strap.position.copy(STOCK_CENTER).addScaledVector(STOCK_DIRECTION,y);
+      strap.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),STOCK_DIRECTION);
+      this.straps.push(strap);
     }
-    const card=label('PVC Ø20 · 3 m · 20 ΤΕΜΑΧΙΑ',.64,.08);card.position.set(3.32,1.55,1.16);card.rotation.y=-Math.PI/2;this.add(card);
+    const card=label('PVC Ø20 · 3 m · 20 ΤΕΜΑΧΙΑ',.64,.08);
+    const cardNormal=new THREE.Vector3(-STOCK_DIRECTION.y,STOCK_DIRECTION.x,0);
+    card.position.copy(STOCK_CENTER).addScaledVector(STOCK_DIRECTION,1.53).addScaledVector(cardNormal,.064);
+    card.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3(0,0,1),STOCK_DIRECTION,cardNormal));
+    this.add(card);
     this.userData.stockLabel=card;
     const metal=new THREE.MeshStandardMaterial({color:0xa6b4b4,roughness:.4,metalness:.6});
     part(this.straightedge,new THREE.BoxGeometry(.66,.012,.04),metal,'Straightedge');
@@ -77,9 +92,9 @@ export class PvcStock extends THREE.Group{
   layout(progress:number):void{
     this.spread=progress;
     for(let i=0;i<PVC.count;i++){
-      const p=this.pipes[i],row=Math.floor(i/5),col=i%5;
-      p.position.set(THREE.MathUtils.lerp(3.42+row*.022,1.94+i*.028,progress),.02,THREE.MathUtils.lerp(1.10+col*.022,-.35,progress));
-      p.rotation.z=THREE.MathUtils.lerp(.05,0,progress);p.rotation.x=progress*Math.PI/2;
+      const p=this.pipes[i],offset=STOCK_BUNDLE_OFFSETS[i];
+      p.position.set(THREE.MathUtils.lerp(STOCK_CENTER.x+offset.x,1.94+i*.028,progress),STOCK_CENTER.y,THREE.MathUtils.lerp(STOCK_CENTER.z+offset.y,-.35,progress));
+      p.rotation.z=THREE.MathUtils.lerp(-STOCK_LEAN,0,progress);p.rotation.x=progress*Math.PI/2;
     }
     (this.userData.stockLabel as THREE.Object3D).visible=progress<.8;
     this.ruler.visible=progress===1;
