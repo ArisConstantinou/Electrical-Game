@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import type { Game } from '../core/Game';
 import type { WheelbarrowModel } from '../world/SiteEquipmentModels';
-import { setWheelbarrowFill } from '../world/SiteEquipmentModels';
+import { MortarSlump } from './MortarSlump';
+import { mortarMaterial, mortarSurfaceGeometry, MORTAR_RINGS, MORTAR_SEGMENTS } from './MortarAppearance';
 import type { WorkerGripTarget } from '../player/WorkerArm';
 import { GAME_CONFIG } from '../data/gameConfig';
 import '../styles/wheelbarrow.css';
@@ -28,16 +29,19 @@ export class Wheelbarrow {
   private readonly support:THREE.Vector3[]=[];
   private readonly stanceAnchor=new THREE.Vector3();
   private readonly carryRotation=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),.12);
-  private baseSurface:Float32Array;
   private fill=-1;
+  private presentedFill=-1;
+  private presentedRevision=-1;
   private yaw=0;
   private pitch=0;
   private roll=0;
   private pitchSpeed=0;
   private rollSpeed=0;
   private wheelAngle=0;
-  private slosh=new THREE.Vector2();
-  private sloshSpeed=new THREE.Vector2();
+  readonly mortarSlump=new MortarSlump();
+  private surfaceLevel=.66;
+  private overflowDepth=0;
+  private spillPoint=new THREE.Vector3();
   private accumulator=0;
   private time=0;
   private tipTime=0;
@@ -64,7 +68,7 @@ export class Wheelbarrow {
     }
     const carryFloor=-Math.min(...this.support.map(p=>p.clone().applyQuaternion(this.carryRotation).y))+.002;
     this.stanceAnchor.set(0,-carryFloor,-1.13).applyQuaternion(this.carryRotation.clone().invert());
-    this.baseSurface=new Float32Array(model.mortar.geometry.getAttribute('position').array);
+    model.mortar.geometry.dispose();model.mortar.geometry=mortarSurfaceGeometry();const previousMaterial=model.mortar.material as THREE.MeshStandardMaterial;previousMaterial.bumpMap?.dispose();previousMaterial.dispose();model.mortar.material=mortarMaterial();
     const geo=new THREE.SphereGeometry(1,12,8);const pos=geo.getAttribute('position');
     for(let i=0;i<pos.count;i++){const x=pos.getX(i),y=pos.getY(i),z=pos.getZ(i),r=1+.065*Math.sin(x*16+z*13)*Math.cos(y*17);pos.setXYZ(i,x*r,y*r,z*r);}geo.computeVertexNormals();
     this.spills=new THREE.InstancedMesh(geo,(model.mortar.material as THREE.Material).clone(),240);
@@ -123,8 +127,6 @@ export class Wheelbarrow {
       const travelled=root.position.clone().sub(this.lastPosition);this.wheelAngle+=travelled.length()*Math.sign(travelled.dot(forward)||travelled.dot(right))/.202;
     }else{this.velocity.multiplyScalar(Math.exp(-5*dt));if(this.state==='tipping'){this.lastPosition.copy(root.position);root.position.addScaledVector(this.velocity,dt);if(!this.positionAllowed()){root.position.copy(this.lastPosition);this.velocity.set(0,0,0);}}}
     const acceleration=this.velocity.clone().sub(oldVelocity).divideScalar(dt),ax=clamp(acceleration.dot(right)+turn*this.velocity.dot(forward),-24,24),az=clamp(acceleration.dot(forward),-24,24);
-    const tx=clamp(-ax*.055,-.7,.7),tz=clamp(az*.05,-.65,.65);
-    this.sloshSpeed.x+=(tx-this.slosh.x)*22*dt-this.sloshSpeed.x*6*dt;this.sloshSpeed.y+=(tz-this.slosh.y)*22*dt-this.sloshSpeed.y*6*dt;this.slosh.addScaledVector(this.sloshSpeed,dt);
     if(this.state==='driving'||this.state==='parked'){
       const load=.95+.05*this.massKg/this.capacityKg;
       this.rollSpeed+=(-ax*.11*load-this.roll)*19*dt-this.rollSpeed*4*dt;
@@ -142,13 +144,24 @@ export class Wheelbarrow {
       this.tipTime+=dt;const t=THREE.MathUtils.smoothstep(this.tipTime/1.15,0,1);this.pitch=this.recoveryStart.x*(1-t);this.roll=this.recoveryStart.y*(1-t);if(t===1){this.state='parked';this.pitchSpeed=this.rollSpeed=0;this.stability=0;}
     }
     root.rotation.set(this.pitch,this.yaw,this.roll,'YXZ');let minY=Infinity;for(const p of this.support)minY=Math.min(minY,p.clone().applyQuaternion(root.quaternion).y);root.position.y=-minY+.002;root.updateWorldMatrix(true,true);
+    // Cohesive regions stick until their individual yield threshold is passed.
+    const gravity=UP.clone().negate().applyQuaternion(root.quaternion.clone().invert()),vertical=Math.max(.25,-gravity.y);
+    this.mortarSlump.update(dt,clamp(gravity.x/vertical-ax*.035-turn*.055,-1.6,1.6),clamp(gravity.z/vertical-az*.035,-1.6,1.6));
+    this.syncSurface();
     const up=UP.clone().applyQuaternion(root.quaternion),inclination=Math.acos(clamp(up.y,-1,1));
-    const overflow=Math.max(0,inclination+this.slosh.length()*.7-(.48+(1-this.massKg/this.capacityKg)*.50));
-    if(this.massKg>0&&overflow>0){const amount=Math.min(this.massKg,dt*(inclination>1.25?100:overflow*24));this.emit(amount);}
+    this.overflowDepth=0;
+    for(let i=0;i<80;i++){
+      const a=i/80*Math.PI*2,s=Math.sin(a),c=Math.cos(a),z=Math.sign(c)*Math.pow(Math.abs(c),.6)*.483,x=Math.sign(s)*Math.pow(Math.abs(s),.6)*.350*(1-.09*z/.483);
+      const over=this.surfaceHeight(x,z)-(.700+.05*z);
+      if(over>this.overflowDepth){this.overflowDepth=over;this.spillPoint.set(x,.705+.05*z,z);}
+    }
+    if(inclination>1.25){const a=Math.atan2(gravity.x,gravity.z);this.spillPoint.set(Math.sin(a)*.35,.705,Math.cos(a)*.483);}
+    const chunk=this.mortarSlump.takeChunk(dt,this.overflowDepth,inclination>1.25);
+    if(this.massKg>0&&chunk>0)this.emit(Math.min(this.massKg,chunk));
     for(const p of this.parcels){
       if(p.mass<=0||p.settled)continue;p.velocity.y-=9.81*dt;p.position.addScaledVector(p.velocity,dt);
       const r=Math.cbrt(p.mass/1900/(4*Math.PI/3));
-      if(p.position.y<=r){const speed=Math.hypot(p.velocity.x,p.velocity.z),stretch=1+Math.min(3,speed*.6);const height=Math.max(.008,r*.38),wide=Math.sqrt((p.mass/1900)*3/(4*Math.PI*height*stretch));p.scale.set(wide*stretch,height,wide);p.position.y=height+.003;p.rotation.setFromAxisAngle(UP,Math.atan2(-p.velocity.z,p.velocity.x));p.position.x=clamp(p.position.x,-3.6,3.6);p.position.z=clamp(p.position.z,GAME_CONFIG.room.wallFrontZ+.1,3.4);p.settled=true;p.velocity.set(0,0,0);}
+      if(p.position.y<=r){const speed=Math.hypot(p.velocity.x,p.velocity.z),stretch=1+Math.min(1.3,speed*.25);const height=Math.max(.012,r*.62),wide=Math.sqrt((p.mass/1900)*3/(4*Math.PI*height*stretch));p.scale.set(wide*stretch,height,wide);p.position.y=height+.003;p.rotation.setFromAxisAngle(UP,Math.atan2(-p.velocity.z,p.velocity.x));p.position.x=clamp(p.position.x,-3.6,3.6);p.position.z=clamp(p.position.z,GAME_CONFIG.room.wallFrontZ+.1,3.4);p.settled=true;p.velocity.set(0,0,0);}
     }
     const action=this.handAction;
     if(action){action.elapsed+=dt;if(!action.committed&&action.elapsed>.64){action.committed=true;if(action.kind==='scoop'){
@@ -169,10 +182,8 @@ export class Wheelbarrow {
     }return true;
   }
   private emit(mass:number):void{
-    // One bounded parcel per 40 ms. Coalesce into the latest airborne parcel
-    // instead of losing mass when a long spill reaches the rendering budget.
-    const root=this.model.group,localGravity=UP.clone().negate().applyQuaternion(root.quaternion.clone().invert());localGravity.x-=this.slosh.x;localGravity.z-=this.slosh.y;
-    const a=Math.atan2(localGravity.x,localGravity.z),local=new THREE.Vector3(Math.sin(a)*.34,.70,Math.cos(a)*.46);
+    // Each yield event releases one cohesive lump, retaining all its mass.
+    const root=this.model.group,local=this.spillPoint.clone(),a=Math.atan2(local.x,local.z);
     const position=root.localToWorld(local),velocity=this.velocity.clone().add(new THREE.Vector3(Math.sin(a),-.15,Math.cos(a)).applyQuaternion(root.quaternion).multiplyScalar(.5+Math.abs(this.rollSpeed)+Math.abs(this.pitchSpeed)));
     const last=this.parcels.at(-1);let parcel=last&&!last.settled&&last.position.distanceTo(position)<.16?last:undefined;
     if(!parcel){parcel=this.parcels.find(p=>p.mass<1e-8);if(parcel){parcel.position.copy(position);parcel.velocity.copy(velocity);parcel.settled=false;parcel.mass=0;}else if(this.parcels.length<240){parcel={mass:0,position,velocity,scale:new THREE.Vector3(),rotation:new THREE.Quaternion(),settled:false};this.parcels.push(parcel);}else{
@@ -182,13 +193,42 @@ export class Wheelbarrow {
       if(settled.length>=2){const keep=settled[0],reuse=settled.slice(1).reduce((a,b)=>a.position.distanceToSquared(keep.position)<b.position.distanceToSquared(keep.position)?a:b),total=keep.mass+reuse.mass;keep.position.lerp(reuse.position,reuse.mass/total);keep.scale.multiplyScalar(Math.cbrt(total/keep.mass));keep.mass=total;keep.position.y=keep.scale.y+.003;reuse.mass=0;reuse.settled=false;reuse.position.copy(position);reuse.velocity.copy(velocity);parcel=reuse;}
       else parcel=this.parcels.filter(p=>!p.settled).reduce((a,b)=>a.position.distanceToSquared(position)<b.position.distanceToSquared(position)?a:b);
     }}
-    parcel.mass+=mass;this.massKg-=mass;const radius=Math.cbrt(parcel.mass/1900/(4*Math.PI/3));parcel.scale.set(radius*1.2,radius*.85,radius/1.02);
+    parcel.mass+=mass;this.massKg-=mass;this.mortarSlump.shedAt(local.x,local.z,mass);const radius=Math.cbrt(parcel.mass/1900/(4*Math.PI/3));parcel.scale.set(radius*1.2,radius*.85,radius/1.02);
+  }
+  private syncSurface():void{
+    if(Math.abs(this.fill-this.massKg)<1e-7)return;
+    if(this.fill>=0&&this.massKg>this.fill)this.mortarSlump.replenish(this.massKg-this.fill);
+    this.fill=this.massKg;const fraction=clamp(this.massKg/this.capacityKg,0,1);this.model.mortar.visible=fraction>0;
+    const volume=(h:number)=>.215*.297*h+(.215*.168+.297*.125)*h*h/2+.125*.168*h*h*h/3;
+    let low=0,high=1;for(let i=0;i<18;i++){const h=(low+high)/2;if(volume(h)<fraction*volume(1))low=h;else high=h;}
+    // Retain headroom for normal carrying; the entire contact line is free to
+    // climb the flared tray instead of pinning every rim vertex in place.
+    this.surfaceLevel=.44+.248*(low+high)/2-.039*fraction;
+  }
+  private surfaceHeight(x:number,z:number):number{
+    return this.surfaceLevel+.05*z+this.mortarSlump.height(x,z)*Math.min(1,this.massKg/14);
   }
   private present():void{
     this.wheel.quaternion.copy(this.wheelBase).multiply(new THREE.Quaternion().setFromAxisAngle(UP,-this.wheelAngle));
-    if(Math.abs(this.fill-this.massKg)>1e-7){setWheelbarrowFill(this.model,this.massKg/this.capacityKg);this.fill=this.massKg;this.baseSurface.set(this.model.mortar.geometry.getAttribute('position').array);}
+    this.syncSurface();
+    if(this.presentedRevision!==this.mortarSlump.revision||this.presentedFill!==this.massKg){
+    this.presentedRevision=this.mortarSlump.revision;this.presentedFill=this.massKg;
     const p=this.model.mortar.geometry.getAttribute('position');
-    for(let i=0;i<p.count;i++){const x=this.baseSurface[i*3],z=this.baseSurface[i*3+2],r=Math.min(1,Math.hypot(x/.34,z/.465));p.setY(i,this.baseSurface[i*3+1]+(1-r)*(.055*Math.sin(this.time*5+x*8+z*7)*Math.min(1,this.slosh.length()*4)+this.slosh.x*x+this.slosh.y*z));}p.needsUpdate=true;this.model.mortar.geometry.computeVertexNormals();
+    p.setXYZ(0,0,this.surfaceHeight(0,0),0);
+    for(let i=0;i<MORTAR_SEGMENTS;i++){
+      const a=i/MORTAR_SEGMENTS*Math.PI*2,s=Math.sin(a),c=Math.cos(a),sx=Math.sign(s)*Math.pow(Math.abs(s),.6)*(1-.09*Math.sign(c)*Math.pow(Math.abs(c),.6)),sz=Math.sign(c)*Math.pow(Math.abs(c),.6);
+      // Intersect the moving surface with the actual flared inner wall.
+      let low=0,high=1.07,x=0,z=0;
+      for(let n=0;n<10;n++){const mid=(low+high)/2;x=sx*(.215+.120*mid);z=sz*(.297+.165*mid);if(this.surfaceHeight(x,z)>.439+.242*mid+.05*z)low=mid;else high=mid;}
+      const h=(low+high)/2;
+      x=sx*(.215+.120*h);z=sz*(.297+.165*h);
+      for(let ring=1;ring<=MORTAR_RINGS;ring++){
+        const r=ring/MORTAR_RINGS,v=1+(ring-1)*MORTAR_SEGMENTS+i,px=x*r,pz=z*r;
+        p.setXYZ(v,px,clamp(this.surfaceHeight(px,pz),.435+.05*pz,.735+.05*pz),pz);
+      }
+    }p.needsUpdate=true;this.model.mortar.geometry.computeVertexNormals();
+    this.model.mortar.geometry.computeBoundingSphere();
+    }
     this.spills.count=this.parcels.length;for(let i=0;i<this.parcels.length;i++){const p=this.parcels[i];this.dummy.position.copy(p.position);this.dummy.quaternion.copy(p.rotation);this.dummy.scale.copy(p.scale);if(p.mass<=1e-8)this.dummy.scale.setScalar(0);this.dummy.updateMatrix();this.spills.setMatrixAt(i,this.dummy.matrix);}this.spills.instanceMatrix.needsUpdate=true;this.spills.computeBoundingSphere();
     this.panel.hidden=!this.driving;this.game.hud.shell.classList.toggle('wheelbarrow-driving',this.driving);const danger=this.stability>.72;this.panel.dataset.danger=String(danger);this.dot.style.transform=`translate(${clamp(this.roll/.55,-1,1)*40}px,${clamp((this.pitch-.12)/.65,-1,1)*40}px)`;
     const speed=this.speed<.25?'TOO SLOW':this.speed>1.65?'TOO FAST':'NORMAL';this.text.innerHTML=`<b>${danger?'DANGER':this.blocked?'ΕΜΠΟΔΙΟ':'STABLE'}</b><span>${speed} · ${this.speed.toFixed(1)} m/s</span><span>${this.massKg.toFixed(1)} kg · ${Math.round(this.stability*100)}% κλίση</span>`;
@@ -196,5 +236,5 @@ export class Wheelbarrow {
   anatomicalGrips():WorkerGripTarget[]{
     if(!this.driving)return[];return[-1,1].map(side=>{const center=this.model.group.localToWorld(new THREE.Vector3(-side*.301,.682,-.94)),axis=new THREE.Vector3(side*.019,-.092,.2).normalize().applyQuaternion(this.model.group.quaternion),rotation=new THREE.Quaternion().setFromUnitVectors(UP,axis);return{side,center,rotation,section:[.022,.022] as [number,number],active:true,straightWrist:true,bodyFrame:{position:this.model.group.localToWorld(this.stanceAnchor.clone()),quaternion:this.model.group.quaternion.clone().multiply(this.carryRotation.clone().invert()).multiply(new THREE.Quaternion().setFromAxisAngle(UP,Math.PI))},palmDirection:new THREE.Vector3(-side*.30,-1,.45).applyQuaternion(this.model.group.quaternion)};});
   }
-  get telemetry(){return{state:this.state,driving:this.driving,massKg:this.massKg,capacityKg:this.capacityKg,shovelKg:this.shovelKg,floorKg:this.floorKg,airborneKg:this.airborneKg,consumedKg:this.consumedKg,totalKg:this.massKg+this.shovelKg+this.floorKg+this.airborneKg+this.consumedKg,speed:this.speed,stability:this.stability,pitch:this.pitch,roll:this.roll,yaw:this.yaw,wheelAngle:this.wheelAngle,slosh:this.slosh.toArray(),position:this.model.group.position.toArray(),parcels:this.parcels.length,blocked:this.blocked,recovering:this.handAction?.kind??null};}
+  get telemetry(){return{state:this.state,driving:this.driving,massKg:this.massKg,capacityKg:this.capacityKg,shovelKg:this.shovelKg,floorKg:this.floorKg,airborneKg:this.airborneKg,consumedKg:this.consumedKg,totalKg:this.massKg+this.shovelKg+this.floorKg+this.airborneKg+this.consumedKg,speed:this.speed,stability:this.stability,pitch:this.pitch,roll:this.roll,yaw:this.yaw,wheelAngle:this.wheelAngle,slump:this.mortarSlump.telemetry,overflowDepth:this.overflowDepth,position:this.model.group.position.toArray(),parcels:this.parcels.length,blocked:this.blocked,recovering:this.handAction?.kind??null};}
 }

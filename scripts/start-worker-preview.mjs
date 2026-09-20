@@ -15,7 +15,7 @@ let occupied=false;
 try{await fetch(url,{signal:AbortSignal.timeout(2000)});occupied=true;}
 catch(error){if(error.cause?.code!=='ECONNREFUSED')throw error;}
 if(occupied){
- for(const file of ['src/core/Game.ts','src/player/FPSRig.ts','src/player/WorkerBody.ts','src/electrical/BoxAssembly.ts']){
+ for(const file of ['src/core/Game.ts','src/player/FPSRig.ts','src/player/WorkerBody.ts','src/electrical/BoxAssembly.ts','src/systems/Wheelbarrow.ts','src/systems/MortarSlump.ts','src/systems/MortarAppearance.ts']){
   const response=await fetch(url+file,{signal:AbortSignal.timeout(3000)}),body=await response.text();
   const encoded=body.match(/sourceMappingURL=data:application\/json;base64,([^\s]+)/)?.[1];
   const served=encoded?JSON.parse(Buffer.from(encoded,'base64').toString()).sourcesContent?.[0]:null;
