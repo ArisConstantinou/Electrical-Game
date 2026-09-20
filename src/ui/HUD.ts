@@ -152,6 +152,7 @@ export class HUD {
           <div id="box-supply" class="hud-card" aria-label="Box supply" hidden>
             <b id="box-supply-title">BACK BOX TOOL</b>
             <button id="box-assembly-toggle" type="button">Q · OPEN LIVE ASSEMBLY</button>
+            <div id="box-history-actions" hidden><button id="box-undo" type="button"><kbd>Q</kbd><span>UNDO</span></button><button id="box-reset" type="button"><kbd>E</kbd><span>RESET</span></button></div>
             <div class="box-presets">${['1G','2G'].map(kind=>`<button id="box-preset-${kind}" type="button" data-box-preset="${kind}" aria-pressed="${kind==='1G'}">START ${kind}</button>`).join('')}</div>
             <div id="box-assembly-state"><span>LEFT HAND <b id="box-assembly-count">1 BOX</b></span><span>RIGHT HAND <b id="box-candidate-kind">1G · 0°</b></span></div>
             <div id="box-zone-buttons" aria-label="Attachment positions">
@@ -270,6 +271,8 @@ export class HUD {
     };
     root.querySelectorAll<HTMLButtonElement>('[data-box-preset]').forEach(button=>bindHammerButton(`#${button.id}`,()=>dispatchEvent(new CustomEvent('wirehouse:box-preset',{detail:button.dataset.boxPreset}))));
     bindHammerButton('#box-assembly-toggle',()=>dispatchEvent(new CustomEvent(root.dataset.boxAssembly==='true'?'wirehouse:box-exit-assembly':'wirehouse:box-enter-assembly')));
+    bindHammerButton('#box-undo',()=>dispatchEvent(new CustomEvent('wirehouse:box-undo')));
+    bindHammerButton('#box-reset',()=>dispatchEvent(new CustomEvent('wirehouse:box-reset')));
     root.querySelectorAll<HTMLButtonElement>('[data-box-zone]').forEach(button=>bindHammerButton(`[data-box-zone="${button.dataset.boxZone}"]`,()=>dispatchEvent(new CustomEvent('wirehouse:box-attach',{detail:Number(button.dataset.boxZone)}))));
     bindHammerButton('#box-next-kind',()=>dispatchEvent(new CustomEvent('wirehouse:box-cycle-candidate')));
     bindHammerButton('#box-rotate-candidate',()=>dispatchEvent(new CustomEvent('wirehouse:box-rotate-candidate')));
@@ -422,13 +425,15 @@ export class HUD {
   updateBoxAssemblyMode(active:boolean):void {
     this.shell.dataset.boxAssembly=String(active);
     this.shell.querySelector('#box-supply-title')!.textContent=active?'LIVE BOX ASSEMBLY':'BACK BOX TOOL';
-    this.shell.querySelector('#box-assembly-toggle')!.textContent=active?'Q · CLOSE ASSEMBLY':'Q · OPEN LIVE ASSEMBLY';
+    this.shell.querySelector('#box-assembly-toggle')!.textContent=active?'ESC · CLOSE ASSEMBLY':'Q · OPEN LIVE ASSEMBLY';
+    this.shell.querySelector<HTMLElement>('#box-history-actions')!.hidden=!active;
     if(this.selectedTool==='fitting')this.tool.querySelector('em')!.textContent=active?'BUILD 1–4 · PLACE RMB':'Q · LIVE ASSEMBLY · WHEEL SWITCHES TOOL';
   }
 
   updateBoxAssembly(snapshot:{modules:Array<{kind:string}>;candidateKind:string;candidateRotation:number},zones:Array<{zone:number;available:boolean}>):void {
     this.shell.querySelector('#box-assembly-count')!.textContent=`${snapshot.modules.length} ${snapshot.modules.length===1?'BOX':'BOXES'}`;
     this.shell.querySelector('#box-candidate-kind')!.textContent=`${snapshot.candidateKind} · ${snapshot.candidateRotation*90}°`;
+    this.shell.querySelector<HTMLButtonElement>('#box-undo')!.disabled=snapshot.modules.length<=1;
     for(const zone of zones){const button=this.shell.querySelector<HTMLButtonElement>(`[data-box-zone="${zone.zone}"]`)!;button.disabled=!zone.available;button.setAttribute('aria-label',`${zone.zone} · ${button.querySelector('span')!.textContent} · ${zone.available?'available':'occupied'}`);}
   }
 

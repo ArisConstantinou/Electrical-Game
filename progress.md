@@ -814,3 +814,11 @@ Original prompt for this task: Selecting BOX should show an initial box in the l
 - Trowel pose stability passes desktop, portrait and landscape checks with no camera correction or normal rebuilds. The focused pose loop measured 0.186 ms before and 0.196 ms after per iteration on this host. TypeScript and production build pass; the existing large-chunk warning remains.
 - The wider trowel-motion UI test reaches its pre-action mass assertion and fails because initialized stored mortar is 5.852 kg while launched mass is 0 kg. This is outside the wrist/box change; the focused trowel pose, anatomical wrist and worker-tool regressions pass.
 - Evidence: output/wrist-pitch/final-verified, output/box-hand-assembly-q-final2, output/box-grip-visibility-q-final and output/trowel-pose-stability.json. Preview remains http://127.0.0.1:5365/Electrical-Game/.
+
+## 2026-09-20 · Box assembly undo and reset controls
+
+- Added two explicit controls beside LIVE BOX ASSEMBLY: Q / UNDO removes only the most recently attached box, and E / RESET restores one clean 1G starting box. UNDO is disabled when only the starting box remains.
+- Q still opens assembly while BOX is selected but inactive. Inside assembly Q is exclusively UNDO, E is exclusively RESET, and Escape closes assembly. E clears transient action/interaction state before reset; outside assembly E retains normal gameplay use/interact and Q retains its prior non-BOX behavior.
+- Desktop and touch buttons use the same events. The narrow portrait layout keeps the two-button rail beside the panel without horizontal overflow or covering the mobile USE control.
+- Verified builder history, desktop/mobile input isolation, undo/reset, draft preservation, re-entry and placement. The 40-case desktop/portrait box visibility suite and 12-case wrist/performance suite pass; current headless WebGL submit P95 was 24.0 ms desktop and 15.8 ms portrait. TypeScript and production build pass with the existing large-chunk warning.
+- Evidence: output/box-history-actions-final, output/box-history-visibility-final and output/box-history-wrist-performance. Preview remains http://127.0.0.1:5365/Electrical-Game/.

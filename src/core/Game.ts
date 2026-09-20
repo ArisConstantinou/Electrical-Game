@@ -547,6 +547,16 @@ export class Game {
       if(![1,2,3,4].includes(zone))return;
       this.pendingSceneActions.push(()=>{if(this.selectedTool!=='fitting'||!this.boxAssemblyActive)return;const added=this.boxAssembly.attach(zone);if(!added){this.hud.notify(`Zone ${zone} is occupied by the held assembly.`,false,1400);return;}this.audio.play('box');this.syncBoxAssembly(added.id);});
     });
+    addEventListener('wirehouse:box-undo',()=>this.pendingSceneActions.push(()=>{
+      if(this.selectedTool!=='fitting'||!this.boxAssemblyActive)return;
+      const removed=this.boxAssembly.undo();
+      if(!removed){this.hud.notify('Nothing to undo.',false,900);return;}
+      this.syncBoxAssembly();this.audio.play('box');
+    }));
+    addEventListener('wirehouse:box-reset',()=>this.pendingSceneActions.push(()=>{
+      if(this.selectedTool!=='fitting'||!this.boxAssemblyActive)return;
+      this.boxAssembly.reset('1G');this.syncBoxAssembly();this.hud.notify('Assembly reset to one 1G box.',true,1000);
+    }));
     addEventListener('wirehouse:box-enter-assembly',()=>{
       if(this.started&&this.selectedTool==='fitting')this.setBoxAssemblyActive(true);
     });

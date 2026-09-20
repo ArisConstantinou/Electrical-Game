@@ -21,6 +21,9 @@ try{
     assert(Math.abs(a.x-b.x)>=(as.width+bs.width)/2-.001||Math.abs(a.y-b.y)>=(as.height+bs.height)/2-.001,`${a.id} overlaps ${b.id}`);
   }
   const bounds=boxAssemblyBounds(snapshot.modules);assert(bounds.width>.2&&bounds.height>.2);
+  const history=new BoxAssemblyBuilder('1G');history.cycleCandidate();const added=history.attach(2);assert(added);assert.equal(history.snapshot.modules.length,2);
+  const removed=history.undo();assert.deepEqual(removed,added);assert.equal(history.snapshot.modules.length,1);assert.equal(history.snapshot.activeId,'box-1');assert.equal(history.snapshot.candidateKind,'2G');assert.equal(history.undo(),null,'the starting box cannot be removed');
+  history.reset('1G');assert.deepEqual(history.snapshot.modules.map(module=>module.kind),['1G']);
   const blocked=new BoxAssemblyBuilder('1G');assert(blocked.attach(2));assert.equal(blocked.attach(4),null,'returning into the initial box is blocked');assert.equal(blocked.zoneAvailable(4),false);
   console.log(JSON.stringify({passed:true,count:snapshot.modules.length,bounds,active:snapshot.activeId,candidate:snapshot.candidateKind,rotation:snapshot.candidateRotation}));
 }finally{await server.close();}

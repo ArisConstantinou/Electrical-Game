@@ -26,7 +26,7 @@ const read=page=>page.evaluate(()=>{
     boxScreenBounds.push({minX,maxX,minY,maxY});
   }
   const arms=g.fpsRig.armSets.get('fitting')??[],legacySkinVisible=arms.some(a=>a.upper.visible||a.forearm.visible||a.hand.children.some(child=>child.visible&&!child.userData.heldAccessory));
-  return{boxScreenBounds,worker:g.workerBody?.telemetry,legacySkinVisible,referenceKeys:g.fpsRig.anatomicalGrips().map(grip=>grip.referenceKey??null),selected:state.mission.selectedTool,assemblyActive:state.mission.boxAssemblyActive,datasetAssembly:document.querySelector('#game-shell').dataset.boxAssembly,zoneRootVisible:g.fpsRig.fittingZonesRoot.visible,toolInstruction:document.querySelector('#tool-status em').textContent,assembly:state.mission.boxAssembly,arms:g.fpsRig.debugPose().arms,zones,fit:g.boxFitPreview.telemetry,visible:g.mission.points.filter(p=>p.boxGroup.visible).map(p=>({id:p.definition.id,layout:p.definition.boxLayout??p.boxGroup.layout,position:p.boxGroup.position.toArray()})),overflow:document.documentElement.scrollWidth>innerWidth,error:g.renderer.renderError};
+  return{boxScreenBounds,worker:g.workerBody?.telemetry,legacySkinVisible,referenceKeys:g.fpsRig.anatomicalGrips().map(grip=>grip.referenceKey??null),selected:state.mission.selectedTool,assemblyActive:state.mission.boxAssemblyActive,datasetAssembly:document.querySelector('#game-shell').dataset.boxAssembly,zoneRootVisible:g.fpsRig.fittingZonesRoot.visible,toolInstruction:document.querySelector('#tool-status em').textContent,input:{action:g.input.actionRequested,actionHeld:g.input.actionHeld,interaction:g.input.interactionRequested,interactionHeld:g.input.interactionHeld},assembly:state.mission.boxAssembly,arms:g.fpsRig.debugPose().arms,zones,fit:g.boxFitPreview.telemetry,visible:g.mission.points.filter(p=>p.boxGroup.visible).map(p=>({id:p.definition.id,layout:p.definition.boxLayout??p.boxGroup.layout,position:p.boxGroup.position.toArray()})),overflow:document.documentElement.scrollWidth>innerWidth,error:g.renderer.renderError};
 });
 try{
   for(const [name,viewport,mobile] of [['desktop',{width:1366,height:768},false],['mobile',{width:390,height:844},true]]){
@@ -42,6 +42,16 @@ try{
     }
     await step(page,4);
     const initial=await read(page),initialVisibleIds=new Set(initial.visible.map(point=>point.id));assert.equal(initial.assemblyActive,true,'Q/touch control must enter live assembly');assert.equal(initial.zoneRootVisible,true);assert.equal(initial.worker?.loaded,true,'new anatomical body must load alongside box assembly');assert.equal(initial.worker.bones,52);assert.equal(initial.legacySkinVisible,false,'legacy segmented skin must stay hidden');assert.deepEqual(initial.referenceKeys,[null,null],'independent fitting hands must not replay the old one-box reference');assert.equal(initial.selected,'fitting');assert.equal(initial.assembly.modules.length,1);assert.deepEqual(initial.arms.map(a=>a.gripRole).sort(),['assembly','candidate']);assert.equal(initial.zones.length,4);
+    assert.equal(await page.locator('#box-assembly-toggle').textContent(),'ESC · CLOSE ASSEMBLY');assert(await page.locator('#box-undo').isVisible());assert(await page.locator('#box-reset').isVisible());assert(await page.locator('#box-undo').isDisabled(),'UNDO is disabled when only the starting box remains');
+    if(mobile){
+      await page.locator('[data-box-zone="2"]').tap();await step(page,30);assert.equal((await read(page)).assembly.modules.length,2);assert.equal(await page.locator('#box-undo').isDisabled(),false);
+      await page.locator('#box-undo').tap();await step(page,2);assert.equal((await read(page)).assembly.modules.length,1,'touch UNDO removes the last box');
+      await page.locator('[data-box-zone="2"]').tap();await step(page,30);await page.locator('#box-reset').tap();await step(page,2);const reset=await read(page);assert.equal(reset.assembly.modules.length,1);assert.equal(reset.assembly.modules[0].kind,'1G');
+    }else{
+      await page.keyboard.press('Digit2');await step(page,30);assert.equal((await read(page)).assembly.modules.length,2);
+      await page.keyboard.press('KeyQ');await step(page,2);assert.equal((await read(page)).assembly.modules.length,1,'Q removes the last box without closing assembly');
+      await page.keyboard.press('Digit2');await step(page,30);await page.keyboard.press('KeyE');await step(page,2);const reset=await read(page);assert.equal(reset.assembly.modules.length,1);assert.equal(reset.assembly.modules[0].kind,'1G');assert.deepEqual(reset.input,{action:false,actionHeld:false,interaction:false,interactionHeld:false},'E reset must not leak into gameplay input');
+    }
     await page.waitForTimeout(1300);
     await page.evaluate(async()=>{const r=window.__wireTheHouse.renderer;await r.waitForFrame();r.render();await r.waitForFrame();});await page.screenshot({path:`${out}/${name}-initial-two-hands.png`});
     if(mobile){
@@ -64,6 +74,8 @@ try{
       await page.mouse.move(viewport.width*.75,viewport.height*.6);await page.waitForTimeout(220);await page.mouse.wheel(0,100);await step(page,2);
       assert.equal((await read(page)).selected,'level','wheel returns to normal tool switching');
       await page.keyboard.press('Digit1');await step(page,2);assert.equal((await read(page)).selected,'spring','number keys return to normal tool selection');
+      await page.evaluate(()=>dispatchEvent(new KeyboardEvent('keydown',{code:'KeyE',key:'e'})));const outsideE=await read(page);assert.equal(outsideE.input.action,true,'E keeps its normal gameplay action outside assembly');assert.equal(outsideE.input.interaction,true,'E keeps its normal interaction outside assembly');await page.evaluate(()=>window.__wireTheHouse.input.resetTransientInput());
+      await page.keyboard.press('KeyQ');await step(page,2);const outsideQ=await read(page);assert.equal(outsideQ.selected,'spring');assert.equal(outsideQ.assemblyActive,false,'Q outside BOX keeps its existing non-assembly behavior');
       await page.keyboard.press('Digit5');await step(page,2);await page.keyboard.press('KeyQ');await step(page,2);const reentered=await read(page);assert.equal(reentered.assemblyActive,true);assert.equal(reentered.assembly.modules.length,built.assembly.modules.length,'re-entering assembly restores the draft');
     }
     await step(page,30);
