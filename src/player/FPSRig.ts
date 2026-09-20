@@ -48,6 +48,7 @@ export class FPSRig extends THREE.Group {
         grip.shape='box';
         Object.defineProperty(grip,'object',{value:arm.side>0?this.fittingCandidateRoot:this.fittingAssemblyRoot});
       }
+      if(this.selectedTool==='trowel')grip.straightWrist=true;
       return grip;
     });
   }
@@ -172,6 +173,7 @@ export class FPSRig extends THREE.Group {
   private fittingAttachment:{elapsed:number;duration:number;addedId:string;target:THREE.Vector3}|null=null;
   private readonly fittingCandidateHome=new THREE.Vector3(.125,-.018,-.055);
   private fittingPresentationScale=1;
+  private fittingAssemblyActive=false;
   levelTiltDegrees = 0;
   mortarCharge = 0;
   mortarRecovery = 0;
@@ -627,6 +629,7 @@ export class FPSRig extends THREE.Group {
     return tool.localToWorld(new THREE.Vector3().fromArray(tool.userData.releasePoint));
   }
   strike(): void { this.strikeAmount = 1; }
+  setFittingAssemblyActive(active:boolean):void {this.fittingAssemblyActive=active;}
   update(dt: number, moving: boolean, spraying = false): void {
     this.restoreGrasp();
     this.measureMarkTime=Math.max(0,this.measureMarkTime-Math.min(Math.max(dt,0),.05));
@@ -882,7 +885,7 @@ export class FPSRig extends THREE.Group {
       for(const part of this.fittingBoxParts)part.visible=false;
       this.fittingAssemblyRoot.visible=this.fittingBoxAvailable;
       this.fittingCandidateRoot.visible=this.fittingBoxAvailable;
-      this.fittingZonesRoot.visible=this.fittingBoxAvailable&&!this.fittingAttachment;
+      this.fittingZonesRoot.visible=this.fittingAssemblyActive&&this.fittingBoxAvailable&&!this.fittingAttachment;
       for(const arm of this.armSets.get('fitting')!){
         const hand=arm.hand;hand.userData.gripping=this.fittingBoxAvailable;hand.userData.gripRole=emptyFitting?'reaching':arm.side<0?'assembly':'candidate';
         if(!emptyFitting){

@@ -295,6 +295,10 @@ export class WorkerBody extends THREE.Group {
         // A handle fixes the contact axis, not a camera-space 90-degree wrist
         // bend. Approach it from the elbow and solve the palm offset twice.
         const rigidContact=tool==='fitting'&&!station;
+        // A trowel is held as a straight continuation of the forearm. Its elbow
+        // pole follows the handle instead of folding under the palm; the old
+        // generic pole bent the visible wrist by 47–73°.
+        const straightTrowel=grip.straightWrist===true;
         let long=rigidContact?oldBack.clone().negate():grip.center.clone().sub(this.point('upper_arm.'+side));
         long.normalize();
         let rotation=grip.rotation.clone(),section:[number,number]=grip.section;
@@ -311,7 +315,8 @@ export class WorkerBody extends THREE.Group {
           if(rigidContact)middle.add((side==='R'?new THREE.Vector3(.0591,-.0009,.0019):new THREE.Vector3(-.0619,-.0019,-.0028)).applyQuaternion(grip.rotation));
           const wrist=middle.sub(this.handFrames.get(side)!.knuckle.clone().applyQuaternion(q));
           this.reachWithShoulder(side,wrist);
-          this.limb('upper_arm.'+side,'forearm.'+side,'hand.'+side,wrist,right.clone().multiplyScalar(sign*.45).add(new THREE.Vector3(0,-1,0)));
+          const elbowPole=straightTrowel?long.clone().negate():right.clone().multiplyScalar(sign*.45).add(new THREE.Vector3(0,-1,0));
+          this.limb('upper_arm.'+side,'forearm.'+side,'hand.'+side,wrist,elbowPole);
           this.setHandOrientation(side,radial,long);
           this.gripErrors[side]=this.point('hand.'+side).distanceTo(wrist);
           if(pass===0&&!rigidContact)long=this.point('hand.'+side).sub(this.point('forearm.'+side)).normalize();

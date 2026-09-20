@@ -41,7 +41,7 @@ const TOOL_HINTS: Record<RigTool, string> = {
   laser: 'LASER · place on a drilled fixing, then secure with the driver',
   spray: 'SPRAY CAN · mark the chase route',
   hammer: 'DEMO HAMMER · chase or remove masonry',
-  fitting: 'BACK BOX · build with 1–4 · wheel changes box · R rotates · RMB places flush · Esc returns to tools',
+  fitting: 'BACK BOX · Q opens live assembly · wheel continues through tools',
   level: 'SPIRIT LEVEL · align the box group',
   spring: 'BENDING SPRING · shape the 20 mm PVC',
   cutter: 'PVC CUTTER · single-action cut to length',
@@ -85,7 +85,7 @@ export class Game {
   readonly boxAssembly = new BoxAssemblyBuilder('1G');
   readonly audio = new ConstructionAudio();
   selectedTool: RigTool = 'spray';
-  private toolBeforeBoxAssembly: RigTool = 'spray';
+  boxAssemblyActive = false;
   sprayMode: 'dots' | 'live' = 'live';
   sprayColorIndex = 0;
   hammerMode: HammerMode = 'chase';
@@ -333,9 +333,9 @@ export class Game {
     const waterHit = this.selectedTool === 'spray' || mortarTool ? this.room.brickWall.aim(this.renderer.camera) : null;
     const wallAim = Boolean(waterHit);
     const aimedBox=['fitting','level','spring','cutter'].includes(this.selectedTool)?this.boxPlacement.target(this.renderer.camera):null;
-    this.boxFitPreview.update(this.renderer.camera,this.boxAssembly.snapshot.modules,this.started&&!mixingOwnedInput&&this.selectedTool==='fitting'&&this.fpsRig.fittingBoxAvailable,Boolean(aimedBox),dt,point=>this.fpsRig.canReachPoint(this.renderer.camera,point),false,aimedBox?.boxGroup.position.z??0);
+    this.boxFitPreview.update(this.renderer.camera,this.boxAssembly.snapshot.modules,this.started&&!mixingOwnedInput&&this.selectedTool==='fitting'&&this.boxAssemblyActive&&this.fpsRig.fittingBoxAvailable,Boolean(aimedBox),dt,point=>this.fpsRig.canReachPoint(this.renderer.camera,point),false,aimedBox?.boxGroup.position.z??0);
     this.hud.updateBoxFit(this.boxFitPreview.telemetry);
-    const pointAim=this.selectedTool==='fitting'?Boolean(aimedBox||this.boxWorkAim()):Boolean(aimedBox||this.mission.target(this.renderer.camera));
+    const pointAim=this.selectedTool==='fitting'?this.boxAssemblyActive&&Boolean(aimedBox||this.boxWorkAim()):Boolean(aimedBox||this.mission.target(this.renderer.camera));
     const aimed = this.selectedTool==='measure'?Boolean(this.heightMeasure.target):this.selectedTool === 'hammer' ? this.fpsRig.reachable && !this.fpsRig.chiselInAir : this.selectedTool === 'spray' ? wallAim : pointAim;
     this.hud.update(this.mission.activePoint, aimed, this.mission.progress, this.selectedTool);
     this.hud.updateHeightMeasure(this.selectedTool==='measure',this.heightMeasure.heightM,Boolean(this.heightMeasure.target));
@@ -353,7 +353,7 @@ export class Game {
       :this.selectedTool==='laser'?(this.laserLevel.telemetry.mounted?'TAP TO PICK UP':'TAP TO MOUNT')
       :this.selectedTool==='hammer'?(this.hammerSpeed===0?'SPEED 0 · PAUSED':hammerStatus[this.fpsRig.contactStatus])
       :this.selectedTool==='trowel'?(this.mortar.throwFeedback.overheld?'RELEASE TO RESET':this.mortar.recovery>0?'RELOADING':useHeld?'RELEASE TO THROW':'HOLD TO LOAD')
-      :this.selectedTool==='fitting'?(aimedBox?'TAP TO PICK UP':this.boxFitPreview.mode==='fits'?'TAP TO PLACE BOX':this.boxFitPreview.mode==='proud'?`PLACE · +${this.boxFitPreview.telemetry.proudDepthMm} mm`:this.boxFitPreview.mode==='blocked'?'POSITION BLOCKED':'MOVE INTO REACH')
+      :this.selectedTool==='fitting'?(!this.boxAssemblyActive?'PRESS Q · LIVE ASSEMBLY':aimedBox?'TAP TO PICK UP':this.boxFitPreview.mode==='fits'?'TAP TO PLACE BOX':this.boxFitPreview.mode==='proud'?`PLACE · +${this.boxFitPreview.telemetry.proudDepthMm} mm`:this.boxFitPreview.mode==='blocked'?'POSITION BLOCKED':'MOVE INTO REACH')
       :this.selectedTool==='level'?(this.mission.activePoint?.stage==='leveling'?'ADJUST SELECTED BOX':aimedBox?'TAP TO PLACE LEVEL':'AIM AT A BOX')
       :useHeld?'USING TOOL':'HOLD TO USE';
     // While the preparation bay owns input, MixingStation is the sole writer
@@ -422,7 +422,7 @@ export class Game {
       coordinateSystem: 'metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall',
       mode: !this.started ? 'start' : this.mission.complete ? 'mission-complete' : point?.stage === 'leveling' ? 'leveling' : 'playing',
       player: { crouched:this.player.eyeHeight<1.1, x: Number(this.renderer.camera.position.x.toFixed(3)), y: Number(this.renderer.camera.position.y.toFixed(3)), z: Number(this.renderer.camera.position.z.toFixed(3)), yaw: Number(this.player.yaw.toFixed(3)), pitch: Number(this.player.pitch.toFixed(3)) },
-      mission: { boxPreset:this.mission.boxPreset, boxAssembly:this.boxAssembly.snapshot, name: 'Living Room First Fix', progressPercent: this.mission.progress, selectedTool: this.selectedTool, complete: this.mission.complete },
+      mission: { boxPreset:this.mission.boxPreset, boxAssembly:this.boxAssembly.snapshot, boxAssemblyActive:this.boxAssemblyActive, name: 'Living Room First Fix', progressPercent: this.mission.progress, selectedTool: this.selectedTool, complete: this.mission.complete },
       workSurface: { ...this.room.brickWall.telemetry, stanceSideDegrees:this.hammerWorkStance.sideDegrees, stanceCameraOffset:this.hammerWorkStance.offset.toArray(), freeSprayMarks: this.room.brickWall.freeMarkCount, activeFragments: this.chasing.activeFragmentCount, debrisStrikes:this.chasing.debrisStrikeCount, debrisSplits:this.chasing.debrisSplitCount, debrisCrushes:this.chasing.debrisCrushCount, insideFragments: this.chasing.insideFragmentCount, inwardFragments: this.chasing.inwardFragmentCount, physicsMs:this.chasing.lastUpdateMs, peakPhysicsMs:this.chasing.maximumUpdateMs, fragmentBudget:this.chasing.fragmentBudget, chiselTip:{x:this.fpsRig.chiselTipWorld.x,y:this.fpsRig.chiselTipWorld.y,z:this.fpsRig.chiselTipWorld.z,inAir:this.fpsRig.chiselInAir}, airborneFragments: this.chasing.airborneFragmentCount, settledFragments: this.chasing.settledFragmentCount, sprayMode: this.sprayMode, sprayColor: SPRAY_COLORS[this.sprayColorIndex].name, hammerMode: this.hammerMode, chisel: this.room.brickWall.chiselType, chiselEnergyJ: this.room.brickWall.chiselEnergyJ, chiselWidthMm: this.room.brickWall.chiselWidthM*1000, chiselTiltDegrees:this.room.brickWall.chiselTiltDegrees, actualTiltDegrees:this.fpsRig.actualTiltDegrees, chiselSideDegrees:this.room.brickWall.chiselSideDegrees, chiselEdgeDegrees: this.room.brickWall.chiselEdgeAngle*180/Math.PI, aimControlMode:this.aimControlMode, aimInputMode:this.aimInputMode, aimProfile:this.aimProfile, wallAssist:this.wallAssistEnabled, proximityPrecision:Number(this.player.wallAssistAmount.toFixed(3)) },
       activePoint: point ? { id: point.definition.id, kind: point.definition.kind, bottomHeightM: point.boxGroup.getWorldPosition(new THREE.Vector3()).y-point.boxGroup.groupHeight/2, boxes: point.definition.boxes, stage: point.stage, chaseHits: point.chaseHits, chaseCoverage: Number(this.room.brickWall.getChaseCoverage(point.definition.id).toFixed(3)), pipeStep: point.pipeStep, targeted: this.mission.target(this.renderer.camera) === point, tiltDegrees: Number(point.boxGroup.tiltDegrees.toFixed(2)), depthErrorMm: Number((point.boxGroup.depthError * 1000).toFixed(1)), levelPass: point.boxGroup.isLevel, flushPass: point.boxGroup.isFlush } : null,
       points: this.mission.points.map(item => ({ id: item.definition.id, stage: item.stage, boxes:item.definition.boxes, visible:item.boxGroup.visible, position:item.boxGroup.getWorldPosition(new THREE.Vector3()).toArray(), tiltDegrees:item.boxGroup.tiltDegrees, levelVisible:item.boxGroup.levelBar.visible, conduitVisible: Boolean(item.conduit) })),
@@ -431,6 +431,7 @@ export class Game {
 
   private performAction(continuing = false): void {
     if(['measure','drill','driver'].includes(this.selectedTool))return;
+    if(this.selectedTool==='fitting'&&!this.boxAssemblyActive)return;
     if(this.selectedTool==='laser'){
       this.fpsRig.show('laser');
       this.laserLevel.update(this.renderer.camera,'laser',false,0,(point,normal)=>this.fpsRig.canReachPoint(this.renderer.camera,point,.10,normal));
@@ -539,17 +540,20 @@ export class Game {
       if(preset!=='1G'&&preset!=='2G'&&preset!=='2G+1G')return;
       this.pendingSceneActions.push(()=>{const modules=horizontalBoxLayout(preset.split('+') as Array<'1G'|'2G'>);this.boxAssembly.restore(modules);this.boxFitPreview.clearGuide();this.syncBoxAssembly();});
     });
-    addEventListener('wirehouse:box-cycle-candidate',()=>this.pendingSceneActions.push(()=>{if(this.selectedTool==='fitting'){this.boxAssembly.cycleCandidate();this.syncBoxAssembly();}}));
-    addEventListener('wirehouse:box-rotate-candidate',()=>this.pendingSceneActions.push(()=>{if(this.selectedTool==='fitting'){this.boxAssembly.rotateCandidate();this.syncBoxAssembly();}}));
+    addEventListener('wirehouse:box-cycle-candidate',()=>this.pendingSceneActions.push(()=>{if(this.selectedTool==='fitting'&&this.boxAssemblyActive){this.boxAssembly.cycleCandidate();this.syncBoxAssembly();}}));
+    addEventListener('wirehouse:box-rotate-candidate',()=>this.pendingSceneActions.push(()=>{if(this.selectedTool==='fitting'&&this.boxAssemblyActive){this.boxAssembly.rotateCandidate();this.syncBoxAssembly();}}));
     addEventListener('wirehouse:box-attach',event=>{
       const zone=(event as CustomEvent<number>).detail as BoxAttachmentZone;
       if(![1,2,3,4].includes(zone))return;
-      this.pendingSceneActions.push(()=>{if(this.selectedTool!=='fitting')return;const added=this.boxAssembly.attach(zone);if(!added){this.hud.notify(`Zone ${zone} is occupied by the held assembly.`,false,1400);return;}this.audio.play('box');this.syncBoxAssembly(added.id);});
+      this.pendingSceneActions.push(()=>{if(this.selectedTool!=='fitting'||!this.boxAssemblyActive)return;const added=this.boxAssembly.attach(zone);if(!added){this.hud.notify(`Zone ${zone} is occupied by the held assembly.`,false,1400);return;}this.audio.play('box');this.syncBoxAssembly(added.id);});
+    });
+    addEventListener('wirehouse:box-enter-assembly',()=>{
+      if(this.started&&this.selectedTool==='fitting')this.setBoxAssemblyActive(true);
     });
     addEventListener('wirehouse:box-exit-assembly',()=>{
-      if(this.started&&this.selectedTool==='fitting')this.selectTool(this.toolBeforeBoxAssembly);
+      if(this.started&&this.selectedTool==='fitting')this.setBoxAssemblyActive(false);
     });
-    addEventListener('wirehouse:box-place-assembly',()=>this.pendingSceneActions.push(()=>{if(this.started&&this.selectedTool==='fitting')this.performAction();}));
+    addEventListener('wirehouse:box-place-assembly',()=>this.pendingSceneActions.push(()=>{if(this.started&&this.selectedTool==='fitting'&&this.boxAssemblyActive)this.performAction();}));
     const setChiselWidth=(value:number)=>{
       const wall=this.room.brickWall;
       if(wall.chiselType!=='flat'||!Number.isFinite(value))return;
@@ -720,16 +724,23 @@ export class Game {
     if(this.mixing.carrying){this.hud.notify('Άφησε πρώτα τη σύκλα.',false,1600);return;}
     if(this.mixing.active)this.mixing.setActive(false);
     const changed = this.selectedTool !== tool;
-    if(changed&&tool==='fitting')this.toolBeforeBoxAssembly=this.selectedTool;
     if(changed&&this.selectedTool==='fitting'&&tool==='hammer')this.boxFitPreview.pin(this.renderer.camera,this.boxAssembly.snapshot.modules);
     if(changed){this.mobileControls.cancelActiveGestures();this.mortar.cancel();const point=this.mission.activePoint;if(point?.stage==='leveling')this.pendingSceneActions.push(()=>this.leveling.cancel(point));}
     this.selectedTool = tool;
-    this.hud.shell.dataset.boxAssembly=String(tool==='fitting');
+    if(changed||tool!=='fitting')this.setBoxAssemblyActive(false);
     // Keep the established spray -> hammer gesture useful, but queue exactly
     // one hammer strike rather than turning a held pointer into auto-repeat.
     if (changed && tool === 'hammer' && this.input.actionHeld) this.input.actionRequested = true;
     if (tool === 'spring' || tool === 'cutter') this.conduit.selectTool(tool as PvcTool);
     this.hud.notify(TOOL_HINTS[tool], true, 1200);
+  }
+
+  private setBoxAssemblyActive(active:boolean):void {
+    this.boxAssemblyActive=this.selectedTool==='fitting'&&active;
+    this.fpsRig.setFittingAssemblyActive(this.boxAssemblyActive);
+    this.hud.updateBoxAssemblyMode(this.boxAssemblyActive);
+    this.boxFitPreview.clearGuide();this.boxFitPreview.invalidate();
+    if(this.boxAssemblyActive)this.hud.notify('LIVE BOX ASSEMBLY · Q or ESC to return to tool switching',true,1500);
   }
 
   private cycleTool(direction: number): void {

@@ -125,7 +125,11 @@ export class DesktopControls {
       if (event.code === 'KeyC' && !event.repeat) window.dispatchEvent(new CustomEvent('wirehouse:front-body-view'));
       if (event.code === 'BracketLeft') window.dispatchEvent(new CustomEvent('wirehouse:tilt-chisel',{detail:-5}));
       if (event.code === 'BracketRight') window.dispatchEvent(new CustomEvent('wirehouse:tilt-chisel',{detail:5}));
-      if (event.code === 'KeyQ' && !event.repeat && !(event.target instanceof Element && event.target.closest('input,textarea,select,[contenteditable="true"]'))) window.dispatchEvent(new CustomEvent('wirehouse:hammer-view-side',{detail:0}));
+      if (event.code === 'KeyQ' && !event.repeat && !(event.target instanceof Element && event.target.closest('input,textarea,select,[contenteditable="true"]'))) {
+        event.preventDefault();
+        if(surface.dataset.activeTool==='fitting')window.dispatchEvent(new CustomEvent(surface.dataset.boxAssembly==='true'?'wirehouse:box-exit-assembly':'wirehouse:box-enter-assembly'));
+        else window.dispatchEvent(new CustomEvent('wirehouse:hammer-view-side',{detail:0}));
+      }
       if (event.code === 'KeyJ') window.dispatchEvent(new CustomEvent('wirehouse:side-chisel',{detail:5}));
       if (event.code === 'KeyK') window.dispatchEvent(new CustomEvent('wirehouse:side-chisel',{detail:-5}));
       if (event.code === 'KeyT' && !event.repeat) window.dispatchEvent(new CustomEvent('wirehouse:cycle-chisel'));
