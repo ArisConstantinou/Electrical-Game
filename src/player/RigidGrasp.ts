@@ -3,6 +3,7 @@ import * as THREE from 'three';
 export interface GraspArm {
   shoulder:THREE.Vector3;
   upperLength:number;
+  handSign?:number;
   elbow:THREE.Vector3;
   wrist:THREE.Vector3;
 }
@@ -21,20 +22,25 @@ export function solveRigidGrasp(
   const forward=new THREE.Vector3(0,0,-1).applyQuaternion(cameraQ);
   const right=new THREE.Vector3(1,0,0).applyQuaternion(cameraQ);right.y=0;right.normalize();
   const lift=THREE.MathUtils.smoothstep(forward.y,.25,.9);
-  const preferredUpper=forward.clone();preferredUpper.y=-.85+lift*1.5;preferredUpper.addScaledVector(right,.18).normalize();
+  const preferredUpper=forward.clone();preferredUpper.y=-.85+lift*1.5;preferredUpper.addScaledVector(right,.18*(arm.handSign??1)).normalize();
   const evaluate=(q:THREE.Quaternion,swivel=new THREE.Quaternion())=>{
     const sphereCenter=arm.shoulder.clone().sub(arm.elbow.clone().applyQuaternion(q));
     const p=center.clone().sub(sphereCenter).applyQuaternion(swivel).setLength(arm.upperLength).add(sphereCenter);
     const wrist=arm.wrist.clone().applyQuaternion(q).add(p),view=wrist.clone().applyMatrix4(inverseCamera),ndc=wrist.clone().project(camera);
     const overflow=Math.max(0,Math.abs(ndc.x)-.82,Math.abs(ndc.y)-.82);
     let violation=overflow*overflow+Math.max(0,.20+view.z)**2*100;
-    const bounds=new THREE.Box3().setFromPoints(corners.map(c=>c.clone().applyQuaternion(q).add(p)));
+    const points=corners.map(c=>c.clone().applyQuaternion(q).add(p));
+    if(arm.handSign!==undefined)for(const point of points){
+      const projected=point.clone().project(camera),view=point.clone().applyMatrix4(inverseCamera);
+      violation+=Math.max(0,Math.abs(projected.x)-.90,Math.abs(projected.y)-.90)**2+Math.max(0,.15+view.z)**2*100;
+    }
+    const bounds=new THREE.Box3().setFromPoints(points);
     const front=frontForBounds?.(bounds);
     if(front!=null)violation+=Math.max(0,front+.004-bounds.min.z)**2*100;
     const upper=arm.elbow.clone().applyQuaternion(q).add(p).sub(arm.shoulder).normalize();
     // A visible, connected wrist alone is not a valid arm: keep the elbow
     // below the shoulder at level aim, on its own side, and out of the chest.
-    const anatomy=Math.max(0,upper.y-(-.12+lift*.95))**2+Math.max(0,-.12-upper.dot(right))**2;
+    const anatomy=Math.max(0,upper.y-(-.12+lift*.95))**2+Math.max(0,-.12-upper.dot(right)*(arm.handSign??1))**2;
     const angle=rotation.angleTo(q),continuity=previousQ?previousQ.angleTo(q)**2*.02+previousSwivel!.angleTo(swivel)**2*.004:0;
     const score=violation+anatomy*.5+upper.distanceToSquared(preferredUpper)*.002+angle*angle*.0003+p.distanceToSquared(center)*.001+continuity;
     return{center:p,rotation:q,swivel,error:violation,score};

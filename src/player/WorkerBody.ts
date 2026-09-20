@@ -274,7 +274,8 @@ export class WorkerBody extends THREE.Group {
         const axis=Y.clone().applyQuaternion(grip.rotation),oldAcross=new THREE.Vector3(1,0,0).applyQuaternion(grip.rotation),oldBack=new THREE.Vector3(0,0,1).applyQuaternion(grip.rotation);
         // A handle fixes the contact axis, not a camera-space 90-degree wrist
         // bend. Approach it from the elbow and solve the palm offset twice.
-        let long=grip.center.clone().sub(this.point('upper_arm.'+side));
+        const rigidContact=tool==='fitting'&&!station;
+        let long=rigidContact?oldBack.clone().negate():grip.center.clone().sub(this.point('upper_arm.'+side));
         long.normalize();
         let rotation=grip.rotation.clone(),section:[number,number]=grip.section;
         for(let pass=0;pass<2;pass++){
@@ -291,7 +292,7 @@ export class WorkerBody extends THREE.Group {
           this.limb('upper_arm.'+side,'forearm.'+side,'hand.'+side,wrist,right.clone().multiplyScalar(sign*.45).add(new THREE.Vector3(0,-1,0)));
           this.setHandOrientation(side,radial,long);
           this.gripErrors[side]=this.point('hand.'+side).distanceTo(wrist);
-          if(pass===0)long=this.point('hand.'+side).sub(this.point('forearm.'+side)).normalize();
+          if(pass===0&&!rigidContact)long=this.point('hand.'+side).sub(this.point('forearm.'+side)).normalize();
         }
         this.wrapGrip(side,grip.center,rotation,section,false,working,grip.shape,grip.trigger);
       }else{
@@ -309,12 +310,60 @@ export class WorkerBody extends THREE.Group {
         }
       }
     }
+    if(tool==='fitting'&&!station)this.poseBoxGrasps(grips,camera,fps,right,frontForBounds);
+    else this.boxGraspHistory.clear();
     this.headParts.forEach(o=>o.visible=true);
     for(const material of this.headMaterials){material.colorWrite=this.overview;material.depthWrite=this.overview;}
     // Publish the completed pose as one unit. Render/shadow passes can have
     // visited this skeleton earlier; tools and skin must use the same pose.
     this.updateMatrixWorld(true);
     for(const skeleton of this.skeletons)skeleton.update();
+  }
+  private boxGraspHistory=new Map<THREE.Object3D,GraspHistory>();
+  private poseBoxGrasps(grips:WorkerGripTarget[],camera:THREE.PerspectiveCamera,fps:FPSRig,right:THREE.Vector3,frontForBounds?:(bounds:THREE.Box3)=>number|null):void {
+    const objects=new Set(grips.filter(g=>g.active&&g.object&&!g.referenceKey).map(g=>g.object!));
+    for(const object of objects){
+      const targets=grips.filter(g=>g.active&&g.object===object),primary=targets[0];
+      // Preserve every finger and the hand/tool contact. The rigid unit now
+      // includes a straight forearm; only the shoulder/elbow place this unit.
+      const inverse=primary.rotation.clone().invert();
+      const frames=targets.map(grip=>{
+        const name=grip.side>0?'R':'L',wrist=this.point('hand.'+name),oldElbow=this.point('forearm.'+name);
+        const long=this.point('middle.01.'+name).sub(wrist).normalize();
+        const elbow=wrist.clone().addScaledVector(long,-wrist.distanceTo(oldElbow));
+        const handQ=this.bone('hand.'+name).getWorldQuaternion(new THREE.Quaternion());
+        const neutralQ=handQ.clone().multiply(this.handFrames.get(name)!.foreToHand.clone().invert());
+        neutralQ.premultiply(new THREE.Quaternion().setFromUnitVectors(Y.clone().applyQuaternion(neutralQ),long));
+        const shoulder=this.point('upper_arm.'+name);
+        return{name,handSign:grip.side,shoulder,upperLength:shoulder.distanceTo(oldElbow),elbow:elbow.sub(primary.center).applyQuaternion(inverse),wrist:wrist.sub(primary.center).applyQuaternion(inverse),foreQ:inverse.clone().multiply(neutralQ),handQ:inverse.clone().multiply(handQ)};
+      });
+      if(primary.contactLocked)continue;
+      const bounds=new THREE.Box3().setFromObject(object),corners:THREE.Vector3[]=[];
+      for(const x of [bounds.min.x,bounds.max.x])for(const y of [bounds.min.y,bounds.max.y])for(const z of [bounds.min.z,bounds.max.z])corners.push(new THREE.Vector3(x,y,z).sub(primary.center).applyQuaternion(inverse));
+      // Start with the arm, as with spray: position the elbow first,
+      // palm continuing the forearm. Carry the captured contact with it.
+      const forward=camera.getWorldDirection(new THREE.Vector3()),flat=forward.clone();flat.y=0;flat.normalize();
+      const side=primary.side,long=forward.clone().addScaledVector(Y,.55).normalize();
+      const radial=Y.clone().addScaledVector(long,-long.y).normalize();
+      const handQ=this.handOrientation(side>0?'R':'L',radial,long);
+      const desiredRotation=handQ.multiply(frames[0].handQ.clone().invert());
+      const pole=flat.clone().multiplyScalar(1.15).addScaledVector(right,-side*(camera.aspect<1?.65:.20)).addScaledVector(Y,-.05).normalize();
+      const elbow=frames[0].shoulder.clone().addScaledVector(pole,frames[0].upperLength);
+      const desiredCenter=elbow.sub(frames[0].elbow.clone().applyQuaternion(desiredRotation));
+      desiredCenter.add(fps.boxGraspMotion(object));
+      const pose=solveRigidGrasp(desiredCenter,desiredRotation,frames[0],camera,corners,frontForBounds,this.boxGraspHistory.get(object));
+      const cameraQ=camera.getWorldQuaternion(new THREE.Quaternion()),cameraInverse=cameraQ.clone().invert();
+      this.boxGraspHistory.set(object,{rotation:cameraInverse.clone().multiply(pose.rotation),swivel:cameraInverse.clone().multiply(pose.swivel).multiply(cameraQ)});
+      for(const frame of frames){
+        const elbow=frame.elbow.clone().applyQuaternion(pose.rotation).add(pose.center);
+        this.orient('upper_arm.'+frame.name,elbow);
+        this.worldRotation(this.bone('forearm.'+frame.name),pose.rotation.clone().multiply(frame.foreQ));
+        this.worldRotation(this.bone('hand.'+frame.name),pose.rotation.clone().multiply(frame.handQ));
+        this.gripErrors[frame.name]=this.point('hand.'+frame.name).distanceTo(frame.wrist.clone().applyQuaternion(pose.rotation).add(pose.center));
+      }
+      const turn=pose.rotation.clone().multiply(inverse);
+      fps.transformAnatomicalGrasp(primary.center,pose.center,turn,object);
+    }
   }
   private poseReferenceGrasps(grips:WorkerGripTarget[],camera:THREE.PerspectiveCamera,fps:FPSRig,station:boolean,right:THREE.Vector3,frontForBounds?: (bounds:THREE.Box3)=>number|null):Set<string>{
     const targets=grips.filter(g=>g.active&&g.object&&g.referenceKey&&this.referenceGrips[g.referenceKey]);

@@ -44,6 +44,10 @@ export class FPSRig extends THREE.Group {
         const tool=this.tools.get(this.selectedTool)!,trigger=tool.getObjectByName('Index finger trigger');
         if(arm.side>0&&trigger)grip.trigger=trigger.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0,0,-.013).applyQuaternion(tool.getWorldQuaternion(new THREE.Quaternion())));
       }
+      if(this.selectedTool==='fitting'){
+        grip.shape='box';
+        Object.defineProperty(grip,'object',{value:arm.side>0?this.fittingCandidateRoot:this.fittingAssemblyRoot});
+      }
       return grip;
     });
   }
@@ -57,20 +61,32 @@ export class FPSRig extends THREE.Group {
     // The target is the fingertip bone endpoint; its fleshy pad extends below it.
     return tool.getObjectByName('Broad finger press actuator')!.localToWorld(new THREE.Vector3(0,.025,0));
   }
-  /** Carry the tool with a solved forearm without changing its grip frame. */
-  private graspBase:{tool:THREE.Group;position:THREE.Vector3;rotation:THREE.Quaternion}|undefined;
-  private restoreGrasp():void {
-    if(!this.graspBase)return;
-    const {tool,position,rotation}=this.graspBase;tool.position.copy(position);tool.quaternion.copy(rotation);tool.updateWorldMatrix(false,true);this.graspBase=undefined;
+  /** Preserve the candidate's attachment motion while the arm carries it. */
+  boxGraspMotion(object:THREE.Object3D):THREE.Vector3 {
+    if(object!==this.fittingCandidateRoot||!this.fittingAttachment)return new THREE.Vector3();
+    return object.position.clone().sub(this.fittingCandidateHome).applyQuaternion(object.parent!.getWorldQuaternion(new THREE.Quaternion()));
   }
-  transformAnatomicalGrasp(from:THREE.Vector3,to:THREE.Vector3,turn:THREE.Quaternion):void {
-    const tool=this.tools.get(this.selectedTool)!;
-    this.graspBase??={tool,position:tool.position.clone(),rotation:tool.quaternion.clone()};
-    const position=tool.getWorldPosition(new THREE.Vector3()).sub(from).applyQuaternion(turn).add(to);
-    const rotation=turn.clone().multiply(tool.getWorldQuaternion(new THREE.Quaternion()));
-    tool.position.copy(tool.parent!.worldToLocal(position));
-    tool.quaternion.copy(tool.parent!.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(rotation));
-    tool.updateWorldMatrix(false,true);
+  private graspBases=new Map<THREE.Object3D,{position:THREE.Vector3;rotation:THREE.Quaternion}>();
+  private restoreGrasp():void {
+    for(const [tool,{position,rotation}] of this.graspBases){tool.position.copy(position);tool.quaternion.copy(rotation);tool.updateWorldMatrix(false,true);}
+    this.graspBases.clear();
+  }
+  /** Carry the tool, contact anchor and labels with the solved forearm. */
+  transformAnatomicalGrasp(from:THREE.Vector3,to:THREE.Vector3,turn:THREE.Quaternion,object?:THREE.Object3D):void {
+    const tool=object??this.tools.get(this.selectedTool)!;
+    const objects=tool===this.fittingAssemblyRoot?[tool,this.fittingZonesRoot]:[tool];
+    if(this.selectedTool==='fitting'){
+      const arm=this.armSets.get('fitting')!.find(a=>a.side===(tool===this.fittingAssemblyRoot?-1:1));
+      if(arm)objects.push(arm.hand);
+    }
+    for(const part of objects){
+      if(!this.graspBases.has(part))this.graspBases.set(part,{position:part.position.clone(),rotation:part.quaternion.clone()});
+      const position=part.getWorldPosition(new THREE.Vector3()).sub(from).applyQuaternion(turn).add(to);
+      const rotation=turn.clone().multiply(part.getWorldQuaternion(new THREE.Quaternion()));
+      part.position.copy(part.parent!.worldToLocal(position));
+      part.quaternion.copy(part.parent!.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(rotation));
+      part.updateWorldMatrix(false,true);
+    }
   }
   private readonly tools = new Map<RigTool, THREE.Group>();
   private readonly heldBounds = new Map<string, THREE.Box3>();
@@ -334,6 +350,7 @@ export class FPSRig extends THREE.Group {
     this.setFittingAssembly({modules,activeId,candidateKind:kinds.at(-1)??'1G',candidateRotation:0},[]);
   }
   setFittingAssembly(snapshot:BoxAssemblySnapshot,zones:Array<{zone:BoxAttachmentZone;module:BoxModuleLayout;available:boolean}>,addedId?:string):void{
+    this.restoreGrasp();
     this.fittingAssembly={...snapshot,modules:snapshot.modules.map(module=>({...module}))};
     this.fittingZones=zones.map(zone=>({...zone,module:{...zone.module}}));
     this.fittingPreset=snapshot.modules.map(module=>`${module.kind}@${module.rotation}:${module.x.toFixed(3)},${module.y.toFixed(3)}`).join('|');
@@ -803,11 +820,21 @@ export class FPSRig extends THREE.Group {
       for(const arm of this.armSets.get('fitting')!){
         const hand=arm.hand;hand.userData.gripping=this.fittingBoxAvailable;hand.userData.gripRole=emptyFitting?'reaching':arm.side<0?'assembly':'candidate';
         if(!emptyFitting){
-          const assemblyHeight=this.fittingAssembly?boxAssemblyBounds(this.fittingAssembly.modules).height*this.fittingPresentationScale:.074;
-          const position=arm.side<0
-            ?this.fittingAssemblyRoot.position.clone().add(new THREE.Vector3(-.024,-assemblyHeight*.5-.028,.025))
-            :this.fittingCandidateRoot.position.clone().add(new THREE.Vector3(.022,-.042,.025));
-          hand.position.copy(position);hand.quaternion.setFromEuler(new THREE.Euler(-.12,arm.side<0?-.18:.18,arm.side<0?-.18:.18));
+          const modules=this.fittingAssembly?.modules??horizontalBoxLayout(['1G']);
+          const bounds=boxAssemblyBounds(modules);
+          // Hold an actual outside casing edge, including L-shaped assemblies.
+          const held=modules.reduce((best,module)=>{
+            const edge=module.x-boxModuleSize(module).width/2,bestEdge=best.x-boxModuleSize(best).width/2;
+            return edge<bestEdge-1e-6||Math.abs(edge-bestEdge)<1e-6&&module.y<best.y?module:best;
+          });
+          const candidate=this.fittingCandidateRoot.children[0];
+          const candidateSize=boxModuleSize({kind:candidate?.userData.boxKind??'1G',rotation:candidate?.userData.quarterTurn??0});
+          const scale=arm.side<0?this.fittingPresentationScale:this.fittingCandidateRoot.scale.x;
+          const edge=arm.side<0
+            ?new THREE.Vector3((held.x-boxModuleSize(held).width/2-bounds.centerX)*scale,(held.y-bounds.centerY)*scale,-.0185*scale)
+            :new THREE.Vector3(candidateSize.width*.5*scale,0,-.0185*scale);
+          hand.position.copy(arm.side<0?this.fittingAssemblyRoot.position:this.fittingCandidateRoot.position).add(edge);
+          hand.quaternion.identity();hand.userData.gripSection=[.006,.0185*scale];
         }
       }
     }
