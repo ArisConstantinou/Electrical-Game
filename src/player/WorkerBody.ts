@@ -297,25 +297,37 @@ export class WorkerBody extends THREE.Group {
         const finalPlanar=finalDirection.clone().addScaledVector(axis,-finalDirection.dot(axis)).normalize();
         this.fingerFit.sprayForward={dot:finalPlanar.dot(nozzleDirection),wristBendDegrees:THREE.MathUtils.radToDeg(alignedLong.angleTo(this.point('hand.R').sub(this.point('forearm.R')).normalize())),long:alignedLong.toArray(),wrist:this.point('hand.R').toArray(),elbow:this.point('forearm.R').toArray(),shoulder:shoulder.toArray()};
       }else if(!station&&grip&&side==='R'&&(tool==='trowel'||tool==='hose')){
-        // Carry one rigid forearm/palm/grip unit. Rotating only the palm to an
-        // aimed handle folded the hose wrist backwards at downward views.
-        const axis=Y.clone().applyQuaternion(grip.rotation),inverse=grip.rotation.clone().invert();
-        const long=camera.getWorldDirection(new THREE.Vector3());long.addScaledVector(axis,-long.dot(axis)).normalize();
+        // Keep the handle, palm and forearm as one straight working line. The
+        // previous screen-space solve pulled the tool back toward the chest:
+        // the wrist stayed straight, but the elbow folded to 36–154 degrees
+        // and the oversized upper arm filled the downward view.
+        const originalAxis=Y.clone().applyQuaternion(grip.rotation),shoulder=this.point('upper_arm.R');
+        // Aim the straight arm through a stable lower-right screen target.
+        // Extending purely along camera-forward put the wrist below the frame
+        // because the shoulder itself sits well below the first-person eye.
+        const screenTarget=tool==='trowel'?new THREE.Vector3(.16,-.06,-.72):new THREE.Vector3(.12,-.04,-.72);
+        const long=camera.localToWorld(screenTarget).sub(shoulder).normalize();
+        const axis=originalAxis.clone().addScaledVector(long,-originalAxis.dot(long)).normalize();
+        const toolTurn=new THREE.Quaternion().setFromUnitVectors(originalAxis,axis);
         const across=long.clone().negate(),back=across.clone().cross(axis).normalize();
         const handQ=this.handOrientation(side,axis,long);
         const middle=grip.center.clone().addScaledVector(across,-grip.section[0]*.6).addScaledVector(back,-grip.section[1]-.012);
         const wrist=middle.sub(this.handFrames.get(side)!.knuckle.clone().applyQuaternion(handQ));
-        const shoulder=this.point('upper_arm.R'),foreLength=this.point('hand.R').distanceTo(this.point('forearm.R'));
-        const elbow=wrist.clone().addScaledVector(long,-foreLength),upperLength=shoulder.distanceTo(this.point('forearm.R'));
-        const bounds=fps.heldToolBoundsWorld(),corners:THREE.Vector3[]=[];
-        for(const x of [bounds.min.x,bounds.max.x])for(const y of [bounds.min.y,bounds.max.y])for(const z of [bounds.min.z,bounds.max.z])corners.push(new THREE.Vector3(x,y,z).sub(grip.center).applyQuaternion(inverse));
-        const pose=solveRigidGrasp(grip.center,grip.rotation,{shoulder,upperLength,handSign:1,lockRotation:true,screenRegion:{minX:.02,maxX:.90},elbow:elbow.clone().sub(grip.center).applyQuaternion(inverse),wrist:wrist.clone().sub(grip.center).applyQuaternion(inverse)},camera,corners,frontForBounds);
-        const shift=pose.center.clone().sub(grip.center);
-        this.orient('upper_arm.R',elbow.add(shift));this.orient('forearm.R',wrist.add(shift));this.setHandOrientation(side,axis,long);
-        fps.transformAnatomicalGrasp(grip.center,pose.center,new THREE.Quaternion());
-        const rotation=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(across,axis,back));
-        this.wrapGrip(side,pose.center,rotation,grip.section,false,working,grip.shape,grip.trigger?.clone().add(shift));
-        this.gripErrors.R=this.point('hand.R').distanceTo(wrist);
+        const foreLength=this.point('hand.R').distanceTo(this.point('forearm.R'));
+        const upperLength=shoulder.distanceTo(this.point('forearm.R')),reach=upperLength+foreLength-.008;
+        const targetWrist=shoulder.clone().addScaledVector(long,reach),shift=targetWrist.clone().sub(wrist);
+        const elbowPole=right.clone().multiplyScalar(.45).addScaledVector(Y,-.35).addScaledVector(long,-.1);
+        this.limb('upper_arm.R','forearm.R','hand.R',targetWrist,elbowPole,.008);
+        const forearmLong=this.point('hand.R').sub(this.point('forearm.R')).normalize();
+        const radial=axis.clone().addScaledVector(forearmLong,-axis.dot(forearmLong)).normalize();
+        this.setHandOrientation(side,radial,forearmLong);
+        const gripAcross=forearmLong.clone().negate(),gripBack=gripAcross.clone().cross(axis).normalize();
+        const rotation=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(gripAcross,axis,gripBack));
+        const center=grip.center.clone().add(shift);
+        fps.transformAnatomicalGrasp(grip.center,center,toolTurn);
+        const trigger=grip.trigger?.clone().sub(grip.center).applyQuaternion(toolTurn).add(center);
+        this.wrapGrip(side,center,rotation,grip.section,false,working,grip.shape,trigger);
+        this.gripErrors.R=this.point('hand.R').distanceTo(targetWrist);
       }else if(tool==='laser'&&grip&&side==='R'){
         const axis=Y.clone().applyQuaternion(grip.rotation),oldAcross=new THREE.Vector3(1,0,0).applyQuaternion(grip.rotation),oldBack=new THREE.Vector3(0,0,1).applyQuaternion(grip.rotation);
         let long=grip.center.clone().sub(this.point('upper_arm.R')).addScaledVector(axis,-grip.center.clone().sub(this.point('upper_arm.R')).dot(axis)).normalize();

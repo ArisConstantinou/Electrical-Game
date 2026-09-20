@@ -30,12 +30,17 @@ try{
    g.player.workPosition.locked=false;g.player.workPosition.released=true;g.player.crouched=false;g.player.velocity.set(0,0,0);g.player.yaw=yaw;g.player.pitch=pitch;c.position.set(-.6,1.65,g.room.brickWall.volume.frontZ+1.1);w.overview=false;g.renderer.viewCamera=null;
    for(let i=0;i<40;i++)window.reviewStep(1/60);g.renderer.render();await g.renderer.waitForFrame();
    const grips=(station?g.mixing.anatomicalGrips():g.fpsRig.anatomicalGrips()).filter(x=>x.active),arms={};
-   for(const grip of grips){const side=grip.side>0?'R':'L',wrist=w.point('hand.'+side),elbow=w.point('forearm.'+side),long=w.point('middle.01.'+side).sub(wrist),projected=wrist.clone().project(c);arms[side]={bend:long.angleTo(wrist.clone().sub(elbow))*180/Math.PI,wrist:wrist.toArray(),elbow:elbow.toArray(),shoulder:w.point('upper_arm.'+side).toArray(),handInGrip:grip.rotation.clone().invert().multiply(w.bone('hand.'+side).getWorldQuaternion(c.quaternion.clone())).toArray(),projected:projected.toArray(),visible:Math.abs(projected.x)<1&&Math.abs(projected.y)<1&&projected.z>-1&&projected.z<1};}
+   for(const grip of grips){const side=grip.side>0?'R':'L',wrist=w.point('hand.'+side),elbow=w.point('forearm.'+side),shoulder=w.point('upper_arm.'+side),long=w.point('middle.01.'+side).sub(wrist),projected=wrist.clone().project(c);arms[side]={bend:long.angleTo(wrist.clone().sub(elbow))*180/Math.PI,elbowAngle:shoulder.clone().sub(elbow).angleTo(wrist.clone().sub(elbow))*180/Math.PI,wrist:wrist.toArray(),elbow:elbow.toArray(),shoulder:shoulder.toArray(),handInGrip:grip.rotation.clone().invert().multiply(w.bone('hand.'+side).getWorldQuaternion(c.quaternion.clone())).toArray(),projected:projected.toArray(),visible:Math.abs(projected.x)<1&&Math.abs(projected.y)<1&&projected.z>-1&&projected.z<1};}
    return{tool,pitch,yaw,arms,solve:w.userData.graspSolve,telemetry:w.telemetry};
   },{tool,pitch,yaw});report.cases.push(data);
   if(process.env.REVIEW_ALL_SHOTS||pitch===-1.15||tool==='drill')await p.screenshot({path:`${out}/${tool.replace(':','-')}-${pitch}${yaw?'-yaw'+yaw:''}.png`});
  }
  const trowelCases=report.cases.filter(c=>c.tool==='trowel'||c.tool==='hose');
- for(const c of trowelCases){const bend=c.arms.R?.bend??Infinity;assert(bend<(Math.abs(c.pitch)<=.6?15:35),`${c.tool} wrist bends ${bend.toFixed(1)}° at pitch ${c.pitch}`);}
+ for(const c of trowelCases){
+  const bend=c.arms.R?.bend??Infinity,elbow=c.arms.R?.elbowAngle??0;
+  assert(bend<(Math.abs(c.pitch)<=.6?15:35),`${c.tool} wrist bends ${bend.toFixed(1)}° at pitch ${c.pitch}`);
+  if(c.pitch<=0)assert(elbow>=158,`${c.tool} elbow folds to ${elbow.toFixed(1)}° at pitch ${c.pitch}`);
+  if(c.pitch<=0)assert(c.arms.R?.visible,`${c.tool} wrist leaves the camera at pitch ${c.pitch}`);
+ }
  console.log(JSON.stringify(report.cases.map(c=>({tool:c.tool,pitch:c.pitch,wrists:Object.fromEntries(Object.entries(c.arms).map(([k,v])=>[k,Math.round(v.bend)]))})),null,2));
 }finally{await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));await browser.close();}

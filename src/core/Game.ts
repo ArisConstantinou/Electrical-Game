@@ -403,6 +403,7 @@ export class Game {
     if(overheadPvc)this.workerBody.visible=false;
     if(this.modelInspector.active&&this.modelInspector.live)this.modelInspector.afterWorld(dt);
     else if(this.frontBodyView)this.updateFrontBodyCamera();
+    else if(this.pvc.presentationCamera)this.renderer.viewCamera=this.pvc.presentationCamera;
     else this.renderer.viewCamera=null;
     if(this.renderer.viewCamera&&!this.renderer.modelScene)this.hideInspectionObstructions(this.renderer.viewCamera);
     // Catch-up physics may run several times per image. Build wet surfaces

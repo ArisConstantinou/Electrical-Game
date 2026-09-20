@@ -26,10 +26,12 @@ export class PvcWorkshop {
   readonly cable:THREE.Mesh;
   readonly arms:WorkerArm[]=[];
   readonly controls:HTMLElement;
+  readonly markConfirm:HTMLButtonElement;
   customPresets:PvcPreset[]=[];
   transparent=false;
   readonly prompt:HTMLButtonElement;
   readonly liveMeasure:HTMLOutputElement;
+  readonly workCamera=new THREE.PerspectiveCamera(48,1,.025,60);
   bend=new PvcBend();
   phase:Phase='sealed';
   focused=false;
@@ -46,8 +48,8 @@ export class PvcWorkshop {
   private elapsed=0;
   private feedTime=0;
   private pressHeld=false;
-  private waitForActionRelease=false;
   private toolbarHold=false;
+  private canvasHold=false;
   private shapeKey='';
   private message='';
   private readonly cameraDestination=v();
@@ -58,6 +60,7 @@ export class PvcWorkshop {
   private readonly previewRoot=new THREE.Group();
   private readonly cutRing:THREE.Mesh;
   private readonly markRing:THREE.Mesh;
+  private pipeFrame={minX:0,maxX:0,minY:0,maxY:0,inside:false};
   private cableKey='';
   private readonly offcuts:THREE.Mesh[]=[];
   private readonly queue:Array<()=>void>=[];
@@ -79,10 +82,12 @@ export class PvcWorkshop {
     this.controls.innerHTML='<button data-pvc="back">A −</button><button data-pvc="forward">D +</button><button id="pvc-use">ΚΡΑΤΑ</button><button data-pvc="confirm">E ✓</button><button data-pvc="save">P · PRESET</button><button data-pvc="transparent">R · ΔΙΑΦΑΝΕΙΑ</button><button data-pvc="less">−</button><button data-pvc="more">+</button><button data-pvc="pause">ΠΙΣΩ</button>';
     this.prompt=document.createElement('button');this.prompt.id='pvc-prompt';this.prompt.hidden=true;
     this.liveMeasure=document.createElement('output');this.liveMeasure.id='pvc-live-measure';this.liveMeasure.hidden=true;this.liveMeasure.setAttribute('aria-label','Ζωντανή μέτρηση σωλήνας');
-    game.hud.shell.append(this.prompt,this.liveMeasure,this.controls);
+    this.markConfirm=document.createElement('button');this.markConfirm.id='pvc-mark-confirm';this.markConfirm.textContent='E · ΕΠΙΒΕΒΑΙΩΣΗ ΣΗΜΑΔΙΟΥ';this.markConfirm.hidden=true;
+    game.hud.shell.append(this.prompt,this.liveMeasure,this.markConfirm,this.controls);
     try{this.customPresets=readPvcPresets(localStorage);}catch{/* Storage can be unavailable in private/embedded contexts. */}
     this.stock.setPresets(this.presets);
     this.prompt.addEventListener('click',()=>this.queue.push(()=>this.interact()));
+    this.markConfirm.addEventListener('click',()=>this.queue.push(()=>this.interact()));
     this.controls.querySelectorAll<HTMLButtonElement>('[data-pvc]').forEach(button=>{
       let touchHandled=false;
       button.addEventListener('pointerdown',e=>{touchHandled=e.pointerType!=='mouse';});
@@ -97,9 +102,12 @@ export class PvcWorkshop {
       if(this.phase==='review')this.queue.push(()=>this.changeQuantity(e.deltaY<0?1:-1));
     },{capture:true,passive:false});
     let touchY:number|null=null;
-    game.renderer.webgl.domElement.addEventListener('pointerdown',e=>{if(e.pointerType==='touch'&&this.focused){e.stopPropagation();touchY=e.clientY;(e.target as Element).setPointerCapture(e.pointerId);}});
+    game.renderer.webgl.domElement.addEventListener('pointerdown',e=>{
+      if(e.pointerType==='mouse'&&e.button===0&&this.focused)this.canvasHold=true;
+      if(e.pointerType==='touch'&&this.focused){e.stopPropagation();touchY=e.clientY;(e.target as Element).setPointerCapture(e.pointerId);}
+    });
     game.renderer.webgl.domElement.addEventListener('pointermove',e=>{if(e.pointerType!=='touch'||touchY===null)return;e.stopPropagation();game.player.lookHandler?.(0,e.clientY-touchY);touchY=e.clientY;});
-    for(const event of ['pointerup','pointercancel'])game.renderer.webgl.domElement.addEventListener(event,()=>touchY=null);
+    for(const event of ['pointerup','pointercancel'])addEventListener(event,e=>{if((e as PointerEvent).pointerType==='mouse')this.canvasHold=false;touchY=null;});
     addEventListener('blur',()=>this.pause());document.addEventListener('visibilitychange',()=>{if(document.hidden)this.pause();});
     addEventListener('keydown',e=>{
       if(e.target instanceof Element&&e.target.closest('input,textarea,select,[contenteditable="true"]')||!this.game.started)return;
@@ -129,6 +137,7 @@ export class PvcWorkshop {
     });
   }
   get blocksWork():boolean{return this.focused||this.phase==='carrying';}
+  get presentationCamera():THREE.PerspectiveCamera|null{return this.focused&&['spring','inserting','bending','review','extracting'].includes(this.phase)?this.workCamera:null;}
   get presets():PvcPreset[]{return [...DEFAULT_PVC_PRESETS,...this.customPresets].sort((a,b)=>a.cm-b.cm);}
   private changeQuantity(delta:number):void{this.quantity=THREE.MathUtils.clamp(this.quantity+delta,1,this.rawCount);}
   private savePreset(remove=false):void{
@@ -154,8 +163,8 @@ export class PvcWorkshop {
     this.message='Άφησε τη σωλήνα στη μάτσα ή πάτησε ESC για παύση.';return false;
   }
   private transition(phase:Phase):void{this.phase=phase;this.elapsed=0;this.message='';this.shapeKey='';}
-  private setFocus():void{
-    this.focused=true;this.game.mixing.setActive(false);this.game.mixing.releaseAutomaticStance();this.game.input.resetTransientInput();
+  private setFocus(preserveInput=false):void{
+    this.focused=true;this.game.mixing.setActive(false);this.game.mixing.releaseAutomaticStance();if(!preserveInput)this.game.input.resetTransientInput();
     const c=this.game.renderer.camera;
     if(this.target){
       const p=this.target.boxGroup.getWorldPosition(v());
@@ -166,7 +175,7 @@ export class PvcWorkshop {
     const camera=new THREE.PerspectiveCamera();camera.position.copy(this.cameraDestination);camera.lookAt(this.cameraFocus);this.targetRotation.copy(camera.quaternion);
   }
   pause():void{
-    if(!this.focused)return;this.focused=false;this.pressHeld=this.toolbarHold=false;this.game.input.resetTransientInput();
+    if(!this.focused)return;this.focused=false;this.pressHeld=this.toolbarHold=this.canvasHold=false;this.game.input.resetTransientInput();
     if(this.target&&['fitting','cut'].includes(this.phase)){this.target=null;this.transition('carrying');}
     this.message='Η εργασία κρατήθηκε. Στόχευσε τη μάτσα ή το κουτί και πάτησε E για συνέχεια.';
   }
@@ -185,7 +194,10 @@ export class PvcWorkshop {
     const wasBlocking=this.blocksWork;
     if(interaction&&(wasBlocking||this.stockAimed()||this.target&&this.game.boxPlacement.target(this.game.renderer.camera)===this.target)){this.interact();action=false;interaction=false;}
     if(this.focused&&action)this.use();
-    this.pressHeld=this.focused&&(this.toolbarHold||this.game.input.actionHeld&&!this.game.input.interactionHeld);
+    // Do not infer a mouse hold from actionHeld: E intentionally sets that
+    // flag too. Tracking the canvas pointer separately prevents a held E from
+    // auto-inserting the spring while still allowing the very next LMB.
+    this.pressHeld=this.focused&&(this.toolbarHold||this.canvasHold);
     if(this.focused){
       const c=this.game.renderer.camera,t=1-Math.exp(-8*dt);c.position.lerp(this.cameraDestination,t);c.quaternion.slerp(this.targetRotation,t);
       this.game.player.yaw=c.rotation.y;this.game.player.pitch=c.rotation.x;this.game.player.velocity.set(0,0,0);
@@ -196,14 +208,9 @@ export class PvcWorkshop {
       if(this.phase==='bending'&&this.pressHeld)this.bend.press(dt);
       if(this.phase==='marking'&&this.pressHeld){
         this.markingProgress=Math.min(1,this.markingProgress+dt/.85);
-        if(this.markingProgress===1){
-          this.transition('spring');
-          this.waitForActionRelease=true;
-          this.message='Το σημάδι ολοκληρώθηκε. Άφησε το mouse και πάτησε ξανά για να βάλεις το spring.';
-        }
+        if(this.markingProgress===1)this.message='Το σημάδι ολοκληρώθηκε. Πάτησε E για να πάρεις τη σωλήνα και το spring.';
       }
-      if(this.waitForActionRelease){if(!this.pressHeld)this.waitForActionRelease=false;}
-      else if(this.phase==='spring'&&this.pressHeld){this.transition('inserting');}
+      if(this.phase==='spring'&&this.pressHeld)this.transition('inserting');
       if(animated.includes(this.phase))this.animate(dt);
     }
     return wasBlocking||this.blocksWork;
@@ -248,7 +255,7 @@ export class PvcWorkshop {
     if(this.phase==='loose'&&this.stockAimed()){this.transition('spreading');this.setFocus();return;}
     if(this.phase==='marking'){
       if(this.markingProgress<1){this.message='Κράτα αριστερό mouse για να περάσει ο μαρκαδόρος πάνω από όλες τις σωλήνες.';return;}
-      this.transition('spring');this.setFocus();return;
+      this.transition('spring');this.setFocus(true);return;
     }
     if(this.phase==='spring'){this.message='Κράτα αριστερό mouse για να βάλεις το spring μέσα στη σωλήνα.';return;}
     if(this.phase==='bending'){
@@ -365,6 +372,25 @@ export class PvcWorkshop {
     this.pipe.material.transparent=this.transparent;this.pipe.material.opacity=this.transparent?.40:1;this.pipe.material.depthWrite=!this.transparent;
     this.pipe.position.set(-mark.x,-.23-mark.y,-.39);this.pipe.quaternion.identity();
     if(this.phase==='spring'||this.phase==='inserting')this.pipe.position.x=THREE.MathUtils.lerp(-.08,-mark.x,this.insertion);
+    if(bending){
+      const rect=this.game.renderer.webgl.domElement.getBoundingClientRect();
+      this.workCamera.aspect=Math.max(.1,rect.width/Math.max(1,rect.height));this.workCamera.updateProjectionMatrix();
+      let minX=-.62,maxX=.62,minY=-1.72,maxY=.28;
+      const samples:THREE.Vector3[]=[];
+      for(let i=0;i<=40;i++){
+        const p=this.bend.at(this.cutFrom+(PVC.length-this.cutFrom)*i/40),point=v(p.x+this.pipe.position.x,p.y+this.pipe.position.y,this.pipe.position.z);
+        samples.push(point);minX=Math.min(minX,point.x);maxX=Math.max(maxX,point.x);minY=Math.min(minY,point.y);maxY=Math.max(maxY,point.y);
+      }
+      const center=v((minX+maxX)/2,(minY+maxY)/2,this.pipe.position.z),tan=Math.tan(THREE.MathUtils.degToRad(this.workCamera.fov/2));
+      const distance=THREE.MathUtils.clamp(Math.max((maxY-minY)/(2*tan),(maxX-minX)/(2*tan*this.workCamera.aspect))*1.24,4.4,8);
+      const focus=c.localToWorld(center.clone()),worldUp=v(0,1,0),yawFrame=new THREE.Quaternion().setFromAxisAngle(worldUp,this.game.player.yaw);
+      this.workCamera.position.copy(focus).add(v(0,.22,distance).applyQuaternion(yawFrame));
+      this.workCamera.up.copy(worldUp);
+      this.workCamera.lookAt(focus);this.workCamera.updateMatrixWorld(true);
+      let frameMinX=Infinity,frameMaxX=-Infinity,frameMinY=Infinity,frameMaxY=-Infinity;
+      for(const point of samples){const projected=c.localToWorld(point).project(this.workCamera);frameMinX=Math.min(frameMinX,projected.x);frameMaxX=Math.max(frameMaxX,projected.x);frameMinY=Math.min(frameMinY,projected.y);frameMaxY=Math.max(frameMaxY,projected.y);}
+      this.pipeFrame={minX:frameMinX,maxX:frameMaxX,minY:frameMinY,maxY:frameMaxY,inside:frameMinX>-.94&&frameMaxX<.94&&frameMinY>-.94&&frameMaxY<.94};
+    }
     if(this.phase==='carrying'){
       this.pipe.rotation.z=-1.2;const grip=this.bend.at(Math.min(this.bend.mark,.6));
       this.pipe.position.copy(v(.19,-.28,-.43).sub(v(grip.x,grip.y).applyQuaternion(this.pipe.quaternion)));
@@ -436,7 +462,7 @@ export class PvcWorkshop {
     this.game.hud.shell.classList.toggle('pvc-focused',this.focused);
     this.prompt.hidden=!this.game.started||(!show&&!near&&this.phase!=='carrying');
     const tips:Partial<Record<Phase,string>>={
-      marking:'Mouse: γωνία · Κράτα LMB: γραμμή · μετά περνά αυτόματα στο spring · P: preset · Tab: επόμενο',
+      marking:'Mouse: γωνία · Κράτα LMB: γραμμή · όταν τελειώσει πάτησε E · P: preset · Tab: επόμενο',
       spring:'LMB: βάλε το spring · R: διαφάνεια · ESC: πίσω',
       bending:'A / D: χέρι · LMB: λύγισε εδώ · Z: διόρθωση · E: έλεγχος · R: διαφάνεια',
       review:'Ροδέλα ή − / +: ποσότητα · E: παραγωγή · R: διαφάνεια',
@@ -451,6 +477,7 @@ export class PvcWorkshop {
       this.phase==='batch'?`E · ${this.prepared.length?'ΠΑΡΕ ΣΩΛΗΝΑ':'ΝΕΑ ΠΡΟΕΤΟΙΜΑΣΙΑ'} · ${this.prepared.length} έτοιμες / ${this.rawCount} άκοπες`:
       this.phase==='carrying'?(this.message||'E στο κουτί: εφαρμογή · E στη μάτσα: επιστροφή · R: διαφάνεια'):'E · ΣΥΝΕΧΙΣΕ';
     if(this.prompt.textContent!==hint)this.prompt.textContent=hint;
+    this.markConfirm.hidden=!show||this.phase!=='marking'||this.markingProgress<1;
     this.liveMeasure.hidden=!show||!['marking','bending','review','fitting','cut'].includes(this.phase);
     if(!this.liveMeasure.hidden){
       const marking=this.phase==='marking',fit=Boolean(this.target);
@@ -458,7 +485,7 @@ export class PvcWorkshop {
       if(marking)point=v(2.64,.055,this.bend.mark-.35);
       else if(fit)point=this.target!.boxGroup.getWorldPosition(v()).add(v(.17,-.06,.10));
       else point=this.pipe.localToWorld(v(this.bend.at(this.bend.mark).x+.20,this.bend.at(this.bend.mark).y,0));
-      point.project(this.game.renderer.camera);
+      point.project(this.presentationCamera??this.game.renderer.camera);
       const rect=this.game.renderer.webgl.domElement.getBoundingClientRect(),shell=this.game.hud.shell.getBoundingClientRect();
       this.liveMeasure.textContent=marking?`${(this.bend.mark*100).toFixed(1)} cm · από την αρχή`:
         fit?`Κοπή ${(this.cutS*100).toFixed(1)} cm · ${this.fitError().toFixed(0)} mm διαφορά`:
@@ -475,5 +502,5 @@ export class PvcWorkshop {
     use.hidden=!['marking','spring','bending','fitting'].includes(this.phase);
     use.textContent=this.phase==='marking'?'ΜΑΡΚΑΔΟΡΟΣ':this.phase==='fitting'?'ΚΟΨΕ':this.phase==='bending'?'ΛΥΓΙΣΕ':'SPRING';
   }
-  get telemetry(){return{phase:this.phase,focused:this.focused,raw:this.rawCount,prepared:this.prepared.length,carrying:Boolean(this.carried),installed:this.installedCount,total:this.rawCount+this.prepared.length+Number(Boolean(this.carried))+this.installedCount,markCm:this.bend.mark*100,markingProgress:this.markingProgress,springInsertion:this.insertion,springCentreM:this.bend.mark,springLengthM:PVC.springLength,retrievalCableM:PVC.cableLength,grip:this.bend.grip,angle:this.bend.angle,radiusMm:this.bend.radius?this.bend.radius*1000:null,ready:this.bend.ready,angles:[...this.bend.angles],quantity:this.quantity,target:this.target?.definition.id??null,cutCm:this.cutS*100,cutFromCm:this.cutFrom*100,fitErrorMm:this.fitError(),offcuts:this.offcuts.length,message:this.message,preview:this.pipe.visible,arms:this.arms.map(a=>({side:a.side,reach:a.shoulder.distanceTo(a.wrist)}))};}
+  get telemetry(){return{phase:this.phase,focused:this.focused,raw:this.rawCount,prepared:this.prepared.length,carrying:Boolean(this.carried),installed:this.installedCount,total:this.rawCount+this.prepared.length+Number(Boolean(this.carried))+this.installedCount,markCm:this.bend.mark*100,markingProgress:this.markingProgress,springInsertion:this.insertion,springCentreM:this.bend.mark,springLengthM:PVC.springLength,retrievalCableM:PVC.cableLength,grip:this.bend.grip,angle:this.bend.angle,radiusMm:this.bend.radius?this.bend.radius*1000:null,ready:this.bend.ready,angles:[...this.bend.angles],quantity:this.quantity,target:this.target?.definition.id??null,cutCm:this.cutS*100,cutFromCm:this.cutFrom*100,fitErrorMm:this.fitError(),offcuts:this.offcuts.length,message:this.message,preview:this.pipe.visible,pipeFrame:{...this.pipeFrame},arms:this.arms.map(a=>({side:a.side,reach:a.shoulder.distanceTo(a.wrist)}))};}
 }

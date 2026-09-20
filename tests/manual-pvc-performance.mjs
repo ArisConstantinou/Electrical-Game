@@ -3,7 +3,7 @@ import {mkdir,writeFile} from 'node:fs/promises';
 import {blockPointerLock} from './browser-safety.mjs';
 const browser=await chromium.launch({channel:'chrome',headless:true});const report=[];
 try{
- for(const port of [5365,5367]){
+ for(const port of [5365]){
   const context=await browser.newContext({viewport:{width:1366,height:768}});await blockPointerLock(context);
   const page=await context.newPage();await page.goto(`http://127.0.0.1:${port}/Electrical-Game/`);await page.locator('#start-button').click({timeout:120000});
   const profile=await page.evaluate(async()=>{
