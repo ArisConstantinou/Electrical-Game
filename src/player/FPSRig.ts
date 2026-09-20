@@ -365,9 +365,11 @@ export class FPSRig extends THREE.Group {
     for(const child of [...root.children])root.remove(child);
   }
   private viewBox(module:Pick<BoxModuleLayout,'id'|'kind'|'rotation'>):ElectricalBox{
+    // Dynamic boxes need the same depth policy as the other anatomical
+    // viewmodels: rear casing faces must not overwrite their own front rim.
     const box=new ElectricalBox(module.kind,`held-assembly:${module.id}`);
     box.rotation.z=module.rotation*Math.PI/2;box.userData.assemblyModuleId=module.id;box.userData.boxKind=module.kind;box.userData.quarterTurn=module.rotation;
-    box.traverse(object=>{if(object instanceof THREE.Mesh){object.material=(Array.isArray(object.material)?object.material:[object.material]).map(entry=>{const copy=entry.clone();copy.depthTest=false;copy.depthWrite=false;return copy;});if((object.material as THREE.Material[]).length===1)object.material=(object.material as THREE.Material[])[0];object.renderOrder=20;object.castShadow=false;object.receiveShadow=false;}});
+    box.traverse(object=>{if(object instanceof THREE.Mesh){object.material=(Array.isArray(object.material)?object.material:[object.material]).map(entry=>{const copy=entry.clone();copy.depthTest=true;copy.depthWrite=true;return copy;});if((object.material as THREE.Material[]).length===1)object.material=(object.material as THREE.Material[])[0];object.renderOrder=20;object.castShadow=false;object.receiveShadow=false;}});
     return box;
   }
   private rebuildFittingAssembly():void{
@@ -557,7 +559,8 @@ export class FPSRig extends THREE.Group {
     // Keep the working hand above the landscape toolbar and inside a portrait
     // view. The entire tool moves with the wrist; arm lengths stay physical.
     const handTool=this.selectedTool!=='hammer';
-    this.position.x=handTool&&innerWidth<innerHeight?-.065:.02;
+    // Two separated box hands need the centred frame on portrait screens.
+    this.position.x=handTool&&this.selectedTool!=='fitting'&&innerWidth<innerHeight?-.065:.02;
     this.position.y=(handTool&&this.touchViewport.matches&&innerHeight<520?(this.selectedTool==='fitting'?-.07:.02):this.restingY)+bob;
     this.strikeAmount = Math.max(0, this.strikeAmount - dt * 5.5);
     this.rotation.x = -Math.sin(this.strikeAmount * Math.PI) * 0.16;

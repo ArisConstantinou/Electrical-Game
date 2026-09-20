@@ -741,3 +741,10 @@ Original prompt for this task: Selecting BOX should show an initial box in the l
 - New box-escape-pointerlock regression reproduces the prior failure and passes after: unlock with no keydown, settings unlock and Escape, inspector unlock and Escape, key-only Escape, normal Escape and retained draft. Lock state/events are emulated with OS cursor capture blocked; this is not physical Pointer Lock proof in the user's embedded browser.
 - Existing desktop/touch assembly/placement regression, build and bundled client pass. Before/after screenshots: output/box-escape-lock-before and output/box-escape-lock-after. Current IAB tab reloaded. No geometry/animation/per-frame render changes.
 - API reference checked: https://www.w3.org/TR/pointerlock-2/#requirements (default unlock gesture and pointer-lock lifecycle).
+
+## 2026-09-20 · Held gang-box cropped rendering
+
+- Reproduced casing back faces overwriting front rims/knockouts because dynamically rebuilt boxes disabled depth testing/writes. Enabled the same depth policy as other anatomical held tools. Side-by-side in-page A/B screenshots confirm the missing details return.
+- Reproduced a two-box portrait assembly leaving the left edge. Centre the complete fitting viewmodel instead of applying the single-hand portrait offset. Native desktop/mobile assembly, rotation, placement and Escape regression pass, including projected casing bounds inside the viewport.
+- Build and held preset/near-wall checks pass. Frozen WebGL A/B: unchanged draw calls (276 desktop / 277 portrait), render-submit P95 7.5 to 7.0 ms desktop and 6.5 to 6.0 ms portrait; short headless samples, not hardware-mobile proof. Evidence: output/box-crop-diagnostic, output/box-depth-comparison and output/box-depth-after.
+- User supplied a further screenshot rejecting both box wrists. Rendering correction does not resolve the separate generic hand-orientation bug; neutral wrist investigation continues.

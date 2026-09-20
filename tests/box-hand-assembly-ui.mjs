@@ -19,8 +19,14 @@ async function fixture(page){return page.evaluate(async()=>{
 });}
 const read=page=>page.evaluate(()=>{
   const g=window.__wireTheHouse,state=JSON.parse(window.render_game_to_text()),zones=[];g.fpsRig.traverse(o=>{if(o.userData.zone)zones.push({zone:o.userData.zone,available:o.userData.available,visible:o.visible});});
+  const boxScreenBounds=[];
+  for(const root of [g.fpsRig.fittingAssemblyRoot,g.fpsRig.fittingCandidateRoot]){
+    let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+    root.updateWorldMatrix(true,true);root.traverse(o=>{if(!o.isMesh)return;const a=o.geometry.attributes.position;for(let i=0;i<a.count;i++){const v=o.position.clone().set(a.getX(i),a.getY(i),a.getZ(i)).applyMatrix4(o.matrixWorld).project(g.renderer.renderCamera);minX=Math.min(minX,v.x);maxX=Math.max(maxX,v.x);minY=Math.min(minY,v.y);maxY=Math.max(maxY,v.y);}});
+    boxScreenBounds.push({minX,maxX,minY,maxY});
+  }
   const arms=g.fpsRig.armSets.get('fitting')??[],legacySkinVisible=arms.some(a=>a.upper.visible||a.forearm.visible||a.hand.children.some(child=>child.visible&&!child.userData.heldAccessory));
-  return{worker:g.workerBody?.telemetry,legacySkinVisible,referenceKeys:g.fpsRig.anatomicalGrips().map(grip=>grip.referenceKey??null),selected:state.mission.selectedTool,assembly:state.mission.boxAssembly,arms:g.fpsRig.debugPose().arms,zones,fit:g.boxFitPreview.telemetry,visible:g.mission.points.filter(p=>p.boxGroup.visible).map(p=>({id:p.definition.id,layout:p.definition.boxLayout??p.boxGroup.layout,position:p.boxGroup.position.toArray()})),overflow:document.documentElement.scrollWidth>innerWidth,error:g.renderer.renderError};
+  return{boxScreenBounds,worker:g.workerBody?.telemetry,legacySkinVisible,referenceKeys:g.fpsRig.anatomicalGrips().map(grip=>grip.referenceKey??null),selected:state.mission.selectedTool,assembly:state.mission.boxAssembly,arms:g.fpsRig.debugPose().arms,zones,fit:g.boxFitPreview.telemetry,visible:g.mission.points.filter(p=>p.boxGroup.visible).map(p=>({id:p.definition.id,layout:p.definition.boxLayout??p.boxGroup.layout,position:p.boxGroup.position.toArray()})),overflow:document.documentElement.scrollWidth>innerWidth,error:g.renderer.renderError};
 });
 try{
   for(const [name,viewport,mobile] of [['desktop',{width:1366,height:768},false],['mobile',{width:390,height:844},true]]){
@@ -41,6 +47,7 @@ try{
     }
     const built=await read(page);assert.equal(built.legacySkinVisible,false);assert.equal(built.worker.loaded,true);assert.equal(built.selected,'fitting','contextual digits cannot switch tools');assert(built.assembly.modules.length>=(mobile?2:8));assert.equal(built.zones.length,4);assert(!built.overflow);assert.equal(built.error,'');
     await page.evaluate(async()=>{const r=window.__wireTheHouse.renderer;await r.waitForFrame();r.render();await r.waitForFrame();});await page.screenshot({path:`${out}/${name}-built-puzzle.png`});
+    for(const b of built.boxScreenBounds)assert(b.minX>=-1&&b.maxX<=1&&b.minY>=-1&&b.maxY<=1,`${name}: held gang boxes must stay fully inside the camera frame: ${JSON.stringify(b)}`);
     if(!mobile){
       await page.keyboard.press('Escape');await step(page,2);
       const escaped=await read(page);assert.equal(escaped.selected,'spray','Escape returns to the tool used before box assembly');
