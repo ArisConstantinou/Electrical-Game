@@ -12,7 +12,7 @@ try{
   const context=await browser.newContext({viewport:{width,height},isMobile:mobile,hasTouch:mobile});await blockPointerLock(context);
   const p=await context.newPage();p.on('pageerror',e=>report.errors.push(`${viewport}: ${e.message}`));
   await p.goto('http://127.0.0.1:5365/Electrical-Game/?renderer=webgl');await p.waitForFunction(()=>window.__wireTheHouse?.workerBody.loaded,null,{timeout:90000});await p.locator('#start-button')[mobile?'tap':'click']();
-  await p.evaluate(()=>{const g=window.__wireTheHouse;window.contactStep=g.step.bind(g);g.step=()=>{};g.input.locked=false;g.selectTool('fitting');g.player.velocity.set(0,0,0);g.player.workPosition.locked=false;g.player.workPosition.released=true;});
+  await p.evaluate(()=>{const g=window.__wireTheHouse;window.contactStep=g.step.bind(g);g.step=()=>{};g.input.locked=false;g.selectTool('fitting');window.dispatchEvent(new CustomEvent('wirehouse:box-enter-assembly'));g.player.velocity.set(0,0,0);g.player.workPosition.locked=false;g.player.workPosition.released=true;});
   for(const shape of ['six','zigzag','single','rotated-2G']){
    await p.evaluate(shape=>{const g=window.__wireTheHouse;g.boxAssembly.reset(shape==='rotated-2G'?'2G':'1G');if(shape==='six')for(const z of [2,1,4,1,2])g.boxAssembly.attach(z);if(shape==='zigzag')for(const z of [2,3,2,3])g.boxAssembly.attach(z);if(shape==='rotated-2G')g.boxAssembly.rotateCandidate();g.syncBoxAssembly();},shape);
    for(const [label,pitch,yaw] of [['straight',0,Math.PI],['down',-1.15,Math.PI],['up',1.15,Math.PI],['left',0,Math.PI-.8],['right',0,Math.PI+.8]]){

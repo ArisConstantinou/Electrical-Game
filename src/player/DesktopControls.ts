@@ -119,13 +119,22 @@ export class DesktopControls {
       if(surface.dataset.boxAssembly==='true'&&event.code==='KeyR'){
         event.preventDefault();if(!event.repeat)window.dispatchEvent(new CustomEvent('wirehouse:box-rotate-candidate'));return;
       }
+      if(surface.dataset.boxAssembly==='true'&&(event.code==='KeyQ'||event.code==='KeyE')&&!(event.code==='KeyE'&&surface.dataset.mixingInteract==='true')){
+        event.preventDefault();input.resetTransientInput();
+        if(!event.repeat)window.dispatchEvent(new CustomEvent(event.code==='KeyQ'?'wirehouse:box-undo':'wirehouse:box-reset'));
+        return;
+      }
       if(event.code==='KeyM'&&!event.repeat&&!(event.target instanceof Element&&event.target.closest('input,textarea,select,[contenteditable="true"]')))window.dispatchEvent(new CustomEvent('wirehouse:measure-mark'));
       if (directTools[event.code]) window.dispatchEvent(new CustomEvent('wirehouse:select-tool', { detail: directTools[event.code] }));
       if (event.code === 'KeyV' && !event.repeat) window.dispatchEvent(new CustomEvent('wirehouse:cycle-spray-mode'));
       if (event.code === 'KeyC' && !event.repeat) window.dispatchEvent(new CustomEvent('wirehouse:front-body-view'));
       if (event.code === 'BracketLeft') window.dispatchEvent(new CustomEvent('wirehouse:tilt-chisel',{detail:-5}));
       if (event.code === 'BracketRight') window.dispatchEvent(new CustomEvent('wirehouse:tilt-chisel',{detail:5}));
-      if (event.code === 'KeyQ' && !event.repeat && !(event.target instanceof Element && event.target.closest('input,textarea,select,[contenteditable="true"]'))) window.dispatchEvent(new CustomEvent('wirehouse:hammer-view-side',{detail:0}));
+      if (event.code === 'KeyQ' && !event.repeat && !(event.target instanceof Element && event.target.closest('input,textarea,select,[contenteditable="true"]'))) {
+        event.preventDefault();
+        if(surface.dataset.activeTool==='fitting')window.dispatchEvent(new CustomEvent('wirehouse:box-enter-assembly'));
+        else window.dispatchEvent(new CustomEvent('wirehouse:hammer-view-side',{detail:0}));
+      }
       if (event.code === 'KeyJ') window.dispatchEvent(new CustomEvent('wirehouse:side-chisel',{detail:5}));
       if (event.code === 'KeyK') window.dispatchEvent(new CustomEvent('wirehouse:side-chisel',{detail:-5}));
       if (event.code === 'KeyT' && !event.repeat) window.dispatchEvent(new CustomEvent('wirehouse:cycle-chisel'));

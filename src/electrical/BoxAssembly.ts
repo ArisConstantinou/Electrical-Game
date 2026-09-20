@@ -128,6 +128,15 @@ export class BoxAssemblyBuilder {
     return { ...candidate };
   }
 
+  undo(): BoxModuleLayout | null {
+    if (this.modules.length <= 1) return null;
+    const removed = this.modules.pop()!;
+    this.activeId = this.modules.at(-1)!.id;
+    this.candidateKind = removed.kind;
+    this.candidateRotation = removed.rotation;
+    return { ...removed };
+  }
+
   get snapshot(): BoxAssemblySnapshot {
     return { modules: this.modules.map(module => ({ ...module })), activeId: this.activeId, candidateKind: this.candidateKind, candidateRotation: this.candidateRotation };
   }
