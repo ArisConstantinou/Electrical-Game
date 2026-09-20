@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { Game } from '../core/Game';
 import type { WheelbarrowModel } from '../world/SiteEquipmentModels';
 import { MortarSlump } from './MortarSlump';
-import { mortarMaterial, mortarSurfaceGeometry, MORTAR_RINGS, MORTAR_SEGMENTS } from './MortarAppearance';
+import { mortarMaterial, mortarSurfaceGeometry, mortarReliefAt, MORTAR_RINGS, MORTAR_SEGMENTS, MORTAR_DIRECTIONS } from './MortarAppearance';
 import type { WorkerGripTarget } from '../player/WorkerArm';
 import { GAME_CONFIG } from '../data/gameConfig';
 import '../styles/wheelbarrow.css';
@@ -32,6 +32,8 @@ export class Wheelbarrow {
   private fill=-1;
   private presentedFill=-1;
   private presentedRevision=-1;
+  private readonly surfaceGrid=new Float32Array(33*49);
+  private tipExposure=0;
   private yaw=0;
   private pitch=0;
   private roll=0;
@@ -117,23 +119,34 @@ export class Wheelbarrow {
       const input=this.game.input;let x=Number(input.pressed('KeyD'))-Number(input.pressed('KeyA'))+input.mobileMove.x,y=Number(input.pressed('KeyW'))-Number(input.pressed('KeyS'))-input.mobileMove.y;
       const magnitude=Math.max(1,Math.hypot(x,y));x/=magnitude;y/=magnitude;
       const fast=input.pressed('ShiftLeft')||input.pressed('ShiftRight'),speed=fast?3.1:1.05;
-      const target=forward.clone().multiplyScalar(y*speed).addScaledVector(right,-x*speed),change=target.sub(this.velocity),limit=(fast?9:1.8)*dt;
+      const target=forward.clone().multiplyScalar(y*speed).addScaledVector(right,-x*speed),change=target.sub(this.velocity),limit=(fast?3.4:1.8)*dt;
       if(change.length()>limit)change.setLength(limit);this.velocity.add(change);
       const yawDelta=Math.atan2(Math.sin(this.game.player.yaw-Math.PI-this.yaw),Math.cos(this.game.player.yaw-Math.PI-this.yaw));
       turn=clamp(yawDelta*7,-4,4);this.yaw+=turn*dt;
       this.lastPosition.copy(root.position);root.position.addScaledVector(this.velocity,dt);
       root.rotation.set(this.pitch,this.yaw,this.roll,'YXZ');root.updateWorldMatrix(true,true);
-      if(!this.positionAllowed()){root.position.copy(this.lastPosition);this.velocity.set(0,0,0);this.blocked=true;}
+      if(!this.positionAllowed()){
+        root.position.copy(this.lastPosition);
+        // A hard stop transfers momentum in the actual collision direction.
+        // Ordinary walking contacts do not knock the operator off balance.
+        const impact=Math.max(0,this.velocity.length()-1.4),scale=impact/Math.max(.001,this.velocity.length())*6.2;
+        this.rollSpeed-=this.velocity.dot(right)*scale;this.pitchSpeed+=this.velocity.dot(forward)*scale;
+        this.velocity.set(0,0,0);this.blocked=true;
+      }
       const travelled=root.position.clone().sub(this.lastPosition);this.wheelAngle+=travelled.length()*Math.sign(travelled.dot(forward)||travelled.dot(right))/.202;
     }else{this.velocity.multiplyScalar(Math.exp(-5*dt));if(this.state==='tipping'){this.lastPosition.copy(root.position);root.position.addScaledVector(this.velocity,dt);if(!this.positionAllowed()){root.position.copy(this.lastPosition);this.velocity.set(0,0,0);}}}
     const acceleration=this.velocity.clone().sub(oldVelocity).divideScalar(dt),ax=clamp(acceleration.dot(right)+turn*this.velocity.dot(forward),-24,24),az=clamp(acceleration.dot(forward),-24,24);
     if(this.state==='driving'||this.state==='parked'){
       const load=.95+.05*this.massKg/this.capacityKg;
-      this.rollSpeed+=(-ax*.11*load-this.roll)*19*dt-this.rollSpeed*4*dt;
-      this.pitchSpeed+=((this.driving?.12:0)+az*.11*load-this.pitch)*19*dt-this.pitchSpeed*4*dt;
+      const displacedLoad=this.mortarSlump.loadOffset,loadFraction=this.driving?this.massKg/this.capacityKg:0;
+      // Retained mortar shifts the combined centre of mass. Downhill weight
+      // reinforces the lean; spilling reduces that torque immediately.
+      this.rollSpeed+=(ax*.08*load-displacedLoad.x*2*loadFraction-this.roll)*22*dt-this.rollSpeed*7*dt;
+      this.pitchSpeed+=((this.driving?.12:0)-az*.08*load+displacedLoad.y*.7*loadFraction-this.pitch)*22*dt-this.pitchSpeed*7*dt;
       this.roll+=this.rollSpeed*dt;this.pitch+=this.pitchSpeed*dt;
       this.stability=Math.hypot(this.roll/.55,(this.pitch-.12)/.65);
-      if(this.stability>1){
+      this.tipExposure=this.stability>1?this.tipExposure+dt:Math.max(0,this.tipExposure-dt*2);
+      if(this.tipExposure>.075){
         this.tipStart.set(this.pitch,this.roll);const direction=new THREE.Vector2(this.pitch-.12,this.roll).normalize();
         this.tipEnd.copy(direction).multiplyScalar(2.45);this.tipTime=0;this.state='tipping';const momentum=this.velocity.clone();this.release();this.velocity.copy(momentum);
         this.game.hud.notify('Το καρότσι ανατρέπεται! E για επαναφορά όταν σταματήσει.',false,2500);
@@ -141,7 +154,7 @@ export class Wheelbarrow {
     }else if(this.state==='tipping'){
       this.tipTime+=dt;const t=THREE.MathUtils.smoothstep(this.tipTime/1.05,0,1);this.pitch=THREE.MathUtils.lerp(this.tipStart.x,this.tipEnd.x,t);this.roll=THREE.MathUtils.lerp(this.tipStart.y,this.tipEnd.y,t);if(t===1)this.state='flipped';
     }else if(this.state==='righting'){
-      this.tipTime+=dt;const t=THREE.MathUtils.smoothstep(this.tipTime/1.15,0,1);this.pitch=this.recoveryStart.x*(1-t);this.roll=this.recoveryStart.y*(1-t);if(t===1){this.state='parked';this.pitchSpeed=this.rollSpeed=0;this.stability=0;}
+      this.tipTime+=dt;const t=THREE.MathUtils.smoothstep(this.tipTime/1.15,0,1);this.pitch=this.recoveryStart.x*(1-t);this.roll=this.recoveryStart.y*(1-t);if(t===1){this.state='parked';this.pitchSpeed=this.rollSpeed=0;this.stability=this.tipExposure=0;}
     }
     root.rotation.set(this.pitch,this.yaw,this.roll,'YXZ');let minY=Infinity;for(const p of this.support)minY=Math.min(minY,p.clone().applyQuaternion(root.quaternion).y);root.position.y=-minY+.002;root.updateWorldMatrix(true,true);
     // Cohesive regions stick until their individual yield threshold is passed.
@@ -213,18 +226,27 @@ export class Wheelbarrow {
     this.syncSurface();
     if(this.presentedRevision!==this.mortarSlump.revision||this.presentedFill!==this.massKg){
     this.presentedRevision=this.mortarSlump.revision;this.presentedFill=this.massKg;
+    // Expensive cohesive deformation is low frequency. Interpolate it onto a
+    // finer mesh carrying the real clod relief instead of evaluating 12 patches
+    // independently for all 16k vertices every frame.
+    for(let z=0;z<49;z++)for(let x=0;x<33;x++)this.surfaceGrid[z*33+x]=this.surfaceHeight((x/32-.5)*.8,(z/48-.5)*1.1);
+    const heightAt=(x:number,z:number)=>{
+      const u=clamp((x/.8+.5)*32,0,31.999),v=clamp((z/1.1+.5)*48,0,47.999),i=Math.floor(u),j=Math.floor(v),n=j*33+i,fx=u-i,fz=v-j,g=this.surfaceGrid;
+      const base=THREE.MathUtils.lerp(THREE.MathUtils.lerp(g[n],g[n+1],fx),THREE.MathUtils.lerp(g[n+33],g[n+34],fx),fz);
+      return base+mortarReliefAt(x-this.mortarSlump.displacement.x,z-this.mortarSlump.displacement.y)*Math.min(1,this.massKg/14);
+    };
     const p=this.model.mortar.geometry.getAttribute('position');
-    p.setXYZ(0,0,this.surfaceHeight(0,0),0);
+    p.setXYZ(0,0,heightAt(0,0),0);
     for(let i=0;i<MORTAR_SEGMENTS;i++){
-      const a=i/MORTAR_SEGMENTS*Math.PI*2,s=Math.sin(a),c=Math.cos(a),sx=Math.sign(s)*Math.pow(Math.abs(s),.6)*(1-.09*Math.sign(c)*Math.pow(Math.abs(c),.6)),sz=Math.sign(c)*Math.pow(Math.abs(c),.6);
+      const {x:sx,z:sz}=MORTAR_DIRECTIONS[i];
       // Intersect the moving surface with the actual flared inner wall.
       let low=0,high=1.07,x=0,z=0;
-      for(let n=0;n<10;n++){const mid=(low+high)/2;x=sx*(.215+.120*mid);z=sz*(.297+.165*mid);if(this.surfaceHeight(x,z)>.439+.242*mid+.05*z)low=mid;else high=mid;}
+      for(let n=0;n<10;n++){const mid=(low+high)/2;x=sx*(.215+.120*mid);z=sz*(.297+.165*mid);if(heightAt(x,z)>.439+.242*mid+.05*z)low=mid;else high=mid;}
       const h=(low+high)/2;
       x=sx*(.215+.120*h);z=sz*(.297+.165*h);
       for(let ring=1;ring<=MORTAR_RINGS;ring++){
         const r=ring/MORTAR_RINGS,v=1+(ring-1)*MORTAR_SEGMENTS+i,px=x*r,pz=z*r;
-        p.setXYZ(v,px,clamp(this.surfaceHeight(px,pz),.435+.05*pz,.735+.05*pz),pz);
+        p.setXYZ(v,px,clamp(heightAt(px,pz),.435+.05*pz,.735+.05*pz),pz);
       }
     }p.needsUpdate=true;this.model.mortar.geometry.computeVertexNormals();
     this.model.mortar.geometry.computeBoundingSphere();

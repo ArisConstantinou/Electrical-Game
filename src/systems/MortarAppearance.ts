@@ -1,6 +1,41 @@
 import * as THREE from 'three';
 
-export const MORTAR_RINGS=30,MORTAR_SEGMENTS=96;
+export const MORTAR_RINGS=64,MORTAR_SEGMENTS=256;
+// Equal arc length avoids the wide gaps that |sin(angle)|^.6 produces along
+// the centre axes. Those gaps erase small clods and resemble cut strips.
+export const MORTAR_DIRECTIONS=(()=>{
+ const points:{x:number;z:number;length:number}[]=[],count=4096;let length=0;
+ for(let i=0;i<=count;i++){
+  const a=i/count*Math.PI*2,s=Math.sin(a),c=Math.cos(a),z=Math.sign(c)*Math.pow(Math.abs(c),.6),x=Math.sign(s)*Math.pow(Math.abs(s),.6)*(1-.09*z),previous=points.at(-1);
+  if(previous)length+=Math.hypot((x-previous.x)*.335,(z-previous.z)*.462);
+  points.push({x,z,length});
+ }
+ let at=1;return Array.from({length:MORTAR_SEGMENTS},(_,i)=>{
+  const target=i/MORTAR_SEGMENTS*length;while(points[at].length<target)at++;
+  const a=points[at-1],b=points[at],t=(target-a.length)/(b.length-a.length);
+  return{x:THREE.MathUtils.lerp(a.x,b.x,t),z:THREE.MathUtils.lerp(a.z,b.z,t)};
+ });
+})();
+const hash=(x:number,y:number)=>{let n=Math.imul(x,374761393)^Math.imul(y,668265263);n=Math.imul(n^(n>>>13),1274126177);return((n^(n>>>16))>>>0)/4294967296;};
+const reliefSize=257,reliefSpan=1.6,relief=new Float32Array(reliefSize*reliefSize);
+// Millimetres-to-centimetres of actual paste geometry, not a shading illusion.
+// Irregular joined clods have steep torn seams and differently flattened tops.
+// Bake once; transport samples the field in moving material coordinates.
+for(let j=0;j<reliefSize;j++)for(let i=0;i<reliefSize;i++){
+ const x=(i/(reliefSize-1)-.5)*reliefSpan,z=(j/(reliefSize-1)-.5)*reliefSpan;
+ const u=x/.032+.5*Math.sin(z*43)+.19*Math.sin(x*79+z*27),v=z/.029+.48*Math.sin(x*37)+.17*Math.sin(z*91-x*31),ix=Math.floor(u),iz=Math.floor(v);
+ let first=Infinity,second=Infinity,id=0;
+ for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++){
+  const cx=ix+dx,cz=iz+dz,px=cx+.15+.7*hash(cx,cz),pz=cz+.15+.7*hash(cx+81,cz-17),d=Math.hypot(u-px,v-pz);
+  if(d<first){second=first;first=d;id=hash(cx+39,cz+91);}else second=Math.min(second,d);
+ }
+ const seam=second-first,top=Math.max(0,1-first*first*1.7);
+ relief[j*reliefSize+i]=(.005+id*.008)*top-.005*Math.exp(-seam*seam/ .006)+.003*(hash(i,j)-.5);
+}
+export function mortarReliefAt(x:number,z:number):number{
+ const u=THREE.MathUtils.clamp((x/reliefSpan+.5)*(reliefSize-1),0,reliefSize-1.001),v=THREE.MathUtils.clamp((z/reliefSpan+.5)*(reliefSize-1),0,reliefSize-1.001),i=Math.floor(u),j=Math.floor(v),fx=u-i,fz=v-j,n=j*reliefSize+i;
+ return THREE.MathUtils.lerp(THREE.MathUtils.lerp(relief[n],relief[n+1],fx),THREE.MathUtils.lerp(relief[n+reliefSize],relief[n+reliefSize+1],fx),fz);
+}
 export function mortarSurfaceGeometry():THREE.BufferGeometry{
  const uv:number[]=[.5,.5],indices:number[]=[],geometry=new THREE.BufferGeometry();
  geometry.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array((1+MORTAR_RINGS*MORTAR_SEGMENTS)*3),3));
@@ -26,5 +61,5 @@ export function mortarMaterial():THREE.MeshStandardMaterial{
  const map=new THREE.DataTexture(colour,size,size),bumpMap=new THREE.DataTexture(height,size,size);
  for(const texture of [map,bumpMap]){texture.wrapS=texture.wrapT=THREE.RepeatWrapping;texture.repeat.set(2,2);texture.magFilter=THREE.LinearFilter;texture.minFilter=THREE.LinearMipmapLinearFilter;texture.generateMipmaps=true;texture.anisotropy=4;texture.needsUpdate=true;}
  map.colorSpace=THREE.SRGBColorSpace;
- return new THREE.MeshStandardMaterial({color:0xffffff,map,bumpMap,bumpScale:.0017,roughness:.91,metalness:0});
+ return new THREE.MeshStandardMaterial({color:0xffffff,map,bumpMap,bumpScale:.0007,roughness:.94,metalness:0});
 }
