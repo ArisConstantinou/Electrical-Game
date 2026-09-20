@@ -6,7 +6,7 @@ const backend=process.env.WORKER_BACKEND||'webgl',out=`output/worker-three-fixes
 const browser=await chromium.launch({channel:'chrome',headless:true});
 try{
  const context=await browser.newContext({viewport:{width:1440,height:810}});await blockPointerLock(context);const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
- await page.goto(`http://127.0.0.1:5365/Electrical-Game/?renderer=${backend}`);await page.waitForFunction(()=>window.__wireTheHouse?.workerBody.loaded,{},{timeout:90000});await page.locator('#start-button').click();
+ const base=process.env.QA_BASE??'http://127.0.0.1:5365/Electrical-Game/';await page.goto(`${base}?renderer=${backend}`);await page.waitForFunction(()=>window.__wireTheHouse?.workerBody.loaded,{},{timeout:90000});await page.locator('#start-button').click();
  await page.waitForTimeout(800);
  await page.evaluate(()=>{const g=window.__wireTheHouse;g.step=()=>{};g.input.locked=false;});
  const results=[];

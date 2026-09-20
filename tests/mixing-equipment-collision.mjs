@@ -47,7 +47,15 @@ try{
     for(let i=0;i<90;i++)window.__collisionStep(1/60);g.input.mobileMove={x:0,y:0};return{position:[c.position.x,c.position.z],limit:o.minZ-radius,contacts:[...g.player.collisionContacts],renderError:g.renderer.renderError};
   });
   assert(sweep.position[1]<=sweep.limit+1e-6,'Sustained forward movement cannot pass through the wheelbarrow');assert(sweep.contacts.includes('wheelbarrow'));assert.equal(sweep.renderError,'');
-  await page.evaluate(async()=>{const g=window.__wireTheHouse,m=g.mixing,c=g.renderer.camera,p=m.models.wheelbarrow.group.getWorldPosition(c.position.clone());c.lookAt(p.x,p.y+.48,p.z);g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;await g.renderer.waitForFrame();g.renderer.render();await g.renderer.waitForFrame();});await page.screenshot({path:`${out}/wheelbarrow-contact.png`});
+  await page.evaluate(()=>{const g=window.__wireTheHouse,m=g.mixing,c=g.renderer.camera,p=m.models.wheelbarrow.group.getWorldPosition(c.position.clone());c.lookAt(p.x,p.y+.48,p.z);g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;});
+  // Camera-attached tools move as soon as the view changes, while the world-space
+  // anatomical body is posed by Game.step(). Advance both before visual capture
+  // so a QA screenshot cannot show the spray at the new view with a stale hand.
+  await step(2);
+  const capturePose=await page.evaluate(async()=>{const g=window.__wireTheHouse,t=g.workerBody.telemetry.fingerFit;g.renderer.render();await g.renderer.waitForFrame();return{indexError:t.indexR.error,forwardDot:t.sprayForward.dot,wristBendDegrees:t.sprayForward.wristBendDegrees};});
+  assert(capturePose.indexError<.006,`Collision capture lost spray button contact: ${JSON.stringify(capturePose)}`);
+  assert(capturePose.forwardDot>.98,`Collision capture points the index away from the spray actuator: ${JSON.stringify(capturePose)}`);
+  await page.screenshot({path:`${out}/wheelbarrow-contact.png`});
   const dynamic=await page.evaluate(()=>{const g=window.__wireTheHouse,m=g.mixing;m.setActive(true);m.chooseTool('water');m.present();const held=m.collisionObstacles().some(o=>o.id==='water-jug');m.chooseTool('hands');m.present();const returned=m.collisionObstacles().some(o=>o.id==='water-jug');return{held,returned};});
   assert.equal(dynamic.held,false,'Picked-up tools stop blocking their empty floor position');assert.equal(dynamic.returned,true,'Put-down tools become physical again');
   const approachStarted=await page.evaluate(()=>{const g=window.__wireTheHouse,m=g.mixing,c=g.renderer.camera,b=m.models.bucket.getWorldPosition(c.position.clone());g.player.setObstacleProvider(()=>m.collisionObstacles());c.position.set(b.x,g.player.eyeHeight,b.z-.92);c.lookAt(b.x,b.y+.3,b.z);g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;m.setActive(true);m.chooseTool('mixer');return m.action('insert');});
@@ -55,5 +63,5 @@ try{
   assert.equal(mixerApproach.mixing.inserted,true,`Physical bucket clearance still permits the assisted mixer stance: ${JSON.stringify(mixerApproach)}`);
   const performance=await page.evaluate(()=>{const m=window.__wireTheHouse.mixing;for(let i=0;i<100;i++)m.collisionObstacles();const start=performance.now();for(let i=0;i<2000;i++)m.collisionObstacles();return{meanMs:(performance.now()-start)/2000,count:m.collisionObstacles().length};});
   assert(performance.meanMs<.25,`Equipment footprint update stays below 0.25 ms/frame, got ${performance.meanMs.toFixed(4)} ms`);
-  assert.deepEqual(report.errors,[]);report.passed=true;report.sweep=sweep;report.dynamic=dynamic;report.mixerApproach=mixerApproach;report.performance=performance;console.log(JSON.stringify({passed:true,obstacles:report.obstacles.map(o=>o.id),sweep,dynamic,mixerInserted:mixerApproach.mixing.inserted,performance}));await context.close();
+  assert.deepEqual(report.errors,[]);report.passed=true;report.sweep=sweep;report.capturePose=capturePose;report.dynamic=dynamic;report.mixerApproach=mixerApproach;report.performance=performance;console.log(JSON.stringify({passed:true,obstacles:report.obstacles.map(o=>o.id),sweep,capturePose,dynamic,mixerInserted:mixerApproach.mixing.inserted,performance}));await context.close();
 }finally{await browser.close();await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));}
