@@ -119,7 +119,7 @@ export class DesktopControls {
       if(surface.dataset.boxAssembly==='true'&&event.code==='KeyR'){
         event.preventDefault();if(!event.repeat)window.dispatchEvent(new CustomEvent('wirehouse:box-rotate-candidate'));return;
       }
-      if(surface.dataset.boxAssembly==='true'&&(event.code==='KeyQ'||event.code==='KeyE')){
+      if(surface.dataset.boxAssembly==='true'&&(event.code==='KeyQ'||event.code==='KeyE')&&!(event.code==='KeyE'&&surface.dataset.mixingInteract==='true')){
         event.preventDefault();input.resetTransientInput();
         if(!event.repeat)window.dispatchEvent(new CustomEvent(event.code==='KeyQ'?'wirehouse:box-undo':'wirehouse:box-reset'));
         return;

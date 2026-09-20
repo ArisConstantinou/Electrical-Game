@@ -131,8 +131,10 @@ export class MixingStation {
     addEventListener('blur',()=>{this.stop();this.drum.running=false;});document.addEventListener('visibilitychange',()=>{if(document.hidden){this.stop();this.drum.running=false;}});
   }
   get blocksWork():boolean{return this.active||this.carrying;}
+  get interactionTargeted():boolean{return this.game.hud.shell.dataset.mixingInteract==='true';}
   setActive(value:boolean):void{
     if(!this.game.started)return;
+    if(value&&this.game.boxAssemblyActive)window.dispatchEvent(new CustomEvent('wirehouse:box-exit-assembly'));
     if(!value&&this.automaticCrouch){this.game.player.crouched=false;this.automaticCrouch=false;}
     this.active=value;this.stop();this.game.input.resetTransientInput();this.game.mortar.cancel();
     if(value){
@@ -418,10 +420,15 @@ export class MixingStation {
     this.elapsed+=dt;this.pouringTime=Math.max(0,this.pouringTime-dt);
     const station=this.models.group.getWorldPosition(this.stationPoint),camera=this.game.renderer.camera.position;
     const distance=Math.hypot(station.x-camera.x,station.z-camera.z);
-    const stageNearby=this.game.started&&distance<2.35&&!this.finished;this.toolbelt.hidden=!stageNearby;this.game.hud.shell.classList.toggle('mixing-stage',stageNearby);
-    this.receipt.update(this.workingBatch,this.game.started&&(this.active||stageNearby&&this.game.selectedTool!=='trowel'),dt,this.destination==='drum'?this.drum.running?`Μπετονιέρα σε λειτουργία · ${Math.round(this.drum.batch.mixProgress*100)}%`:this.drum.batch.ready?'Έτοιμο · FINISH για χρήση':'20 L νερό · 18 μιστριές τσιμέντο · 36 φτυαριές άμμο':this.recipeHint(),this.destination==='drum'?'ΣΤΗ ΜΠΕΤΟΝΙΕΡΑ':'ΣΤΗ ΣΥΚΛΑ');
+    const stageNearby=this.game.started&&distance<2.35&&!this.finished;
     if(this.active&&distance>this.activationDistance+1.2)this.setActive(false);
     const aimed=this.aimedObject(),prompt=this.promptFor(aimed),interactAvailable=Boolean(prompt);this.prompt.hidden=!prompt;this.prompt.textContent=prompt;
+    const mixingUiAvailable=stageNearby&&(!this.game.boxAssemblyActive||interactAvailable);
+    this.toolbelt.hidden=!mixingUiAvailable;
+    this.game.hud.shell.classList.toggle('mixing-stage',mixingUiAvailable);
+    this.game.hud.shell.classList.toggle('mixing-target',interactAvailable);
+    this.game.hud.shell.dataset.mixingInteract=String(interactAvailable);
+    this.receipt.update(this.workingBatch,this.game.started&&(this.active||mixingUiAvailable&&this.game.selectedTool!=='trowel'),dt,this.destination==='drum'?this.drum.running?`Μπετονιέρα σε λειτουργία · ${Math.round(this.drum.batch.mixProgress*100)}%`:this.drum.batch.ready?'Έτοιμο · FINISH για χρήση':'20 L νερό · 18 μιστριές τσιμέντο · 36 φτυαριές άμμο':this.recipeHint(),this.destination==='drum'?'ΣΤΗ ΜΠΕΤΟΝΙΕΡΑ':'ΣΤΗ ΣΥΚΛΑ');
     this.mixerControlHint=prompt.replace(/^.*? · /,'');
     if(this.mobileInteract){this.mobileInteract.hidden=!interactAvailable;this.mobileInteract.querySelector('small')!.textContent=this.carrying?'ΑΦΗΣΕ ΣΥΚΛΑ':prompt?.replace(/^.*? · /,'')||'ΣΤΟΧΕΥΣΕ ΑΝΤΙΚΕΙΜΕΝΟ';}
     this.toggle.hidden=true;this.actionTime=Math.max(0,this.actionTime-dt);
@@ -484,7 +491,7 @@ export class MixingStation {
     if(this.inserted||this.cleanSeconds>0){const right=new THREE.Vector3(1,0,0).applyQuaternion(this.game.renderer.camera.quaternion);m.mixer.position.copy(this.inserted?m.bucket.position:m.rinse.position);m.mixer.position.y+=.06;m.mixer.rotation.set(0,Math.atan2(-right.z,right.x),0);m.paddle.rotation.y+=this.mixingNow||this.cleanSeconds>0?.31:0;}
     else{m.mixer.position.copy(this.mixerHome);m.mixer.rotation.copy(this.mixerRotation);}
     m.mixer.visible=this.inserted||this.cleanSeconds>0||this.tool!=='mixer'||!this.active;m.shovel.visible=this.tool!=='shovel'||!this.active;
-    this.game.fpsRig.visible=!this.blocksWork;
+    this.game.fpsRig.visible=!this.blocksWork&&!(this.interactionTargeted&&this.game.selectedTool==='fitting');
     if(this.blocksWork)this.game.hud.updateMobileUseStatus(this.carrying?'ΑΦΗΣΕ ΤΗ ΣΥΚΛΑ':this.tool==='hands'?'ΠΙΑΣΕ ΕΡΓΑΛΕΙΟ':this.tool==='mixer'?this.mixerControlHint:'ΧΡΗΣΗ',this.tool!=='hands',this.mixingNow);
     this.stationTrowel.visible=this.tool!=='trowel'||!this.active;this.stationTrowel.getObjectByName('trowel-load')!.visible=Boolean(state.heldTrowel);
     m.water.visible=this.tool!=='water'||!this.active;
