@@ -134,6 +134,7 @@ export class Game {
     this.conduit = new ConduitSystem(this.renderer.scene, this.room.brickWall);
     this.mortar = new MortarSystem(this.renderer.scene, this.room.brickWall, this.mission.points);
     this.mixing = new MixingStation(this);
+    this.player.setObstacleProvider(()=>this.mixing.collisionObstacles());
     this.mixing.onSound=(kind,intensity)=>this.audio.play(kind,intensity);
     this.mortar.reserveScoop = amount => this.mixing.reserveScoop(amount);
     this.mortar.scoopBond = () => this.mixing.bondFactor;

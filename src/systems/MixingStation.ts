@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { PlayerObstacle } from '../player/EquipmentCollision';
 import { setWheelbarrowFill } from '../world/SiteEquipmentModels';
 import type { Game } from '../core/Game';
 import { MortarBatch } from './MortarBatch';
@@ -78,6 +79,7 @@ export class MixingStation {
   private pendingTool:MixingTool|null=null;
   private mixerApproach:{object:THREE.Object3D;from:THREE.Vector3;to:THREE.Vector3;elapsed:number;yaw:number;pitch:number}|null=null;
   private mixerControlHint='ΒΑΛΕ ΤΟ ΜΙΞΕΡ';
+  private readonly collisionSources:Array<{id:string;object:THREE.Object3D;bounds:THREE.Box3}>=[];
   onSound?:(kind:'water-pour'|'sack-tear'|'cement-scrape'|'sand-scoop'|'mixer-insert'|'mixer-rinse',intensity?:number)=>void;
 
   constructor(private readonly game:Game){
@@ -99,6 +101,12 @@ export class MixingStation {
     // Rest the actual blade above the floor instead of burying it below an
     // arbitrary group origin; visible steel remains available for pickup.
     this.stationTrowel.position.y=.018-new THREE.Box3().setFromObject(this.stationTrowel).min.y;m.group.add(this.stationTrowel);
+    const collisionObjects:Array<readonly [string,THREE.Object3D]>=[
+      ['wheelbarrow',m.wheelbarrow.group],['concrete-mixer',m.concreteMixer],['mixing-bucket',m.bucket],['sand-pile',m.sand],
+      ...m.sacks.map((sack,index)=>[`cement-sack-${index+1}`,sack] as const),['shovel',m.shovel],['cordless-mixer',m.mixer],
+      ['rinse-pail',m.rinse],['water-jug',m.water],['mixing-trowel',this.stationTrowel],
+    ];
+    this.collisionSources=collisionObjects.map(([id,object])=>({id,object,bounds:this.localBounds(object)}));
     const particles=new THREE.BufferGeometry();particles.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(48),3));
     this.pouring=new THREE.Points(particles,new THREE.PointsMaterial({color:0xbda77e,size:.018,transparent:true,opacity:.85}));this.pouring.visible=false;game.renderer.scene.add(this.pouring);
     for(const side of [1,-1]){const hand=workerHand(side,'hose'),arm=workerArm(side,hand,new THREE.Vector3());game.renderer.scene.add(arm.group);this.arms.push(arm);}
@@ -131,6 +139,33 @@ export class MixingStation {
     addEventListener('blur',()=>{this.stop();this.drum.running=false;});document.addEventListener('visibilitychange',()=>{if(document.hidden){this.stop();this.drum.running=false;}});
   }
   get blocksWork():boolean{return this.active||this.carrying;}
+  private localBounds(root:THREE.Object3D):THREE.Box3{
+    root.updateWorldMatrix(true,true);const inverse=root.matrixWorld.clone().invert(),bounds=new THREE.Box3(),point=new THREE.Vector3(),corner=new THREE.Vector3(),instance=new THREE.Matrix4(),world=new THREE.Matrix4();
+    root.traverse(object=>{
+      if(!(object instanceof THREE.Mesh))return;
+      if(!object.geometry.boundingBox)object.geometry.computeBoundingBox();const box=object.geometry.boundingBox;if(!box||box.isEmpty())return;
+      const copies=object instanceof THREE.InstancedMesh?object.count:1;
+      for(let copy=0;copy<copies;copy++){
+        world.copy(object.matrixWorld);if(object instanceof THREE.InstancedMesh){object.getMatrixAt(copy,instance);world.multiply(instance);}
+        world.premultiply(inverse);
+        for(const x of [box.min.x,box.max.x])for(const y of [box.min.y,box.max.y])for(const z of [box.min.z,box.max.z])bounds.expandByPoint(point.copy(corner.set(x,y,z)).applyMatrix4(world));
+      }
+    });
+    return bounds;
+  }
+  collisionObstacles():PlayerObstacle[]{
+    this.models.group.updateWorldMatrix(true,true);const obstacles:PlayerObstacle[]=[],point=new THREE.Vector3();
+    for(const {id,object,bounds} of this.collisionSources){
+      const portable=id==='shovel'||id==='cordless-mixer'||id==='water-jug'||id==='mixing-trowel'||id.startsWith('cement-sack-');
+      if(portable&&!object.visible||id==='mixing-bucket'&&this.carrying)continue;
+      object.updateWorldMatrix(true,false);let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity;
+      for(const x of [bounds.min.x,bounds.max.x])for(const y of [bounds.min.y,bounds.max.y])for(const z of [bounds.min.z,bounds.max.z]){
+        point.set(x,y,z).applyMatrix4(object.matrixWorld);minX=Math.min(minX,point.x);maxX=Math.max(maxX,point.x);minZ=Math.min(minZ,point.z);maxZ=Math.max(maxZ,point.z);
+      }
+      if(Number.isFinite(minX))obstacles.push({id,minX,maxX,minZ,maxZ});
+    }
+    return obstacles;
+  }
   get interactionTargeted():boolean{return this.game.hud.shell.dataset.mixingInteract==='true';}
   setActive(value:boolean):void{
     if(!this.game.started)return;
@@ -173,7 +208,7 @@ export class MixingStation {
       const hand=this.toolHands.get('mixer')![side===1?0:1];
       const wrist=new THREE.Vector3().fromArray(hand.userData.wristPoint).applyQuaternion(new THREE.Quaternion().fromArray(this.models.mixer.userData[rotationKey])).add(new THREE.Vector3().fromArray(this.models.mixer.userData[key])).applyQuaternion(facing).add(origin);
       const shoulder=c.position.clone().addScaledVector(right,side*.18).add(new THREE.Vector3(0,-.3,0));
-      if(wrist.distanceTo(shoulder)>.555)return false;
+      if(wrist.distanceTo(shoulder)>.63)return false;
     }
     return true;
   }
@@ -189,7 +224,7 @@ export class MixingStation {
     const offset=c.position.clone().sub(origin);offset.y=0;
     if(offset.lengthSq()<.001){c.getWorldDirection(offset).negate();offset.y=0;}
     offset.normalize();
-    const to=origin.clone().addScaledVector(offset,.42);to.y=.95;
+    const to=origin.clone().addScaledVector(offset,.49);to.y=.95;
     const {room,player:config}=GAME_CONFIG;
     // Never slide the work stance beyond the same room bounds as normal walking.
     if(Math.abs(to.x)>room.width/2-config.radius||to.z< -room.depth/2+config.radius+.25||to.z>room.depth/2-config.radius){this.mixerReachHint(object);return false;}

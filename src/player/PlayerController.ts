@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { Input } from '../core/Input';
 import { GAME_CONFIG } from '../data/gameConfig';
+import { resolveEquipmentCollisions, type PlayerObstacle } from './EquipmentCollision';
 
 export type MobileAimProfile = 'precise' | 'normal' | 'fast';
 
@@ -23,11 +24,15 @@ export class PlayerController {
   private mobileVerticalScale = 0.72;
   private mobileDragSensitivity = 0.0032;
   private wallAssistEnabled = true;
+  private obstacleProvider:(()=>readonly PlayerObstacle[])|null=null;
+  collisionContacts:string[]=[];
 
   constructor(readonly camera: THREE.PerspectiveCamera, private readonly input: Input) {
     camera.position.set(-1.72, GAME_CONFIG.player.eyeHeight, -0.58);
     camera.rotation.set(this.pitch, this.yaw, 0);
   }
+
+  setObstacleProvider(provider:()=>readonly PlayerObstacle[]):void { this.obstacleProvider=provider; }
 
   // All tools share direct aiming. A hard eye-only window prevents precise
   // placement of the work point and introduces a dead zone on every reversal.
@@ -109,6 +114,11 @@ export class PlayerController {
       // never overwrite the yaw/pitch supplied by mouse or touch input.
       // Forward force is absorbed by the stance; sideways walking remains free.
       if(y>=0)this.velocity.z=0;
+    }
+    this.collisionContacts=resolveEquipmentCollisions(this.camera.position,GAME_CONFIG.player.radius,this.obstacleProvider?.()??[]);
+    if(this.collisionContacts.length&&dt>0){
+      this.velocity.x=(this.camera.position.x-previousX)/dt;
+      this.velocity.z=(this.camera.position.z-previousZ)/dt;
     }
     const radius = GAME_CONFIG.player.radius;
     this.camera.position.x = THREE.MathUtils.clamp(this.camera.position.x, -GAME_CONFIG.room.width / 2 + radius, GAME_CONFIG.room.width / 2 - radius);
