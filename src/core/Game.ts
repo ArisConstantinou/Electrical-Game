@@ -41,7 +41,7 @@ const TOOL_HINTS: Record<RigTool, string> = {
   laser: 'LASER · place on a drilled fixing, then secure with the driver',
   spray: 'SPRAY CAN · mark the chase route',
   hammer: 'DEMO HAMMER · chase or remove masonry',
-  fitting: 'BACK BOX · build with 1–4 · wheel changes box · R rotates · RMB places flush',
+  fitting: 'BACK BOX · build with 1–4 · wheel changes box · R rotates · RMB places flush · Esc returns to tools',
   level: 'SPIRIT LEVEL · align the box group',
   spring: 'BENDING SPRING · shape the 20 mm PVC',
   cutter: 'PVC CUTTER · single-action cut to length',
@@ -85,6 +85,7 @@ export class Game {
   readonly boxAssembly = new BoxAssemblyBuilder('1G');
   readonly audio = new ConstructionAudio();
   selectedTool: RigTool = 'spray';
+  private toolBeforeBoxAssembly: RigTool = 'spray';
   sprayMode: 'dots' | 'live' = 'live';
   sprayColorIndex = 0;
   hammerMode: HammerMode = 'chase';
@@ -537,6 +538,9 @@ export class Game {
       if(![1,2,3,4].includes(zone))return;
       this.pendingSceneActions.push(()=>{if(this.selectedTool!=='fitting')return;const added=this.boxAssembly.attach(zone);if(!added){this.hud.notify(`Zone ${zone} is occupied by the held assembly.`,false,1400);return;}this.audio.play('box');this.syncBoxAssembly(added.id);});
     });
+    addEventListener('wirehouse:box-exit-assembly',()=>{
+      if(this.started&&this.selectedTool==='fitting')this.selectTool(this.toolBeforeBoxAssembly);
+    });
     addEventListener('wirehouse:box-place-assembly',()=>this.pendingSceneActions.push(()=>{if(this.started&&this.selectedTool==='fitting')this.performAction();}));
     const setChiselWidth=(value:number)=>{
       const wall=this.room.brickWall;
@@ -708,6 +712,7 @@ export class Game {
     if(this.mixing.carrying){this.hud.notify('Άφησε πρώτα τη σύκλα.',false,1600);return;}
     if(this.mixing.active)this.mixing.setActive(false);
     const changed = this.selectedTool !== tool;
+    if(changed&&tool==='fitting')this.toolBeforeBoxAssembly=this.selectedTool;
     if(changed&&this.selectedTool==='fitting'&&tool==='hammer')this.boxFitPreview.pin(this.renderer.camera,this.boxAssembly.snapshot.modules);
     if(changed){this.mobileControls.cancelActiveGestures();this.mortar.cancel();const point=this.mission.activePoint;if(point?.stage==='leveling')this.pendingSceneActions.push(()=>this.leveling.cancel(point));}
     this.selectedTool = tool;

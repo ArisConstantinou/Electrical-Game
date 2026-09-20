@@ -41,6 +41,16 @@ try{
     }
     const built=await read(page);assert.equal(built.legacySkinVisible,false);assert.equal(built.worker.loaded,true);assert.equal(built.selected,'fitting','contextual digits cannot switch tools');assert(built.assembly.modules.length>=(mobile?2:8));assert.equal(built.zones.length,4);assert(!built.overflow);assert.equal(built.error,'');
     await page.evaluate(async()=>{const r=window.__wireTheHouse.renderer;await r.waitForFrame();r.render();await r.waitForFrame();});await page.screenshot({path:`${out}/${name}-built-puzzle.png`});
+    if(!mobile){
+      await page.keyboard.press('Escape');await step(page,2);
+      const escaped=await read(page);assert.equal(escaped.selected,'spray','Escape returns to the tool used before box assembly');
+      assert.equal(escaped.assembly.modules.length,built.assembly.modules.length,'Escape preserves the held draft');
+      await page.keyboard.press('Escape');await step(page,2);assert.equal((await read(page)).selected,'spray','Escape outside assembly does not switch tools');
+      await page.mouse.move(viewport.width*.75,viewport.height*.6);await page.waitForTimeout(220);await page.mouse.wheel(0,100);await step(page,2);
+      assert.equal((await read(page)).selected,'hammer','wheel returns to normal tool switching');
+      await page.keyboard.press('Digit1');await step(page,2);assert.equal((await read(page)).selected,'spring','number keys return to normal tool selection');
+      await page.keyboard.press('Digit5');await step(page,2);assert.equal((await read(page)).assembly.modules.length,built.assembly.modules.length,'re-entering assembly restores the draft');
+    }
     await step(page,30);
     if(mobile)await page.locator('#box-place-assembly').tap();else await page.mouse.click(viewport.width*.5,viewport.height*.5,{button:'right'});await step(page,3);
     const placed=await read(page);assert.equal(placed.visible.length,1,`${name}: right-click/touch PLACE adds the complete assembly`);assert.equal(placed.visible[0].layout.length,built.assembly.modules.length);assert(!placed.overflow);assert.equal(placed.error,'');

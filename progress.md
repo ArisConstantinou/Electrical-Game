@@ -727,3 +727,9 @@ Original prompt for this task: Selecting BOX should show an initial box in the l
 - Merged both Game features, retained two-hand fitting targets and excluded obsolete one-box reference replay. New body and hidden legacy skin now have explicit integration assertions.
 - Build, desktop/mobile assembly and placement, bounds/views, inspector release, reference board, GLB contract, bundled client and bounded A/B performance passed. Before/after screenshots and limits are recorded in docs/WORKER_BOX_INTEGRATION.md.
 - Only listener 5365 now points to this checkout. npm run dev validates served source and worker asset hashes before reuse. Existing anatomy/garment defects remain open; this integration is not a finished anatomy release.
+
+## 2026-09-20 · Escape exits gang-box assembly
+
+- Esc now returns to the tool selected before entering BOX, cancels held actions and resets wheel gesture accumulation. The in-hand box draft is retained when returning with Digit5. Settings and inspector Escape handling retain precedence.
+- Extended native-input box regression failed before the change (selected fitting instead of spray) and passes after: Esc, repeat Esc outside assembly, wheel switching, Digit1, re-entry with preserved nine-box draft, placement/reset, plus unchanged touch assembly/placement. Pointer Lock is blocked in automated verification.
+- Typecheck/production build passed; existing chunk-size warning unchanged. No geometry or animation changes.

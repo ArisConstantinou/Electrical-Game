@@ -93,6 +93,14 @@ export class DesktopControls {
     }, { passive: false });
     addEventListener('keydown', event => {
       if(document.querySelector('#model-inspector:not([hidden]):not([data-live="true"])')||event.target instanceof Element&&event.target.closest('input,textarea,select,[contenteditable="true"]'))return;
+      if(event.code==='Escape'&&surface.dataset.boxAssembly==='true'&&!surface.classList.contains('settings-open')){
+        if(!event.repeat){
+          primaryDown=false;input.resetTransientInput();
+          this.wheelSelected=false;this.wheelDistance=0;this.wheelTime=Number.NEGATIVE_INFINITY;
+          window.dispatchEvent(new CustomEvent('wirehouse:box-exit-assembly'));
+        }
+        return;
+      }
       const directTools: Partial<Record<string, string>> = { Digit1: 'spring', Digit2: 'cutter', Digit3: 'spray', Digit4: 'hammer', Digit5: 'fitting', Digit6: 'level', Digit7: 'trowel', Digit8: 'hose', Digit9: 'measure', Digit0:'drill',KeyB:'driver',KeyL:'laser' };
       if(surface.dataset.boxAssembly==='true'&&['Digit1','Digit2','Digit3','Digit4'].includes(event.code)){
         event.preventDefault();if(!event.repeat)window.dispatchEvent(new CustomEvent('wirehouse:box-attach',{detail:Number(event.code.at(-1))}));return;
