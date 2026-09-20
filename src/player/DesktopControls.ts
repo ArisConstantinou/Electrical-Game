@@ -92,6 +92,7 @@ export class DesktopControls {
       window.dispatchEvent(new CustomEvent(surface.dataset.boxAssembly==='true'?'wirehouse:box-cycle-candidate':'wirehouse:cycle-tool', { detail: direction }));
     }, { passive: false });
     addEventListener('keydown', event => {
+      if(document.querySelector('#model-inspector:not([hidden]):not([data-live="true"])')||event.target instanceof Element&&event.target.closest('input,textarea,select,[contenteditable="true"]'))return;
       const directTools: Partial<Record<string, string>> = { Digit1: 'spring', Digit2: 'cutter', Digit3: 'spray', Digit4: 'hammer', Digit5: 'fitting', Digit6: 'level', Digit7: 'trowel', Digit8: 'hose', Digit9: 'measure', Digit0:'drill',KeyB:'driver',KeyL:'laser' };
       if(surface.dataset.boxAssembly==='true'&&['Digit1','Digit2','Digit3','Digit4'].includes(event.code)){
         event.preventDefault();if(!event.repeat)window.dispatchEvent(new CustomEvent('wirehouse:box-attach',{detail:Number(event.code.at(-1))}));return;
@@ -102,7 +103,7 @@ export class DesktopControls {
       if(event.code==='KeyM'&&!event.repeat&&!(event.target instanceof Element&&event.target.closest('input,textarea,select,[contenteditable="true"]')))window.dispatchEvent(new CustomEvent('wirehouse:measure-mark'));
       if (directTools[event.code]) window.dispatchEvent(new CustomEvent('wirehouse:select-tool', { detail: directTools[event.code] }));
       if (event.code === 'KeyV' && !event.repeat) window.dispatchEvent(new CustomEvent('wirehouse:cycle-spray-mode'));
-      if (event.code === 'KeyC' && !event.repeat) window.dispatchEvent(new CustomEvent('wirehouse:cycle-spray-color'));
+      if (event.code === 'KeyC' && !event.repeat) window.dispatchEvent(new CustomEvent('wirehouse:front-body-view'));
       if (event.code === 'BracketLeft') window.dispatchEvent(new CustomEvent('wirehouse:tilt-chisel',{detail:-5}));
       if (event.code === 'BracketRight') window.dispatchEvent(new CustomEvent('wirehouse:tilt-chisel',{detail:5}));
       if (event.code === 'KeyQ' && !event.repeat && !(event.target instanceof Element && event.target.closest('input,textarea,select,[contenteditable="true"]'))) window.dispatchEvent(new CustomEvent('wirehouse:hammer-view-side',{detail:0}));

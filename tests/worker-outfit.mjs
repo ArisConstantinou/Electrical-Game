@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {chromium} from 'playwright';
+import {mkdir,readFile,writeFile} from 'node:fs/promises';
+import {blockPointerLock} from './browser-safety.mjs';
+const phase=process.argv.includes('--before')?'before':'after',out=`output/outfit-correction/${phase}`;await mkdir(out,{recursive:true});
+const b=await chromium.launch({channel:'chrome',headless:true}),report=[];
+try{const c=await b.newContext({viewport:{width:1100,height:1000}});await blockPointerLock(c);const p=await c.newPage();const errors=[];p.on('pageerror',e=>errors.push(e.message));if(phase==='before')await p.route('**/assets/worker/worker.glb',async r=>r.fulfill({body:await readFile('output/outfit-correction/before/worker.glb'),contentType:'model/gltf-binary'}));if(process.argv.includes('--candidate'))await p.route('**/assets/worker/worker.glb',async r=>r.fulfill({body:await readFile('output/outfit-correction/candidate/worker.glb'),contentType:'model/gltf-binary'}));await p.goto('http://127.0.0.1:5365/Electrical-Game/?renderer=webgl');await p.waitForFunction(()=>window.__wireTheHouse?.workerBody.loaded,null,{timeout:90000});await p.locator('#start-button').click();await p.evaluate(()=>{window.__wireTheHouse.step=()=>{};});
+for(const [name,tool,crouch,side]of [['front',false,false,false],['spray',true,false,false],['side',false,false,true],['crouch',true,true,true],['neck',true,false,false]]){
+await p.evaluate(async({name,tool,crouch,side})=>{const g=window.__wireTheHouse,w=g.workerBody,c=g.renderer.camera,v=g.modelInspector.camera;g.player.yaw=0;g.player.pitch=-.45;g.player.crouched=crouch;g.player.velocity.set(0,0,0);c.position.set(0,crouch?.95:1.65,0);c.rotation.set(-.45,0,0);g.fpsRig.show('spray');g.fpsRig.visible=tool;w.overview=true;for(let i=0;i<80;i++)w.update(1/60,c,g.player,g.fpsRig,'spray',false,!tool,[]);v.position.set(side?1.35:0,crouch?1.15:1.05,-2.05);v.lookAt(w.position.clone().add(w.position.clone().set(0,crouch?.7:.95,0)));v.fov=44;v.aspect=1.1;v.updateProjectionMatrix();if(name==='neck'){v.position.set(0,1.46,-.95);v.lookAt(w.position.clone().add(w.position.clone().set(0,1.41,0)));}if(name==='neutral'){let sun;g.renderer.scene.traverse(o=>{if(o.isDirectionalLight)sun=o;});const light=sun.clone();light.name='Diagnostic neutral front fill';light.color.setRGB(1,1,1);light.intensity=2.5;light.castShadow=false;light.position.set(0,2,-2);light.target.position.set(0,1,0);g.renderer.scene.add(light,light.target);}g.renderer.viewCamera=v;g.renderer.render();await g.renderer.waitForFrame();},{name,tool,crouch,side});
+await p.screenshot({path:`${out}/${name}.png`});report.push({name});
+}
+assert.deepEqual(errors,[],'Outfit scene must not introduce runtime errors');
+}finally{await b.close();await writeFile(`${out}/report.json`,JSON.stringify(report));}
+console.log('Outfit runtime captures complete');

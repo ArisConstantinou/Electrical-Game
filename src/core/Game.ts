@@ -4,6 +4,7 @@ import { Input } from './Input';
 import { AssetManager } from './AssetManager';
 import { HammerWorkStance } from '../player/HammerWorkStance';
 import { PlayerController } from '../player/PlayerController';
+import { WorkerBody } from '../player/WorkerBody';
 import type { MobileAimProfile } from '../player/PlayerController';
 import { DesktopControls } from '../player/DesktopControls';
 import { MobileControls, type AimControlMode, type AimInputMode } from '../player/MobileControls';
@@ -29,6 +30,7 @@ import { InteractionSystem } from '../systems/InteractionSystem';
 import type { HammerMode } from '../systems/InteractionSystem';
 import { HUD } from '../ui/HUD';
 import { MobileHUD } from '../ui/MobileHUD';
+import { ModelInspector } from '../ui/ModelInspector';
 import { ConstructionAudio, type ConstructionSound } from '../audio/ConstructionAudio';
 import { BoxAssemblyBuilder, horizontalBoxLayout, type BoxAttachmentZone } from '../electrical/BoxAssembly';
 
@@ -60,6 +62,11 @@ export class Game {
   readonly input = new Input();
   readonly assets = new AssetManager();
   readonly player: PlayerController;
+  readonly workerBody:WorkerBody;
+  readonly modelInspector:ModelInspector;
+  frontBodyView=false;
+  private readonly frontCamera=new THREE.PerspectiveCamera(48,1,.025,60);
+  private readonly inspectionHidden:THREE.Object3D[]=[];
   readonly room: Room;
   readonly mission: MissionSystem;
   readonly conduit: ConduitSystem;
@@ -115,6 +122,7 @@ export class Game {
     this.player = new PlayerController(this.renderer.camera, this.input);
     this.renderer.camera.add(this.fpsRig);
     this.renderer.scene.add(this.renderer.camera);
+    this.workerBody=new WorkerBody(this.renderer.scene);
     this.room = new Room(this.renderer.scene);
     this.renderer.scene.add(this.room);
     this.mission = new MissionSystem(this.renderer.scene);
@@ -154,6 +162,9 @@ export class Game {
     this.mobileControls.setAimInputMode(this.aimInputMode);
     new MobileHUD();
     this.bindEvents();
+    this.modelInspector=new ModelInspector(this);
+    const bodyBanner=document.createElement('button');bodyBanner.id='body-view-banner';bodyBanner.hidden=true;bodyBanner.textContent='Ολόσωμη μπροστινή προβολή · C επιστροφή';bodyBanner.addEventListener('click',()=>window.dispatchEvent(new CustomEvent('wirehouse:front-body-view')));this.hud.shell.append(bodyBanner);
+    addEventListener('wirehouse:front-body-view',()=>{if(!this.started)return;if(this.modelInspector.active){this.modelInspector.faceFront();return;}this.frontBodyView=!this.frontBodyView;bodyBanner.hidden=!this.frontBodyView;this.hud.shell.classList.toggle('front-body-view',this.frontBodyView);});
     document.addEventListener('visibilitychange',()=>{if(document.hidden)this.suspendLifecycle();else void this.resumeLifecycle();});
     document.addEventListener('freeze',this.suspendLifecycle);
     document.addEventListener('resume',()=>void this.resumeLifecycle());
@@ -171,6 +182,7 @@ export class Game {
     startButton.disabled = true;
     startButton.textContent = 'PREPARING WATER AND SITE…';
     this.ready = this.renderer.ready.then(async () => {
+      await this.workerBody.ready;
       await this.renderer.attachRoomWater(this.roomWater);
       this.renderer.setWarmupFactory(()=>this.mortar.createRenderWarmup());
       await this.renderer.prepareToolResources(this.mortar.createRenderWarmup());
@@ -182,6 +194,12 @@ export class Game {
   }
 
   step(dt: number, waterDt = dt, present = true): void {
+    this.restoreInspectionVisibility();
+    if(this.modelInspector.active&&!this.modelInspector.live){
+      for(const sound of ['spray','hose','drill','driver','trowel','mixer'] as const)this.audio.setContinuous(sound,false);
+      this.modelInspector.update(dt);if(present)this.renderer.render();return;
+    }
+    this.modelInspector.beforeWorld(dt);
     this.hammerWorkStance.restore(this.renderer.camera);
     const active = this.mission.activePoint;
     const leveling = active?.stage === 'leveling';
@@ -355,6 +373,13 @@ export class Game {
     this.renderer.eyeYaw = 0;
     this.renderer.eyePitch = 0;
     this.mixing.present();
+    this.workerBody.overview=this.frontBodyView||this.modelInspector.live;
+    this.workerBody.update(dt,this.renderer.camera,this.player,this.fpsRig,this.selectedTool,this.input.actionHeld,mixingOwnedInput,this.mixing.anatomicalGrips(),this.workSurfaces.frontForBounds);
+    this.mixing.useAnatomicalBody(this.workerBody.loaded);
+    if(this.modelInspector.active&&this.modelInspector.live)this.modelInspector.afterWorld(dt);
+    else if(this.frontBodyView)this.updateFrontBodyCamera();
+    else this.renderer.viewCamera=null;
+    if(this.renderer.viewCamera&&!this.renderer.modelScene)this.hideInspectionObstructions(this.renderer.viewCamera);
     // Catch-up physics may run several times per image. Build wet surfaces
     // only once at presentation, keeping cheap flat patches within one budget.
     if(present)this.mortar.flushWetGeometry(64,3);
@@ -380,7 +405,10 @@ export class Game {
       hammer: { speedMultiplier: this.hammerSpeed, paused: this.hammerSpeed === 0, impactIntervalSeconds: this.hammerSpeed > 0 ? .24 / this.hammerSpeed : null, contactStatus:this.fpsRig.contactStatus, contactReason:this.fpsRig.reachReason },
       controls: { actionHeld:this.input.actionHeld, move:this.input.mobileMove, look:this.input.mobileLook, aimInput:this.aimInputMode, manualUse:true },
       body: this.fpsRig.debugPose(),
-      view: { mode: 'continuous-shared', viewQuaternion: this.renderer.renderCamera.quaternion.toArray(), workQuaternion: this.renderer.camera.quaternion.toArray() },
+      anatomicalWorker:this.workerBody.telemetry,
+      modelInspector:this.modelInspector.telemetry,
+      frontBodyView:this.frontBodyView,
+      view: { mode: this.modelInspector.active?'model-inspector':this.frontBodyView?'front-body':'continuous-shared', viewQuaternion: this.renderer.renderCamera.quaternion.toArray(), workQuaternion: this.renderer.camera.quaternion.toArray() },
       workPosition: this.player.workPosition,
       coordinateSystem: 'metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall',
       mode: !this.started ? 'start' : this.mission.complete ? 'mission-complete' : point?.stage === 'leveling' ? 'leveling' : 'playing',
@@ -466,6 +494,34 @@ export class Game {
     this.hud.updateBoxPreset(snapshot.modules.length===1?snapshot.modules[0].kind:'custom');
     this.hud.updateBoxAssembly(snapshot,zones.map(zone=>({zone:zone.zone,available:zone.available})));
     this.boxFitPreview.clearGuide();this.boxFitPreview.invalidate();
+  }
+
+  private updateFrontBodyCamera():void{
+    const target=this.workerBody.position.clone();target.y=this.player.eyeHeight<1.1?.64:.9;
+    this.frontCamera.aspect=this.renderer.camera.aspect;this.frontCamera.fov=48;
+    const vertical=THREE.MathUtils.degToRad(48),horizontal=2*Math.atan(Math.tan(vertical/2)*this.frontCamera.aspect);
+    const distance=Math.max(2.25,1.08/Math.tan(Math.min(vertical,horizontal)/2));
+    const forward=new THREE.Vector3(0,0,-1).applyAxisAngle(new THREE.Vector3(0,1,0),this.workerBody.rotation.y);
+    this.frontCamera.position.copy(target).addScaledVector(forward,distance);this.frontCamera.position.y+=.12;
+    this.frontCamera.lookAt(target);this.frontCamera.updateProjectionMatrix();this.renderer.viewCamera=this.frontCamera;
+  }
+  private restoreInspectionVisibility():void{for(const object of this.inspectionHidden)object.visible=true;this.inspectionHidden.length=0;}
+  private hideInspectionObstructions(camera:THREE.Camera):void{
+    // Presentation-only cutaway lets the front camera inspect a worker beside a wall.
+    // Restore before every simulation step; no collision or gameplay geometry changes.
+    const origin=camera.getWorldPosition(new THREE.Vector3()),hidden=new Set<THREE.Object3D>();
+    const rays=[.15,.8,this.player.eyeHeight].map(y=>{const target=this.workerBody.position.clone();target.y=y;const delta=target.sub(origin);return{ray:new THREE.Ray(origin,delta.clone().normalize()),distance:delta.length()-.25};});
+    const inverse=new THREE.Matrix4(),localRay=new THREE.Ray(),point=new THREE.Vector3();
+    // Room cutaways need bounds, not expensive triangle hits on every brick.
+    this.room.traverseVisible(object=>{
+      if(!(object instanceof THREE.Mesh))return;
+      if(object instanceof THREE.InstancedMesh){if(!object.boundingBox)object.computeBoundingBox();}
+      else if(!object.geometry.boundingBox)object.geometry.computeBoundingBox();
+      const bounds=object instanceof THREE.InstancedMesh?object.boundingBox:object.geometry.boundingBox;if(!bounds)return;
+      inverse.copy(object.matrixWorld).invert();
+      for(const {ray,distance} of rays){localRay.copy(ray).applyMatrix4(inverse);if(localRay.intersectBox(bounds,point)&&point.applyMatrix4(object.matrixWorld).distanceTo(origin)<distance){hidden.add(object);break;}}
+    });
+    for(const object of hidden){this.inspectionHidden.push(object);object.visible=false;}
   }
 
   private bindEvents(): void {

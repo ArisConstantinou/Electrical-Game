@@ -3,7 +3,7 @@ import { buildToolModel } from './ToolModels';
 import { buildTapeMeasureModel, buildMeasurePencil } from './TapeMeasureModel';
 import { buildReferenceToolModel } from './ReferenceToolModels';
 import type { TrowelMotion } from './TrowelMotion';
-import { workerHand, workerArm, poseWorkerArm, flexWorkerHand, poseToolGrip, MAX_WRIST_REACH_M, UPPER_ARM_M, FOREARM_M, type WorkerArm } from './WorkerArm';
+import { workerHand, workerArm, poseWorkerArm, flexWorkerHand, poseToolGrip, MAX_WRIST_REACH_M, UPPER_ARM_M, FOREARM_M, type WorkerArm, workerGripTarget, hideLegacyWorkerArm, type WorkerGripTarget } from './WorkerArm';
 import type { BrickWall, ChiselContact } from '../world/BrickWall';
 import { MaterialId } from '../world/MasonryVolume';
 import type { BoxKind } from '../data/installationRules';
@@ -26,6 +26,52 @@ const material = (color: number, roughness = 0.7, metalness = 0.05): THREE.MeshS
 const place = (object: THREE.Object3D, x: number, y: number, z: number): THREE.Object3D => { object.position.set(x, y, z); object.renderOrder = 20; return object; };
 
 export class FPSRig extends THREE.Group {
+  useAnatomicalSpray(active:boolean):void {this.useAnatomicalBody(active);}
+  useAnatomicalBody(active:boolean):void {
+    for(const arms of this.armSets.values())for(const arm of arms)hideLegacyWorkerArm(arm,active);
+  }
+  anatomicalGrips():WorkerGripTarget[] {
+    if(!this.visible)return [];
+    return (this.armSets.get(this.selectedTool)??[]).map(arm=>{
+      const grip=workerGripTarget(arm,arm.hand.userData.gripping===true||(this.selectedTool==='measure'&&arm.side<0&&this.measureMarkTime>0));
+      if(['drill','driver','measure','laser','level','spring','cutter'].includes(this.selectedTool)&&arm.side>0){
+        grip.referenceKey=`${this.selectedTool}:R`;
+        Object.defineProperty(grip,'object',{value:this.tools.get(this.selectedTool)});
+      }
+      if(this.selectedTool==='drill'||this.selectedTool==='driver'){
+        grip.contactLocked=this.reachable;
+        grip.section=[.020,.029];grip.shape='box';
+        const tool=this.tools.get(this.selectedTool)!,trigger=tool.getObjectByName('Index finger trigger');
+        if(arm.side>0&&trigger)grip.trigger=trigger.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0,0,-.013).applyQuaternion(tool.getWorldQuaternion(new THREE.Quaternion())));
+      }
+      return grip;
+    });
+  }
+  poseAnatomicalSpray(center:THREE.Vector3,orientation:THREE.Quaternion,pressed=false):THREE.Vector3 {
+    const tool=this.tools.get('spray')!,can=tool.children[0];
+    const worldQ=orientation.clone().multiply(can.quaternion.clone().invert());
+    tool.quaternion.copy(tool.parent!.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(worldQ));
+    tool.position.copy(tool.parent!.worldToLocal(center.clone())).sub(can.position.clone().applyQuaternion(tool.quaternion));
+    tool.getObjectByName('spray-actuator')!.position.y=pressed?.102:.104;
+    tool.updateWorldMatrix(false,true);
+    // The target is the fingertip bone endpoint; its fleshy pad extends below it.
+    return tool.getObjectByName('Broad finger press actuator')!.localToWorld(new THREE.Vector3(0,.025,0));
+  }
+  /** Carry the tool with a solved forearm without changing its grip frame. */
+  private graspBase:{tool:THREE.Group;position:THREE.Vector3;rotation:THREE.Quaternion}|undefined;
+  private restoreGrasp():void {
+    if(!this.graspBase)return;
+    const {tool,position,rotation}=this.graspBase;tool.position.copy(position);tool.quaternion.copy(rotation);tool.updateWorldMatrix(false,true);this.graspBase=undefined;
+  }
+  transformAnatomicalGrasp(from:THREE.Vector3,to:THREE.Vector3,turn:THREE.Quaternion):void {
+    const tool=this.tools.get(this.selectedTool)!;
+    this.graspBase??={tool,position:tool.position.clone(),rotation:tool.quaternion.clone()};
+    const position=tool.getWorldPosition(new THREE.Vector3()).sub(from).applyQuaternion(turn).add(to);
+    const rotation=turn.clone().multiply(tool.getWorldQuaternion(new THREE.Quaternion()));
+    tool.position.copy(tool.parent!.worldToLocal(position));
+    tool.quaternion.copy(tool.parent!.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(rotation));
+    tool.updateWorldMatrix(false,true);
+  }
   private readonly tools = new Map<RigTool, THREE.Group>();
   private readonly heldBounds = new Map<string, THREE.Box3>();
   private readonly surfaceBounds = new THREE.Box3();
@@ -238,10 +284,11 @@ export class FPSRig extends THREE.Group {
       // The motor is colliding with the head, although the seated blade looks
       // ready to strike. Withdraw the real tool clear of the wall so the
       // presentation agrees with the rejected contact. Eyes never move.
-      const withdrawal=Math.max(.055,(wall.volume.frontZ+.045-target.z)/Math.max(.04,-direction.z));
-      const withdrawn=target.clone().addScaledVector(direction,-withdrawal);
-      withdrawn.y-=.06;
-      hammer.position.copy(this.worldToLocal(withdrawn)).sub(this.tipAnchor.clone().applyQuaternion(hammer.quaternion));
+      // Resolve only the actual overlap. A fixed withdrawal snapped the
+      // entire tool by centimetres when crossing the head-clearance boundary.
+      const clearance=housing.clone().normalize().multiplyScalar(.19-housing.length());
+      clearance.applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion()));
+      hammer.position.copy(this.worldToLocal(hammer.getWorldPosition(new THREE.Vector3()).add(clearance)));
       this.constrainHeldTool(camera);this.poseArms(camera);
       this.chiselTipWorld.copy(hammer.localToWorld(this.tipAnchor.clone()));
       return null;
@@ -496,6 +543,7 @@ export class FPSRig extends THREE.Group {
   }
   strike(): void { this.strikeAmount = 1; }
   update(dt: number, moving: boolean, spraying = false): void {
+    this.restoreGrasp();
     this.measureMarkTime=Math.max(0,this.measureMarkTime-Math.min(Math.max(dt,0),.05));
     // Explicit side selection owns the hands. Geometric lean is only a fallback
     // for callers without a selected side, never a reason to undo that choice.
@@ -621,18 +669,30 @@ export class FPSRig extends THREE.Group {
     // Feed follows the shaft, including its lateral/vertical component. A
     // 10 cm camera-forward offset exhausted one arm as soon as the shell fell.
     // Intersect both arm spheres with a bounded 24 cm torso travel segment.
-    let lower=0,upper=.24;
     const radius=MAX_WRIST_REACH_M-.001;
-    for(const arm of this.armSets.get('hammer')??[]){
+    const distances=arms.map(arm=>{
       const delta=this.wrist(arm).sub(this.shoulder(camera,arm.side));
-      const along=delta.dot(axis),discriminant=radius*radius-delta.lengthSq()+along*along;
-      if(discriminant<0)return;
-      const span=Math.sqrt(discriminant);
-      lower=Math.max(lower,along-span);upper=Math.min(upper,along+span);
+      return {squared:delta.lengthSq(),along:delta.dot(axis)};
+    });
+    if(!distances.length)return;
+    const furthest=(feed:number)=>Math.max(...distances.map(d=>d.squared-2*feed*d.along+feed*feed));
+    // The minimax distance is convex along the bounded torso travel. Keep
+    // the closest feasible posture even when one wrist is just outside reach;
+    // returning zero there caused a 21 cm jump at a half-degree aim change.
+    let lo=0,hi=.24;
+    for(let i=0;i<32;i++){
+      const a=(2*lo+hi)/3,b=(lo+2*hi)/3;
+      if(furthest(a)<furthest(b))hi=b;else lo=a;
     }
-    if(lower>upper)return;
-    this.hammerFit.feedM=lower;
-    this.hammerFeedOffset.copy(axis).multiplyScalar(lower);
+    let feed=(lo+hi)/2;
+    if(furthest(0)<=radius*radius)feed=0;
+    else if(furthest(feed)<=radius*radius){
+      lo=0;hi=feed;
+      for(let i=0;i<24;i++){const mid=(lo+hi)/2;if(furthest(mid)>radius*radius)lo=mid;else hi=mid;}
+      feed=hi;
+    }
+    this.hammerFit.feedM=feed;
+    this.hammerFeedOffset.copy(axis).multiplyScalar(feed);
   }
   private wrist(arm:WorkerArm):THREE.Vector3 {
     return arm.hand.localToWorld(new THREE.Vector3().fromArray(arm.hand.userData.wristPoint));
@@ -841,7 +901,7 @@ export class FPSRig extends THREE.Group {
       const grip=side===1?primary.clone():resting?new THREE.Vector3():new THREE.Vector3().fromArray(group.userData.secondaryGripPoint);
       const style=kind==='measure'&&side<0?'spring':resting?'relaxed':side<0?'hammer-support':kind==='measure'||kind==='laser'?'fitting':kind==='drill'||kind==='driver'?'hose':kind;
       const hand=workerHand(side,style); hand.position.copy(grip);
-      if(kind==='measure'&&side<0)hand.add(buildMeasurePencil());
+      if(kind==='measure'&&side<0){const pencil=buildMeasurePencil();pencil.userData.heldAccessory=true;hand.add(pencil);}
       if(!resting&&group.userData.gripQuaternion)hand.quaternion.fromArray(group.userData.gripQuaternion);
       hand.userData.gripping=!resting;hand.userData.gripRole=resting?'resting':'primary';
       const arm=workerArm(side,hand,grip);arms.push(arm);this.add(arm.group);

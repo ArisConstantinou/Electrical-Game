@@ -373,7 +373,9 @@ function hammer(): THREE.Group {
   const auxiliary = new THREE.Group(); auxiliary.name = 'Rotatable auxiliary handle'; group.add(auxiliary);
   // Front clamp holds an actual perpendicular support grip with end flange.
   torus(auxiliary,.046,.006,alloy,[.020,.005,-.275],'Adjustable auxiliary handle clamp');
-  rod(auxiliary,[.018,-.005,-.30],[-.060,-.005,-.30],.014,alloy,'Auxiliary handle clamp spindle');
+  // The spindle continues inside the rubber sleeve; exposed air between
+  // these members made the support handle look broken at oblique angles.
+  rod(auxiliary,[.018,-.005,-.30],[-.080,-.005,-.30],.014,alloy,'Auxiliary handle clamp spindle');
   rod(auxiliary,[-.066,-.005,-.30],[-.190,-.005,-.30],.022,dark,'Auxiliary rubber hand grip',.024);
   for(let i=0;i<8;i++) torus(auxiliary,.023,.0012,graphite,[-.073-i*.015,-.005,-.30],'Auxiliary hand grip texture','x');
   torus(auxiliary,.027,.0035,dark,[-.192,-.005,-.30],'Auxiliary handle end stop','x');

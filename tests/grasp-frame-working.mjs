@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {chromium} from 'playwright';import {mkdir,writeFile} from 'node:fs/promises';import {blockPointerLock} from './browser-safety.mjs';
+const out='output/grasp-frame/working';await mkdir(out,{recursive:true});const browser=await chromium.launch({channel:'chrome',headless:true});const ctx=await browser.newContext({viewport:{width:1440,height:900}});await blockPointerLock(ctx);const p=await ctx.newPage(),report={cases:[],errors:[]};p.on('pageerror',e=>report.errors.push(e.message));
+try{await p.goto('http://127.0.0.1:5365/Electrical-Game/?renderer=webgl');await p.waitForFunction(()=>window.__wireTheHouse?.workerBody.loaded);await p.locator('#start-button').click();await p.evaluate(()=>{const g=window.__wireTheHouse;window.useStep=g.step.bind(g);g.step=()=>{};g.input.locked=false;});
+const steps=async n=>p.evaluate(n=>{for(let i=0;i<n;i++)window.useStep(1/60);},n);
+const snap=async(name)=>{const r=await p.evaluate(async()=>{const g=window.__wireTheHouse,w=g.workerBody,c=g.renderer.camera,V=c.position.constructor,target=g.laserLevel.target,object=g.fpsRig.tools.get(g.selectedTool);g.renderer.render();await g.renderer.waitForFrame();return{contactReach:w.userData.contactReach,tool:g.selectedTool,laser:g.laserLevel.telemetry,tipError:target&&object.userData.tipPoint?object.localToWorld(new V().fromArray(object.userData.tipPoint)).distanceTo(target):null,reach:w.telemetry.gripReachErrors,bend:w.point('middle.01.R').sub(w.point('hand.R')).angleTo(w.point('hand.R').sub(w.point('forearm.R')))*180/Math.PI};});report.cases.push({name,...r});await p.screenshot({path:`${out}/${name}.png`});return r;};
+for(const height of [1.2,1.45,1.7]){
+await p.keyboard.press('Digit9');await p.evaluate(height=>{const g=window.__wireTheHouse,c=g.renderer.camera;g.player.workPosition.locked=false;g.player.workPosition.released=true;g.player.crouched=false;c.position.set(-.6,1.65,g.room.brickWall.volume.frontZ+.43);c.lookAt(-.6,height,g.room.brickWall.volume.frontZ);g.player.pitch=c.rotation.x;g.player.yaw=c.rotation.y;},height);await steps(80);await p.keyboard.press('KeyM');await steps(12);
+await p.keyboard.press('Digit0');await steps(60);await p.keyboard.down('KeyE');await steps(10);const drilling=await snap(`${height}-drilling`);await steps(60);await p.keyboard.up('KeyE');await steps(3);await snap(`${height}-drilled`);
+await p.keyboard.press('KeyL');await steps(12);await p.locator('#laser-place').click({timeout:3000});await steps(12);
+await p.keyboard.press('KeyB');await steps(30);await p.keyboard.down('KeyE');await steps(10);const fastening=await snap(`${height}-fastening`);await steps(60);await p.keyboard.up('KeyE');await steps(3);const done=await snap(`${height}-secured`);
+assert(drilling.laser.working);assert(fastening.laser.working);assert(done.laser.active);for(const state of [drilling,fastening]){assert(state.tipError<.001);assert(state.reach.R<.004,`${state.tool} hand gap ${state.reach.R}`);assert(state.bend<25);}
+await p.keyboard.press('KeyL');await steps(6);await p.locator('#laser-place').click();await steps(6);
+}
+assert.deepEqual(report.errors,[]);console.log(JSON.stringify(report.cases.map(c=>({name:c.name,phase:c.laser.phase,bend:c.bend,reach:c.reach,tip:c.tipError})),null,2));
+}finally{await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));await browser.close();}

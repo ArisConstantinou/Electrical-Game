@@ -158,6 +158,26 @@ export interface WorkerArm {
   group:THREE.Group; upper:THREE.Group; forearm:THREE.Group; hand:THREE.Group;
   side:number; grip:THREE.Vector3; shoulder:THREE.Vector3; elbow:THREE.Vector3; wrist:THREE.Vector3;
 }
+/** Physical handle targets shared with the anatomical body; no legacy mesh is needed to render them. */
+export interface WorkerGripTarget {
+  side:number;center:THREE.Vector3;rotation:THREE.Quaternion;section:[number,number];active:boolean;
+  shape?:'round'|'box';
+  trigger?:THREE.Vector3;
+  referenceKey?:string;
+  object?:THREE.Object3D;
+  contactLocked?:boolean;
+}
+export function workerGripTarget(arm:WorkerArm,active=arm.hand.userData.gripRole!=='resting'):WorkerGripTarget {
+  const frame=arm.hand.children.find(o=>String(o.userData.gripStyle).startsWith('mixer-'))??arm.hand;
+  frame.updateWorldMatrix(true,false);
+  return {side:arm.side,center:frame.getWorldPosition(new THREE.Vector3()),rotation:frame.getWorldQuaternion(new THREE.Quaternion()),section:frame.userData.gripSection??[.023,.023],active};
+}
+export function hideLegacyWorkerArm(arm:WorkerArm,active:boolean):void {
+  arm.upper.visible=!active;arm.forearm.visible=!active;
+  // Keep the authored transform and held accessories (such as the measuring
+  // pencil), while replacing every visible skin/clothing component.
+  for(const child of arm.hand.children)child.visible=!active||child.userData.heldAccessory===true;
+}
 export function workerArm(side:number, hand:THREE.Group, grip:THREE.Vector3):WorkerArm {
   const group=new THREE.Group(),upper=new THREE.Group(),forearm=new THREE.Group();
   group.name=`${side<0?'Left':'Right'} fixed-length work arm`;

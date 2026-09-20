@@ -1,0 +1,27 @@
+@import './trials-model-viewer.css';
+/* Layout and interaction vocabulary adapted from Trials src/ui/ModelViewer.ts. */
+#model-inspector-open{position:absolute;right:80px;top:80px;pointer-events:auto;padding:10px 16px;background:#252e31;color:#fff;border:1px solid #d7b884;border-radius:6px;font-size:14px;font-weight:700;z-index:8}
+.model-open{visibility:hidden!important}
+#model-inspector{pointer-events:none}#model-inspector header,#model-inspector nav,#model-inspector footer,#model-orbit{pointer-events:auto}
+#model-inspector[hidden],#model-inspector [hidden]{display:none!important}
+#model-inspector .model-viewer__forms{min-height:44px}
+#character-poses,#model-live-controls{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:8px}
+#model-inspector select,#model-inspector input[type=search]{font:14px system-ui;padding:10px;border:1px solid #98aab4;border-radius:8px;background:#fff;color:#253844;max-width:220px;min-height:44px}
+#model-inspector label{font:700 12px system-ui;color:#546773}#model-speed{width:90px}#model-tool{max-width:145px!important}
+#model-orbit{position:relative}.model-caption{position:absolute;top:10px;left:16px;right:16px;pointer-events:none;text-align:center;color:#253844}.model-caption strong{font-size:16px}.model-caption span{display:block;font-size:14px;max-width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#model-inspector[data-live=true] .model-caption{color:#fff;text-shadow:0 1px 4px #000}
+.model-library{position:absolute;z-index:3;top:0;bottom:0;left:0;width:min(360px,88%);background:#edf2f4f5;padding:14px;overflow:auto;border-right:1px solid #98aab4;pointer-events:auto}
+.model-library input{width:100%;max-width:none!important;margin:8px 0}.model-library output{display:block;font-size:14px;margin-bottom:10px}#model-list{display:grid;gap:6px}#model-list button{text-align:left;overflow-wrap:anywhere}#model-more{width:100%;margin-top:8px}
+#model-drive:not([hidden]){display:flex;position:absolute;bottom:145px;left:18px;right:18px;pointer-events:none}#model-drive button{pointer-events:auto}#model-drive [data-control-input=KeyW]{grid-column:2}#model-drive [data-control-input=KeyA]{grid-column:1}
+#model-inspector .model-viewer__footer{position:relative}#model-inspector .model-viewer__subjects button{width:auto;min-width:150px}
+#model-stats{display:block;text-align:center;font-size:12px;color:#546773;margin-top:4px}#model-live-prompt:empty{display:none}
+.front-body-view #reticle,.front-body-view #interaction-prompt{visibility:hidden}#body-view-banner{position:absolute;top:85px;left:50%;transform:translateX(-50%);padding:8px 14px;background:#182125e8;color:#fff;font-size:14px;pointer-events:auto;border:1px solid #d7b884;border-radius:5px;z-index:8}
+#model-aim-marker{position:absolute;pointer-events:none;font:24px monospace;color:#ffcf86;text-shadow:0 1px 2px #000}
+@media(max-width:700px){#model-inspector .model-viewer__subjects button{min-width:0;flex:1;padding:10px 6px}#model-inspector .model-viewer__forms{flex-wrap:wrap;padding:0 8px 8px}#character-poses,#model-live-controls{gap:5px}#character-poses label{display:none}#model-speed{width:65px}#model-inspector select{max-width:150px}#model-inspector .model-viewer__footer p{font-size:12px;margin:5px 0 0}#model-inspector-open{right:65px;top:70px}#body-view-banner{top:120px;width:max-content;max-width:90%}#model-drive:not([hidden]){bottom:145px;left:10px;right:10px}.model-caption span{display:none}}
+@media(max-height:500px){#model-inspector .model-viewer__subjects{left:24%;right:60px}#model-inspector .model-viewer__subjects button{padding:6px;min-height:36px;min-width:95px}#model-inspector .model-viewer__footer{min-height:54px}#model-drive:not([hidden]){bottom:60px}.model-caption{top:4px}.model-caption span,#model-stats{display:none}#model-inspector .model-viewer__forms{padding-bottom:4px}#model-inspector .model-viewer__forms button,#model-inspector select{min-height:34px;padding:6px}}
+.model-open #game-stage{visibility:visible!important}
+.front-body-view #body-view-banner{top:auto;bottom:16px}
+.front-body-view .controls-guide{display:none}
+.front-body-view #desktop-key-guide{display:none}
+#model-drive:not([hidden]){bottom:calc(100% + 12px)}
+#game-shell:has(#start-screen:not(.hidden)) #model-inspector-open{display:none}

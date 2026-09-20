@@ -19,14 +19,15 @@ async function fixture(page){return page.evaluate(async()=>{
 });}
 const read=page=>page.evaluate(()=>{
   const g=window.__wireTheHouse,state=JSON.parse(window.render_game_to_text()),zones=[];g.fpsRig.traverse(o=>{if(o.userData.zone)zones.push({zone:o.userData.zone,available:o.userData.available,visible:o.visible});});
-  return{selected:state.mission.selectedTool,assembly:state.mission.boxAssembly,arms:g.fpsRig.debugPose().arms,zones,fit:g.boxFitPreview.telemetry,visible:g.mission.points.filter(p=>p.boxGroup.visible).map(p=>({id:p.definition.id,layout:p.definition.boxLayout??p.boxGroup.layout,position:p.boxGroup.position.toArray()})),overflow:document.documentElement.scrollWidth>innerWidth,error:g.renderer.renderError};
+  const arms=g.fpsRig.armSets.get('fitting')??[],legacySkinVisible=arms.some(a=>a.upper.visible||a.forearm.visible||a.hand.children.some(child=>child.visible&&!child.userData.heldAccessory));
+  return{worker:g.workerBody?.telemetry,legacySkinVisible,referenceKeys:g.fpsRig.anatomicalGrips().map(grip=>grip.referenceKey??null),selected:state.mission.selectedTool,assembly:state.mission.boxAssembly,arms:g.fpsRig.debugPose().arms,zones,fit:g.boxFitPreview.telemetry,visible:g.mission.points.filter(p=>p.boxGroup.visible).map(p=>({id:p.definition.id,layout:p.definition.boxLayout??p.boxGroup.layout,position:p.boxGroup.position.toArray()})),overflow:document.documentElement.scrollWidth>innerWidth,error:g.renderer.renderError};
 });
 try{
   for(const [name,viewport,mobile] of [['desktop',{width:1366,height:768},false],['mobile',{width:390,height:844},true]]){
     const context=await browser.newContext({viewport,isMobile:mobile,hasTouch:mobile});await blockPointerLock(context);const page=await context.newPage();page.on('pageerror',e=>report.errors.push(`${name}: ${e.message}`));page.on('console',message=>{if(message.type()==='error')report.errors.push(`${name}: ${message.text()}`);});await page.routeWebSocket('**',()=>{});
     await page.goto(url);await page.waitForFunction(()=>window.__wireTheHouse?.roomWater.waterProActive,undefined,{timeout:120000});await page.locator('#start-button')[mobile?'tap':'click']();const prepared=await fixture(page);assert(prepared.removed>0);
     if(mobile)await page.locator('[data-tool="fitting"]').tap();else await page.keyboard.press('Digit5');await step(page,4);
-    const initial=await read(page);assert.equal(initial.selected,'fitting');assert.equal(initial.assembly.modules.length,1);assert.deepEqual(initial.arms.map(a=>a.gripRole).sort(),['assembly','candidate']);assert.equal(initial.zones.length,4);
+    const initial=await read(page);assert.equal(initial.worker?.loaded,true,'new anatomical body must load alongside box assembly');assert.equal(initial.worker.bones,52);assert.equal(initial.legacySkinVisible,false,'legacy segmented skin must stay hidden');assert.deepEqual(initial.referenceKeys,[null,null],'independent fitting hands must not replay the old one-box reference');assert.equal(initial.selected,'fitting');assert.equal(initial.assembly.modules.length,1);assert.deepEqual(initial.arms.map(a=>a.gripRole).sort(),['assembly','candidate']);assert.equal(initial.zones.length,4);
     await page.waitForTimeout(1300);
     await page.evaluate(async()=>{const r=window.__wireTheHouse.renderer;await r.waitForFrame();r.render();await r.waitForFrame();});await page.screenshot({path:`${out}/${name}-initial-two-hands.png`});
     if(mobile){
@@ -38,7 +39,7 @@ try{
       for(const code of ['Digit1','Digit4']){await page.keyboard.press(code);await step(page,30);}
       await page.mouse.wheel(0,100);await step(page);await page.keyboard.press('Digit4');await step(page,30);await page.keyboard.press('KeyR');await step(page);await page.keyboard.press('Digit1');await step(page,30);await page.keyboard.press('Digit2');await step(page,30);
     }
-    const built=await read(page);assert.equal(built.selected,'fitting','contextual digits cannot switch tools');assert(built.assembly.modules.length>=(mobile?2:8));assert.equal(built.zones.length,4);assert(!built.overflow);assert.equal(built.error,'');
+    const built=await read(page);assert.equal(built.legacySkinVisible,false);assert.equal(built.worker.loaded,true);assert.equal(built.selected,'fitting','contextual digits cannot switch tools');assert(built.assembly.modules.length>=(mobile?2:8));assert.equal(built.zones.length,4);assert(!built.overflow);assert.equal(built.error,'');
     await page.evaluate(async()=>{const r=window.__wireTheHouse.renderer;await r.waitForFrame();r.render();await r.waitForFrame();});await page.screenshot({path:`${out}/${name}-built-puzzle.png`});
     await step(page,30);
     if(mobile)await page.locator('#box-place-assembly').tap();else await page.mouse.click(viewport.width*.5,viewport.height*.5,{button:'right'});await step(page,3);

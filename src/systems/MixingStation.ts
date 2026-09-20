@@ -5,7 +5,7 @@ import { MortarBatch } from './MortarBatch';
 import { DrumMixer } from './DrumMixer';
 import { createMixingStationModels, createMixerModel, createShovelModel, setMixingStationFill, setCementSackOpen, setMixerDirty, setShovelLoaded, updateMixingSurface } from '../world/MixingStationModels';
 import { buildToolModel } from '../player/ToolModels';
-import { workerHand, workerArm, poseWorkerArm, type WorkerArm } from '../player/WorkerArm';
+import { workerHand, workerArm, poseWorkerArm, type WorkerArm, workerGripTarget, hideLegacyWorkerArm, type WorkerGripTarget } from '../player/WorkerArm';
 import { MixingReceipt } from '../ui/MixingReceipt';
 import { GAME_CONFIG } from '../data/gameConfig';
 import '../styles/mixing.css';
@@ -584,6 +584,21 @@ export class MixingStation {
       arm.upper.visible=!mountedMixer;
       poseWorkerArm(arm,shoulder,wrist,right);
     }
+  }
+  anatomicalGrips():WorkerGripTarget[] {
+    if(!this.active&&!this.carrying)return [];
+    return this.arms.map(arm=>{
+      const active=this.carrying||this.inserted||this.cleanSeconds>0||(this.tool!=='hands'&&!(this.tool==='trowel'&&arm.side<0));
+      const target=workerGripTarget(arm,active);
+      if(this.tool==='shovel')target.section=[.018,.018];
+      if(this.tool==='water')target.section=[.018,.012];
+      return target;
+    });
+  }
+  useAnatomicalBody(active:boolean):void {
+    for(const arm of this.arms)hideLegacyWorkerArm(arm,active);
+    for(const hands of this.toolHands.values())for(const hand of hands)
+      for(const child of hand.children)child.visible=!active;
   }
   get mixerRunning():boolean{return this.mixingNow||this.drum.running;}
   get telemetry(){return{destination:this.destination,drum:this.drum.telemetry,wheelbarrow:{massKg:this.wheelbarrowMassKg,capacityKg:this.wheelbarrowCapacityKg,litres:this.wheelbarrowMassKg/1.9},active:this.active,tool:this.tool,pendingTool:this.pendingTool,approaching:Boolean(this.mixerApproach),approachTarget:this.mixerApproach?(this.mixerApproach.object===this.models.bucket?'bucket':'rinse'):null,carrying:this.carrying,customSupply:this.customSupply,finished:this.finished,activity:this.activity,activityProgress:this.activity?this.activityTime/(this.activity==='pour'?1:this.activity==='tear'?.85:this.activity==='water'?1.35:1.55):0,inserted:this.inserted,mixerDirty:this.mixerDirty,mixing:this.mixingNow,cleaningSeconds:this.cleanSeconds,bucketPosition:this.bucketPosition().toArray(),heldToolVisible:this.heldTools.get(this.tool)?.visible??false,aimedTarget:this.aimedObject()?.kind??null,batch:this.batch.getState(),hint:this.message};}

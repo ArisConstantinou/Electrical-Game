@@ -11,6 +11,9 @@ export class Renderer {
   readonly camera = new THREE.PerspectiveCamera(72, 1, 0.025, 60);
   /** Logical camera owns the body/rig; this detached camera owns only the image. */
   readonly renderCamera = new THREE.PerspectiveCamera(72, 1, 0.025, 60);
+  viewCamera:THREE.PerspectiveCamera|null=null;
+  modelScene:THREE.Scene|null=null;
+  modelViewport:{x:number;y:number;width:number;height:number}|null=null;
   eyeYaw = 0;
   eyePitch = 0;
   readonly webgl: WebGPURenderer;
@@ -214,6 +217,7 @@ export class Renderer {
     });
   }
   private snapshotRenderCamera():void{
+    if(this.viewCamera){this.viewCamera.updateMatrixWorld(true);this.renderCamera.copy(this.viewCamera,false);this.renderCamera.updateMatrixWorld(true);return;}
     this.camera.updateWorldMatrix(true,true);
     // Copy projection too, so resizing and Studio lens changes are reflected
     // at the same accepted-frame boundary as the gaze and world pose.
@@ -238,6 +242,7 @@ export class Renderer {
     // Never mutate this snapshot while Water Pro's asynchronous depth/optical
     // passes are pending. Gameplay and input may keep using the logical camera.
     this.snapshotRenderCamera();
+    if(this.modelScene){this.gpu.info.reset();this.drawScene(this.modelScene);return true;}
     this.prepareMaterials();
     const now=performance.now(),dt=Math.min(.05,(now-this.lastRenderTime)/1000);this.lastRenderTime=now;
     const waterVisible=this.roomWater?.surface.visible??false;
@@ -247,14 +252,20 @@ export class Renderer {
       // The Water Pro update normally owns this reset; dry frames still need
       // fresh diagnostics rather than accumulating every draw since loading.
       this.gpu.info.reset();
-      this.gpu.render(this.scene,this.renderCamera);return true;
+      this.drawScene(this.scene);return true;
     }
-    const generation=this.renderGeneration,gpu=this.gpu;
-    const task=this.water.update(dt).then(()=>{if(generation===this.renderGeneration&&!this.suspended)gpu.render(this.scene,this.renderCamera);}).catch(error=>{
+    const generation=this.renderGeneration;
+    const task=this.water.update(dt).then(()=>{if(generation===this.renderGeneration&&!this.suspended)this.drawScene(this.scene);}).catch(error=>{
       if(generation===this.renderGeneration&&!this.deviceLost){this.renderError=String(error);console.error('Room Water Pro rendering failed',error);}
     }).finally(()=>{if(this.renderTask===task)this.renderTask=null;});
     this.renderTask=task;
     return true;
   }
   async waitForFrame():Promise<void>{await this.ready;await this.renderTask;}
+  private drawScene(scene:THREE.Scene):void{
+    const rect=this.modelViewport;if(!rect){this.gpu.render(scene,this.renderCamera);return;}
+    const viewport=this.gpu.getViewport(new THREE.Vector4()),scissor=this.gpu.getScissor(new THREE.Vector4()),test=this.gpu.getScissorTest();
+    try{this.gpu.setViewport(rect.x,rect.y,rect.width,rect.height);this.gpu.setScissor(rect.x,rect.y,rect.width,rect.height);this.gpu.setScissorTest(true);this.gpu.render(scene,this.renderCamera);}
+    finally{this.gpu.setViewport(viewport);this.gpu.setScissor(scissor);this.gpu.setScissorTest(test);}
+  }
 }
