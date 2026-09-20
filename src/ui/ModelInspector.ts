@@ -174,7 +174,8 @@ export class ModelInspector {
     const velocity=new THREE.Vector3(this.stance==='left'||this.stance==='crouchLeft'?-1:this.stance==='right'?1:0,0,this.stance==='back'?1:this.stance==='walk'||this.stance==='jog'?-1:0).multiplyScalar(this.stance==='jog'?3.4:crouch?.6:1.2);
     const tool=this.stance==='tool'?this.el<HTMLSelectElement>('#model-tool').value as RigTool:'spray';
     this.poseCamera.position.set(0,crouch?.95:1.65,0);this.poseCamera.rotation.set(-.25,0,0);this.poseCamera.updateMatrixWorld(true);
-    this.rig.show(tool);this.rig.visible=['spray','press','tool'].includes(this.stance);this.rig.update(dt,moving,this.stance==='press');this.rig.poseArms(this.poseCamera);
+    this.rig.show(tool);this.rig.visible=['spray','press','tool'].includes(this.stance);this.rig.update(dt,moving,this.stance==='press');
+    if(tool==='laser')this.rig.poseLaser(this.poseCamera);else this.rig.poseArms(this.poseCamera);
     this.worker.update(dt,this.poseCamera,{eyeHeight:crouch?.95:1.65,pitch:-.25,yaw:0,velocity},this.rig,tool,this.stance==='press',false);this.worker.overview=true;
   }
   private fit(direction=new THREE.Vector3(.15,.08,-1)):void{

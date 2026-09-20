@@ -34,7 +34,7 @@ export class FPSRig extends THREE.Group {
     if(!this.visible)return [];
     return (this.armSets.get(this.selectedTool)??[]).map(arm=>{
       const grip=workerGripTarget(arm,arm.hand.userData.gripping===true||(this.selectedTool==='measure'&&arm.side<0&&this.measureMarkTime>0));
-      if(['drill','driver','measure','laser','level','spring','cutter'].includes(this.selectedTool)&&arm.side>0){
+      if(['drill','driver','measure','level','spring','cutter'].includes(this.selectedTool)&&arm.side>0){
         grip.referenceKey=`${this.selectedTool}:R`;
         Object.defineProperty(grip,'object',{value:this.tools.get(this.selectedTool)});
       }
@@ -552,6 +552,22 @@ export class FPSRig extends THREE.Group {
     if(working&&this.reachable)motor.rotation.z=(motor.rotation.z+Math.min(Math.max(dt,0),.05)*(kind==='drill'?36:21))%(Math.PI*2);
     tool.userData.working=working&&this.reachable;
     this.poseArms(camera);
+  }
+  /** Hold the laser upright with a nearly extended arm. Its portable pose is
+   * independent from the drilled-fixing orientation used after mounting. */
+  poseLaser(camera:THREE.Camera):void {
+    const tool=this.tools.get('laser')!,{eye,right,forward}=this.bodyFrame(camera),shoulder=this.shoulder(camera,1),up=new THREE.Vector3(0,1,0),view=camera.getWorldDirection(new THREE.Vector3());
+    camera.updateMatrixWorld(true);this.updateWorldMatrix(true,false);
+    const scale=this.getWorldScale(new THREE.Vector3());tool.scale.set(1/scale.x,1/scale.y,1/scale.z);
+    const orientation=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(right,up,forward.clone().negate()));
+    const screenRight=.15-Math.max(0,1-(camera as THREE.PerspectiveCamera).aspect)*(.12+Math.abs(view.y)*.25);
+    const gripOffset=eye.clone().addScaledVector(view,.45).addScaledVector(right,screenRight).addScaledVector(up,-.03).sub(shoulder);
+    if(gripOffset.length()>.502)gripOffset.setLength(.502);
+    const grip=shoulder.clone().add(gripOffset);
+    tool.quaternion.copy(this.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(orientation));
+    const localGrip=new THREE.Vector3().fromArray(tool.userData.gripPoint).applyQuaternion(tool.quaternion);
+    tool.position.copy(this.worldToLocal(grip)).sub(localGrip);tool.updateWorldMatrix(true,true);
+    this.reachable=true;this.poseArms(camera);
   }
   poseTrowel(camera: THREE.Camera, motion: TrowelMotion, dt = 0, wallFrontZ = -2.41): THREE.Vector3 {
     const tool=this.tools.get('trowel')!;

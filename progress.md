@@ -790,3 +790,11 @@ Original prompt for this task: Selecting BOX should show an initial box in the l
 - Contact passes 15 cases under 3.1 mm; wrist stability passes 12 cases. Full desktop nine-module and portrait two-module build, rotation, placement and Escape checks pass against the prepared scene, including the three preinstalled mortar boxes.
 - TypeScript, production build, prepared-wall regression and bundled game client pass. Short headless WebGL submit P95 is 20.5 ms desktop and 29.2 ms portrait; frame P95 is 21.9/30.1 ms. This is Chromium emulation on the desktop host, not physical-phone or GPU proof.
 - Sole preview remains `http://127.0.0.1:5365/Electrical-Game/` (HTTP 200, PID 45884); port 5366 has no listener. Evidence: `output/box-grip-visibility-final-6`, `output/box-grip-contact-final`, `output/box-wrist-stability-final`, and `output/box-hand-assembly-ui-final`.
+
+## 2026-09-20 · Upright handheld laser and extended arm
+
+- Reproduced the reported overview pose: the handheld laser inherited a captured generic reference grip, leaving the elbow at 136.3 degrees and the complete M12 housing tilted with the hand.
+- Added a laser-only portable pose. The housing stays world-upright and faces the player while its screen position follows view yaw/pitch. The mounted/drill/driver reference logic remains separate and unchanged.
+- Replaced the captured laser wrist solve with a laser-only straight-forearm grip. At level aim the elbow opens to 159.5 degrees desktop and 156.5 degrees portrait; wrist bend remains below 0.001 degrees and hand/contact error below 0.001 mm.
+- The focused regression passes ten desktop/portrait level, up, down, left and right cases with zero housing tilt, valid contact and the wrist inside the viewport. The 18-case worker-tool smoke, reference laser logic, twelve drill/driver working-grip states, TypeScript and production build pass.
+- The older full `laser-level-ui` suite currently stops in its initial measurement fixture because the prepared wall returns `out-of-reach` where that test expects `ready`; it does not reach the laser pose or placement assertions. Focused laser pose, logic and drill/driver integration checks pass. Evidence: `output/arm-chain/laser-current`, `output/arm-chain/laser-final`, and `output/laser-held-pose-final`.

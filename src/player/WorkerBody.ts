@@ -273,6 +273,23 @@ export class WorkerBody extends THREE.Group {
         const finalDirection=Y.clone().applyQuaternion(this.bone('index.03.R').getWorldQuaternion(new THREE.Quaternion()));
         const finalPlanar=finalDirection.clone().addScaledVector(axis,-finalDirection.dot(axis)).normalize();
         this.fingerFit.sprayForward={dot:finalPlanar.dot(nozzleDirection),wristBendDegrees:THREE.MathUtils.radToDeg(alignedLong.angleTo(this.point('hand.R').sub(this.point('forearm.R')).normalize())),long:alignedLong.toArray(),wrist:this.point('hand.R').toArray(),elbow:this.point('forearm.R').toArray(),shoulder:shoulder.toArray()};
+      }else if(tool==='laser'&&grip&&side==='R'){
+        const axis=Y.clone().applyQuaternion(grip.rotation),oldAcross=new THREE.Vector3(1,0,0).applyQuaternion(grip.rotation),oldBack=new THREE.Vector3(0,0,1).applyQuaternion(grip.rotation);
+        let long=grip.center.clone().sub(this.point('upper_arm.R')).addScaledVector(axis,-grip.center.clone().sub(this.point('upper_arm.R')).dot(axis)).normalize();
+        let rotation=grip.rotation.clone(),section=grip.section,wrist=grip.center.clone();
+        for(let pass=0;pass<4;pass++){
+          const across=long.clone().multiplyScalar(-1),back=across.clone().cross(axis).normalize();
+          rotation.setFromRotationMatrix(new THREE.Matrix4().makeBasis(across,axis,back));
+          section=[Math.hypot(grip.section[0]*across.dot(oldAcross),grip.section[1]*across.dot(oldBack)),Math.hypot(grip.section[0]*back.dot(oldAcross),grip.section[1]*back.dot(oldBack))];
+          const radial=axis.clone().addScaledVector(long,-axis.dot(long)).normalize(),q=this.handOrientation(side,radial,long);
+          const middle=grip.center.clone().addScaledVector(across,-section[0]*.6).addScaledVector(back,-section[1]-.012);
+          wrist=middle.sub(this.handFrames.get(side)!.knuckle.clone().applyQuaternion(q));
+          this.limb('upper_arm.R','forearm.R','hand.R',wrist,right.clone().multiplyScalar(.18).add(new THREE.Vector3(0,-1,0)));
+          long=this.point('hand.R').sub(this.point('forearm.R')).normalize();
+          this.setHandOrientation(side,axis.clone().addScaledVector(long,-axis.dot(long)).normalize(),long);
+        }
+        this.gripErrors.R=this.point('hand.R').distanceTo(wrist);
+        this.wrapGrip(side,grip.center,rotation,section,false,working,grip.shape);
       }else if(grip){
         const axis=Y.clone().applyQuaternion(grip.rotation),oldAcross=new THREE.Vector3(1,0,0).applyQuaternion(grip.rotation),oldBack=new THREE.Vector3(0,0,1).applyQuaternion(grip.rotation);
         // A handle fixes the contact axis, not a camera-space 90-degree wrist
