@@ -4,6 +4,8 @@ export interface GraspArm {
   shoulder:THREE.Vector3;
   upperLength:number;
   handSign?:number;
+  /** Preserve the calibrated hand/object orientation; solve arm placement only. */
+  lockRotation?:boolean;
   elbow:THREE.Vector3;
   wrist:THREE.Vector3;
 }
@@ -46,11 +48,11 @@ export function solveRigidGrasp(
     return{center:p,rotation:q,swivel,error:violation,score};
   };
   let best=evaluate(rotation.clone());
-  if(previousQ){const prior=evaluate(previousQ,previousSwivel!);if(prior.score<best.score)best=prior;}
+  if(previousQ){const prior=evaluate(arm.lockRotation?rotation:previousQ,previousSwivel!);if(prior.score<best.score)best=prior;}
   const axes=[new THREE.Vector3(1,0,0),new THREE.Vector3(0,1,0),new THREE.Vector3(0,0,1)].map(v=>v.applyQuaternion(cameraQ));
   for(const step of [.6,.3,.15,.075,.0375,.01875])for(let pass=0;pass<3;pass++)for(const axis of axes){
     const base=best.rotation;
-    for(const sign of [-1,1]){
+    if(!arm.lockRotation)for(const sign of [-1,1]){
       const candidate=evaluate(new THREE.Quaternion().setFromAxisAngle(axis,sign*step).multiply(base),best.swivel);
       if(candidate.score<best.score)best=candidate;
     }
@@ -66,7 +68,7 @@ export function solveRigidGrasp(
     // but bound the per-frame orientation change so the elbow/forearm follows
     // the new solution instead of snapping to it in one frame.
     const maxAngularStep=THREE.MathUtils.degToRad(12);
-    const continuousRotation=previousQ.clone().rotateTowards(best.rotation,maxAngularStep);
+    const continuousRotation=arm.lockRotation?rotation.clone():previousQ.clone().rotateTowards(best.rotation,maxAngularStep);
     const continuousSwivel=previousSwivel.clone().rotateTowards(best.swivel,maxAngularStep);
     best=evaluate(continuousRotation,continuousSwivel);
   }

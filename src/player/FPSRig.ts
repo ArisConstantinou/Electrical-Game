@@ -393,7 +393,9 @@ export class FPSRig extends THREE.Group {
     this.clearFittingRoot(this.fittingAssemblyRoot);
     const snapshot=this.fittingAssembly;if(!snapshot)return;
     const bounds=boxAssemblyBounds(snapshot.modules);
-    this.fittingPresentationScale=.72*THREE.MathUtils.clamp(.19/Math.max(bounds.width,bounds.height),.48,1);
+    // Held casings retain their world dimensions relative to the anatomical
+    // hands. Fit the arm/assembly into view instead of shrinking the boxes.
+    this.fittingPresentationScale=1;
     this.fittingAssemblyRoot.position.set(-.105,.005,-.065);
     this.fittingAssemblyRoot.scale.setScalar(this.fittingPresentationScale);
     for(const module of snapshot.modules){
@@ -407,7 +409,7 @@ export class FPSRig extends THREE.Group {
   private rebuildFittingCandidate(kind:BoxKind,rotation:number):void{
     this.clearFittingRoot(this.fittingCandidateRoot);
     const box=this.viewBox({id:'candidate',kind,rotation:rotation as 0|1|2|3});box.name=`Right-hand next ${kind} box`;this.fittingCandidateRoot.add(box);
-    this.fittingCandidateRoot.scale.setScalar(.68);
+    this.fittingCandidateRoot.scale.setScalar(1);
     this.fittingCandidateRoot.position.copy(this.fittingCandidateHome);
   }
   private zoneLabel(value:number,available:boolean):THREE.Sprite{
