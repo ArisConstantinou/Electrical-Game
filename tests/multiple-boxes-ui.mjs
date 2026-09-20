@@ -4,7 +4,7 @@ import {mkdir,writeFile} from 'node:fs/promises';
 import {blockPointerLock} from './browser-safety.mjs';
 
 const out=process.argv[2]??'output/multiple-boxes-ui';await mkdir(out,{recursive:true});
-const url=process.env.QA_BASE??'http://127.0.0.1:5362/Electrical-Game/';
+const url=process.env.QA_BASE??'http://127.0.0.1:5365/Electrical-Game/';
 const report={url,fixture:'Actual saved MasonryVolume node removals create five independent 75 mm recesses with surviving brick ledges. Only camera and frame clock are controlled. Presets, placement, selection, rotation, cancellation and retrieval use native keyboard/touch. No box geometry, placement state, clearance or acceptance method is stubbed.',mobileIsEmulation:true,cases:[],errors:[]};
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const steps=(page,count=1)=>page.evaluate(count=>{for(let i=0;i<count;i++)window.__multipleStep(1/60,1/60,false);},count);

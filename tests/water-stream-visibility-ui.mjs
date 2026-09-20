@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {blockPointerLock} from './browser-safety.mjs';
-const base=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/',out=process.argv[3]??'output/water-stream-visibility';await mkdir(out,{recursive:true});
+const base=process.argv[2]??'http://127.0.0.1:5365/Electrical-Game/',out=process.argv[3]??'output/water-stream-visibility';await mkdir(out,{recursive:true});
 const report={base,mobileIsEmulation:true,method:'Native held hose, then frozen scene screenshots with current, previous and hidden pressure column only. Screenshot contrast within projected stream bounds.',cases:[],errors:[]};
 const browser=await chromium.launch({channel:'chrome',headless:true});
 try{for(const backend of ['webgl','webgpu']){

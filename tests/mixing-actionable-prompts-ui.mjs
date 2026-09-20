@@ -4,7 +4,7 @@ import {mkdir,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import ts from 'typescript';
 import {blockPointerLock} from './browser-safety.mjs';
-const url=process.argv.find(a=>/^https?:/.test(a))??'http://127.0.0.1:5362/Electrical-Game/';
+const url=process.argv.find(a=>/^https?:/.test(a))??'http://127.0.0.1:5365/Electrical-Game/';
 const repro=process.argv.includes('--repro');
 const baseline=repro?execFileSync('git',['show','HEAD:src/systems/MixingStation.ts'],{encoding:'utf8'}):null;
 const out=repro?'output/mixing-actionable-prompts-baseline':'output/mixing-actionable-prompts';await mkdir(out,{recursive:true});

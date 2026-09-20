@@ -8,7 +8,7 @@ const report={method:'60 real simulation steps per idle tool, identical geometry
 try{
  const context=await browser.newContext({viewport:{width:1366,height:768}});await blockPointerLock(context);
  const page=await context.newPage();page.on('pageerror',e=>report.errors.push(e.message));
- await page.goto('http://127.0.0.1:5362/Electrical-Game/');await page.waitForFunction(()=>window.__wireTheHouse?.roomWater.waterProActive);await page.locator('#start-button').click();
+ await page.goto('http://127.0.0.1:5365/Electrical-Game/');await page.waitForFunction(()=>window.__wireTheHouse?.roomWater.waterProActive);await page.locator('#start-button').click();
  await page.evaluate(async()=>{const g=window.__wireTheHouse;await g.renderer.waitForFrame();window.__hudStep=g.step.bind(g);g.step=()=>{};});
  for(const [tool,key] of [['spray','Digit3'],['hammer','Digit4'],['trowel','Digit7'],['hose','Digit8']]){
   await page.keyboard.press(key);

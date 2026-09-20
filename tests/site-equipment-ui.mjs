@@ -10,7 +10,7 @@ const report={errors:[],backend:'WebGL',viewport:'1440x900',pointerLock:'blocked
 try {
  const page=await browser.newPage({viewport:{width:1440,height:900}});await blockPointerLock(page.context());await page.routeWebSocket('**',()=>{});
  page.on('pageerror',e=>report.errors.push(e.message));page.on('console',m=>{if(m.type()==='error')report.errors.push(m.text());});
- await page.goto('http://127.0.0.1:5364/Electrical-Game/?renderer=webgl');await page.waitForFunction(()=>window.__wireTheHouse);
+ await page.goto('http://127.0.0.1:5365/Electrical-Game/?renderer=webgl');await page.waitForFunction(()=>window.__wireTheHouse);
  await page.locator('#start-button').click();await page.waitForTimeout(650);
  const camera=async(position,target)=>page.evaluate(({position,target})=>{const g=window.__wireTheHouse,c=g.renderer.camera;c.position.set(...position);c.lookAt(...target);g.player.pitch=c.rotation.x;g.player.yaw=c.rotation.y;}, {position,target});
  const shot=async name=>{await page.waitForTimeout(200);await page.evaluate(async()=>{const r=window.__wireTheHouse.renderer;await r.waitForFrame();r.render();await r.waitForFrame();});await page.screenshot({path:`${out}/${name}.png`});};

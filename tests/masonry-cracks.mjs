@@ -5,7 +5,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 
 const out = resolve(process.argv[3] ?? 'output/masonry-physical-cracks');
-const url = process.argv[2] ?? 'http://127.0.0.1:5362/Electrical-Game/';
+const url = process.argv[2] ?? 'http://127.0.0.1:5365/Electrical-Game/';
 await mkdir(out, { recursive: true });
 const server = await createServer({ server: { middlewareMode: true }, appType: 'custom', logLevel: 'error' });
 const report = { url, checks: [], viewports: [], errors: [] };

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {blockPointerLock} from './browser-safety.mjs';
-const url=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/',out=process.argv[3]??'output/mobile-hud-layout';await mkdir(out,{recursive:true});
+const url=process.argv[2]??'http://127.0.0.1:5365/Electrical-Game/',out=process.argv[3]??'output/mobile-hud-layout';await mkdir(out,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const report={url,mobileIsEmulation:true,method:'Native touch/click tool selection and direct setting buttons; no physical Pointer Lock, browser closed after all cases.',cases:[],errors:[]};
 const layouts=[{name:'portrait',width:390,height:844,mobile:true},{name:'landscape',width:844,height:390,mobile:true},{name:'compact-portrait',width:320,height:740,mobile:true},{name:'compact-landscape',width:667,height:375,mobile:true},{name:'desktop',width:1366,height:768,mobile:false}];

@@ -4,7 +4,7 @@ import {mkdir,writeFile} from 'node:fs/promises';
 import assert from 'node:assert/strict';
 
 const output='output/room-water';await mkdir(output,{recursive:true});
-const report={date:new Date().toISOString(),url:'http://127.0.0.1:5362/Electrical-Game/',viewport:{width:1366,height:768},headless:true,limitations:[
+const report={date:new Date().toISOString(),url:'http://127.0.0.1:5365/Electrical-Game/',viewport:{width:1366,height:768},headless:true,limitations:[
   'Controlled headless Chrome desktop benchmark, not physical-device performance or a hardware capability claim.',
   'Normal simulation remains active. Automatic render submission is replaced temporarily by one explicit render per requestAnimationFrame, awaited through renderer.waitForFrame and a backend GPU completion fence.',
   'Completion intervals include browser scheduling, CPU work and GPU synchronization overhead. They are not isolated GPU timestamp measurements or the previous synchronous-submit benchmark.',

@@ -9,7 +9,7 @@ const tools=[['spring','Digit1'],['cutter','Digit2'],['spray','Digit3'],['hammer
 try{for(const mobile of [false,true]){
  const platform=mobile?'mobile':'desktop',context=await browser.newContext({viewport:mobile?{width:390,height:844}:{width:1366,height:768},isMobile:mobile,hasTouch:mobile});await blockPointerLock(context);
  const page=await context.newPage();page.on('pageerror',e=>report.errors.push(`${platform}: ${e.message}`));
- await page.goto('http://127.0.0.1:5362/Electrical-Game/');await page.waitForFunction(()=>window.__wireTheHouse?.roomWater.waterProActive,undefined,{timeout:120000});
+ await page.goto('http://127.0.0.1:5365/Electrical-Game/');await page.waitForFunction(()=>window.__wireTheHouse?.roomWater.waterProActive,undefined,{timeout:120000});
  const click=selector=>page.locator(selector)[mobile?'tap':'click']();await click('#start-button');
  const select=async(tool)=>{if(mobile)await click(`[data-tool="${tool}"]`);else await page.keyboard.press(tools.find(t=>t[0]===tool)[1]);await page.waitForFunction(tool=>document.querySelector('#game-shell').dataset.activeTool===tool,tool);};
  const cases=[];

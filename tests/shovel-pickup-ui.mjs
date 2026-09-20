@@ -6,7 +6,7 @@ const out='output/shovel-pickup';await mkdir(out,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:true});const report=[];
 try{for(const mobile of [false,true]){
 const context=await browser.newContext({viewport:mobile?{width:844,height:390}:{width:1366,height:768},isMobile:mobile,hasTouch:mobile});await blockPointerLock(context);
-const page=await context.newPage();await page.goto('http://127.0.0.1:5362/Electrical-Game/');await page.waitForFunction(()=>window.__wireTheHouse?.mixing);await page.locator('#start-button').click();await page.waitForTimeout(900);
+const page=await context.newPage();await page.goto('http://127.0.0.1:5365/Electrical-Game/');await page.waitForFunction(()=>window.__wireTheHouse?.mixing);await page.locator('#start-button').click();await page.waitForTimeout(900);
 const pose=await page.evaluate(()=>{const g=window.__wireTheHouse,m=g.mixing,c=g.renderer.camera;window.__pickupStep=g.step.bind(g);g.step=()=>{};m.chooseTool('trowel');m.models.group.updateMatrixWorld(true);const origin=m.models.group.getWorldPosition(c.position.clone());const blade=m.models.shovel.localToWorld(c.position.clone().set(0,.12,.022));
 const roots=[m.models.bucket,m.models.sand,...m.models.sacks,m.models.rinse,m.models.water,m.models.mixer,m.models.shovel,m.stationTrowel].filter(o=>o.visible);
 const belongs=(o,r)=>{while(o){if(o===r)return true;o=o.parent;}return false;};

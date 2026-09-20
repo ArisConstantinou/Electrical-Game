@@ -6,7 +6,7 @@ import { resolve, join } from 'node:path';
 // Repeat the identical workload before/after the rebuild. Camera placement is a
 // QA fixture. The held-button probe uses real mouse input; the 150-strike workload
 // invokes the existing gameplay impact entry point to control strike count.
-const baseUrl = process.argv[2] ?? 'http://127.0.0.1:5362/Electrical-Game/';
+const baseUrl = process.argv[2] ?? 'http://127.0.0.1:5365/Electrical-Game/';
 const output = resolve(process.argv[3] ?? 'artifacts/masonry-rebuild-baseline');
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch({ channel: 'chrome', headless: true });

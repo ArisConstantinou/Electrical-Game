@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {blockPointerLock} from './browser-safety.mjs';
-const url=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/',out=process.argv[3]??'output/box-mortar-fit-ui';await mkdir(out,{recursive:true});
+const url=process.argv[2]??'http://127.0.0.1:5365/Electrical-Game/',out=process.argv[3]??'output/box-mortar-fit-ui';await mkdir(out,{recursive:true});
 const report={url,mobileIsEmulation:true,fixture:'Actual masonry node cuts and finite fresh production mortar deposits over narrow, shallow and full recesses. Native preset selection and USE attempt insertion; no fit, collision or acceptance functions are replaced.',cases:[],errors:[]},browser=await chromium.launch({channel:'chrome',headless:true});
 try{for(const mobile of [false,true]){
  const platform=mobile?'mobile':'desktop',context=await browser.newContext({viewport:mobile?{width:390,height:844}:{width:1366,height:768},isMobile:mobile,hasTouch:mobile});await blockPointerLock(context);const page=await context.newPage();await page.routeWebSocket('**',()=>{});page.on('pageerror',e=>report.errors.push(e.message));

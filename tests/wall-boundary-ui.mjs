@@ -6,7 +6,7 @@ import {blockPointerLock} from './browser-safety.mjs';
 const before=process.argv.includes('--before'),out=`output/wall-boundary-${before?'before':'after'}`;
 await mkdir(out,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:true});
-const report={url:'http://127.0.0.1:5364/Electrical-Game/',trials:[],errors:[]};
+const report={url:'http://127.0.0.1:5365/Electrical-Game/',trials:[],errors:[]};
 try{
  const page=await browser.newPage({viewport:{width:1366,height:768}});
  await blockPointerLock(page.context());await page.routeWebSocket('**',()=>{});

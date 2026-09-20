@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {blockPointerLock} from './browser-safety.mjs';
-const url=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/',out=process.argv[3]??'output/mortar-tiny-native';await mkdir(out,{recursive:true});
+const url=process.argv[2]??'http://127.0.0.1:5365/Electrical-Game/',out=process.argv[3]??'output/mortar-tiny-native';await mkdir(out,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:true}),report={url,fixture:'Real impact-cut hollow-clay wall, finite prefilled mortar bed. A controlled 48 × 8 mm strip is removed from the bed and accounted as fallen mortar. Native desktop E and mobile USE hold/release must visibly repair this gap without regenerating the bed.',mobileIsEmulation:true,cases:[]};
 try{for(const mobile of [false,true]){
  const platform=mobile?'mobile':'desktop';if(process.env.QA_PLATFORM&&process.env.QA_PLATFORM!==platform)continue;

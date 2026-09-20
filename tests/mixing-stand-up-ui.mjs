@@ -7,7 +7,7 @@ const report={cases:[],errors:[],fixtures:'Camera/recipe and deterministic clock
 const browser=await chromium.launch({channel:'chrome',headless:true});
 try{for(const layout of [{name:'desktop',width:1366,height:768},{name:'portrait',width:390,height:844},{name:'landscape',width:844,height:390}]){
  const mobile=layout.name!=='desktop',context=await browser.newContext({viewport:{width:layout.width,height:layout.height},isMobile:mobile,hasTouch:mobile});await blockPointerLock(context);
- const page=await context.newPage();page.on('pageerror',e=>report.errors.push(e.message));await page.goto('http://127.0.0.1:5362/Electrical-Game/');await page.waitForFunction(()=>window.__wireTheHouse?.mixing);await page.locator('#start-button')[mobile?'tap':'click']();await page.waitForTimeout(350);
+ const page=await context.newPage();page.on('pageerror',e=>report.errors.push(e.message));await page.goto('http://127.0.0.1:5365/Electrical-Game/');await page.waitForFunction(()=>window.__wireTheHouse?.mixing);await page.locator('#start-button')[mobile?'tap':'click']();await page.waitForTimeout(350);
  await page.evaluate(()=>{const g=window.__wireTheHouse;window.__stanceStep=g.step.bind(g);g.step=()=>{};});
  const step=n=>page.evaluate(n=>{for(let i=0;i<n;i++)window.__stanceStep(1/60);},n);
  const state=()=>page.evaluate(()=>{const g=window.__wireTheHouse;return{crouched:g.player.crouched,y:g.renderer.camera.position.y,mixing:g.mixing.telemetry,held:g.input.actionHeld,overflow:document.documentElement.scrollWidth>innerWidth,error:g.renderer.renderError};});

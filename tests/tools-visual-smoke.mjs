@@ -1,7 +1,7 @@
 import { chromium } from 'playwright';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
-const url=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/';
+const url=process.argv[2]??'http://127.0.0.1:5365/Electrical-Game/';
 const output=resolve(process.argv[3]??'output/tools-visual');
 await mkdir(output,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:true});

@@ -3,7 +3,7 @@ import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {blockPointerLock} from './browser-safety.mjs';
 
-const base=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/';
+const base=process.argv[2]??'http://127.0.0.1:5365/Electrical-Game/';
 const out=process.argv[3]??'output/render-motion-coherence';await mkdir(out,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const report={base,method:'Native A/D and touch movement on the live RAF loop. Alternate Water Pro updates deliberately delayed 100 ms to expose cross-frame scene mutations and slow-frame time loss. Desktop relative look calls PlayerController directly because OS Pointer Lock is blocked.',cases:[],errors:[]};

@@ -3,7 +3,7 @@ import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {blockPointerLock} from './browser-safety.mjs';
 import {prepareFinishedMortar} from './prepared-mortar-fixture.mjs';
-const url=process.argv.find(a=>/^https?:/.test(a))??'http://127.0.0.1:5364/Electrical-Game/';
+const url=process.argv.find(a=>/^https?:/.test(a))??'http://127.0.0.1:5365/Electrical-Game/';
 const baseline=process.argv.includes('--baseline'),out=`output/trowel-supply-view-${baseline?'before':'after'}`;
 await mkdir(out,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:true}),report={url,baseline,cases:[]};

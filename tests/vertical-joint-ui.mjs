@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {blockPointerLock} from './browser-safety.mjs';
-const url=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/',out=process.argv[3]??'output/vertical-joint-ui';await mkdir(out,{recursive:true});
+const url=process.argv[2]??'http://127.0.0.1:5365/Electrical-Game/',out=process.argv[3]??'output/vertical-joint-ui';await mkdir(out,{recursive:true});
 const report={url,mobileIsEmulation:true,fixture:'Starting camera and saved shallow chase only. Native tool selection, 90-degree edge and 800-percent speed controls; native USE holds. Actual FPSRig/contact/masonry/debris/renderer run without substitutions.',cases:[],errors:[]};
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const step=(page,n)=>page.evaluate(async n=>{for(let i=0;i<n;i++){window.__jointStep(1/60);if((i+1)%12===0){await window.__wireTheHouse.chasing.waitForDebrisSplits();await window.__wireTheHouse.renderer.waitForFrame();}}},n);

@@ -3,7 +3,7 @@ import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {blockPointerLock} from './browser-safety.mjs';
 const out=process.argv[2]??'output/trowel-native-camera';await mkdir(out,{recursive:true});
-const url=process.env.QA_BASE??'http://127.0.0.1:5362/Electrical-Game/';
+const url=process.env.QA_BASE??'http://127.0.0.1:5365/Electrical-Game/';
 const report={url,clock:'Unmodified live requestAnimationFrame and physics; only initial camera pose is authored.',mobileIsEmulation:true,cases:[],errors:[]};
 const browser=await chromium.launch({channel:'chrome',headless:true});
 try{

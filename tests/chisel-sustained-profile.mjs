@@ -3,7 +3,7 @@ import {mkdir,writeFile} from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import {blockPointerLock} from './browser-safety.mjs';
 
-const url=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/?renderer=webgl';
+const url=process.argv[2]??'http://127.0.0.1:5365/Electrical-Game/?renderer=webgl';
 const out=process.argv[3]??'output/chisel-sustained';await mkdir(out,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const report={url,cpuSlowdown:Number(process.env.QA_CPU_RATE??4),method:'Native held tool under real RAF; touch Chromium 390x844 DPR3 with controlled camera sweep. CPU slowdown is comparative, not physical iPhone FPS.',stages:[],errors:[]};

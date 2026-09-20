@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import { mkdir, writeFile } from 'node:fs/promises';
-const base=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/';
+const base=process.argv[2]??'http://127.0.0.1:5365/Electrical-Game/';
 const out='output/masonry-acceptance'; await mkdir(out,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const page=await browser.newPage({viewport:{width:1366,height:768}});const errors=[];page.on('pageerror',e=>errors.push(e.message));

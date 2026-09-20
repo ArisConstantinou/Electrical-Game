@@ -3,7 +3,7 @@ import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {blockPointerLock} from './browser-safety.mjs';
 
-const url=process.argv.find(arg=>/^https?:/.test(arg))??'http://127.0.0.1:5362/Electrical-Game/';
+const url=process.argv.find(arg=>/^https?:/.test(arg))??'http://127.0.0.1:5365/Electrical-Game/';
 const repro=process.argv.includes('--repro'),out='output/ready-mortar-wall';
 await mkdir(out,{recursive:true});
 const report={repro,cases:[],errors:[],fixtures:'Recipe ingredients, camera, deterministic clock and cavity impacts; real mouse/touch tool selection and casts. No FINISH click.'};

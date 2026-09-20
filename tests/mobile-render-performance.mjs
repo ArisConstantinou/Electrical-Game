@@ -10,7 +10,7 @@ try{
  for(const backend of ['webgpu','webgl']){
   const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:3,isMobile:true,hasTouch:true});await blockPointerLock(context);
   const page=await context.newPage();page.on('pageerror',e=>report.errors.push(e.message));
-  await page.goto(`http://127.0.0.1:5362/Electrical-Game/${backend==='webgl'?'?renderer=webgl':''}`);
+  await page.goto(`http://127.0.0.1:5365/Electrical-Game/${backend==='webgl'?'?renderer=webgl':''}`);
   await page.waitForFunction(()=>window.__wireTheHouse?.roomWater.waterProActive,undefined,{timeout:120000});
   await page.locator('#start-button').tap();
   await page.evaluate(async()=>{const g=window.__wireTheHouse;g.step=()=>{};await g.renderer.waitForFrame();});

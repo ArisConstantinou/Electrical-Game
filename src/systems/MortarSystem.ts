@@ -181,7 +181,9 @@ export class MortarSystem {
     point.updateWorldMatrix(true,true);
     const width=point.boxGroup.groupWidth/2+.026,height=point.boxGroup.groupHeight/2+.024;
     let added=0;
-    for(let side=0;side<4;side++)for(let i=0;i<20;i++){
+    // Leave the bottom edge open: this is the physical entry from the wide
+    // chase into the box knockouts. Top and side beds provide the bond.
+    for(let side=1;side<4;side++)for(let i=0;i<20;i++){
       const t=-.9+1.8*i/19;
       const local=new THREE.Vector3(side<2?t*width:side===2?-width:width,side<2?side===0?-height:height:t*height,-.025);
       added+=this.deposit(local.applyMatrix4(point.boxGroup.matrixWorld),.08,Z,false,.18,undefined,side*.19+i*.07,true);
@@ -189,8 +191,15 @@ export class MortarSystem {
     this.stuckMass+=added;
     this.field.finishImpact();
     this.field.tick(1.4);
+    const inverse=point.boxGroup.matrixWorld.clone().invert(),bottom=-point.boxGroup.groupHeight/2;
+    const removed=this.field.removeWhere(q=>{
+      const local=q.applyMatrix4(inverse);
+      return Math.abs(local.x)<point.boxGroup.groupWidth/2+.012&&local.y>bottom-.055&&local.y<bottom+.012&&local.z>-.08&&local.z<.04;
+    },true);
+    this.stuckMass=Math.max(0,this.stuckMass-removed);
+    if(removed>0)this.geometryRevision++;
     this.syncFieldGeometry();
-    return added;
+    return added-removed;
   }
   cancel(): void {
     this.wasHeld = false; this.charge = 0; this.heldSeconds = 0; this.overheld = false;
@@ -949,7 +958,8 @@ export class MortarSystem {
       const hit=this.field.raycast(q,direction,.065);
       if(hit&&(!stableOnly||this.field.stateAt(hit.point).age>=1.3))counts[side]++;
     }
-    const value = Math.min(...counts) / 12;
+    const requiredCounts=point.boxGroup.userData.conduitEntry==='bottom'?counts.slice(1):counts;
+    const value = Math.min(...requiredCounts) / 12;
     this.coverageCache.set(key, { time: this.simulationTime, revision: this.geometryRevision, transform, value }); return value;
   }
   get telemetry() { return { angleDegrees: this.angleDegrees, power: this.charge, throwFeedback:this.throwFeedback, recovery: this.recovery, airborne: this.projectiles.length, launchedKg: this.launchedMass, stuckKg: this.stuckMass, restingKg: this.restingMass, restingBatches: this.resting.length, floorKg: this.floorMass, movingKg: this.pendingWashMass + this.projectiles.reduce((sum, clod) => sum + clod.mass, 0), washedKg: this.washedMass, volumeField: this.field.statistics, lastImpactFootprint:this.lastImpactFootprint, wetCells: this.water.size, pendingWetGeometry:this.pendingWetGeometry, wetDrawCalls: this.wetBatches.length, patches: this.deposits.length, outcome: this.lastOutcome, initialStabilitySeconds: 1.3, freshWorkingSeconds: 3600, geometryLimit: MAX_PATCHES, coverage: this.points.map(point => ({ id: point.definition.id, fraction: this.coverage(point) })) }; }

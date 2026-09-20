@@ -3,7 +3,7 @@ import { chromium } from 'playwright';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 
-const url=process.argv[2]??'http://127.0.0.1:5366/Electrical-Game/';
+const url=process.argv[2]??'http://127.0.0.1:5365/Electrical-Game/';
 const out=resolve(process.argv[3]??'output/prepared-multi-pipe-wall');
 await mkdir(out,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:true});
@@ -29,8 +29,14 @@ try{
       const floorMouthClear=v.cavityBox({x:point.position.x-.098,y:0,z:front-.05},{x:point.position.x+.098,y:.025,z:front+.001}).clear;
       return{id:point.definition.id,widthM:.20,clear,floorMouthClear,outsideSolid,samples,coverage:g.room.brickWall.getChaseCoverage(point.definition.id)};
     });
+    const mortarEntries=g.mission.points.map(point=>{
+      const V=g.renderer.camera.position.constructor,bottom=-point.boxGroup.groupHeight/2,maxSamples=[];
+      for(let x=-point.boxGroup.groupWidth/2+.008;x<=point.boxGroup.groupWidth/2-.008;x+=.012)
+        for(let z=-.065;z<=.018;z+=.008)maxSamples.push(g.mortar.field.sample(new V(x,bottom-.018,z).applyMatrix4(point.boxGroup.matrixWorld)));
+      return{id:point.definition.id,bottomEntryClear:Math.max(0,...maxSamples)<.35,maximumMortar:Math.max(0,...maxSamples),entry:point.boxGroup.userData.conduitEntry};
+    });
     return{
-      state:JSON.parse(window.render_game_to_text()),channels,
+      state:JSON.parse(window.render_game_to_text()),channels,mortarEntries,
       mortarReady:g.mission.points.map(point=>({id:point.definition.id,ready:g.mortar.ready(point),coverage:g.mortar.coverage(point)})),
       rightWall:{name:g.room.intactPracticeWall.name,position:g.room.intactPracticeWall.position.toArray(),rotationY:g.room.intactPracticeWall.rotation.y,children:g.room.intactPracticeWall.children.length},
       render:{calls:g.renderer.webgl.info.render.calls,triangles:g.renderer.webgl.info.render.triangles},errors:[],
@@ -38,6 +44,7 @@ try{
   });
   assert(report.channels.every(channel=>channel.clear),JSON.stringify(report.channels));
   assert(report.channels.every(channel=>channel.floorMouthClear),'Every chase must be open through its bottom course to floor level.');
+  assert(report.mortarEntries.every(entry=>entry.bottomEntryClear&&entry.entry==='bottom'),JSON.stringify(report.mortarEntries));
   assert(report.channels.every(channel=>channel.outsideSolid>0),'Each wide chase must retain masonry immediately outside its 200 mm lane.');
   assert(report.channels.every(channel=>channel.coverage>=.99),JSON.stringify(report.channels));
   assert(report.state.points.every(point=>point.visible&&point.stage==='leveled'),'Every supplied box starts visible and ready for PVC.');
@@ -78,5 +85,5 @@ try{
   await mobile.close();
   report.errors=errors;
   await writeFile(join(out,'report.json'),JSON.stringify(report,null,2));
-  console.log(JSON.stringify({url,checks:['three real 200 mm multi-pipe chases open to floor','masonry retained outside lanes','three mortar-bonded level boxes','PVC action gate','untouched right wall','390 × 844 layout and prepared state','console clean'],render:report.render,report:join(out,'report.json')}));
+  console.log(JSON.stringify({url,checks:['three real 200 mm multi-pipe chases open to floor','bottom mortar removed for PVC entries','masonry retained outside lanes','three mortar-bonded level boxes','PVC action gate','untouched right wall','390 × 844 layout and prepared state','console clean'],render:report.render,report:join(out,'report.json')}));
 }finally{await browser.close();}

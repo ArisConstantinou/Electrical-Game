@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {blockPointerLock} from './browser-safety.mjs';
 
-const url=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/';
+const url=process.argv[2]??'http://127.0.0.1:5365/Electrical-Game/';
 const browser=await chromium.launch({channel:'chrome',headless:true}),context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});await blockPointerLock(context);
 const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
 try{

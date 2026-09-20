@@ -9,7 +9,7 @@ page.on('pageerror',e=>errors.push(e.message));
 try{
  await blockPointerLock(page.context());
  await page.addInitScript(()=>{const original=crypto.getRandomValues.bind(crypto);crypto.getRandomValues=array=>{if(array instanceof Uint32Array&&array.length===1){array[0]=193187;return array;}return original(array);};});
- await page.goto('http://127.0.0.1:5362/Electrical-Game/?waterPro=0',{waitUntil:'networkidle'});
+ await page.goto('http://127.0.0.1:5365/Electrical-Game/?waterPro=0',{waitUntil:'networkidle'});
  await page.locator('#start-button').click();await page.evaluate(()=>document.exitPointerLock());
  const excavation=await page.evaluate(async()=>{
   const g=window.__wireTheHouse,w=g.room.brickWall,c=g.renderer.camera.clone(false),v=w.volume;

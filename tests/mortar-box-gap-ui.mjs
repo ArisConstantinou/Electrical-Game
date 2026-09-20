@@ -3,7 +3,7 @@ import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {blockPointerLock} from './browser-safety.mjs';
 import {prepareFinishedMortar} from './prepared-mortar-fixture.mjs';
-const url=process.argv[2]??'http://127.0.0.1:5364/Electrical-Game/',out='output/mortar-box-gaps';await mkdir(out,{recursive:true});
+const url=process.argv[2]??'http://127.0.0.1:5365/Electrical-Game/',out='output/mortar-box-gaps';await mkdir(out,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:true}),report={url,fixture:'Seeded impact-cut hollow clay, visible 2G box, native finite-batch casts at fixed perimeter targets. Camera and box placement are test fixtures.',cases:[]};
 try{for(const mobile of [false,true]){
  const page=await browser.newPage({viewport:mobile?{width:390,height:844}:{width:1366,height:768},isMobile:mobile,hasTouch:mobile});await blockPointerLock(page.context());

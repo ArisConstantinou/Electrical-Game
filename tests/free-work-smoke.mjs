@@ -3,7 +3,7 @@ import { chromium } from 'playwright';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 
-const url = process.argv[2] ?? 'http://127.0.0.1:5362/Electrical-Game/';
+const url = process.argv[2] ?? 'http://127.0.0.1:5365/Electrical-Game/';
 const out = resolve(process.argv[3] ?? 'output/free-work');
 const uiOnly = process.argv.includes('--ui-only');
 await mkdir(out, { recursive: true });

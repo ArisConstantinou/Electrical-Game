@@ -5,7 +5,7 @@ import {blockPointerLock} from './browser-safety.mjs';
 import {prepareFinishedMortar} from './prepared-mortar-fixture.mjs';
 import {execFileSync} from 'node:child_process';
 import ts from 'typescript';
-const baseline=process.argv.includes('--baseline'),url='http://127.0.0.1:5364/Electrical-Game/',out=`output/followup-ui-${baseline?'before':'after'}`;await mkdir(out,{recursive:true});
+const baseline=process.argv.includes('--baseline'),url='http://127.0.0.1:5365/Electrical-Game/',out=`output/followup-ui-${baseline?'before':'after'}`;await mkdir(out,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:true}),report={url,baseline,cases:[]};
 try{for(const mobile of [false,true]){
  const page=await browser.newPage({viewport:mobile?{width:390,height:844}:{width:1366,height:768},isMobile:mobile,hasTouch:mobile});await blockPointerLock(page.context());await page.routeWebSocket('**',()=>{});const errors=[];page.on('pageerror',e=>errors.push(e.message));

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {blockPointerLock} from './browser-safety.mjs';
-const url=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/',out=process.argv[3]??'output/hammer-wall-hug';await mkdir(out,{recursive:true});
+const url=process.argv[2]??'http://127.0.0.1:5365/Electrical-Game/',out=process.argv[3]??'output/hammer-wall-hug';await mkdir(out,{recursive:true});
 const report={url,mobileIsEmulation:true,fixture:'Initial position only; subsequent desktop relative deltas use production PlayerController.look because OS Pointer Lock is forbidden. Mobile look uses native CDP touch drags; keyboard/touch approaches, manual side buttons and AUTO setting are native. No pose/contact substitutions.',cases:[],errors:[]};
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const step=(p,n=120)=>p.evaluate(async n=>{for(let i=0;i<n;i++){window.__hugStep(1/60);if((i+1)%12===0){await window.__wireTheHouse.chasing.waitForDebrisSplits();await window.__wireTheHouse.renderer.waitForFrame();}}},n);

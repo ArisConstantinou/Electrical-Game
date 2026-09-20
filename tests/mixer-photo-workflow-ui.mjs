@@ -3,7 +3,7 @@ import {chromium} from 'playwright';
 import {mkdir, writeFile} from 'node:fs/promises';
 import {blockPointerLock} from './browser-safety.mjs';
 
-const url = process.argv.find(arg => /^https?:/.test(arg)) ?? 'http://127.0.0.1:5362/Electrical-Game/';
+const url = process.argv.find(arg => /^https?:/.test(arg)) ?? 'http://127.0.0.1:5365/Electrical-Game/';
 const repro = process.argv.includes('--repro');
 const out = 'output/mixer-photo-workflow';
 await mkdir(out, {recursive:true});

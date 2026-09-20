@@ -7,7 +7,7 @@ const output='assets/exports';await mkdir(output,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:true});
 try {
  const page=await browser.newPage();await blockPointerLock(page.context());
- await page.goto('http://127.0.0.1:5364/Electrical-Game/');await page.waitForFunction(()=>window.__wireTheHouse);
+ await page.goto('http://127.0.0.1:5365/Electrical-Game/');await page.waitForFunction(()=>window.__wireTheHouse);
  for(const kind of ['wheelbarrow','concrete-mixer']){
   const encoded=await page.evaluate(async kind=>{
    const models=await import('/Electrical-Game/output/site-equipment-export.js');

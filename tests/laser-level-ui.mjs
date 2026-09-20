@@ -4,7 +4,7 @@ import {mkdir,writeFile} from 'node:fs/promises';
 import {blockPointerLock} from './browser-safety.mjs';
 import {serveTaskBuild} from './serve-task-build.mjs';
 
-const url=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/';
+const url=process.argv[2]??'http://127.0.0.1:5365/Electrical-Game/';
 const out=process.argv[3]??'output/laser-level-ui';await mkdir(out,{recursive:true});
 const report={url,mobileIsEmulation:true,fixture:'Only camera position and deterministic game steps prepare native interactions. Actual room wall rays, tool reach, pencil marks, drill/fasten timings and laser placement remain active. A saved-node masonry cut tests a real through-hole. Paired renders temporarily disable only the mounted laser illumination to locate actual projected pixels. Pointer Lock is rejected.',cases:[],errors:[]};
 const browser=await chromium.launch({channel:'chrome',headless:true});

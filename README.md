@@ -7,7 +7,7 @@ npm install
 npm run dev
 ```
 
-Open `http://127.0.0.1:5362/Electrical-Game/`.
+Open `http://127.0.0.1:5365/Electrical-Game/`.
 
 Web Game Studio can open the repository through `studio.webgame.json`; its runtime entrypoint is `/Electrical-Game/?studio=1`.
 

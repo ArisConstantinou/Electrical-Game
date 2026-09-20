@@ -5,7 +5,7 @@ import {blockPointerLock} from './browser-safety.mjs';
 import {execFileSync} from 'node:child_process';
 import ts from 'typescript';
 
-const url=process.argv.find(a=>/^https?:/.test(a))??'http://127.0.0.1:5362/Electrical-Game/';
+const url=process.argv.find(a=>/^https?:/.test(a))??'http://127.0.0.1:5365/Electrical-Game/';
 const repro=process.argv.includes('--repro');
 // Reproduction serves the committed pre-fix module without changing the shared checkout.
 const baselineRef=process.argv.find(a=>a.startsWith('--baseline-ref='))?.split('=')[1]??'HEAD';

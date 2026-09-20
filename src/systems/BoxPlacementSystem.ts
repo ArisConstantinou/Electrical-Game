@@ -42,6 +42,7 @@ export class BoxPlacementSystem {
     point.boxGroup.userData.placement=placement;
     point.boxGroup.userData.minimumDepth=-.058;
     point.boxGroup.userData.finishDepth=0;
+    point.boxGroup.userData.conduitEntry='bottom';
     this.boxesRevision++;
     point.chaseHits=1;
     point.pipeStep='measure';

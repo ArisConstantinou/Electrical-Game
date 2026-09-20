@@ -2,6 +2,7 @@ Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web gam
 
 ## 2026-09-20 · Prepared multi-pipe wall
 
+- Port 5365 is the single saved runtime default across Vite, Studio, launchers and live QA; 5366 is no longer used by this preview.
 - Current request: start directly at the PVC phase. The main wall must have real wide chases and boxes already secured with mortar; preserve an untouched masonry wall on the right side.
 - Implementation uses 200 mm clear vertical masonry openings for multiple parallel 20 mm conduits. Cavities, mortar coverage and bonded box state use the existing physical volume systems.
 - Work is isolated in the `prepared-multi-pipe-wall` managed worktree from active preview commit `8e0c26c`; the existing port 5365 server remains untouched.
@@ -9,6 +10,8 @@ Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web gam
 - Final desktop WebGL headless comparison against the active 5365 baseline: 1.19 ms mean / 2.70 ms p95 / 42 calls / 322,837 triangles before; 1.87 ms mean / 2.90 ms p95 / 132 calls / 492,461 triangles for the prepared scene. This is not physical-phone evidence.
 - User screenshot caught a surviving bottom brick course at all three chase mouths. The authored carve now continues below the wall's first lattice row, and QA samples the complete 200 mm opening from 6 mm above the floor plus a dedicated 0–25 mm floor-mouth volume.
 - A 390×844 touch-emulated startup check confirms no horizontal overflow, readable prepared-wall copy and the same three leveled/mortar-bonded PVC-ready points. Physical iPhone/Safari remains unverified.
+- User screenshot identified mortar closing the lower conduit entries. Prepared boxes now omit the bottom mortar bed and clear any side-bed overlap from a 55 mm-high strip below each box, while top/left/right mortar retains the bond. QA samples the actual mortar field through each complete bottom opening before exercising the PVC gate.
+- Final validation on the single strict-port URL `http://127.0.0.1:5365/Electrical-Game/`: all three bottom-entry samples report zero mortar, prepared-wall desktop/mobile QA passes, masonry acceptance has zero failures, Studio contract is 10/10, typecheck/build and the bundled game client pass. Port 5366 has no listener; mobile evidence remains Chromium emulation rather than a physical iPhone.
 
 ## 2026-09-20 · Full-body WASD locomotion, editable rig and exports
 

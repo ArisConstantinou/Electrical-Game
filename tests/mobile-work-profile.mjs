@@ -3,7 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { blockPointerLock } from './browser-safety.mjs';
 
-const url=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/?renderer=webgl';
+const url=process.argv[2]??'http://127.0.0.1:5365/Electrical-Game/?renderer=webgl';
 const out=process.argv[3]??'output/mobile-work-profile';await mkdir(out,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const report={url,method:'Real RAF, 390x844 touch Chromium with device scale 3. Native tool selection/held USE; controlled sinusoidal camera rotation. Inclusive CPU timings overlap. Emulation, not physical iPhone FPS.',stages:[],errors:[]};

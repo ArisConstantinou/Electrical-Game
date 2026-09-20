@@ -3,7 +3,7 @@ import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {blockPointerLock} from './browser-safety.mjs';
 
-const base=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/',out=process.argv[3]??'output/hose-fracture-ui';
+const base=process.argv[2]??'http://127.0.0.1:5365/Electrical-Game/',out=process.argv[3]??'output/hose-fracture-ui';
 await mkdir(out,{recursive:true});
 const report={base,mobileIsEmulation:true,fixture:'Actual chisel impacts create the recess. Native held USE wets it under real RAF; screenshots sample the same fixed camera. No material, contact or rendering methods are stubbed.',cases:[],errors:[]};
 const browser=await chromium.launch({channel:'chrome',headless:true});

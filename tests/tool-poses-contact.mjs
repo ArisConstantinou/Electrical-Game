@@ -3,7 +3,7 @@ import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import { blockPointerLock } from './browser-safety.mjs';
 
-const url=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/';
+const url=process.argv[2]??'http://127.0.0.1:5365/Electrical-Game/';
 const out=process.argv[3]??'output/tool-poses-contact';await mkdir(out,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const report={url,fixture:'Deterministic camera/angle matrix. Each case restores the real pristine masonry save, settles production Game.step, and strikes through BrickWall.removeAtAim and the real FPS contact provider. Native input is covered separately by shared-tool-view-ui.',cases:[],errors:[]};

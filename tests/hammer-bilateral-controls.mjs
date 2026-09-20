@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {blockPointerLock} from './browser-safety.mjs';
-const url=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/',out=process.argv[3]??'output/hammer-bilateral-controls';await mkdir(out,{recursive:true});
+const url=process.argv[2]??'http://127.0.0.1:5365/Electrical-Game/',out=process.argv[3]??'output/hammer-bilateral-controls';await mkdir(out,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const report={url,mobileIsEmulation:true,fixture:'Initial camera placement and deterministic clock only. Real Q/J/K keys, visible buttons, settings and held keyboard/touch strokes. Pointer Lock blocked before navigation.',cases:[],errors:[]};
 const step=(p,n=120)=>p.evaluate(async n=>{for(let i=0;i<n;i++){window.__sideStep(1/60);if((i+1)%12===0){await window.__wireTheHouse.chasing.waitForDebrisSplits();await window.__wireTheHouse.renderer.waitForFrame();}}},n);

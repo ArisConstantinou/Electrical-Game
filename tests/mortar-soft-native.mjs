@@ -3,7 +3,7 @@ import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {blockPointerLock} from './browser-safety.mjs';
 import {prepareFinishedMortar} from './prepared-mortar-fixture.mjs';
-const url=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/',out=process.argv[3]??'output/mortar-soft-native';await mkdir(out,{recursive:true});
+const url=process.argv[2]??'http://127.0.0.1:5365/Electrical-Game/',out=process.argv[3]??'output/mortar-soft-native';await mkdir(out,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:true}),report={url,mobileIsEmulation:true,fixture:'120 × 100 mm real hollow-clay opening, impacts limited to 40 mm requested depth. Actual exposed internal chambers are measured, never replaced by an analytical wall. Native hold/release uses the production hand release point and projectile solver.',cases:[]};
 try{for(const mobile of [false,true]){
  const platform=mobile?'mobile':'desktop';if(process.env.QA_PLATFORM&&process.env.QA_PLATFORM!==platform)continue;

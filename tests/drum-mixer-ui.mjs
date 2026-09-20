@@ -7,7 +7,7 @@ const browser=await chromium.launch({channel:'chrome',headless:true});
 try{for(const mobile of [false,true]){
  const page=await browser.newPage({viewport:mobile?{width:390,height:844}:{width:1440,height:900},isMobile:mobile,hasTouch:mobile});await blockPointerLock(page.context());await page.routeWebSocket('**',()=>{});
  page.on('pageerror',e=>report.errors.push(e.message));page.on('console',m=>{if(m.type()==='error')report.errors.push(m.text());});
- await page.goto('http://127.0.0.1:5364/Electrical-Game/?renderer=webgl');await page.waitForFunction(()=>window.__wireTheHouse);await page.locator('#start-button')[mobile?'tap':'click']();await page.waitForTimeout(600);
+ await page.goto('http://127.0.0.1:5365/Electrical-Game/?renderer=webgl');await page.waitForFunction(()=>window.__wireTheHouse);await page.locator('#start-button')[mobile?'tap':'click']();await page.waitForTimeout(600);
  await page.evaluate(()=>{const g=window.__wireTheHouse;window.drumStep=g.step.bind(g);g.step=()=>{};});
  const step=n=>page.evaluate(n=>{for(let i=0;i<n;i++)window.drumStep(1/60);},n);
  const state=()=>page.evaluate(()=>window.__wireTheHouse.mixing.telemetry);

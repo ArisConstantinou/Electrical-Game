@@ -3,7 +3,7 @@ import { createServer } from 'node:http';
 import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
-const gameOrigin = 'http://127.0.0.1:5362';
+const gameOrigin = 'http://127.0.0.1:5365';
 const gameUrl = `${gameOrigin}/Electrical-Game/?studio=1`;
 const output = new URL('../output/qa/', import.meta.url);
 const sidecar = new URL('../.studio/wire-the-house-overrides.json', import.meta.url);

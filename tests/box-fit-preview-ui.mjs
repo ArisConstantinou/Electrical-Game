@@ -3,7 +3,7 @@ import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {blockPointerLock} from './browser-safety.mjs';
 
-const out=process.argv[2]??'output/box-fit-preview-ui',base=new URL(process.env.QA_BASE??'http://127.0.0.1:5362/Electrical-Game/');
+const out=process.argv[2]??'output/box-fit-preview-ui',base=new URL(process.env.QA_BASE??'http://127.0.0.1:5365/Electrical-Game/');
 if(process.env.QA_WEBGL==='1')base.searchParams.set('renderer','webgl');
 const url=base.href;await mkdir(out,{recursive:true});
 const report={url,mobileIsEmulation:true,fixture:'Real saved MasonryVolume node removals create narrow, shallow and full-depth recesses plus a front-shell cutaway. Actual geometry and collision stay active. Native keyboard/touch controls select presets, refuse blocked insertion, place and retrieve casings; only camera and simulation clock are fixtures.',cases:[],errors:[]};

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {blockPointerLock} from './browser-safety.mjs';
-const url=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/',out=process.argv[3]??'output/debris-restrike-ui';
+const url=process.argv[2]??'http://127.0.0.1:5365/Electrical-Game/',out=process.argv[3]??'output/debris-restrike-ui';
 await mkdir(out,{recursive:true});const browser=await chromium.launch({channel:'chrome',headless:true});
 const report={url,fixture:'Real moving 35-degree masonry cuts create lodged fragments. Starting cut and camera are fixtures; rebreaking uses native held keyboard/touch with production tool contact. No particle scaling/relocation. Pointer Lock prohibited. Mobile is browser emulation.',cases:[],errors:[]};
 const step=(page,n)=>page.evaluate(async n=>{for(let i=0;i<n;i++){window.__debrisStep(1/60);if(i%12===11)await window.__wireTheHouse.chasing.waitForDebrisSplits()}},n);

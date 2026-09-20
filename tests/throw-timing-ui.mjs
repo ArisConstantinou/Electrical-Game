@@ -5,7 +5,7 @@ import { resolve, join } from 'node:path';
 import { blockPointerLock } from './browser-safety.mjs';
 import { prepareFinishedMortar } from './prepared-mortar-fixture.mjs';
 
-const url = process.argv[2] ?? 'http://127.0.0.1:5362/Electrical-Game/';
+const url = process.argv[2] ?? 'http://127.0.0.1:5365/Electrical-Game/';
 const out = resolve(process.argv[3] ?? 'output/throw-timing-ui');
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch({ channel: 'chrome', headless: true });

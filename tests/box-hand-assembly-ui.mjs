@@ -3,7 +3,7 @@ import { chromium } from 'playwright';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { blockPointerLock } from './browser-safety.mjs';
 
-const url=process.env.QA_BASE??'http://127.0.0.1:5366/Electrical-Game/',out=process.argv[2]??'output/box-hand-assembly-ui';await mkdir(out,{recursive:true});
+const url=process.env.QA_BASE??'http://127.0.0.1:5365/Electrical-Game/',out=process.argv[2]??'output/box-hand-assembly-ui';await mkdir(out,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:true}),report={url,mobileIsEmulation:true,cases:[],errors:[]};
 const step=(page,n=2)=>page.evaluate(n=>{for(let i=0;i<n;i++)window.__boxAssemblyStep(1/60);},n);
 async function fixture(page){return page.evaluate(async()=>{

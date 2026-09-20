@@ -11,7 +11,7 @@ for(const backend of process.argv.includes('--gpu-only')?['webgpu']:['webgpu','w
  await blockPointerLock(page.context());
  if(process.env.QA_FREEZE_HMR==='1')await page.addInitScript(()=>{const Original=window.WebSocket;window.WebSocket=class extends Original{addEventListener(type,callback,options){if(type!=='message')return super.addEventListener(type,callback,options);return super.addEventListener(type,event=>{try{if(['update','full-reload'].includes(JSON.parse(event.data).type))return;}catch{}if(typeof callback==='function')callback.call(this,event);else callback?.handleEvent(event);},options);}};});
  page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
- await page.goto(`http://127.0.0.1:5362/Electrical-Game/${backend==='webgl'?'?renderer=webgl':''}`,{waitUntil:'networkidle'});
+ await page.goto(`http://127.0.0.1:5365/Electrical-Game/${backend==='webgl'?'?renderer=webgl':''}`,{waitUntil:'networkidle'});
  await page.waitForFunction(()=>window.__wireTheHouse,{timeout:120000});
  await page.locator('#start-button').click();await page.waitForTimeout(200);
  if(backend==='webgpu'){

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {blockPointerLock} from './browser-safety.mjs';
-const url=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/',out=process.argv[3]??'output/mobile-manual-input';
+const url=process.argv[2]??'http://127.0.0.1:5365/Electrical-Game/',out=process.argv[3]??'output/mobile-manual-input';
 await mkdir(out,{recursive:true});
 const report={url,mobileIsEmulation:true,cases:[],errors:[],fixture:'Native CDP multi-touch. Initial placement and deterministic clock only; saved legacy control modes use their public setter. Lost capture is exercised using the real releasePointerCapture API.'};
 const browser=await chromium.launch({channel:'chrome',headless:true});

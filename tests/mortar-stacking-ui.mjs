@@ -3,7 +3,7 @@ import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import { blockPointerLock } from './browser-safety.mjs';
 import {prepareFinishedMortar} from './prepared-mortar-fixture.mjs';
-const url=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/';
+const url=process.argv[2]??'http://127.0.0.1:5365/Electrical-Game/';
 const out=process.argv[3]??'output/mortar-stacking-ui';await mkdir(out,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const report={url,mobileIsEmulation:true,fixture:'A broad recess cut by actual MasonryVolume impacts; no box or authored mortar. Camera placements, aim targets, material seed and deterministic clock are fixtures; the close-to-far retreat uses native mobile movement. Every scoop uses native keyboard or touch hold/release. Deposit instrumentation delegates unchanged to the actual method.',scenarios:[],errors:[]};

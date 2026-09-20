@@ -5,7 +5,7 @@
   "name": "WIRE THE HOUSE",
   "runtime": {
     "host": "127.0.0.1",
-    "port": 5362,
+    "port": 5365,
     "strictPort": true,
     "npmScript": "studio:webgame",
     "entrypoints": [

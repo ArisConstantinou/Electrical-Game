@@ -3,7 +3,7 @@ import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import { blockPointerLock } from './browser-safety.mjs';
 
-const url=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/';
+const url=process.argv[2]??'http://127.0.0.1:5365/Electrical-Game/';
 const out=process.argv[3]??'output/continuous-chase-ui';
 const baseline=process.env.CHASE_BASELINE==='1';
 await mkdir(out,{recursive:true});

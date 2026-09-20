@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {blockPointerLock} from './browser-safety.mjs';
-const url=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/',out=process.argv[3]??'output/tool-selection-stability';await mkdir(out,{recursive:true});
+const url=process.argv[2]??'http://127.0.0.1:5365/Electrical-Game/',out=process.argv[3]??'output/tool-selection-stability';await mkdir(out,{recursive:true});
 const report={url,cases:[],failures:[],errors:[],mobileIsEmulation:true,fixture:'Native keyboard, wheel and touch controls. Fixed starting placement; desktop look uses production PlayerController.look with OS Pointer Lock blocked.'};
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const check=(v,message)=>{if(!v)report.failures.push(message);};

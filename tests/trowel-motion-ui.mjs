@@ -4,7 +4,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { blockPointerLock } from './browser-safety.mjs';
 import { prepareFinishedMortar } from './prepared-mortar-fixture.mjs';
 
-const url = process.argv[2] ?? 'http://127.0.0.1:5362/Electrical-Game/';
+const url = process.argv[2] ?? 'http://127.0.0.1:5365/Electrical-Game/';
 const out = process.argv[3] ?? 'output/trowel-motion';
 await mkdir(out, { recursive: true });
 const report = { url, mobileIsEmulation: true, fixture: 'Real native keyboard/touch hold and release. Only initial camera and masonry excavation are authored; production Game.step, rig, timed scoop and projectile launch remain intact. Pointer Lock blocked before navigation.', cases: [], errors: [] };

@@ -4,7 +4,7 @@ import {mkdir, writeFile} from 'node:fs/promises';
 import {blockPointerLock} from './browser-safety.mjs';
 import {serveTaskBuild} from './serve-task-build.mjs';
 
-const url=process.argv[2]??'http://127.0.0.1:5362/Electrical-Game/';
+const url=process.argv[2]??'http://127.0.0.1:5365/Electrical-Game/';
 const out=process.argv[3]??'output/height-measure-ui';
 await mkdir(out,{recursive:true});
 const report={url,mobileIsEmulation:true,fixture:'Only camera position/pitch and the simulation clock are fixtures. Real wall rays, reach, tape, pencil marks and damage remain active. Native keyboard/touch select, mark, crouch and move; mobile view swipes also change the live reading. Automated Pointer Lock is rejected.',cases:[],errors:[]};
