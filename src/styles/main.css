@@ -373,9 +373,9 @@ button {
 .tool-quick-button {touch-action:manipulation;}
 @media (pointer:coarse),(max-width:760px) {
   #mobile-move-zone {display:block;position:fixed;left:0;top:35dvh;bottom:142px;width:50vw;pointer-events:auto;z-index:1;touch-action:none;}
-  #joystick {position:fixed;z-index:2;bottom:142px;width:112px;height:112px;opacity:.5;}
+  #joystick {position:fixed;z-index:2;left:max(14px,env(safe-area-inset-left));bottom:calc(158px + env(safe-area-inset-bottom));width:112px;height:112px;opacity:.7;}
   #joystick.active {opacity:1;}
-  #look-joystick,#game-shell.aim-input-drag #look-joystick {position:fixed;z-index:3;right:max(14px,env(safe-area-inset-right));bottom:170px;width:112px;height:112px;border-radius:50%;}
+  #look-joystick,#game-shell.aim-input-drag #look-joystick {position:fixed;z-index:3;right:max(14px,env(safe-area-inset-right));bottom:calc(158px + env(safe-area-inset-bottom));width:112px;height:112px;border-radius:50%;}
   #look-joystick .look-joystick-ring,#game-shell.aim-input-drag .look-joystick-ring {border-radius:50%;border:1px solid #c2e4ed77;background:rgba(18,31,34,.17);box-shadow:inset 0 0 0 12px #ffffff06;}
   #look-joystick .look-joystick-ring::before,#look-joystick .look-joystick-ring::after,#game-shell.aim-input-drag #drag-aim-cue {display:none;}
   #look-joystick-thumb,#game-shell.aim-input-drag #look-joystick-thumb {display:flex;flex-direction:column;justify-content:center;gap:3px;width:58px;height:58px;border:1px solid #b7dde58c;background:rgba(34,80,94,.58);box-shadow:none;}
@@ -409,8 +409,8 @@ button {
   .settings-open #tool-quick-controls,.settings-open #aim-quick-controls {visibility:hidden;}
 }
 @media (pointer:coarse) and (max-height:520px) {
-  #look-joystick,#game-shell.aim-input-drag #look-joystick,#joystick {width:96px;height:96px;bottom:137px;}
-  #look-joystick,#game-shell.aim-input-drag #look-joystick {bottom:170px;}
+  #look-joystick,#game-shell.aim-input-drag #look-joystick,#joystick {width:96px;height:96px;bottom:calc(156px + env(safe-area-inset-bottom));}
+  #mobile-use-status{left:auto;right:0;transform:none;}
   #look-joystick-thumb {width:52px;height:52px;}
   #tool-quick-controls {right:132px;}
   #aim-quick-controls {grid-template-columns:repeat(2,54px);top:auto;bottom:calc(max(7px,env(safe-area-inset-bottom)) + 65px);}
@@ -545,3 +545,6 @@ button {
   #box-fit-size { line-height:1; }
   #box-fit-status { line-height:1.15; }
 }
+/* These work cards already provide the action hint. Avoid a second overlay. */
+@media(pointer:coarse){#game-shell:is([data-active-tool="measure"],[data-active-tool="laser"],[data-active-tool="drill"],[data-active-tool="driver"]) #interaction-prompt{display:none}}
+@media(pointer:coarse) and (max-height:520px){#mobile-interact{top:62px;bottom:auto;right:108px;min-height:44px}}

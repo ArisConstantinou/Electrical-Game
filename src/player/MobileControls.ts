@@ -162,8 +162,8 @@ export class MobileControls {
       this.joystickPointer = event.pointerId; this.moveX = event.clientX; this.moveY = event.clientY;
       const joystick = this.surface.querySelector<HTMLElement>('#joystick');
       if (joystick) {
-        joystick.style.left = `${this.moveX}px`; joystick.style.top = `${this.moveY}px`;
-        joystick.style.right = 'auto'; joystick.style.bottom = 'auto'; joystick.style.transform = 'translate(-50%, -50%)';
+        // The visible pad stays aligned with AIM. Touching anywhere in the
+        // move zone still starts neutral, with travel measured from that touch.
         joystick.classList.add('active');
       }
       this.capture(joystick ?? this.surface, event.pointerId); this.input.resetMobileMove();
@@ -183,12 +183,13 @@ export class MobileControls {
     if (event.pointerId === this.joystickPointer) {
       event.preventDefault();
       const joystick = this.surface.querySelector<HTMLElement>('#joystick');
-      const radius = Math.max(1, (joystick?.getBoundingClientRect().width ?? 112) * .34);
+      const radius = Math.max(1, (joystick?.getBoundingClientRect().width ?? 112) / 2);
       let x = event.clientX - this.moveX, y = event.clientY - this.moveY;
       const length = Math.hypot(x, y); if (length > radius) { x *= radius / length; y *= radius / length; }
-      this.input.mobileMove = { x: x / radius, y: y / radius };
+      const raw=Math.min(1,length/radius),amount=raw<=.08?0:((raw-.08)/.92)**1.35;
+      this.input.mobileMove = { x: length>0?x/Math.min(length,radius)*amount:0, y: length>0?y/Math.min(length,radius)*amount:0 };
       const thumb = this.surface.querySelector<HTMLElement>('#joystick-thumb');
-      if (thumb) thumb.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
+      if (thumb) thumb.style.transform = `translate(calc(-50% + ${x*.52}px), calc(-50% + ${y*.52}px))`;
     } else if (event.pointerId === this.lookActionPointer) {
       event.preventDefault();
       const action = this.surface.querySelector<HTMLElement>('#look-joystick');

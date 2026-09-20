@@ -147,7 +147,10 @@ export class WorkerBody extends THREE.Group {
     this.clock+=dt;
     for(const [b,r]of this.rest){b.quaternion.copy(r.q);b.position.copy(r.p);}
     const cartGrip=stationGrips.some(g=>g.palmDirection);
-    const crouch=cartGrip?0:player.eyeHeight<1.1?1:0;this.bend=THREE.MathUtils.damp(this.bend,crouch,14,Math.min(dt,.05));
+    // The eye already eases between heights. Follow its actual position,
+    // including low socket work, rather than snapping the torso at 1.1 m
+    // while the camera is still travelling through it.
+    this.bend=cartGrip?0:THREE.MathUtils.clamp((1.65-camera.position.y)/.70,0,1);
     const speed=Math.hypot(player.velocity.x,player.velocity.z);
     const grips=station?stationGrips:fps.anatomicalGrips();
     const yawQ=new THREE.Quaternion().setFromAxisAngle(Y,player.yaw),forward=new THREE.Vector3(0,0,-1).applyQuaternion(yawQ),right=new THREE.Vector3(1,0,0).applyQuaternion(yawQ);
@@ -169,7 +172,7 @@ export class WorkerBody extends THREE.Group {
     this.position.set(camera.position.x+Math.sin(player.yaw)*bodyOffset,0,camera.position.z+Math.cos(player.yaw)*bodyOffset);this.rotation.set(0,bodyYaw,0);
     if(cartFrame){this.position.copy(cartFrame.position);this.quaternion.copy(cartFrame.quaternion);}
     this.updateMatrixWorld(true);
-    const pelvis=this.bone('pelvis'),position=pelvis.getWorldPosition(new THREE.Vector3());position.y-=this.bend*.44;
+    const pelvis=this.bone('pelvis'),position=pelvis.getWorldPosition(new THREE.Vector3());position.y-=this.bend*.44+(cartGrip?0:Math.max(0,.95-camera.position.y));
     position.x+=Math.sin(player.yaw)*this.bend*.15;position.z+=Math.cos(player.yaw)*this.bend*.15;
     // Locomotion starts at the centre of mass, not at the ankles. Two vertical
     // pulses per cycle follow the two contacts, while lateral sway transfers
@@ -293,6 +296,19 @@ export class WorkerBody extends THREE.Group {
         this.setHandOrientation(side,alignedRadial,alignedLong);
         rotation.premultiply(graspQ);
         this.wrapGrip(side,center,rotation,[.0335,.0335],true,working,'round',undefined,buttonTarget);
+        if(player.pitch<-.65){
+          // Fit the already calibrated can/fingers/forearm together when the
+          // eye looks down. A crouch must not push the hand above the screen.
+          const inverse=canQ.clone().invert(),elbow=this.point('forearm.R'),wrist=this.point('hand.R');
+          const foreQ=this.bone('forearm.R').getWorldQuaternion(new THREE.Quaternion());
+          const bounds=fps.heldToolBoundsWorld(),corners:THREE.Vector3[]=[];
+          for(const x of [bounds.min.x,bounds.max.x])for(const y of [bounds.min.y,bounds.max.y])for(const z of [bounds.min.z,bounds.max.z])corners.push(new THREE.Vector3(x,y,z).sub(center).applyQuaternion(inverse));
+          const frame={shoulder:this.point('upper_arm.R'),upperLength:this.point('upper_arm.R').distanceTo(elbow),elbow:elbow.clone().sub(center).applyQuaternion(inverse),wrist:wrist.clone().sub(center).applyQuaternion(inverse),handSign:1,lockRotation:true};
+          const pose=solveRigidGrasp(center,canQ,frame,camera,corners,frontForBounds);
+          this.orient('upper_arm.R',frame.elbow.clone().applyQuaternion(pose.rotation).add(pose.center));
+          this.worldRotation(this.bone('forearm.R'),foreQ);
+          fps.transformAnatomicalGrasp(center,pose.center,new THREE.Quaternion());
+        }
         const finalDirection=Y.clone().applyQuaternion(this.bone('index.03.R').getWorldQuaternion(new THREE.Quaternion()));
         const finalPlanar=finalDirection.clone().addScaledVector(axis,-finalDirection.dot(axis)).normalize();
         this.fingerFit.sprayForward={dot:finalPlanar.dot(nozzleDirection),wristBendDegrees:THREE.MathUtils.radToDeg(alignedLong.angleTo(this.point('hand.R').sub(this.point('forearm.R')).normalize())),long:alignedLong.toArray(),wrist:this.point('hand.R').toArray(),elbow:this.point('forearm.R').toArray(),shoulder:shoulder.toArray()};
@@ -544,7 +560,7 @@ export class WorkerBody extends THREE.Group {
     this.clampBoxComposition(objects,grips,camera,fps);
   }
   private poseReferenceGrasps(grips:WorkerGripTarget[],camera:THREE.PerspectiveCamera,fps:FPSRig,station:boolean,right:THREE.Vector3,frontForBounds?: (bounds:THREE.Box3)=>number|null):Set<string>{
-    const targets=grips.filter(g=>g.active&&g.object&&g.referenceKey&&this.referenceGrips[g.referenceKey]);
+    const targets=grips.filter(g=>g.active&&g.object&&g.referenceKey&&this.referenceGrips[g.referenceKey]&&!(g.referenceKey==='measure:R'&&g.contactLocked));
     const solved=new Set<string>();if(!targets.length){this.graspHistory=undefined;return solved;}
     const primary=targets[0],inverse=primary.rotation.clone().invert(),object=primary.object!;
     const frames=targets.filter(g=>g.object===object).map(grip=>{
@@ -554,7 +570,7 @@ export class WorkerBody extends THREE.Group {
       const elbow=new THREE.Vector3().fromArray(fore.positionInGrip).applyQuaternion(rotation).add(offset);
       const wrist=new THREE.Vector3().fromArray(hand.positionInGrip).applyQuaternion(rotation).add(offset);
       const shoulder=this.point('upper_arm.'+side),upperLength=shoulder.distanceTo(this.point('forearm.'+side));
-      return{side,reference,fore,hand,rotation,shoulder,upperLength,elbow,wrist};
+      return{side,reference,fore,hand,rotation,shoulder,upperLength,elbow,wrist,handSign:grip.side,lockRotation:grip.referenceKey==='drill:R'||grip.referenceKey==='driver:R'};
     });
     const contact=primary.contactLocked;
     if(this.graspTool!==primary.referenceKey||contact)this.graspHistory=undefined;

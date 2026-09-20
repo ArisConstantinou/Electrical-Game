@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
 export type ReferenceToolKind='drill'|'driver'|'laser';
 
@@ -9,6 +10,12 @@ export function buildReferenceToolModel(kind:ReferenceToolKind):THREE.Group {
   const paint=new THREE.MeshStandardMaterial({color:kind==='drill'?0xbf3429:kind==='driver'?0x287fa1:0x67a82d,roughness:.48});
   const steel=new THREE.MeshStandardMaterial({color:0xaab4b5,metalness:.60,roughness:.38});
   const part=(parent:THREE.Group,name:string,geometry:THREE.BufferGeometry,material:THREE.Material,x:number,y:number,z:number)=>{
+    // Moulded shells and rubber guards need radiused edges at hand distance.
+    // Keep optical faces, metal plates and tiny switch details flat.
+    if(geometry instanceof THREE.BoxGeometry&&/housing|bumper|guard|pistol grip|battery|Battery|latch|foot/i.test(name)){
+      const {width,height,depth}=geometry.parameters;geometry.dispose();
+      geometry=new RoundedBoxGeometry(width,height,depth,2,Math.min(width,height,depth)*.16);
+    }
     const mesh=new THREE.Mesh(geometry,material);mesh.name=name;mesh.position.set(x,y,z);mesh.renderOrder=20;mesh.receiveShadow=true;mesh.castShadow=false;mesh.userData.toolModelPart=true;parent.add(mesh);return mesh;
   };
   if(kind==='laser'){
@@ -25,7 +32,7 @@ export function buildReferenceToolModel(kind:ReferenceToolKind):THREE.Group {
     };
     // The datum remains the exposed screw beside the unit. The high optical
     // turret shares its Y=0 plane while the recognisable M12 body sits below it.
-    part(group,'Laser wall mounting plate',new THREE.BoxGeometry(.166,.023,.009),black,.065,0,.0045);
+    part(group,'Laser wall mounting plate',new THREE.BoxGeometry(.231,.023,.009),black,.0975,0,.0045);
     part(group,'Magnetic mount rear upright',new THREE.BoxGeometry(.019,.160,.011),black,.202,-.066,.010);
     part(group,'Wide pivoting mounting foot',new THREE.BoxGeometry(.167,.013,.097),softBlack,.125,-.151,.052);
     profile('Angular rubber armoured M12 shell',[[.053,-.142],[.202,-.142],[.207,-.099],[.167,-.081],[.133,-.033],[.121,-.018],[.069,-.018],[.054,-.037]],.064,.019,softBlack);
@@ -88,22 +95,33 @@ export function buildReferenceToolModel(kind:ReferenceToolKind):THREE.Group {
   }
   const drill=kind==='drill',bodyLength=drill?.135:.092;
   part(group,'Rubber pistol grip',new THREE.BoxGeometry(.039,.089,.043),black,0,-.008,.011);
-  part(group,'Grip colour inlay',new THREE.BoxGeometry(.040,.070,.013),paint,0,-.009,.033);
+  part(group,'Grip colour inlay',new RoundedBoxGeometry(.034,.068,.014,2,.005),paint,0,-.009,.032);
   part(group,'Battery pack rubber base',new THREE.BoxGeometry(.077,.040,.084),black,0,-.070,.016);
   part(group,'Battery latch',new THREE.BoxGeometry(.080,.018,.027),paint,0,-.059,.038);
-  const body=part(group,drill?'Cordless drill motor housing':'Compact impact driver housing',new THREE.CylinderGeometry(.038,.041,bodyLength,20),paint,0,.064,-.011-bodyLength/2);body.rotation.x=Math.PI/2;
-  part(group,'Rear motor bumper',new THREE.BoxGeometry(.069,.067,.019),black,0,.064,-.006);
-  for(let i=0;i<4;i++)part(group,'Motor ventilation slot',new THREE.BoxGeometry(.002,.031,.004),black,.039,.065,-.035-i*.011);
+  // A tapered motor shell, narrow gearbox and swept grip shoulder replace
+  // the uniform red barrel. Anchor/bit datums stay in metre space.
+  const profile=[new THREE.Vector2(0,0),new THREE.Vector2(.027,0),new THREE.Vector2(.034,.008),new THREE.Vector2(.037,.028),new THREE.Vector2(.035,bodyLength*.64),new THREE.Vector2(.029,bodyLength-.015),new THREE.Vector2(.026,bodyLength),new THREE.Vector2(0,bodyLength)];
+  const body=part(group,drill?'Cordless drill motor housing':'Compact impact driver housing',new THREE.LatheGeometry(profile,24),paint,0,.064,-.011);body.rotation.x=-Math.PI/2;
+  part(group,'Rear motor bumper',new THREE.BoxGeometry(.059,.058,.014),black,0,.064,-.007);
+  const shoulder=part(group,'Contoured motor grip shoulder',new RoundedBoxGeometry(.042,.051,.067,2,.011),paint,0,.024,-.015);shoulder.rotation.x=-.15;
+  for(const side of [-1,1]){
+    for(let i=0;i<5;i++){const vent=part(group,'Recessed motor ventilation slot',new RoundedBoxGeometry(.003,.020,.0035,1,.001),black,side*.033,.063,-.029-i*.008);vent.rotation.x=-.22;}
+    for(let i=0;i<4;i++)part(group,'Grip rubber traction rib',new RoundedBoxGeometry(.002,.002,.028,1,.0008),black,side*.020,-.024+i*.009,.010);
+    for(const z of [-.023,-.070]){const screw=part(group,'Recessed motor screw',new THREE.CylinderGeometry(.002,.002,.0015,8),steel,side*.034,.048,z);screw.rotation.z=Math.PI/2;}
+  }
   part(group,'Index finger trigger',new THREE.BoxGeometry(.022,.021,.013),black,0,.018,-.019);
   part(group,'Forward reverse switch',new THREE.BoxGeometry(.047,.009,.013),black,0,.031,-.020);
   const motor=new THREE.Group();motor.name='reference-motor';motor.position.set(0,.064,-.012-bodyLength);group.add(motor);
+  const collar=part(group,'Fixed torque selection collar',new THREE.CylinderGeometry(.027,.029,.023,32),black,0,.064,motor.position.z+.010);collar.rotation.x=Math.PI/2;
+  for(let i=0;i<16;i++){const a=i*Math.PI/8;const rib=part(group,'Torque collar grip rib',new THREE.BoxGeometry(.002,.003,.017),steel,Math.cos(a)*.028,.064+Math.sin(a)*.028,motor.position.z+.010);rib.rotation.z=a-Math.PI/2;}
+  const led=part(group,'Trigger work light lens',new RoundedBoxGeometry(.012,.005,.002,1,.001),new THREE.MeshStandardMaterial({color:0xe9e7d4,roughness:.24}),0,.032,-.043);led.rotation.x=-.2;
   const chuck=part(motor,drill?'Keyless masonry drill chuck':'Quick release hex collet',new THREE.CylinderGeometry(drill?.019:.013,drill?.025:.019,drill?.043:.029,16),drill?black:steel,0,0,-.016);chuck.rotation.x=Math.PI/2;
   const length=drill?.145:.070,tipZ=-.038-length;
   const bit=part(motor,drill?'Long masonry drill bit':'Short hex screwdriver bit',new THREE.CylinderGeometry(drill?.003:.0035,drill?.003:.0035,length,drill?12:6),steel,0,0,-.038-length/2);bit.rotation.x=Math.PI/2;
   if(drill){
-    // Small fixed collars suggest the spiral cutting profile without a dense animated mesh.
-    for(let i=0;i<10;i++){
-      const flute=part(motor,'Masonry bit helical cutting land',new THREE.TorusGeometry(.0031,.0006,4,10,Math.PI*1.4),steel,0,0,-.055-i*.011);flute.rotation.z=i*1.3;
+    for(const phase of [0,Math.PI]){
+      const points=Array.from({length:97},(_,i)=>{const t=i/96,a=phase+t*Math.PI*16;return new THREE.Vector3(Math.cos(a)*.0031,Math.sin(a)*.0031,-.050-t*.120);});
+      part(motor,'Continuous masonry bit helical cutting land',new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points),96,.00065,4,false),steel,0,0,0);
     }
     part(motor,'Carbide masonry cutting head',new THREE.BoxGeometry(.008,.0025,.005),steel,0,0,tipZ);
   }else{

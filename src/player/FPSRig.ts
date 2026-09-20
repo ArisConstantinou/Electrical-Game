@@ -33,7 +33,7 @@ export class FPSRig extends THREE.Group {
   anatomicalGrips():WorkerGripTarget[] {
     if(!this.visible)return [];
     return (this.armSets.get(this.selectedTool)??[]).map(arm=>{
-      const grip=workerGripTarget(arm,arm.hand.userData.gripping===true||(this.selectedTool==='measure'&&arm.side<0&&this.measureMarkTime>0));
+      const grip=workerGripTarget(arm,arm.hand.userData.gripping===true||(this.selectedTool==='measure'&&arm.side<0));
       if(['drill','driver','measure','level','spring','cutter'].includes(this.selectedTool)&&arm.side>0){
         grip.referenceKey=`${this.selectedTool}:R`;
         Object.defineProperty(grip,'object',{value:this.tools.get(this.selectedTool)});
@@ -49,6 +49,11 @@ export class FPSRig extends THREE.Group {
         Object.defineProperty(grip,'object',{value:arm.side>0?this.fittingCandidateRoot:this.fittingAssemblyRoot});
       }
       if(this.selectedTool==='trowel')grip.straightWrist=true;
+      if(this.selectedTool==='measure'){
+        if(arm.side>0){grip.contactLocked=this.tools.get('measure')!.userData.measuring===true;grip.section=[.031,.025];grip.shape='box';}
+        else {grip.section=[.005,.003];grip.shape='box';}
+      }
+      if(this.selectedTool==='laser'){grip.section=[.021,.035];grip.shape='box';}
       return grip;
     });
   }
@@ -874,8 +879,13 @@ export class FPSRig extends THREE.Group {
     const hammer=this.tools.get('hammer')!;
     // Keep the chosen hand and screen side even outside a reachable work area.
     // The established right-handed rest pose is the blend's zero endpoint.
-    hammer.position.set(-.18*this.hammerGripBlend,-.055,0);
-    hammer.rotation.set(.12,THREE.MathUtils.lerp(-.08,.08,this.hammerGripBlend),0);
+    const {eye,right,forward}=this.bodyFrame(camera),view=camera.getWorldDirection(new THREE.Vector3());
+    const worldQ=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(right,new THREE.Vector3(0,1,0),forward.clone().negate()));
+    worldQ.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(-.28,THREE.MathUtils.lerp(-.12,.12,this.hammerGripBlend),-.06+this.hammerGripBlend*.12)));
+    hammer.quaternion.copy(this.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(worldQ));
+    const target=eye.clone().addScaledVector(forward,.32).addScaledVector(right,THREE.MathUtils.lerp(.16,-.16,this.hammerGripBlend));
+    target.y-=.34+THREE.MathUtils.clamp(-view.y,0,1)*.13;
+    hammer.position.copy(this.worldToLocal(target));
     this.constrainHeldTool(camera);this.poseArms(camera);
     this.chiselTipWorld.copy(hammer.localToWorld(this.tipAnchor.clone()));
   }

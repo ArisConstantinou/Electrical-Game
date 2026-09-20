@@ -57,6 +57,7 @@ export class Wheelbarrow {
   stability=0;
   speed=0;
   blocked=false;
+  private mobileFast=false;
   constructor(readonly model:WheelbarrowModel,private readonly game:Game){
     game.renderer.scene.attach(model.group);
     this.yaw=model.group.rotation.y;
@@ -78,6 +79,12 @@ export class Wheelbarrow {
     this.panel=document.createElement('aside');this.panel.id='wheelbarrow-guide';this.panel.hidden=true;
     this.panel.innerHTML='<b>ΚΑΡΟΤΣΙ · ΙΣΟΡΡΟΠΙΑ</b><div class="cart-guide-row"><div class="cart-level" aria-label="Κλίση καροτσιού"><span class="cart-safe"></span><i></i></div><div class="cart-readout"></div></div><small>WASD · ΚΙΝΗΣΗ &nbsp; MOUSE · ΣΤΡΟΦΗ<br>SHIFT · ΓΡΗΓΟΡΑ &nbsp; E · ΑΦΗΣΕ</small>';
     this.dot=this.panel.querySelector('i')!;this.text=this.panel.querySelector('.cart-readout')!;game.hud.shell.append(this.panel);
+    this.panel.insertAdjacentHTML('beforeend','<div class="cart-touch-actions"><button id="cart-fast" type="button" aria-pressed="false">ΚΡΑΤΑ · ΓΡΗΓΟΡΑ</button><button id="cart-release" type="button">ΑΦΗΣΕ</button></div>');
+    const fast=this.panel.querySelector<HTMLButtonElement>('#cart-fast')!;
+    fast.addEventListener('pointerdown',event=>{event.preventDefault();event.stopPropagation();fast.setPointerCapture(event.pointerId);this.mobileFast=true;fast.setAttribute('aria-pressed','true');});
+    for(const type of ['pointerup','pointercancel','lostpointercapture'])fast.addEventListener(type,()=>{this.mobileFast=false;fast.setAttribute('aria-pressed','false');});
+    this.panel.querySelector('#cart-release')!.addEventListener('click',()=>this.release());
+    if(matchMedia('(pointer:coarse)').matches)this.panel.querySelector('small')!.textContent='ΑΡΙΣΤΕΡΟ · ΚΙΝΗΣΗ  |  ΔΕΞΙΟ · ΣΤΡΟΦΗ';
     addEventListener('blur',()=>{if(this.driving)this.release();});
   }
   get busy():boolean{return this.driving||this.state==='righting';}
@@ -95,7 +102,7 @@ export class Wheelbarrow {
     this.game.renderer.camera.position.copy(back).setY(1.65);this.game.renderer.camera.rotation.set(-.60,this.game.player.yaw,0);
     this.velocity.set(0,0,0);this.driving=true;this.state='driving';return true;
   }
-  release():void{this.driving=false;this.velocity.set(0,0,0);if(this.state==='driving')this.state='parked';this.game.player.crouched=this.savedCrouch;}
+  release():void{this.mobileFast=false;this.panel.querySelector('#cart-fast')?.setAttribute('aria-pressed','false');this.driving=false;this.velocity.set(0,0,0);if(this.state==='driving')this.state='parked';this.game.player.crouched=this.savedCrouch;}
   consume(amount:number):number{if(this.state!=='parked')return 0;const take=Math.min(Math.max(0,amount),this.massKg);this.massKg-=take;this.consumedKg+=take;return take;}
   scoop(point:THREE.Vector3):boolean{
     if(this.shovelKg>0||this.handAction||!this.parcels.some(p=>p.settled&&p.mass>0&&p.position.distanceTo(point)<.6))return false;
@@ -118,7 +125,7 @@ export class Wheelbarrow {
     if(this.driving){
       const input=this.game.input;let x=Number(input.pressed('KeyD'))-Number(input.pressed('KeyA'))+input.mobileMove.x,y=Number(input.pressed('KeyW'))-Number(input.pressed('KeyS'))-input.mobileMove.y;
       const magnitude=Math.max(1,Math.hypot(x,y));x/=magnitude;y/=magnitude;
-      const fast=input.pressed('ShiftLeft')||input.pressed('ShiftRight'),speed=fast?3.1:1.05;
+      const fast=this.mobileFast||input.pressed('ShiftLeft')||input.pressed('ShiftRight'),speed=fast?3.1:1.05;
       const target=forward.clone().multiplyScalar(y*speed).addScaledVector(right,-x*speed),change=target.sub(this.velocity),limit=(fast?3.4:1.8)*dt;
       if(change.length()>limit)change.setLength(limit);this.velocity.add(change);
       const yawDelta=Math.atan2(Math.sin(this.game.player.yaw-Math.PI-this.yaw),Math.cos(this.game.player.yaw-Math.PI-this.yaw));

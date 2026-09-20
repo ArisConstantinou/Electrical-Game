@@ -5,6 +5,7 @@ import { AssetManager } from './AssetManager';
 import { HammerWorkStance } from '../player/HammerWorkStance';
 import { PlayerController } from '../player/PlayerController';
 import { WorkerBody } from '../player/WorkerBody';
+import { HoseSupplyLine } from '../player/HoseSupplyLine';
 import type { MobileAimProfile } from '../player/PlayerController';
 import { DesktopControls } from '../player/DesktopControls';
 import { MobileControls, type AimControlMode, type AimInputMode } from '../player/MobileControls';
@@ -84,6 +85,7 @@ export class Game {
   readonly leveling = new LevelingSystem();
   readonly hud: HUD;
   readonly fpsRig = new FPSRig();
+  readonly hoseSupply:HoseSupplyLine;
   readonly boxAssembly = new BoxAssemblyBuilder('1G');
   readonly audio = new ConstructionAudio();
   selectedTool: RigTool = 'spray';
@@ -128,6 +130,7 @@ export class Game {
     this.workerBody=new WorkerBody(this.renderer.scene);
     this.room = new Room(this.renderer.scene);
     this.renderer.scene.add(this.room);
+    this.hoseSupply=new HoseSupplyLine(this.renderer.scene,this.fpsRig.getObjectByName('FPS hose tool')!);
     this.mission = new MissionSystem(this.renderer.scene);
     this.room.brickWall.registerInstallations(this.mission.points);
     this.room.brickWall.prepareMultiPipeChases(this.mission.points);
@@ -401,6 +404,7 @@ export class Game {
     // Pipe work owns a clean close-up: keep the authored worker intact but
     // hide it so neither torso nor head can cover marking, spring or bending.
     if(bodylessPvc)this.workerBody.visible=false;
+    this.hoseSupply.update(this.selectedTool==='hose'&&this.fpsRig.visible&&!mixingOwnedInput&&!pvcOwnedInput);
     if(this.modelInspector.active&&this.modelInspector.live)this.modelInspector.afterWorld(dt);
     else if(this.frontBodyView)this.updateFrontBodyCamera();
     else this.renderer.viewCamera=null;

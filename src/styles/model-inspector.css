@@ -25,3 +25,6 @@
 .front-body-view #desktop-key-guide{display:none}
 #model-drive:not([hidden]){bottom:calc(100% + 12px)}
 #game-shell:has(#start-screen:not(.hidden)) #model-inspector-open{display:none}
+/* Keep the viewer reachable beside the mobile work cards, not behind them. */
+@media(pointer:coarse){#model-inspector-open{top:186px;right:max(10px,env(safe-area-inset-right));width:54px;min-height:44px;padding:5px;font-size:12px;line-height:16px}}
+@media(pointer:coarse) and (max-height:520px){#model-inspector-open{top:62px;width:80px}}

@@ -3,3 +3,30 @@
 
 .wheelbarrow-driving #tool-status,.wheelbarrow-driving #desktop-key-guide,.wheelbarrow-driving #mixing-world-prompt,.wheelbarrow-driving #mixing-receipt{display:none}
 @media(max-width:650px){#wheelbarrow-guide{top:160px;bottom:auto}}
+
+.cart-touch-actions{display:none}
+@media(pointer:coarse){
+  #wheelbarrow-guide{top:76px;left:50%;right:auto;transform:translateX(-50%);bottom:auto;width:min(280px,calc(100vw - 28px));padding:10px;box-sizing:border-box;font-size:14px}
+  #wheelbarrow-guide .cart-guide-row{gap:10px;margin:7px 0}
+  #wheelbarrow-guide .cart-level{width:56px;height:56px;border-width:5px}
+  #wheelbarrow-guide .cart-safe{inset:7px}
+  #wheelbarrow-guide .cart-readout{gap:3px;font-size:14px}
+  #wheelbarrow-guide .cart-readout b{font-size:16px}
+  #wheelbarrow-guide small{font-size:12px}
+  .cart-touch-actions{display:flex;gap:8px;margin-top:7px;pointer-events:auto}
+  .cart-touch-actions button{flex:1;min-height:44px;border:1px solid #bed4ba;border-radius:6px;background:#355a40;color:white;font-size:12px;font-weight:700;touch-action:none}
+  #cart-fast[aria-pressed=true]{background:#a85530}
+  .wheelbarrow-driving #aim-quick-controls,.wheelbarrow-driving #tool-quick-controls{display:none}
+  .wheelbarrow-driving #mobile-interact,.wheelbarrow-driving #model-inspector-open,.wheelbarrow-driving #mobile-use-status{display:none}
+  .wheelbarrow-driving #look-joystick-thumb span,.wheelbarrow-driving #look-joystick-thumb small{display:none}
+  .wheelbarrow-driving #look-joystick-thumb::after{content:'ΣΤΡΟΦΗ';font-size:12px;font-weight:700;color:white}
+}
+@media(pointer:coarse) and (max-height:520px){
+  #wheelbarrow-guide{top:66px;width:470px;max-width:calc(100vw - 250px);display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;padding:8px}
+  #wheelbarrow-guide>b{grid-column:1 / -1;font-size:12px}
+  #wheelbarrow-guide .cart-guide-row{margin:0;gap:8px}
+  #wheelbarrow-guide .cart-level{width:40px;height:40px;border-width:4px}
+  #wheelbarrow-guide .cart-readout,#wheelbarrow-guide .cart-readout b{font-size:12px}
+  #wheelbarrow-guide small{display:none}
+  #wheelbarrow-guide .cart-touch-actions{margin:0;align-self:center}
+}

@@ -18,10 +18,11 @@ async function aim(page,kind='side',height=1.2,distance=.43){
   await page.evaluate(({kind,height,distance})=>{
     const g=window.__wireTheHouse,c=g.renderer.camera;
     g.hammerWorkStance.restore(c);
-    if(kind==='side'){c.position.set(-3+distance,g.player.eyeHeight,0);c.lookAt(-3,height,0);}
+    if(kind==='side'){const wall=g.room.getObjectByName('Left concrete wall'),surface=wall.position.x+wall.geometry.parameters.width/2;c.position.set(surface+distance,g.player.eyeHeight,0);c.lookAt(surface,height,0);}
     else{c.position.set(0,g.player.eyeHeight,g.room.brickWall.volume.frontZ+distance);c.lookAt(0,height,g.room.brickWall.volume.frontZ);}
     g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;
     g.player.workPosition.locked=false;g.player.workPosition.released=false;
+    window.__laserAim={camera:c.position.toArray(),pitch:g.player.pitch,yaw:g.player.yaw,eye:g.player.eyeHeight};
   },{kind,height,distance});await steps(page,90);
 }
 async function hold(page,mobile,n){
@@ -35,7 +36,7 @@ async function hold(page,mobile,n){
 const state=page=>page.evaluate(()=>{
   const g=window.__wireTheHouse,r=JSON.parse(window.render_game_to_text());
   const rectangle=selector=>{const e=document.querySelector(selector),b=e?.getBoundingClientRect();return b?{x:b.x,y:b.y,right:b.right,bottom:b.bottom,width:b.width,height:b.height,font:parseFloat(getComputedStyle(e).fontSize)}:null;};
-  return{selected:g.selectedTool,measure:g.heightMeasure.telemetry,laser:g.laserLevel.telemetry,renderLaser:r.laser,activeHeight:g.laserLevel.activeHeightM,
+  return{player:r.player,aim:window.__laserAim,selected:g.selectedTool,measure:g.heightMeasure.telemetry,laser:g.laserLevel.telemetry,renderLaser:r.laser,activeHeight:g.laserLevel.activeHeightM,
     device:{visible:g.laserLevel.device.visible,position:g.laserLevel.device.position.toArray(),quaternion:g.laserLevel.device.quaternion.toArray()},
     placeDisabled:document.querySelector('#laser-place')?.disabled,pose:g.fpsRig.debugPose(),held:g.input.actionHeld,removed:g.room.brickWall.volume.removedVolume,
     layout:{panel:rectangle('#laser-panel'),height:rectangle('#laser-work-height'),place:rectangle('#laser-place'),viewport:{width:innerWidth,height:innerHeight}},
