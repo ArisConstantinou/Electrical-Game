@@ -66,6 +66,54 @@ export class FPSRig extends THREE.Group {
     if(object!==this.fittingCandidateRoot||!this.fittingAttachment)return new THREE.Vector3();
     return object.position.clone().sub(this.fittingCandidateHome).applyQuaternion(object.parent!.getWorldQuaternion(new THREE.Quaternion()));
   }
+  boxGraspViewCorners(object:THREE.Object3D,center:THREE.Vector3,rotation:THREE.Quaternion):THREE.Vector3[]{
+    const bounds=new THREE.Box3(),inverse=rotation.clone().invert();
+    for(const root of object===this.fittingAssemblyRoot?[object,this.fittingZonesRoot]:[object]){
+      root.updateWorldMatrix(true,true);root.traverse(part=>{
+        const geometry=(part as THREE.Mesh).geometry;if(!geometry)return;
+        if(!geometry.boundingBox)geometry.computeBoundingBox();const box=geometry.boundingBox!;
+        for(const x of [box.min.x,box.max.x])for(const y of [box.min.y,box.max.y])for(const z of [box.min.z,box.max.z])bounds.expandByPoint(new THREE.Vector3(x,y,z).applyMatrix4(part.matrixWorld).sub(center).applyQuaternion(inverse));
+      });
+    }
+    const corners:THREE.Vector3[]=[];
+    for(const x of [bounds.min.x,bounds.max.x])for(const y of [bounds.min.y,bounds.max.y])for(const z of [bounds.min.z,bounds.max.z])corners.push(new THREE.Vector3(x,y,z));
+    return corners;
+  }
+  /** Project the assembly and each attachment zone separately: empty space
+   * between zones is usable, but the next casing must not cover a choice. */
+  boxGraspScreenObstacles(object:THREE.Object3D,camera:THREE.PerspectiveCamera):THREE.Box2[]{
+    if(object!==this.fittingCandidateRoot||this.fittingAttachment)return [];
+    return [this.fittingAssemblyRoot,...this.fittingZonesRoot.children].map(root=>{
+      root.updateWorldMatrix(true,true);const bounds=new THREE.Box2();
+      root.traverse(part=>{
+        const geometry=(part as THREE.Mesh).geometry;if(!geometry)return;
+        if(!geometry.boundingBox)geometry.computeBoundingBox();const box=geometry.boundingBox!;
+        for(const x of [box.min.x,box.max.x])for(const y of [box.min.y,box.max.y])for(const z of [box.min.z,box.max.z]){
+          const point=new THREE.Vector3(x,y,z).applyMatrix4(part.matrixWorld).project(camera);
+          bounds.expandByPoint(new THREE.Vector2(point.x,point.y));
+        }
+      });return bounds.expandByScalar(.025);
+    });
+  }
+  /** Numbered choices are interaction UI attached to the held assembly. Keep
+   * their cross visible without moving the physical boxes, hands or camera. */
+  clampFittingZones(camera:THREE.PerspectiveCamera):void {
+    if(!this.fittingZonesRoot.visible||!this.fittingZonesRoot.children.length)return;
+    const worldRight=new THREE.Vector3(1,0,0).applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion())),worldUp=new THREE.Vector3(0,1,0).applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion()));
+    for(let pass=0;pass<6;pass++){
+      const bounds=this.boxGraspScreenObstacles(this.fittingCandidateRoot,camera).slice(1).reduce((all,box)=>all.union(box),new THREE.Box2());
+      const dx=bounds.min.x<-.96?-.96-bounds.min.x:bounds.max.x>.96?.96-bounds.max.x:0,dy=bounds.min.y<-.96?-.96-bounds.min.y:bounds.max.y>.96?.96-bounds.max.y:0;
+      if(Math.abs(dx)<1e-6&&Math.abs(dy)<1e-6)break;
+      const world=this.fittingZonesRoot.getWorldPosition(new THREE.Vector3()),view=world.clone().applyMatrix4(camera.matrixWorldInverse),halfHeight=-view.z*Math.tan(THREE.MathUtils.degToRad(camera.fov*.5));
+      world.addScaledVector(worldRight,dx*halfHeight*camera.aspect).addScaledVector(worldUp,dy*halfHeight);
+      this.fittingZonesRoot.position.copy(this.fittingZonesRoot.parent!.worldToLocal(world));this.fittingZonesRoot.updateWorldMatrix(false,true);
+    }
+  }
+  translateBoxGrasp(object:THREE.Object3D,delta:THREE.Vector3):void {
+    const parts=object===this.fittingAssemblyRoot?[object,this.fittingZonesRoot]:[object];
+    const arm=this.armSets.get('fitting')!.find(entry=>entry.side===(object===this.fittingAssemblyRoot?-1:1));if(arm)parts.push(arm.hand);
+    for(const part of parts){const world=part.getWorldPosition(new THREE.Vector3()).add(delta);part.position.copy(part.parent!.worldToLocal(world));part.updateWorldMatrix(false,true);}
+  }
   private graspBases=new Map<THREE.Object3D,{position:THREE.Vector3;rotation:THREE.Quaternion}>();
   private restoreGrasp():void {
     for(const [tool,{position,rotation}] of this.graspBases){tool.position.copy(position);tool.quaternion.copy(rotation);tool.updateWorldMatrix(false,true);}

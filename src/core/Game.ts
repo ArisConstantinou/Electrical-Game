@@ -224,7 +224,9 @@ export class Game {
     // shorter reach. Requested tilt can differ substantially near floor/ceiling.
     const upwardSideFeed=.20*Math.max(0,-Math.sin(workTilt))*Math.abs(Math.sin(workSide));
     this.player.wallWorkDistance=handWork?.46:Math.max(.46,(.38+.55*Math.abs(wallAxisZ)-upwardSideFeed)*Math.max(.2,Math.cos(this.player.yaw)));
-    this.player.handWorkTargetY=handWork?this.boxWorkAim()?.y??null:null;
+    // Looking around while building a gang must rotate only the view. Do not
+    // auto-crouch or retarget the camera from the wall point under the cursor.
+    this.player.handWorkTargetY=handWork&&this.selectedTool!=='fitting'?this.boxWorkAim()?.y??null:null;
     if (this.started && !leveling) this.player.update(Math.min(dt, 0.05));
     this.fpsRig.beginFrame(dt, this.selectedTool==='hammer' && this.input.actionHeld && Math.abs(this.player.velocity.x)>1e-6
       ? this.player.velocity.x*Math.min(dt,.05) : null,this.selectedTool==='hammer'&&(this.input.actionHeld||this.input.actionRequested));

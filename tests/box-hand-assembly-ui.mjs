@@ -33,7 +33,7 @@ try{
     const context=await browser.newContext({viewport,isMobile:mobile,hasTouch:mobile});await blockPointerLock(context);const page=await context.newPage();page.on('pageerror',e=>report.errors.push(`${name}: ${e.message}`));page.on('console',message=>{if(message.type()==='error')report.errors.push(`${name}: ${message.text()}`);});await page.routeWebSocket('**',()=>{});
     await page.goto(url);await page.waitForFunction(()=>window.__wireTheHouse?.roomWater.waterProActive,undefined,{timeout:120000});await page.locator('#start-button')[mobile?'tap':'click']();const prepared=await fixture(page);assert(prepared.removed>0);
     if(mobile)await page.locator('[data-tool="fitting"]').tap();else await page.keyboard.press('Digit5');await step(page,4);
-    const initial=await read(page);assert.equal(initial.worker?.loaded,true,'new anatomical body must load alongside box assembly');assert.equal(initial.worker.bones,52);assert.equal(initial.legacySkinVisible,false,'legacy segmented skin must stay hidden');assert.deepEqual(initial.referenceKeys,[null,null],'independent fitting hands must not replay the old one-box reference');assert.equal(initial.selected,'fitting');assert.equal(initial.assembly.modules.length,1);assert.deepEqual(initial.arms.map(a=>a.gripRole).sort(),['assembly','candidate']);assert.equal(initial.zones.length,4);
+    const initial=await read(page),initialVisibleIds=new Set(initial.visible.map(point=>point.id));assert.equal(initial.worker?.loaded,true,'new anatomical body must load alongside box assembly');assert.equal(initial.worker.bones,52);assert.equal(initial.legacySkinVisible,false,'legacy segmented skin must stay hidden');assert.deepEqual(initial.referenceKeys,[null,null],'independent fitting hands must not replay the old one-box reference');assert.equal(initial.selected,'fitting');assert.equal(initial.assembly.modules.length,1);assert.deepEqual(initial.arms.map(a=>a.gripRole).sort(),['assembly','candidate']);assert.equal(initial.zones.length,4);
     await page.waitForTimeout(1300);
     await page.evaluate(async()=>{const r=window.__wireTheHouse.renderer;await r.waitForFrame();r.render();await r.waitForFrame();});await page.screenshot({path:`${out}/${name}-initial-two-hands.png`});
     if(mobile){
@@ -60,7 +60,7 @@ try{
     }
     await step(page,30);
     if(mobile)await page.locator('#box-place-assembly').tap();else await page.mouse.click(viewport.width*.5,viewport.height*.5,{button:'right'});await step(page,3);
-    const placed=await read(page);assert.equal(placed.visible.length,1,`${name}: right-click/touch PLACE adds the complete assembly`);assert.equal(placed.visible[0].layout.length,built.assembly.modules.length);assert(!placed.overflow);assert.equal(placed.error,'');
+    const placed=await read(page),newlyPlaced=placed.visible.filter(point=>!initialVisibleIds.has(point.id));assert.equal(placed.visible.length,initial.visible.length+1,`${name}: right-click/touch PLACE adds one complete assembly`);assert.equal(newlyPlaced.length,1);assert.equal(newlyPlaced[0].layout.length,built.assembly.modules.length);assert(!placed.overflow);assert.equal(placed.error,'');
     assert.equal(placed.assembly.modules.length,1,`${name}: successful placement starts a fresh one-box hand assembly`);
     await page.waitForTimeout(950);
     await page.evaluate(async()=>{const r=window.__wireTheHouse.renderer;await r.waitForFrame();r.render();await r.waitForFrame();});await page.screenshot({path:`${out}/${name}-placed.png`});

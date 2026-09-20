@@ -326,8 +326,55 @@ export class WorkerBody extends THREE.Group {
     for(const skeleton of this.skeletons)skeleton.update();
   }
   private boxGraspHistory=new Map<THREE.Object3D,GraspHistory>();
+  private boxUnitScreenBounds(object:THREE.Object3D,side:number,camera:THREE.PerspectiveCamera):THREE.Box2 {
+    object.updateWorldMatrix(true,true);const bounds=new THREE.Box3().setFromObject(object),points:THREE.Vector3[]=[];
+    for(const x of [bounds.min.x,bounds.max.x])for(const y of [bounds.min.y,bounds.max.y])for(const z of [bounds.min.z,bounds.max.z])points.push(new THREE.Vector3(x,y,z));
+    const projected=(point:THREE.Vector3)=>{const p=point.clone().project(camera);return new THREE.Vector2(p.x,p.y);},screen=new THREE.Box2().setFromPoints(points.map(projected));
+    if(side>0){const hand=['hand.R','index.01.R','index.02.R','index.03.R','middle.01.R','middle.02.R','middle.03.R','ring.01.R','ring.02.R','ring.03.R','little.01.R','little.02.R','little.03.R','thumb.01.R','thumb.02.R','thumb.03.R'].map(name=>projected(this.point(name)));screen.union(new THREE.Box2().setFromPoints(hand).expandByScalar(.02));}
+    return screen;
+  }
+  private boxScreenDelta(object:THREE.Object3D,camera:THREE.PerspectiveCamera,dx:number,dy:number):THREE.Vector3 {
+    if(Math.abs(dx)<1e-6&&Math.abs(dy)<1e-6)return new THREE.Vector3();
+    const center=object.getWorldPosition(new THREE.Vector3()),view=center.clone().applyMatrix4(camera.matrixWorldInverse),halfHeight=-view.z*Math.tan(THREE.MathUtils.degToRad(camera.fov*.5)),cameraQ=camera.getWorldQuaternion(new THREE.Quaternion());
+    return new THREE.Vector3(1,0,0).applyQuaternion(cameraQ).multiplyScalar(dx*halfHeight*camera.aspect).addScaledVector(new THREE.Vector3(0,1,0).applyQuaternion(cameraQ),dy*halfHeight);
+  }
+  private boxViewportCorrection(object:THREE.Object3D,side:number,camera:THREE.PerspectiveCamera):THREE.Vector3 {
+    const bounds=this.boxUnitScreenBounds(object,side,camera),dx=bounds.min.x<-.98?-.98-bounds.min.x:bounds.max.x>.98?.98-bounds.max.x:0,dy=bounds.min.y<-.98?-.98-bounds.min.y:bounds.max.y>.98?.98-bounds.max.y:0;
+    return this.boxScreenDelta(object,camera,dx,dy);
+  }
+  private boxObstacleCorrection(object:THREE.Object3D,side:number,camera:THREE.PerspectiveCamera,fps:FPSRig):THREE.Vector3 {
+    if(side<0)return new THREE.Vector3();
+    const unit=this.boxUnitScreenBounds(object,side,camera),obstacles=fps.boxGraspScreenObstacles(object,camera).map(obstacle=>obstacle.clone().expandByScalar(-.025));
+    const xs=[0,-.98-unit.min.x,.98-unit.max.x],ys=[0,-.98-unit.min.y,.98-unit.max.y];
+    for(const obstacle of obstacles){xs.push(obstacle.min.x-unit.max.x-.001,obstacle.max.x-unit.min.x+.001);ys.push(obstacle.min.y-unit.max.y-.001,obstacle.max.y-unit.min.y+.001);}
+    const choices=[] as {x:number;y:number;score:number}[];
+    for(const x of xs)for(const y of ys){
+      const moved=unit.clone().translate(new THREE.Vector2(x,y));
+      if(moved.min.x<-.98||moved.max.x>.98||moved.min.y<-.98||moved.max.y>.98||obstacles.some(obstacle=>moved.intersectsBox(obstacle)))continue;
+      // In portrait the hand and casing sit at slightly different depths, so
+      // a large horizontal correction can push the nearer fingers offscreen.
+      // Prefer the available vertical lane and keep their rigid pinch intact.
+      choices.push({x,y,score:Math.abs(y)*.10+Math.abs(x)});
+    }
+    choices.sort((a,b)=>a.score-b.score);const best=choices[0];
+    return best?this.boxScreenDelta(object,camera,best.x,best.y):new THREE.Vector3();
+  }
+  private clampBoxComposition(objects:THREE.Object3D[],grips:WorkerGripTarget[],camera:THREE.PerspectiveCamera,fps:FPSRig):void {
+    const assembly=objects.find(object=>grips.find(grip=>grip.object===object)?.side===-1),candidate=objects.find(object=>grips.find(grip=>grip.object===object)?.side===1);
+    if(!assembly||!candidate)return;
+    for(let pass=0;pass<5;pass++){
+      const bounds=this.boxUnitScreenBounds(assembly,-1,camera).union(this.boxUnitScreenBounds(candidate,1,camera));
+      for(const obstacle of fps.boxGraspScreenObstacles(candidate,camera))bounds.union(obstacle.clone().expandByScalar(-.025));
+      const dx=bounds.min.x<-.98?-.98-bounds.min.x:bounds.max.x>.98?.98-bounds.max.x:0,dy=bounds.min.y<-.98?-.98-bounds.min.y:bounds.max.y>.98?.98-bounds.max.y:0;
+      const delta=this.boxScreenDelta(candidate,camera,dx,dy);if(delta.lengthSq()<1e-12)break;
+      this.translateArm('L',delta);this.translateArm('R',delta);fps.translateBoxGrasp(assembly,delta);fps.translateBoxGrasp(candidate,delta);this.updateMatrixWorld(true);
+    }
+  }
+  private translateArm(side:string,delta:THREE.Vector3):void {
+    if(delta.lengthSq()<1e-12)return;const clavicle=this.bone('clavicle.'+side),world=clavicle.getWorldPosition(new THREE.Vector3()).add(delta);clavicle.position.copy(clavicle.parent!.worldToLocal(world));clavicle.updateWorldMatrix(true,true);
+  }
   private poseBoxGrasps(grips:WorkerGripTarget[],camera:THREE.PerspectiveCamera,fps:FPSRig,right:THREE.Vector3,frontForBounds?:(bounds:THREE.Box3)=>number|null):void {
-    const objects=new Set(grips.filter(g=>g.active&&g.object&&!g.referenceKey).map(g=>g.object!));
+    const objects=[...new Set(grips.filter(g=>g.active&&g.object&&!g.referenceKey).map(g=>g.object!))].sort((a,b)=>grips.find(g=>g.object===a)!.side-grips.find(g=>g.object===b)!.side);
     for(const object of objects){
       const targets=grips.filter(g=>g.active&&g.object===object),primary=targets[0];
       // Preserve every finger and the hand/tool contact. The rigid unit now
@@ -341,11 +388,12 @@ export class WorkerBody extends THREE.Group {
         const neutralQ=handQ.clone().multiply(this.handFrames.get(name)!.foreToHand.clone().invert());
         neutralQ.premultiply(new THREE.Quaternion().setFromUnitVectors(Y.clone().applyQuaternion(neutralQ),long));
         const shoulder=this.point('upper_arm.'+name);
-        return{name,handSign:grip.side,lockRotation:true,shoulder,upperLength:shoulder.distanceTo(oldElbow),elbow:elbow.sub(primary.center).applyQuaternion(inverse),wrist:wrist.sub(primary.center).applyQuaternion(inverse),foreQ:inverse.clone().multiply(neutralQ),handQ:inverse.clone().multiply(handQ)};
+        const screenRegion=grip.side<0?{minX:-.90,maxX:.05}:{minX:.10,maxX:.90};
+        return{name,handSign:grip.side,lockRotation:true,screenObstacles:fps.boxGraspScreenObstacles(object,camera),screenRegion,shoulder,upperLength:shoulder.distanceTo(oldElbow),elbow:elbow.sub(primary.center).applyQuaternion(inverse),wrist:wrist.sub(primary.center).applyQuaternion(inverse),foreQ:inverse.clone().multiply(neutralQ),handQ:inverse.clone().multiply(handQ)};
       });
       if(primary.contactLocked)continue;
-      const bounds=new THREE.Box3().setFromObject(object),corners:THREE.Vector3[]=[];
-      for(const x of [bounds.min.x,bounds.max.x])for(const y of [bounds.min.y,bounds.max.y])for(const z of [bounds.min.z,bounds.max.z])corners.push(new THREE.Vector3(x,y,z).sub(primary.center).applyQuaternion(inverse));
+      const corners=fps.boxGraspViewCorners(object,primary.center,primary.rotation);
+      if(primary.side>0)for(const name of ['hand.R','index.01.R','index.02.R','index.03.R','middle.01.R','middle.02.R','middle.03.R','ring.01.R','ring.02.R','ring.03.R','little.01.R','little.02.R','little.03.R','thumb.01.R','thumb.02.R','thumb.03.R'])corners.push(this.point(name).sub(primary.center).applyQuaternion(inverse));
       // Start with the arm, as with spray: position the elbow first,
       // palm continuing the forearm. Carry the captured contact with it.
       const forward=camera.getWorldDirection(new THREE.Vector3()),flat=forward.clone();flat.y=0;flat.normalize();
@@ -367,7 +415,24 @@ export class WorkerBody extends THREE.Group {
       }
       const turn=pose.rotation.clone().multiply(inverse);
       fps.transformAnatomicalGrasp(primary.center,pose.center,turn,object);
+      this.updateMatrixWorld(true);
+      if(side<0)fps.clampFittingZones(camera);
+      for(let pass=0;pass<3;pass++){
+        const viewportShift=this.boxViewportCorrection(object,side,camera);
+        if(viewportShift.lengthSq()>1e-12){this.translateArm(side>0?'R':'L',viewportShift);fps.translateBoxGrasp(object,viewportShift);this.updateMatrixWorld(true);}
+        const obstacleShift=this.boxObstacleCorrection(object,side,camera,fps);
+        if(obstacleShift.lengthSq()>1e-12){this.translateArm(side>0?'R':'L',obstacleShift);fps.translateBoxGrasp(object,obstacleShift);this.updateMatrixWorld(true);}
+      }
     }
+    fps.clampFittingZones(camera);
+    const candidate=objects.find(object=>grips.find(grip=>grip.object===object)?.side===1);
+    if(candidate)for(let pass=0;pass<3;pass++){
+      const viewportShift=this.boxViewportCorrection(candidate,1,camera);
+      if(viewportShift.lengthSq()>1e-12){this.translateArm('R',viewportShift);fps.translateBoxGrasp(candidate,viewportShift);this.updateMatrixWorld(true);}
+      const obstacleShift=this.boxObstacleCorrection(candidate,1,camera,fps);
+      if(obstacleShift.lengthSq()>1e-12){this.translateArm('R',obstacleShift);fps.translateBoxGrasp(candidate,obstacleShift);this.updateMatrixWorld(true);}
+    }
+    this.clampBoxComposition(objects,grips,camera,fps);
   }
   private poseReferenceGrasps(grips:WorkerGripTarget[],camera:THREE.PerspectiveCamera,fps:FPSRig,station:boolean,right:THREE.Vector3,frontForBounds?: (bounds:THREE.Box3)=>number|null):Set<string>{
     const targets=grips.filter(g=>g.active&&g.object&&g.referenceKey&&this.referenceGrips[g.referenceKey]);
