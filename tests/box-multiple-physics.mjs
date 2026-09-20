@@ -58,8 +58,11 @@ try{
   rear.boxGroup.visible=false;
   upper.boxGroup.position.z=0;
   old=upper.boxGroup.position.clone();upper.boxGroup.position.z+=.002;
-  assert.equal(placement.constrainAdjustment(upper,old,tilt),true,'Clear outward depth adjustment succeeds');
-  report.push('tilt rollback; swept depth rejects tunnelling; free depth adjustment succeeds');
+  assert.equal(placement.constrainAdjustment(upper,old,tilt),false,'Outward depth adjustment stops at the bare-wall finish plane');
+  assert.deepEqual(upper.boxGroup.position.toArray(),old.toArray());
+  upper.boxGroup.position.z-=.002;
+  assert.equal(placement.constrainAdjustment(upper,old,tilt),true,'Clear inward depth adjustment succeeds until the physical back-stop');
+  report.push('tilt rollback; swept depth rejects tunnelling; finish plane blocks outward travel while inward travel succeeds');
 
   placement.retrieve(lower);step(1);
   assert.equal(state(upper).state,'floor','Removing the supporting box makes its upper box fall');

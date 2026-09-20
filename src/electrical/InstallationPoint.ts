@@ -18,7 +18,7 @@ export class InstallationPoint extends THREE.Group {
     this.userData.studioEntityId = `installation-point-${definition.id}`;
     this.position.set(definition.x, definition.bottom + 0.037, GAME_CONFIG.room.wallFrontZ);
 
-    this.boxGroup = new BoxGroup(definition.boxes, `point-${definition.id}:box-group`);
+    this.boxGroup = new BoxGroup(definition.boxes, `point-${definition.id}:box-group`, definition.boxLayout);
     this.boxGroup.visible = false;
     this.add(this.boxGroup);
 

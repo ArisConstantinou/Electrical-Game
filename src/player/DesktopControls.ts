@@ -16,7 +16,8 @@ export class DesktopControls {
         event.preventDefault();
         input.actionHeld = false;
         input.actionRequested = false;
-        window.dispatchEvent(new CustomEvent('wirehouse:exit-leveling'));
+        if(surface.dataset.boxAssembly==='true')window.dispatchEvent(new CustomEvent('wirehouse:box-place-assembly'));
+        else window.dispatchEvent(new CustomEvent('wirehouse:exit-leveling'));
         if (document.pointerLockElement !== this.lockTarget) this.requestLock();
         return;
       }
@@ -88,10 +89,16 @@ export class DesktopControls {
       // once, then wait for a new gesture or a deliberate direction reversal.
       if (this.wheelSelected || this.wheelDistance < 40) return;
       this.wheelSelected = true;
-      window.dispatchEvent(new CustomEvent('wirehouse:cycle-tool', { detail: direction }));
+      window.dispatchEvent(new CustomEvent(surface.dataset.boxAssembly==='true'?'wirehouse:box-cycle-candidate':'wirehouse:cycle-tool', { detail: direction }));
     }, { passive: false });
     addEventListener('keydown', event => {
       const directTools: Partial<Record<string, string>> = { Digit1: 'spring', Digit2: 'cutter', Digit3: 'spray', Digit4: 'hammer', Digit5: 'fitting', Digit6: 'level', Digit7: 'trowel', Digit8: 'hose', Digit9: 'measure', Digit0:'drill',KeyB:'driver',KeyL:'laser' };
+      if(surface.dataset.boxAssembly==='true'&&['Digit1','Digit2','Digit3','Digit4'].includes(event.code)){
+        event.preventDefault();if(!event.repeat)window.dispatchEvent(new CustomEvent('wirehouse:box-attach',{detail:Number(event.code.at(-1))}));return;
+      }
+      if(surface.dataset.boxAssembly==='true'&&event.code==='KeyR'){
+        event.preventDefault();if(!event.repeat)window.dispatchEvent(new CustomEvent('wirehouse:box-rotate-candidate'));return;
+      }
       if(event.code==='KeyM'&&!event.repeat&&!(event.target instanceof Element&&event.target.closest('input,textarea,select,[contenteditable="true"]')))window.dispatchEvent(new CustomEvent('wirehouse:measure-mark'));
       if (directTools[event.code]) window.dispatchEvent(new CustomEvent('wirehouse:select-tool', { detail: directTools[event.code] }));
       if (event.code === 'KeyV' && !event.repeat) window.dispatchEvent(new CustomEvent('wirehouse:cycle-spray-mode'));

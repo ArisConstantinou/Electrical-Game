@@ -2,24 +2,29 @@ import * as THREE from 'three';
 import { buildToolModel } from '../player/ToolModels';
 import { INSTALLATION_RULES, type BoxKind } from '../data/installationRules';
 import { ElectricalBox } from './Box';
+import { boxAssemblyBounds, horizontalBoxLayout, type BoxModuleLayout } from './BoxAssembly';
 
 export class BoxGroup extends THREE.Group {
   readonly boxes: ElectricalBox[] = [];
   readonly groupWidth: number;
-  readonly groupHeight = INSTALLATION_RULES.box.oneGang.height;
+  readonly groupHeight: number;
   readonly levelBar: THREE.Group;
+  readonly layout: BoxModuleLayout[];
 
-  constructor(kinds: BoxKind[], stableId: string) {
+  constructor(kinds: BoxKind[], stableId: string, layout?: readonly BoxModuleLayout[]) {
     super();
     this.name = `Recessed box group ${kinds.join(' + ')}`;
     this.userData.studioEntityId = stableId;
-    this.groupWidth = kinds.reduce((total, kind) => total + (kind === '1G' ? INSTALLATION_RULES.box.oneGang.width : INSTALLATION_RULES.box.twoGang.width), 0)
-      + Math.max(0, kinds.length - 1) * INSTALLATION_RULES.box.groupGap;
-    let cursor = -this.groupWidth / 2;
-    kinds.forEach((kind, index) => {
+    this.layout = (layout?.length ? layout : horizontalBoxLayout(kinds)).map(module => ({ ...module }));
+    const bounds = boxAssemblyBounds(this.layout);
+    this.groupWidth = bounds.width;
+    this.groupHeight = bounds.height;
+    this.layout.forEach((module, index) => {
+      const kind = module.kind;
       const box = new ElectricalBox(kind, `${stableId}:box-${index}`);
-      box.position.x = cursor + box.width / 2;
-      cursor += box.width + INSTALLATION_RULES.box.groupGap;
+      box.position.set(module.x - bounds.centerX, module.y - bounds.centerY, 0);
+      box.rotation.z = module.rotation * Math.PI / 2;
+      box.userData.assemblyModuleId = module.id;
       this.boxes.push(box);
       this.add(box);
     });
@@ -43,7 +48,7 @@ export class BoxGroup extends THREE.Group {
   }
 
   get tiltDegrees(): number { return THREE.MathUtils.radToDeg(this.rotation.z); }
-  get depthError(): number { return this.position.z; }
+  get depthError(): number { return this.position.z-(Number(this.userData.finishDepth) || 0); }
   get isLevel(): boolean { return Math.abs(this.tiltDegrees) <= INSTALLATION_RULES.leveling.tiltToleranceDegrees; }
   get isFlush(): boolean { return Math.abs(this.depthError) <= INSTALLATION_RULES.leveling.depthToleranceMetres; }
 

@@ -15,7 +15,7 @@ export interface BoxFitCell {x:number;y:number;surfaceZ:number;extraDepthM:numbe
 export interface BoxFitAssessment {
   target:{x:number;y:number;wallFrontZ:number}|null;
   required:{width:number;height:number;depth:number};
-  fits:boolean;canPlace:boolean;proudDepthM:number;blockedCells:BoxFitCell[];reason:BoxFitReason;message:string;
+  fits:boolean;canPlace:boolean;proudDepthM:number;seatDepthM:number;backstopDepthM:number;blockedCells:BoxFitCell[];reason:BoxFitReason;message:string;
 }
 
 /** Boxes are rigid hollow casings. Insertion sweeps their backing footprint,
@@ -83,7 +83,7 @@ export class BoxPlacementSystem {
    * placement time; no visible box, stage or mortar state changes on refusal. */
   assess(point:InstallationPoint,camera:THREE.Camera):BoxFitAssessment{
     const required={width:point.boxGroup.groupWidth,height:point.boxGroup.groupHeight,depth:Math.max(...point.boxGroup.boxes.map(box=>box.depth))};
-    const result:BoxFitAssessment={target:null,required,fits:false,canPlace:false,proudDepthM:0,blockedCells:[],reason:'out-of-reach',message:'Aim the full box group at a reachable wall cavity.'};
+    const result:BoxFitAssessment={target:null,required,fits:false,canPlace:false,proudDepthM:0,seatDepthM:0,backstopDepthM:0,blockedCells:[],reason:'out-of-reach',message:'Aim the full box group at a reachable wall cavity.'};
     const origin=camera.getWorldPosition(new THREE.Vector3()),direction=camera.getWorldDirection(new THREE.Vector3());
     if(direction.z>=-.01)return result;
     const distance=(this.wall.volume.frontZ-origin.z)/direction.z;
@@ -97,25 +97,25 @@ export class BoxPlacementSystem {
     try{
       point.position.copy(point.parent?point.parent.worldToLocal(target.clone()):target);
       point.boxGroup.position.set(0,0,0);point.boxGroup.rotation.set(0,0,0);point.updateWorldMatrix(true,true);
-      const insertion=this.insertionLimit(point,result.blockedCells);result.proudDepthM=insertion.depth;
+      const finishDepth=this.finishDepth(point),insertion=this.insertionLimit(point,result.blockedCells,finishDepth);
+      result.seatDepthM=finishDepth;result.backstopDepthM=insertion.depth;result.proudDepthM=Math.max(0,insertion.depth-finishDepth);
       result.blockedCells=[...new Map(result.blockedCells.map(cell=>[`${Math.round(cell.x*1e6)}:${Math.round(cell.y*1e6)}`,cell])).values()].slice(0,4095);
       // Stop at the real masonry surface. The insertion sweep ends at this
       // proud pose, not at an imaginary flush pose behind the obstruction.
-      const startDepth=Math.max(insertion.depth,origin.z-.08-this.wall.volume.frontZ);
+      const startDepth=Math.max(insertion.depth,finishDepth,origin.z-.08-this.wall.volume.frontZ);
       const travel=startDepth-insertion.depth;
       if(this.casingTravel(point,BACK,travel,new THREE.Vector3(0,0,startDepth))!==null){
         result.reason='other-box';result.message='Another box blocks this position. Leave room for both casings and their front rims.';
         result.blockedCells.push({x:target.x,y:target.y,surfaceZ:this.wall.volume.frontZ,extraDepthM:required.depth,material:'other-box'});
         return result;
       }
-      result.canPlace=true;
-      if(insertion.depth>CLEARANCE+1e-8){
+      if(insertion.depth>finishDepth+CLEARANCE+1e-8){
         result.reason=insertion.material==='mortar'?'cured-mortar':'masonry';
         const footprint=`${Math.round(required.width*1000)} × ${Math.round(required.height*1000)} × ${Math.round(required.depth*1000)} mm`;
-        result.message=`Box will protrude ${Math.ceil(insertion.depth*1000)} mm. ${result.reason==='cured-mortar'?'Hard mortar':'Brick'} stops it here; clear the marked area for the full ${footprint} recess.`;
+        result.message=`Box would protrude ${Math.ceil(result.proudDepthM*1000)} mm beyond the mortar finish. ${result.reason==='cured-mortar'?'Hard mortar':'Brick'} stops it; deepen the marked ${footprint} recess.`;
         return result;
       }
-      result.fits=true;result.reason='fits';result.message='Full box group fits the cavity flush.';return result;
+      result.fits=true;result.canPlace=true;result.reason='fits';result.message='Full box assembly fits at or behind the mortar finish plane.';return result;
     }finally{
       point.position.copy(previousPointPosition);point.boxGroup.position.copy(previousPosition);point.boxGroup.quaternion.copy(previousRotation);point.updateWorldMatrix(true,true);
     }
@@ -130,15 +130,13 @@ export class BoxPlacementSystem {
     }
     const assessment=this.assess(point,camera);if(!assessment.canPlace||!assessment.target)return{success:false,message:assessment.message};
     const target=new THREE.Vector3(assessment.target.x,assessment.target.y,assessment.target.wallFrontZ);
-    point.position.copy(point.parent?point.parent.worldToLocal(target):target);point.boxGroup.position.set(0,0,assessment.proudDepthM);point.boxGroup.rotation.set(0,0,0);point.updateWorldMatrix(true,true);
+    point.position.copy(point.parent?point.parent.worldToLocal(target):target);point.boxGroup.position.set(0,0,assessment.seatDepthM);point.boxGroup.rotation.set(0,0,0);point.updateWorldMatrix(true,true);
     point.boxGroup.visible=true;point.boxGroup.levelBar.visible=false;this.boxesRevision++;
     const displaced=this.mortar.pressBox(point);
     const placement:Placement={state:'loose',velocityY:0,secured:false,contactMaterial:'air',checkTime:0,...displaced};
-    this.placements.set(point,placement);point.boxGroup.userData.placement=placement;point.boxGroup.userData.minimumDepth=assessment.proudDepthM;
+    this.placements.set(point,placement);point.boxGroup.userData.placement=placement;point.boxGroup.userData.minimumDepth=assessment.backstopDepthM;point.boxGroup.userData.finishDepth=assessment.seatDepthM;
     point.setStage('fitted');
-    return{success:true,message:assessment.fits
-      ?'Box inserted flush. Let it rest on the ledge, then pack fresh mortar behind and around the sides.'
-      :`Box seated against ${assessment.reason==='cured-mortar'?'hard mortar':'masonry'}, protruding ${Math.ceil(assessment.proudDepthM*1000)} mm. Retrieve it and deepen the marked area to recess it fully.`};
+    return{success:true,message:'Box assembly seated flush with the mortar finish. It may move inward to the physical back-stop, never outward beyond this plane.'};
   }
 
   /** Explain inventory state before a generic wall-reach check obscures it. */
@@ -152,17 +150,40 @@ export class BoxPlacementSystem {
 
   retrieve(point:InstallationPoint):{success:boolean;message:string}{
     this.boxesRevision++;
-    point.boxGroup.visible=false;point.boxGroup.levelBar.visible=false;this.placements.delete(point);delete point.boxGroup.userData.placement;delete point.boxGroup.userData.minimumDepth;
+    point.boxGroup.visible=false;point.boxGroup.levelBar.visible=false;this.placements.delete(point);delete point.boxGroup.userData.placement;delete point.boxGroup.userData.minimumDepth;delete point.boxGroup.userData.finishDepth;
     point.boxGroup.position.set(0,0,0);point.boxGroup.rotation.set(0,0,0);
     if(point.conduit){point.remove(point.conduit);point.conduit=null;point.pipeStep='measure';}
     point.setStage(point.chaseHits?'chasing':'inspect');
     return{success:true,message:'Box retrieved. Adjust the cavity or aim elsewhere and place it again.'};
   }
 
+  /** Robust local finish plane from the mortar immediately around the casing
+   * rims. A percentile rejects isolated proud clods while retaining a real,
+   * continuous rendered finish. Bare masonry remains the zero fallback. */
+  private finishDepth(point:InstallationPoint):number {
+    if(!this.mortar.field.nodes.size)return 0;
+    point.updateWorldMatrix(true,true);const front=this.wall.volume.frontZ,spacing=this.mortar.field.spacing,regions=point.boxGroup.boxes.map(box=>new THREE.Box3().setFromObject(box));
+    const depths:number[]=[];
+    for(const node of this.mortar.field.nodes.values()){
+      if(node.value<.18)continue;
+      const x=node.x*spacing,y=node.y*spacing,z=node.z*spacing;
+      if(z<front-.018||z>front+.055)continue;
+      const besideRim=regions.some(region=>{
+        const nearX=x>=region.min.x-.024&&x<=region.max.x+.024&&y>=region.min.y-.024&&y<=region.max.y+.024;
+        if(!nearX)return false;
+        const innerX=x>region.min.x+.008&&x<region.max.x-.008,innerY=y>region.min.y+.008&&y<region.max.y-.008;
+        return !(innerX&&innerY);
+      });
+      if(besideRim)depths.push(z+spacing*.55-front);
+    }
+    if(!depths.length)return 0;
+    depths.sort((a,b)=>a-b);return THREE.MathUtils.clamp(depths[Math.floor((depths.length-1)*.65)],0,.04);
+  }
+
   /** The rear casing must travel through every occupied column on insertion;
    * checking the centre alone would let intact edge bricks enter the box. */
-  private insertionLimit(point:InstallationPoint,blockedCells?:BoxFitCell[]):{depth:number;material:'brick'|'mortar'|'air'}{
-    const front=this.wall.volume.frontZ;let required=front,material:'brick'|'mortar'|'air'='air',fresh=false,hasCured=false;
+  private insertionLimit(point:InstallationPoint,blockedCells?:BoxFitCell[],finishDepth=0):{depth:number;material:'brick'|'mortar'|'air'}{
+    const front=this.wall.volume.frontZ;let required=front-.12,material:'brick'|'mortar'|'air'='air',fresh=false,hasCured=false;
     point.updateWorldMatrix(true,true);
     const groupZ=point.boxGroup.getWorldPosition(new THREE.Vector3()).z;
     const regions=point.boxGroup.boxes.map(box=>new THREE.Box3().setFromObject(box));
@@ -181,7 +202,7 @@ export class BoxPlacementSystem {
       const nx=Math.ceil(box.width/.004),ny=Math.ceil(box.height/.004);
       for(let iy=0;iy<=ny;iy++)for(let ix=0;ix<=nx;ix++){
         const p=new THREE.Vector3(-box.width/2+box.width*ix/nx,-box.height/2+box.height*iy/ny,-box.depth).applyMatrix4(box.matrixWorld),rearOffset=p.z-groupZ;p.z=front+.18;
-        let cellRequired=front,cellMaterial:'brick'|'mortar'|'air'='air',surfaceZ=front;
+        let cellRequired=front-.12,cellMaterial:'brick'|'mortar'|'air'='air',surfaceZ=front-.12;
         // Material deeper than the casing cannot obstruct insertion. Cache
         // exact columns (no spatial rounding) until actual masonry changes.
         const rayDepth=.18+Math.max(0,-rearOffset)+CLEARANCE;
@@ -200,13 +221,13 @@ export class BoxPlacementSystem {
           }
         }
         if(cellRequired>required){required=cellRequired;material=cellMaterial;}
-        const proud=cellRequired-front+(fresh&&cellRequired>front?.002:0);
+        const proud=cellRequired-front-finishDepth+(fresh&&cellRequired>front?.002:0);
         if(blockedCells&&proud>CLEARANCE+1e-8)blockedCells.push({x:p.x,y:p.y,surfaceZ,extraDepthM:proud-CLEARANCE,material:cellMaterial==='mortar'?'cured-mortar':'masonry'});
       }
     }
     // Leave a small backing allowance when pressing paste against hard masonry.
-    if(fresh&&required>front)required+=.002;
-    return{depth:Math.max(0,required-front),material};
+    if(fresh&&required>front-.12)required+=.002;
+    return{depth:required-front,material};
   }
 
   canAdjust(point:InstallationPoint):boolean {const p=this.placements.get(point);return !p||p.state==='supported'||p.state==='bonded';}
@@ -223,8 +244,8 @@ export class BoxPlacementSystem {
       const proposedBottom=this.casing(point).bounds.min.y;
       if(Number.isFinite(previousBottom)&&Number.isFinite(proposedBottom))point.boxGroup.position.y+=previousBottom-proposedBottom;
     }
-    const depth=this.insertionLimit(point).depth;
-    let accepted=point.boxGroup.position.z>=depth&&this.canAdjust(point);
+    const finishDepth=this.finishDepth(point),depth=this.insertionLimit(point,undefined,finishDepth).depth;
+    let accepted=point.boxGroup.position.z>=depth&&point.boxGroup.position.z<=finishDepth+1e-8&&this.canAdjust(point);
     if(accepted){
       const proposed=point.boxGroup.position.clone(),tilt=point.boxGroup.rotation.z,translation=previousPosition.clone().sub(proposed);
       if(tilt===previousTilt){const distance=translation.length();accepted=this.casingTravel(point,distance?translation.clone().multiplyScalar(-1/distance):BACK,distance,translation)===null;}
@@ -240,6 +261,7 @@ export class BoxPlacementSystem {
     else{this.mortar.pressBox(point);this.boxesRevision++;if(placement)placement.checkTime=0;}
     point.updateWorldMatrix(true,true);
     point.boxGroup.userData.minimumDepth=depth;
+    point.boxGroup.userData.finishDepth=finishDepth;
     return accepted;
   }
 

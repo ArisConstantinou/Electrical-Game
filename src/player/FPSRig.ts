@@ -7,6 +7,8 @@ import { workerHand, workerArm, poseWorkerArm, flexWorkerHand, poseToolGrip, MAX
 import type { BrickWall, ChiselContact } from '../world/BrickWall';
 import { MaterialId } from '../world/MasonryVolume';
 import type { BoxKind } from '../data/installationRules';
+import { ElectricalBox } from '../electrical/Box';
+import { boxAssemblyBounds, boxModuleSize, horizontalBoxLayout, type BoxAssemblySnapshot, type BoxAttachmentZone, type BoxModuleLayout } from '../electrical/BoxAssembly';
 
 export type RigTool = 'spray' | 'hammer' | 'fitting' | 'level' | 'spring' | 'cutter' | 'trowel' | 'hose' | 'measure' | 'drill' | 'driver' | 'laser';
 export const RIG_TOOLS: RigTool[] = ['spray', 'hammer', 'fitting', 'level', 'spring', 'cutter', 'trowel', 'hose', 'measure', 'drill', 'driver', 'laser'];
@@ -52,6 +54,14 @@ export class FPSRig extends THREE.Group {
   private readonly fittingBoxParts: THREE.Object3D[] = [];
   private readonly fittingVariants=new Map<string,{parts:THREE.Object3D[];kinds:readonly BoxKind[];width:number}>();
   private fittingPreset='1G';
+  private readonly fittingAssemblyRoot=new THREE.Group();
+  private readonly fittingCandidateRoot=new THREE.Group();
+  private readonly fittingZonesRoot=new THREE.Group();
+  private fittingAssembly:BoxAssemblySnapshot|null=null;
+  private fittingZones:Array<{zone:BoxAttachmentZone;module:BoxModuleLayout;available:boolean}>=[];
+  private fittingAttachment:{elapsed:number;duration:number;addedId:string;target:THREE.Vector3}|null=null;
+  private readonly fittingCandidateHome=new THREE.Vector3(.125,-.018,-.055);
+  private fittingPresentationScale=1;
   levelTiltDegrees = 0;
   mortarCharge = 0;
   mortarRecovery = 0;
@@ -87,6 +97,7 @@ export class FPSRig extends THREE.Group {
 
   /** Contact can be queried several times per impact; advance the pose once per frame. */
   beginFrame(dt: number, wallTravelM: number | null = null, working=true): void {
+    this.updateFittingAttachment(dt);
     if(this.hammerWasWorking&&!working)this.holdHammerFeed=true;
     if(working)this.holdHammerFeed=false;
     this.hammerWasWorking=working;
@@ -269,15 +280,101 @@ export class FPSRig extends THREE.Group {
   }
 
   show(tool: RigTool): void { if(tool!=='measure')this.measureMarkTime=0; this.selectedTool=tool; this.tools.forEach((group, key) => { group.visible = key === tool; }); this.armSets.forEach((arms,key)=>arms.forEach(arm=>arm.group.visible=key===tool)); }
-  get fittingBoxKinds():readonly BoxKind[]{return this.fittingVariants.get(this.fittingPreset)!.kinds;}
-  /** Switch the finite supply model without rebuilding geometry or the hand. */
+  get fittingBoxKinds():readonly BoxKind[]{return this.fittingAssembly?.modules.map(module=>module.kind)??this.fittingVariants.get(this.fittingPreset)?.kinds??['1G'];}
+  /** Legacy presets now enter the same live assembly representation used by custom puzzles. */
   setFittingBoxKinds(kinds:readonly BoxKind[]):void{
-    const preset=kinds.join('+'),variant=this.fittingVariants.get(preset);
-    if(!variant||preset===this.fittingPreset)return;
-    this.fittingPreset=preset;
-    const tool=this.tools.get('fitting')!;
-    tool.userData.fittingBoxKinds=[...variant.kinds];tool.userData.fittingGroupWidth=variant.width;tool.userData.fittingBoxCount=variant.kinds.length;
-    for(const part of this.fittingBoxParts)part.visible=this.fittingBoxAvailable&&part.userData.fittingPreset===preset;
+    const modules=horizontalBoxLayout(kinds),activeId=modules.at(-1)!.id;
+    this.setFittingAssembly({modules,activeId,candidateKind:kinds.at(-1)??'1G',candidateRotation:0},[]);
+  }
+  setFittingAssembly(snapshot:BoxAssemblySnapshot,zones:Array<{zone:BoxAttachmentZone;module:BoxModuleLayout;available:boolean}>,addedId?:string):void{
+    this.fittingAssembly={...snapshot,modules:snapshot.modules.map(module=>({...module}))};
+    this.fittingZones=zones.map(zone=>({...zone,module:{...zone.module}}));
+    this.fittingPreset=snapshot.modules.map(module=>`${module.kind}@${module.rotation}:${module.x.toFixed(3)},${module.y.toFixed(3)}`).join('|');
+    for(const part of this.fittingBoxParts)part.visible=false;
+    this.rebuildFittingAssembly();
+    const added=addedId?this.fittingAssemblyRoot.children.find(object=>object.userData.assemblyModuleId===addedId):undefined;
+    if(added){
+      added.visible=false;
+      this.rebuildFittingCandidate((added.userData.boxKind as BoxKind)??snapshot.candidateKind,added.userData.quarterTurn??0);
+      const local=added.position.clone().multiplyScalar(this.fittingPresentationScale);
+      this.fittingAttachment={elapsed:0,duration:.34,addedId:addedId!,target:this.fittingAssemblyRoot.position.clone().add(local)};
+      this.fittingZonesRoot.visible=false;
+    }else{
+      this.fittingAttachment=null;
+      this.rebuildFittingCandidate(snapshot.candidateKind,snapshot.candidateRotation);
+      this.rebuildFittingZones();
+    }
+    const bounds=boxAssemblyBounds(snapshot.modules),tool=this.tools.get('fitting')!;
+    tool.userData.fittingBoxKinds=snapshot.modules.map(module=>module.kind);
+    tool.userData.fittingGroupWidth=bounds.width;tool.userData.fittingGroupHeight=bounds.height;tool.userData.fittingBoxCount=snapshot.modules.length;
+    this.heldBounds.clear();
+  }
+  private clearFittingRoot(root:THREE.Group):void{
+    // Do not dispose detached viewmodel buffers during play. Three's WebGPU
+    // render bundles may still reference them after Queue.submit(), which
+    // turns rapid wheel/number edits into device validation errors. The small
+    // transient objects become unreachable here and are reclaimed with the
+    // renderer/page lifecycle.
+    for(const child of [...root.children])root.remove(child);
+  }
+  private viewBox(module:Pick<BoxModuleLayout,'id'|'kind'|'rotation'>):ElectricalBox{
+    const box=new ElectricalBox(module.kind,`held-assembly:${module.id}`);
+    box.rotation.z=module.rotation*Math.PI/2;box.userData.assemblyModuleId=module.id;box.userData.boxKind=module.kind;box.userData.quarterTurn=module.rotation;
+    box.traverse(object=>{if(object instanceof THREE.Mesh){object.material=(Array.isArray(object.material)?object.material:[object.material]).map(entry=>{const copy=entry.clone();copy.depthTest=false;copy.depthWrite=false;return copy;});if((object.material as THREE.Material[]).length===1)object.material=(object.material as THREE.Material[])[0];object.renderOrder=20;object.castShadow=false;object.receiveShadow=false;}});
+    return box;
+  }
+  private rebuildFittingAssembly():void{
+    this.clearFittingRoot(this.fittingAssemblyRoot);
+    const snapshot=this.fittingAssembly;if(!snapshot)return;
+    const bounds=boxAssemblyBounds(snapshot.modules);
+    this.fittingPresentationScale=.72*THREE.MathUtils.clamp(.19/Math.max(bounds.width,bounds.height),.48,1);
+    this.fittingAssemblyRoot.position.set(-.105,.005,-.065);
+    this.fittingAssemblyRoot.scale.setScalar(this.fittingPresentationScale);
+    for(const module of snapshot.modules){
+      const box=this.viewBox(module);box.position.set(module.x-bounds.centerX,module.y-bounds.centerY,0);this.fittingAssemblyRoot.add(box);
+      if(module.id===snapshot.activeId){
+        const size=boxModuleSize(module),edge=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(size.width+.010,size.height+.010,.010)),new THREE.LineBasicMaterial({color:0x62e5ff,depthTest:false,transparent:true,opacity:.9}));
+        edge.name='Active box cyan outline';edge.userData.assemblyModuleId=`active-${module.id}`;edge.renderOrder=22;edge.position.copy(box.position);this.fittingAssemblyRoot.add(edge);
+      }
+    }
+  }
+  private rebuildFittingCandidate(kind:BoxKind,rotation:number):void{
+    this.clearFittingRoot(this.fittingCandidateRoot);
+    const box=this.viewBox({id:'candidate',kind,rotation:rotation as 0|1|2|3});box.name=`Right-hand next ${kind} box`;this.fittingCandidateRoot.add(box);
+    this.fittingCandidateRoot.scale.setScalar(.68);
+    this.fittingCandidateRoot.position.copy(this.fittingCandidateHome);
+  }
+  private zoneLabel(value:number,available:boolean):THREE.Sprite{
+    const canvas=document.createElement('canvas');canvas.width=96;canvas.height=96;const context=canvas.getContext('2d')!;
+    context.fillStyle=available?'#12343c':'#3b2d2b';context.strokeStyle=available?'#a8f2ff':'#9d7771';context.lineWidth=6;context.beginPath();context.roundRect(5,5,86,86,18);context.fill();context.stroke();
+    context.fillStyle=available?'#ffffff':'#c7aaa5';context.font='bold 56px Arial';context.textAlign='center';context.textBaseline='middle';context.fillText(String(value),48,52);
+    const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
+    const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,depthTest:false,depthWrite:false,transparent:true}));sprite.scale.set(.030,.030,1);sprite.renderOrder=24;return sprite;
+  }
+  private rebuildFittingZones():void{
+    this.clearFittingRoot(this.fittingZonesRoot);
+    const snapshot=this.fittingAssembly;if(!snapshot)return;
+    const bounds=boxAssemblyBounds(snapshot.modules);
+    this.fittingZonesRoot.position.copy(this.fittingAssemblyRoot.position);
+    this.fittingZonesRoot.scale.setScalar(this.fittingPresentationScale);
+    for(const zone of this.fittingZones){
+      const size=boxModuleSize(zone.module),group=new THREE.Group();group.name=`Box attachment zone ${zone.zone}`;group.userData.zone=zone.zone;group.userData.available=zone.available;
+      const edge=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(size.width+.006,size.height+.006,.008)),new THREE.LineBasicMaterial({color:zone.available?0x58dff5:0x7b5d58,transparent:true,opacity:zone.available?.82:.42,depthTest:false}));edge.renderOrder=21;group.add(edge);
+      const label=this.zoneLabel(zone.zone,zone.available);label.position.z=.012;group.add(label);
+      group.position.set(zone.module.x-bounds.centerX,zone.module.y-bounds.centerY,.004);
+      this.fittingZonesRoot.add(group);
+    }
+    this.fittingZonesRoot.visible=true;
+  }
+  private updateFittingAttachment(dt:number):void{
+    const animation=this.fittingAttachment;if(!animation)return;
+    animation.elapsed+=Math.max(0,Math.min(dt,.05));const t=THREE.MathUtils.smoothstep(animation.elapsed,0,animation.duration);
+    this.fittingCandidateRoot.position.lerpVectors(this.fittingCandidateHome,animation.target,t);
+    if(t<1)return;
+    const added=this.fittingAssemblyRoot.children.find(object=>object.userData.assemblyModuleId===animation.addedId);if(added)added.visible=true;
+    this.fittingAttachment=null;
+    if(this.fittingAssembly)this.rebuildFittingCandidate(this.fittingAssembly.candidateKind,this.fittingAssembly.candidateRotation);
+    this.rebuildFittingZones();
   }
   setSprayColor(color: number): void {
     this.sprayCanMaterial?.color.setHex(color);
@@ -636,11 +733,20 @@ export class FPSRig extends THREE.Group {
   poseArms(camera:THREE.Camera):void {
     const emptyFitting=this.selectedTool==='fitting'&&!this.fittingBoxAvailable;
     if(this.selectedTool==='fitting'){
-      for(const part of this.fittingBoxParts)part.visible=this.fittingBoxAvailable&&part.userData.fittingPreset===this.fittingPreset;
-      const hand=this.armSets.get('fitting')!.find(arm=>arm.side===1)!.hand;
-      hand.userData.gripping=this.fittingBoxAvailable;
-      hand.userData.gripRole=emptyFitting?'reaching':'primary';
-      if(!emptyFitting){hand.position.fromArray(hand.userData.fittingGripPosition);hand.quaternion.fromArray(hand.userData.fittingGripQuaternion);}
+      for(const part of this.fittingBoxParts)part.visible=false;
+      this.fittingAssemblyRoot.visible=this.fittingBoxAvailable;
+      this.fittingCandidateRoot.visible=this.fittingBoxAvailable;
+      this.fittingZonesRoot.visible=this.fittingBoxAvailable&&!this.fittingAttachment;
+      for(const arm of this.armSets.get('fitting')!){
+        const hand=arm.hand;hand.userData.gripping=this.fittingBoxAvailable;hand.userData.gripRole=emptyFitting?'reaching':arm.side<0?'assembly':'candidate';
+        if(!emptyFitting){
+          const assemblyHeight=this.fittingAssembly?boxAssemblyBounds(this.fittingAssembly.modules).height*this.fittingPresentationScale:.074;
+          const position=arm.side<0
+            ?this.fittingAssemblyRoot.position.clone().add(new THREE.Vector3(-.024,-assemblyHeight*.5-.028,.025))
+            :this.fittingCandidateRoot.position.clone().add(new THREE.Vector3(.022,-.042,.025));
+          hand.position.copy(position);hand.quaternion.setFromEuler(new THREE.Euler(-.12,arm.side<0?-.18:.18,arm.side<0?-.18:.18));
+        }
+      }
     }
     if(this.selectedTool!=='hammer'&&this.selectedTool!=='trowel'&&this.selectedTool!=='measure'&&this.selectedTool!=='drill'&&this.selectedTool!=='driver'&&!emptyFitting)this.constrainHeldTool(camera);
     const {right}=this.bodyFrame(camera);
@@ -752,12 +858,14 @@ export class FPSRig extends THREE.Group {
         this.fittingVariants.set(preset,{parts,kinds,width:variant.userData.fittingGroupWidth});
         for(const part of parts){part.visible=preset===this.fittingPreset;group.add(part);this.fittingBoxParts.push(part);}
       }
+      this.fittingAssemblyRoot.name='Left-hand live box assembly';this.fittingCandidateRoot.name='Right-hand next box';this.fittingZonesRoot.name='Numbered live attachment zones';
+      group.add(this.fittingAssemblyRoot,this.fittingCandidateRoot,this.fittingZonesRoot);
     }
     this.attachArms(kind,group);
     if(kind==='fitting'){
-      const hand=this.armSets.get(kind)!.find(arm=>arm.side===1)!.hand;
-      hand.userData.fittingGripPosition=hand.position.toArray();
-      hand.userData.fittingGripQuaternion=hand.quaternion.toArray();
+      for(const arm of this.armSets.get(kind)!){
+        const hand=arm.hand;if(hand.parent!==group)group.add(hand);hand.userData.gripping=true;hand.userData.gripRole=arm.side<0?'assembly':'candidate';
+      }
     }
     if(kind==='spray'){
       const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(54),3));

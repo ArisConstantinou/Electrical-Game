@@ -397,20 +397,36 @@ button {
 }
 
 /* Box supply remains available while earlier installations are unfinished. */
-#box-supply { top:140px; left:24px; width:290px; padding:12px; display:grid; gap:8px; pointer-events:auto; }
+#box-supply { top:128px; left:24px; z-index:11; width:330px; padding:12px; display:grid; gap:8px; pointer-events:auto; }
 #box-supply[hidden] { display:none; }
 #box-supply>b { font-size:14px; }
 #box-supply>span { font-size:12px; line-height:1.35; }
 .box-presets { display:flex; gap:6px; }
 .box-presets button { flex:1; min-height:44px; border:1px solid #81715f; background:#34302a; color:white; font:700 14px/1 sans-serif; touch-action:manipulation; }
 .box-presets button[aria-pressed="true"] { background:#a44827; border-color:#f1ad75; }
+#box-assembly-state { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+#box-assembly-state span { display:grid; gap:2px; padding:6px 7px; border:1px solid #71675c; background:#201e1a; font:700 12px/1.15 'Barlow Condensed',Arial,sans-serif; color:#bdb5aa; }
+#box-assembly-state b { color:#fff; font-size:15px; }
+#box-zone-buttons { display:grid; grid-template-columns:1fr 1fr 32px 1fr 1fr; align-items:center; gap:5px; }
+#box-zone-buttons button { min-width:0; min-height:48px; display:grid; place-items:center; gap:2px; padding:4px; border:1px solid #65d9ed; background:#12343c; color:#fff; touch-action:manipulation; }
+#box-zone-buttons button:disabled { border-color:#665954; background:#352e2b; color:#8b7b75; }
+#box-zone-buttons kbd { font:900 16px/1 Arial,sans-serif; }
+#box-zone-buttons span { font:800 12px/1 'Barlow Condensed',Arial,sans-serif; }
+#box-zone-buttons i { display:grid; place-items:center; width:30px; height:30px; border-radius:50%; background:#e7e4d9; color:#2b2824; font:900 20px/1 Arial,sans-serif; font-style:normal; }
+#box-assembly-actions { display:grid; grid-template-columns:1fr 1fr 1.1fr; gap:5px; }
+#box-assembly-actions button { min-height:42px; padding:5px; border:1px solid #81715f; background:#34302a; color:#fff; font:800 12px/1.05 'Barlow Condensed',Arial,sans-serif; touch-action:manipulation; }
+#box-place-assembly { background:#a44827 !important; border-color:#f1ad75 !important; }
+#game-shell[data-active-tool="fitting"] #desktop-key-guide { display:none; }
 @media (pointer:coarse), (max-width:760px) {
-  #box-supply { top:80px; left:10px; width:min(290px,calc(100% - 102px)); padding:9px; gap:6px; }
-  #game-shell[data-active-tool="fitting"] #interaction-prompt { top:215px; }
+  #box-supply { top:72px; left:8px; width:min(310px,calc(100% - 86px)); padding:8px; gap:5px; }
+  #box-supply>b,#box-supply>span,#box-fit-legend { display:none; }
+  .box-presets button { min-height:40px; }
+  #box-assembly-actions button { min-height:38px; }
+  #game-shell[data-active-tool="fitting"] #interaction-prompt { top:310px; }
 }
 @media (pointer:coarse) and (max-height:500px) {
-  #box-supply { top:68px; width:290px; padding:7px; gap:4px; }
-  #game-shell[data-active-tool="fitting"] #interaction-prompt { top:180px; }
+  #box-supply { top:58px; width:300px; padding:6px; gap:4px; transform:scale(.88); transform-origin:top left; }
+  #game-shell[data-active-tool="fitting"] #interaction-prompt { top:250px; }
 }
 
 /* Measuring controls must stay below the real level and above touch aim zones. */

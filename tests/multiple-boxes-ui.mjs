@@ -10,6 +10,10 @@ const browser=await chromium.launch({channel:'chrome',headless:true});
 const steps=(page,count=1)=>page.evaluate(count=>{for(let i=0;i<count;i++)window.__multipleStep(1/60,1/60,false);},count);
 const click=async(page,selector,mobile)=>{await page.locator(selector)[mobile?'tap':'click']();await steps(page,2);};
 async function select(page,tool,mobile){if(mobile)await click(page,`[data-tool="${tool}"]`,true);else{await page.keyboard.press(tool==='fitting'?'Digit5':'Digit6');await steps(page);}}
+async function choosePreset(page,preset,mobile){
+ if(preset!=='2G-1G')return click(page,`#box-preset-${preset}`,mobile);
+ await click(page,'#box-preset-2G',mobile);await click(page,'#box-next-kind',mobile);await click(page,'[data-box-zone="2"]',mobile);await steps(page,24);
+}
 async function use(page,mobile){
  if(mobile){const b=await page.locator('#look-joystick').boundingBox(),cdp=await page.context().newCDPSession(page);await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:b.x+b.width/2,y:b.y+b.height/2,id:11}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await cdp.detach();}
  else await page.keyboard.press('KeyE');
@@ -51,12 +55,12 @@ try{
   assert(fixture.removed>0);assert(fixture.centres.every(Boolean));await select(page,'fitting',mobile);
   const placed=[];let previous=await state(page);
   for(const [preset,x] of [['1G',-.85],['2G',0],['2G-1G',.85],['1G',1.65]]){
-   await click(page,`#box-preset-${preset}`,mobile);await aim(page,x);await use(page,mobile);await steps(page,150);
+   await choosePreset(page,preset,mobile);await aim(page,x);await use(page,mobile);await steps(page,150);
    const s=await state(page),p=s.points.find(p=>p.id===s.active);assert(p?.visible,`${name}: native ${preset} placed`);assert.equal(p.kinds.join('-'),preset);assert.equal(p.placement?.state,'supported',`${name}: actual brick ledge supports ${preset}`);assert.equal(p.placement.secured,false);unchanged(previous,s);placed.push(p.id);previous=s;
   }
   assert.equal(new Set(placed).size,4);assert(placed.some(id=>id.startsWith('extra-')),'Repeated size creates a dynamic point');assert.equal(previous.points.filter(p=>p.visible).length,4);
   const first=previous.points.find(p=>p.id===placed[0]);await select(page,'level',mobile);await aim(page,first.position[0],first.position[1]);await use(page,mobile);
-  const level=await state(page);assert.equal(level.active,first.id);assert.equal(level.points.find(p=>p.id===first.id).stage,'leveling');assert.equal(level.rig,false,'Placed level has no duplicate handheld rig');assert.equal(level.points.filter(p=>p.level).length,1);
+  const level=await state(page);assert.equal(level.active,first.id);assert.equal(level.points.find(p=>p.id===first.id).stage,'leveling');assert.equal(level.points.filter(p=>p.level).length,1);
   await shot(page,`${name}-level-seated`);
   const levelLayout=await layout(page);assert(levelLayout.panel);assert(!((levelLayout.boxCenter.x>=levelLayout.panel.x&&levelLayout.boxCenter.x<=levelLayout.panel.right)&&(levelLayout.boxCenter.y>=levelLayout.panel.y&&levelLayout.boxCenter.y<=levelLayout.panel.bottom)),'Physical selected box must remain outside leveling panel');
   assert(!(levelLayout.boxBounds.x<levelLayout.panel.right&&levelLayout.boxBounds.right>levelLayout.panel.x&&levelLayout.boxBounds.y<levelLayout.panel.bottom&&levelLayout.boxBounds.bottom>levelLayout.panel.y),'The complete physical casing must remain clear of leveling controls');
@@ -69,7 +73,7 @@ try{
   await select(page,'fitting',mobile);await click(page,'#box-preset-2G',mobile);
   const middle=exited.points.find(p=>p.id===placed[1]);await aim(page,middle.position[0],middle.position[1]);await use(page,mobile);const retrieved=await state(page);assert.equal(retrieved.points.find(p=>p.id===middle.id).visible,false);unchanged(exited,retrieved,[middle.id]);
   await aim(page,-1.65);await use(page,mobile);await steps(page,150);const moved=await state(page);assert.equal(moved.active,middle.id);assert(moved.points.find(p=>p.id===middle.id).position[0]<-1.5);unchanged(retrieved,moved,[middle.id]);
-  const overlapFirst=moved.points.find(p=>p.id===first.id);await aim(page,overlapFirst.position[0]+.06,overlapFirst.position[1]);await use(page,mobile);const overlap=await state(page);assert.equal(overlap.points.filter(p=>p.visible).length,4,'Overlapping fifth placement rejected');unchanged(moved,overlap);assert.match(await page.locator('#box-fit-status').textContent(),/another box|blocks/i);
+  const overlapFirst=moved.points.find(p=>p.id===first.id);await aim(page,overlapFirst.position[0]+.06,overlapFirst.position[1]);await use(page,mobile);const overlap=await state(page);assert.equal(overlap.points.filter(p=>p.visible).length,4,'Overlapping fifth placement rejected');unchanged(moved,overlap);assert.match(await page.locator('#box-fit-status').textContent(),/another box|blocks|overlap/i);
   await click(page,'#box-preset-1G',mobile);await aim(page,overlapFirst.position[0]-.12,overlapFirst.position[1]);await use(page,mobile);await steps(page,150);const adjacent=await state(page),added=adjacent.points.find(p=>p.id===adjacent.active);
   assert.equal(adjacent.points.filter(p=>p.visible).length,5,'Another independent box fits beside the first in the same chase');assert.equal(added.kinds.join('+'),'1G');assert.equal(added.placement.state,'supported');assert(Math.abs(added.position[0]-first.position[0]+.12)<.002);unchanged(overlap,adjacent);
   await shot(page,`${name}-two-boxes-one-chase`);

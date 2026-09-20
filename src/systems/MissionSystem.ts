@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GAME_CONFIG } from '../data/gameConfig';
 import { INSTALLATION_POINTS, type InstallationStage, type BoxKind } from '../data/installationRules';
 import { InstallationPoint } from '../electrical/InstallationPoint';
+import { boxAssemblyKey, horizontalBoxLayout, type BoxModuleLayout } from '../electrical/BoxAssembly';
 
 const stageProgress: Record<InstallationStage, number> = {
   inspect: 0, marked: 1, chasing: 1.5, chased: 2, fitted: 3, mortared: 4, leveling: 4.5, leveled: 5, conduit: 5.5, complete: 7,
@@ -10,7 +11,7 @@ const stageProgress: Record<InstallationStage, number> = {
 export class MissionSystem {
   readonly points = INSTALLATION_POINTS.map(definition => new InstallationPoint(definition));
   readonly root = new THREE.Group();
-  boxPreset: '1G' | '2G' | '2G+1G' = '2G+1G';
+  boxPreset = '1G';
   private selectedPoint: InstallationPoint | null = null;
   private nextBoxId = 1;
 
@@ -30,13 +31,16 @@ export class MissionSystem {
   select(point: InstallationPoint): void { this.selectedPoint = point; }
 
   /** Keep the shared points array alive for mortar, physics and Studio traversal. */
-  placementCandidate(): InstallationPoint | null {
+  placementCandidate(layout?: readonly BoxModuleLayout[]): InstallationPoint | null {
     if(this.points.filter(point=>point.boxGroup.visible).length>=24)return null;
-    const boxes=this.boxPreset.split('+') as BoxKind[];
-    const matches=(point:InstallationPoint)=>!point.boxGroup.visible&&point.definition.boxes.join('+')===this.boxPreset;
+    const resolved=(layout?.length?layout:horizontalBoxLayout(this.boxPreset.split('+') as BoxKind[])).map(module=>({...module}));
+    const boxes=resolved.map(module=>module.kind),layoutKey=boxAssemblyKey(resolved);
+    const matches=(point:InstallationPoint)=>!point.boxGroup.visible&&boxAssemblyKey(point.definition.boxLayout??horizontalBoxLayout(point.definition.boxes))===layoutKey;
     const reusable=this.activePoint && matches(this.activePoint)?this.activePoint:this.points.find(matches);
     if(reusable)return reusable;
-    const point=new InstallationPoint({id:`extra-${this.nextBoxId++}`,label:`Box ${this.nextBoxId-1} · ${this.boxPreset}`,kind:'socket',boxes,x:0,bottom:.3});
+    const number=this.nextBoxId++;
+    const description=boxes.length===1?boxes[0]:`Custom ${boxes.length}-box assembly`;
+    const point=new InstallationPoint({id:`extra-${number}`,label:`Box ${number} · ${description}`,kind:'socket',boxes,boxLayout:resolved,x:0,bottom:.3});
     this.points.push(point);this.root.add(point);
     return point;
   }

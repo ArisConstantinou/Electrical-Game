@@ -5,6 +5,7 @@ const server=await createServer({server:{middlewareMode:true,hmr:false},optimize
 try {
   const {MissionSystem}=await server.ssrLoadModule('/src/systems/MissionSystem.ts');
   const mission=new MissionSystem(new THREE.Scene()),shared=mission.points;
+  mission.boxPreset='2G+1G';
   const first=mission.placementCandidate();assert.equal(first.definition.id,'A');first.boxGroup.visible=true;first.setStage('fitted');mission.select(first);
   const progressBefore=mission.progress;const second=mission.placementCandidate();assert.equal(mission.progress,progressBefore,'An unused extra does not add a mission obligation');assert.notEqual(first,second);assert.equal(mission.placementCandidate(),second,'Failed/unused placement must reuse the same candidate');
   second.boxGroup.visible=true;second.setStage('fitted');mission.select(second);

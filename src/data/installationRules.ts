@@ -29,6 +29,7 @@ export interface InstallationDefinition {
   label: string;
   kind: 'socket' | 'switch';
   boxes: BoxKind[];
+  boxLayout?: import('../electrical/BoxAssembly').BoxModuleLayout[];
   x: number;
   bottom: number;
 }

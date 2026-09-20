@@ -24,7 +24,8 @@ try{for(const mobile of [false,true]){
   for(const a of [...areas,{x:-1.4}])for(let pass=0;pass<6;pass++)for(const dx of [-.07,0,.07]){const held=g.mortar.deposit(new V(a.x+dx,1.22,v.frontZ-.006),.65,new V(0,0,1),false,.65);g.mortar.launchedMass+=.65;g.mortar.stuckMass+=held;g.mortar.floorMass+=.65-held;added+=held;g.mortar.field.tick(.25);}
   await g.mortar.waitForGeometry();return{removed,addedKg:added};
  });assert(fixture.addedKg>0);
- if(mobile)await page.locator('[data-tool="fitting"]').tap();else await page.keyboard.press('Digit5');await steps(3);await page.locator('#box-preset-2G-1G')[mobile?'tap':'click']();await steps(3);
+ if(mobile)await page.locator('[data-tool="fitting"]').tap();else await page.keyboard.press('Digit5');await steps(3);
+ await page.locator('#box-preset-2G')[mobile?'tap':'click']();await steps(2);await page.locator('#box-next-kind')[mobile?'tap':'click']();await steps(2);await page.locator('[data-box-zone="2"]')[mobile?'tap':'click']();await steps(24);
  const cases=[];
  for(const [kind,x] of [['untouched',-1.4],['narrow',-.7],['shallow',0],['full',.7]]){
   await page.evaluate(x=>{const g=window.__wireTheHouse,c=g.renderer.camera;g.hammerWorkStance.restore(c);c.position.set(x,g.player.eyeHeight,g.room.brickWall.volume.frontZ+.46);c.lookAt(x,1.22,g.room.brickWall.volume.frontZ);g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;},x);await steps(150);
@@ -39,13 +40,16 @@ try{for(const mobile of [false,true]){
    for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++){const i=(y*canvas.width+x)*4;if(Math.abs(data[i]-before[i])+Math.abs(data[i+1]-before[i+1])+Math.abs(data[i+2]-before[i+2])>30)count++;}return count;
   },{b64:png.toString('base64'),hidden:hidden.toString('base64')});
   await use();const after=await state();
-  assert(before.fit.canPlace);assert.equal(after.visible.length,1,'Native USE seats the box at its available insertion depth');assert(Math.abs(after.totalMass-before.totalMass)<1e-7,'Pressing mortar conserves its finite mass');assert.equal(after.wall,before.wall,'Placing a box cannot destroy masonry');
-  const placed=after.visible[0];assert(Math.abs(placed.depth-before.fit.proudDepthM)<1e-7,'Preview and actual protrusion agree');
-  if(kind==='full'){assert(before.fit.fits,'A complete recess with yielding fresh mortar remains usable');assert(placed.flush);}
-  else{assert(!before.fit.fits&&before.tiles>0);assert.equal(before.mode,'proud');assert.match(before.text,/PROTRUDES.*TAP TO PLACE/);assert(!placed.flush);assert(placed.depth>.015);if(kind==='untouched')assert(placed.depth>=before.fit.required.depth);assert(marked>20,`${platform} ${kind}: obstruction markings hidden under mortar (${marked} pixels)`);}
+  assert(Math.abs(after.totalMass-before.totalMass)<1e-7,'A placement attempt conserves finite mortar mass');assert.equal(after.wall,before.wall,'A placement attempt cannot destroy masonry');
+  if(kind==='full'){
+   assert(before.fit.canPlace&&before.fit.fits,'A complete recess with yielding fresh mortar remains usable');assert.equal(after.visible.length,1,'Native USE seats a clear box assembly');
+   const placed=after.visible[0];assert(Math.abs(placed.depth-before.fit.seatDepthM)<1e-7,'The placed front rim matches the detected mortar finish plane');assert(placed.flush);
+  }else{
+   assert(!before.fit.canPlace&&!before.fit.fits&&before.tiles>0);assert.equal(before.mode,'blocked');assert.match(before.text,/REMOVE MARKED/);assert.equal(after.visible.length,0,'A blocked recess cannot leave the box proud of the finish');assert(marked>20,`${platform} ${kind}: obstruction markings hidden under mortar (${marked} pixels)`);
+  }
   assert(!after.overflow&&!after.renderError);cases.push({kind,marked,before,after});
-  await page.evaluate(async()=>{const g=window.__wireTheHouse,c=g.renderer.camera,p=g.mission.points.find(p=>p.boxGroup.visible),v=p.boxGroup.getWorldPosition(c.position.clone());c.position.set(v.x+.32,v.y+.18,g.room.brickWall.volume.frontZ+.55);c.lookAt(v);c.updateMatrixWorld(true);await g.renderer.waitForFrame();g.renderer.render();await g.renderer.waitForFrame();});await page.screenshot({path:`${out}/${platform}-${kind}-placed.png`});
-  await page.evaluate(()=>{const g=window.__wireTheHouse,p=g.mission.points.find(p=>p.boxGroup.visible);g.boxPlacement.retrieve(p);});await steps(2);
+  await page.evaluate(async()=>{const g=window.__wireTheHouse,c=g.renderer.camera,p=g.mission.points.find(p=>p.boxGroup.visible);if(p){const v=p.boxGroup.getWorldPosition(c.position.clone());c.position.set(v.x+.32,v.y+.18,g.room.brickWall.volume.frontZ+.55);c.lookAt(v);c.updateMatrixWorld(true);}await g.renderer.waitForFrame();g.renderer.render();await g.renderer.waitForFrame();});await page.screenshot({path:`${out}/${platform}-${kind}-${kind==='full'?'placed':'blocked'}.png`});
+  await page.evaluate(()=>{const g=window.__wireTheHouse,p=g.mission.points.find(p=>p.boxGroup.visible);if(p)g.boxPlacement.retrieve(p);});await steps(2);
  }
  report.cases.push({platform,fixture,cases});await context.close();console.log(JSON.stringify({platform,passed:true}));
 }assert.deepEqual(report.errors,[]);}finally{await browser.close();await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));}

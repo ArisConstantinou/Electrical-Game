@@ -150,8 +150,17 @@ export class HUD {
           </aside>
           <output id="laser-reference" hidden></output>
           <div id="box-supply" class="hud-card" aria-label="Box supply" hidden>
-            <b>BOX FIT CHECK</b>
-            <div class="box-presets">${['1G','2G','2G+1G'].map(kind=>`<button id="box-preset-${kind.replace('+','-')}" type="button" data-box-preset="${kind}" aria-pressed="${kind==='2G+1G'}">${kind}</button>`).join('')}</div>
+            <b>LIVE BOX ASSEMBLY</b>
+            <div class="box-presets">${['1G','2G'].map(kind=>`<button id="box-preset-${kind}" type="button" data-box-preset="${kind}" aria-pressed="${kind==='1G'}">START ${kind}</button>`).join('')}</div>
+            <div id="box-assembly-state"><span>LEFT HAND <b id="box-assembly-count">1 BOX</b></span><span>RIGHT HAND <b id="box-candidate-kind">1G · 0°</b></span></div>
+            <div id="box-zone-buttons" aria-label="Attachment positions">
+              <button type="button" data-box-zone="1"><kbd>1</kbd><span>TOP</span></button>
+              <button type="button" data-box-zone="4"><kbd>4</kbd><span>LEFT</span></button>
+              <i aria-hidden="true">+</i>
+              <button type="button" data-box-zone="2"><kbd>2</kbd><span>RIGHT</span></button>
+              <button type="button" data-box-zone="3"><kbd>3</kbd><span>BOTTOM</span></button>
+            </div>
+            <div id="box-assembly-actions"><button id="box-next-kind" type="button">WHEEL · CHANGE</button><button id="box-rotate-candidate" type="button">R · ROTATE</button><button id="box-place-assembly" type="button">PLACE · RMB</button></div>
             <output id="box-fit-size">RECESS 216 × 74 × 37 mm</output>
             <output id="box-fit-status" role="status" data-fit="out-of-reach">Aim at the wall to check the recess.</output>
             <span id="box-fit-legend"><i></i> RED: REMOVE <i></i> AMBER: DEPTH</span>
@@ -259,6 +268,10 @@ export class HUD {
       });
     };
     root.querySelectorAll<HTMLButtonElement>('[data-box-preset]').forEach(button=>bindHammerButton(`#${button.id}`,()=>dispatchEvent(new CustomEvent('wirehouse:box-preset',{detail:button.dataset.boxPreset}))));
+    root.querySelectorAll<HTMLButtonElement>('[data-box-zone]').forEach(button=>bindHammerButton(`[data-box-zone="${button.dataset.boxZone}"]`,()=>dispatchEvent(new CustomEvent('wirehouse:box-attach',{detail:Number(button.dataset.boxZone)}))));
+    bindHammerButton('#box-next-kind',()=>dispatchEvent(new CustomEvent('wirehouse:box-cycle-candidate')));
+    bindHammerButton('#box-rotate-candidate',()=>dispatchEvent(new CustomEvent('wirehouse:box-rotate-candidate')));
+    bindHammerButton('#box-place-assembly',()=>dispatchEvent(new CustomEvent('wirehouse:box-place-assembly')));
     bindHammerButton('#measure-mark',()=>{if(!root.querySelector<HTMLButtonElement>('#measure-mark')!.disabled)dispatchEvent(new CustomEvent('wirehouse:measure-mark'));});
     bindHammerButton('#laser-place',()=>{if(!root.querySelector<HTMLButtonElement>('#laser-place')!.disabled)dispatchEvent(new CustomEvent('wirehouse:laser-place'));});
     bindHammerButton('#hammer-view-left',()=>window.dispatchEvent(new CustomEvent('wirehouse:hammer-view-side',{detail:1})));
@@ -355,7 +368,7 @@ export class HUD {
     this.shell.classList.toggle('mortar-tool',selectedTool==='trowel'||selectedTool==='hose');
     this.progress.style.width = `${missionProgress}%`;
     this.reticle.classList.toggle('active', targeted);
-    if(toolChanged)this.tool.innerHTML = `<span>SELECTED TOOL</span><b class="selected">${selectedTool.toUpperCase()}</b><em>${selectedTool==='measure'?'AIM TO MEASURE · M TO MARK':selectedTool==='trowel'?'HOLD · RELEASE':selectedTool==='hose'?'HOLD TO SPRAY':'LEFT CLICK TO USE'}</em>`;
+    if(toolChanged)this.tool.innerHTML = `<span>SELECTED TOOL</span><b class="selected">${selectedTool.toUpperCase()}</b><em>${selectedTool==='measure'?'AIM TO MEASURE · M TO MARK':selectedTool==='trowel'?'HOLD · RELEASE':selectedTool==='hose'?'HOLD TO SPRAY':selectedTool==='fitting'?'BUILD 1–4 · PLACE RMB':'LEFT CLICK TO USE'}</em>`;
     if (!point) {
       this.objective.textContent = 'Site ready for inspection';
       this.shell.querySelector('#objective-compact')!.textContent = 'SITE / INSPECTION';
@@ -402,6 +415,12 @@ export class HUD {
 
   updateBoxPreset(preset:string):void {
     this.shell.querySelectorAll<HTMLButtonElement>('[data-box-preset]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.boxPreset===preset)));
+  }
+
+  updateBoxAssembly(snapshot:{modules:Array<{kind:string}>;candidateKind:string;candidateRotation:number},zones:Array<{zone:number;available:boolean}>):void {
+    this.shell.querySelector('#box-assembly-count')!.textContent=`${snapshot.modules.length} ${snapshot.modules.length===1?'BOX':'BOXES'}`;
+    this.shell.querySelector('#box-candidate-kind')!.textContent=`${snapshot.candidateKind} · ${snapshot.candidateRotation*90}°`;
+    for(const zone of zones){const button=this.shell.querySelector<HTMLButtonElement>(`[data-box-zone="${zone.zone}"]`)!;button.disabled=!zone.available;button.setAttribute('aria-label',`${zone.zone} · ${button.querySelector('span')!.textContent} · ${zone.available?'available':'occupied'}`);}
   }
 
   updateWaterGun(setting:WaterGunSetting,floorLitres:number,depthMm:number):void {

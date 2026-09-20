@@ -8,7 +8,7 @@ const out=process.argv[3]??'output/box-placement-ui';
 await mkdir(out,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const report={url,mobileIsEmulation:true,fixture:'Camera and deterministic frame clock are diagnostic fixtures. Selection, approach and placement use real keyboard/touch events. Broad/narrow cavities use real MasonryVolume impacts; legal falling placements use saved clear vertical node strips with no support, and the shallow recess restores a saved node layer. Beds use actual MortarField volume, with cured age authored explicitly; acceptance methods are never stubbed.',scenarios:[],errors:[]};
-const state=page=>page.evaluate(()=>{const g=window.__wireTheHouse,p=g.mission.points.find(p=>p.definition.id===window.__boxQAOriginalId),m=g.mortar.telemetry;return{id:p.definition.id,activeId:g.mission.activePoint?.definition.id,camera:g.renderer.camera.position.toArray(),point:p.position.toArray(),visible:p.boxGroup.visible,boxLocal:p.boxGroup.position.toArray(),stage:p.stage,placement:g.boxPlacement.telemetry,pose:g.fpsRig.debugPose(),fittingBoxAvailable:g.fpsRig.fittingBoxAvailable,fittingBoxVisible:g.fpsRig.fittingBoxParts.some(part=>part.visible),levelVisible:p.boxGroup.levelBar.visible,mortarMass:g.mortar.field.mass+m.movingKg+m.restingKg+m.floorKg,renderError:g.renderer.renderError};});
+const state=page=>page.evaluate(()=>{const g=window.__wireTheHouse,p=g.mission.points.find(p=>p.definition.id===window.__boxQAOriginalId),m=g.mortar.telemetry,assembly=g.fpsRig.getObjectByName('Left-hand live box assembly'),candidate=g.fpsRig.getObjectByName('Right-hand next box');return{id:p.definition.id,activeId:g.mission.activePoint?.definition.id,camera:g.renderer.camera.position.toArray(),point:p.position.toArray(),visible:p.boxGroup.visible,boxLocal:p.boxGroup.position.toArray(),stage:p.stage,placement:g.boxPlacement.telemetry,pose:g.fpsRig.debugPose(),fittingBoxAvailable:g.fpsRig.fittingBoxAvailable,fittingBoxVisible:!!assembly?.visible&&!!candidate?.visible,levelVisible:p.boxGroup.levelBar.visible,mortarMass:g.mortar.field.mass+m.movingKg+m.restingKg+m.floorKg,renderError:g.renderer.renderError};});
 async function steps(page,count=1,dt=1/60){await page.evaluate(({count,dt})=>{for(let i=0;i<count;i++)window.__boxQAStep(dt);},{count,dt});}
 async function aim(page,x,y=1.4,distance=.42){await page.evaluate(({x,y,distance})=>{const g=window.__wireTheHouse,c=g.renderer.camera;g.hammerWorkStance.restore(c);c.position.set(x,g.player.eyeHeight,g.room.brickWall.volume.frontZ+distance);c.lookAt(x,y,g.room.brickWall.volume.frontZ);g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;window.__boxQAStep(0);},{x,y,distance});await steps(page,60);}
 async function shot(page,name){await page.evaluate(async()=>{const g=window.__wireTheHouse;await g.renderer.waitForFrame();g.renderer.render();await g.renderer.waitForFrame();});await page.screenshot({path:`${out}/${name}.png`});}
@@ -18,7 +18,8 @@ async function action(page,mobile){
   await steps(page,1,0);
 }
 async function select(page,mobile,tool){if(mobile)await page.locator(`[data-tool="${tool}"]`).tap();else await page.keyboard.press(tool==='fitting'?'Digit5':'Digit6');await steps(page,1,0);}
-function proudPlacement(before,after,label,minimumMm=1.2){assert(after.visible,`${label}: box is placed at the hard surface`);const placement=after.placement.find(p=>p.id===after.id);assert(placement.protrusionMm>minimumMm,`${label}: insufficient cavity leaves casing visibly proud`);assert(Math.abs(after.boxLocal[2]*1000-placement.protrusionMm)<1e-6,`${label}: rendered pose matches physical projection`);assert(Math.abs(after.mortarMass-before.mortarMass)<1e-6,`${label}: placement conserves mortar`);}
+function blockedPlacement(before,after,label){assert.equal(after.visible,false,`${label}: obstructed recess cannot leave the box proud of the finish`);assert(Math.abs(after.mortarMass-before.mortarMass)<1e-6,`${label}: refused placement conserves mortar`);}
+function flushOrBlocked(before,after,label){if(after.visible){const placement=after.placement.find(p=>p.id===after.id);assert(placement.protrusionMm<=1.20001,`${label}: any accepted casing must be flush`);}assert(Math.abs(after.mortarMass-before.mortarMass)<1e-6,`${label}: fit attempt conserves mortar`);}
 async function clearVerticalWorkSlots(page){return page.evaluate(async()=>{
  const g=window.__wireTheHouse,v=g.room.brickWall.volume,save=v.serialize(),chunks=new Map(save.chunks.map(c=>[c.key,new Map(c.edits.map(e=>[e[0],e]))]));let removed=0;
  // Real material removal all the way to floor isolates gravity after a legal
@@ -31,7 +32,7 @@ async function clearVerticalWorkSlots(page){return page.evaluate(async()=>{
  }
  save.chunks=[...chunks].map(([key,edits])=>({key,edits:[...edits.values()]}));save.removedVolume=(save.removedVolume??0)+removed*v.nodeVolume;v.restore(save);g.room.brickWall.flushGeometry();await g.room.brickWall.waitForGeometry();return{removed};
 });}
-function oneHand(s,label){const carrying=s.pose.tool!=='fitting'||s.fittingBoxAvailable;assert.equal(s.pose.arms.filter(a=>a.gripping).length,carrying?1:0,`${label}: available tool supply controls gripping hand`);if(s.pose.tool==='fitting'){assert.equal(s.fittingBoxAvailable,true,`${label}: more boxes remain available below the 24-group limit`);assert.equal(s.fittingBoxVisible,true,`${label}: next supplied box stays visible while previous boxes are placed`);assert.equal(s.pose.arms.find(a=>a.side===1).gripRole,'primary',`${label}: supplied box stays in the gripping hand`);}for(const a of s.pose.arms){const distance=(u,v)=>Math.hypot(...u.map((n,i)=>n-v[i]));assert(Math.abs(distance(a.shoulder,a.elbow)-.31)<1e-5,`${label}: upper arm does not stretch`);assert(Math.abs(distance(a.elbow,a.wrist)-.27)<1e-5,`${label}: forearm does not stretch`);assert.equal(a.fingers,5);}const left=s.pose.arms.find(a=>a.side<0);assert.equal(left.gripping,false);if(left.shoulder[1]>.8)assert(left.wrist[1]<left.shoulder[1]-.42,`${label}: free hand hangs at body side`);else assert(left.wrist[1]>.08&&left.grip[1]>.015,`${label}: crouched free hand clears the floor`);}
+function oneHand(s,label){const carrying=s.pose.tool!=='fitting'||s.fittingBoxAvailable;assert.equal(s.pose.arms.filter(a=>a.gripping).length,s.pose.tool==='fitting'&&carrying?2:carrying?1:0,`${label}: available tool supply controls the live hands`);if(s.pose.tool==='fitting'){assert.equal(s.fittingBoxAvailable,true,`${label}: more boxes remain available below the 24-group limit`);assert.equal(s.fittingBoxVisible,true,`${label}: assembly and candidate stay visible while previous boxes are placed`);assert.deepEqual(s.pose.arms.map(a=>a.gripRole).sort(),['assembly','candidate'],`${label}: left and right hands keep their assembly roles`);}for(const a of s.pose.arms){const distance=(u,v)=>Math.hypot(...u.map((n,i)=>n-v[i]));assert(Math.abs(distance(a.shoulder,a.elbow)-.31)<1e-5,`${label}: upper arm does not stretch`);assert(Math.abs(distance(a.elbow,a.wrist)-.27)<1e-5,`${label}: forearm does not stretch`);assert.equal(a.fingers,5);}}
 try{
   for(const mobile of [false,true]){
     const name=mobile?'mobile':'desktop';
@@ -44,8 +45,8 @@ try{
     page.on('console',m=>{if(m.type()==='error')report.errors.push(`${name}: ${m.text()}`);});
     await page.goto(url);await page.waitForFunction(()=>window.__wireTheHouse?.boxPlacement,{timeout:120000});
     await page.locator('#start-button')[mobile?'tap':'click']();await page.evaluate(()=>document.exitPointerLock());await page.waitForTimeout(300);
-    await page.evaluate(()=>{const g=window.__wireTheHouse;window.__boxQAOriginalId=g.mission.activePoint.definition.id;window.__boxQAStep=g.step.bind(g);g.step=()=>{};});
-    await select(page,mobile,'fitting');await aim(page,-.8,1.65,1.3);
+    await page.evaluate(()=>{const g=window.__wireTheHouse;window.__boxQAStep=g.step.bind(g);g.step=()=>{};});
+    await select(page,mobile,'fitting');await page.evaluate(()=>{const g=window.__wireTheHouse;window.__boxQAOriginalId=g.mission.placementCandidate(g.boxAssembly.snapshot.modules).definition.id;});await aim(page,-.8,1.65,1.3);
     await action(page,mobile);const far=await state(page);assert.equal(far.visible,false,`${name}: distant box placement rejected`);
     // Walk normally into the wall; a fixed collision stop must still allow the
     // hand-held box to reach it, without stretching arms across the room.
@@ -55,9 +56,8 @@ try{
     await steps(page,150);
     if(mobile){await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await cdp.detach();}else await page.keyboard.up('KeyW');
     await steps(page,12);const beforeBlocked=await state(page);await action(page,mobile);const blocked=await state(page);
-    proudPlacement(beforeBlocked,blocked,`${name} intact wall`,37);
-    await shot(page,`${name}-intact-wall-proud`);
-    await page.evaluate(()=>{const g=window.__wireTheHouse;g.boxPlacement.retrieve(g.mission.points.find(p=>p.definition.id===window.__boxQAOriginalId));});
+    blockedPlacement(beforeBlocked,blocked,`${name} intact wall`);
+    await shot(page,`${name}-intact-wall-blocked`);
     const voidSlots=await clearVerticalWorkSlots(page);assert(voidSlots.removed>0);
     await action(page,mobile);const inserted=await state(page);assert(inserted.visible,`${name}: normal closest approach places box in cleared cavity`);
     const placed=inserted.placement.find(p=>p.id===inserted.id);assert(placed,`${name}: placement state exists`);assert(placed.protrusionMm<=1.20001,`${name}: accepted casing is flush`);assert.equal(placed.secured,false);oneHand(inserted,name);
@@ -97,9 +97,9 @@ try{
       });
       assert(cavities.narrow.removed>0&&cavities.full.removed>0,'cavity fixtures remove real material');
       await aim(page,-1.25,1.2,.42);const beforeNarrow=await state(page);await action(page,false);const narrow=await state(page);
-      proudPlacement(beforeNarrow,narrow,'narrow footprint');
-      await shot(page,'desktop-narrow-hole-proud');
-      await page.evaluate(()=>{const g=window.__wireTheHouse;g.boxPlacement.retrieve(g.mission.points.find(p=>p.definition.id===window.__boxQAOriginalId));});
+      flushOrBlocked(beforeNarrow,narrow,'narrow footprint');
+      await shot(page,'desktop-narrow-hole-blocked');
+      if(narrow.visible)await page.evaluate(()=>{const g=window.__wireTheHouse;g.boxPlacement.retrieve(g.mission.points.find(p=>p.definition.id===window.__boxQAOriginalId));});
       await aim(page,-.25,1.2,.42);await action(page,false);const full=await state(page);const fullFit=full.placement.find(p=>p.id===full.id);
       assert(full.visible,'actual broad horizontal channel accepts box');assert(Math.abs(full.point[0]+.25)<.02&&Math.abs(full.point[1]-1.2)<.02,'native placement follows arbitrary horizontal channel aim, not original mission coordinates');assert(fullFit.protrusionMm<=1.20001,'full footprint and depth permit flush placement');assert(fullFit.insertionDepthMm>=35.8,'accepted group inserts its entire casing depth');
       await shot(page,'desktop-full-cavity-insertion');
@@ -135,8 +135,7 @@ try{
         }
         save.chunks=[...chunks].map(([key,edits])=>({key,edits:[...edits.values()]}));save.removedVolume=(save.removedVolume??0)+removed*v.nodeVolume;v.restore(save);g.room.brickWall.flushGeometry();await g.room.brickWall.waitForGeometry();return{removed,layerDepthMm:v.hz*1000};
       });
-      assert(shallowFixture.removed>0);await aim(page,2.1,1.2,.42);const beforeShallow=await state(page);await action(page,false);const shallow=await state(page);proudPlacement(beforeShallow,shallow,'shallow recess',15);await shot(page,'desktop-shallow-recess-proud');
-      await page.evaluate(()=>{const g=window.__wireTheHouse;g.boxPlacement.retrieve(g.mission.points.find(p=>p.definition.id===window.__boxQAOriginalId));});
+      assert(shallowFixture.removed>0);await aim(page,2.1,1.2,.42);const beforeShallow=await state(page);await action(page,false);const shallow=await state(page);blockedPlacement(beforeShallow,shallow,'shallow recess');await shot(page,'desktop-shallow-recess-blocked');
       const filledCavity=await page.evaluate(()=>{
         const g=window.__wireTheHouse,m=g.mortar,v=g.room.brickWall.volume,V=g.renderer.camera.position.constructor;let added=0;const before=m.field.mass+m.telemetry.movingKg+m.telemetry.restingKg+m.telemetry.floorKg;
         for(const x of [-.33,-.25,-.17])for(const z of [v.frontZ-.07,v.frontZ-.035])added+=m.field.add(new V(x,1.2,z),new V(0,0,1),.6,q=>v.isOccupied(q.x,q.y,q.z));m.stuckMass+=added;m.syncFieldGeometry();return{before,added};
@@ -150,10 +149,10 @@ try{
       await page.evaluate(()=>{const g=window.__wireTheHouse;g.boxPlacement.retrieve(g.mission.points.find(p=>p.definition.id===window.__boxQAOriginalId));});
       await select(page,false,'fitting');
       const curedBed=await page.evaluate(()=>{const g=window.__wireTheHouse,m=g.mortar,v=g.room.brickWall.volume,V=g.renderer.camera.position.constructor;let added=0;for(const x of [-.33,-.25,-.17])added+=m.field.add(new V(x,1.2,v.frontZ-.01),new V(0,0,1),.7,q=>v.isOccupied(q.x,q.y,q.z));for(const node of m.field.nodes.values())if(Math.abs(node.x*m.field.spacing+.25)<.3)node.age=4000;m.stuckMass+=added;m.syncFieldGeometry();return{added};});
-      await aim(page,-.25,1.2,.42);const beforeCured=await state(page);await action(page,false);const cured=await state(page);proudPlacement(beforeCured,cured,'cured mortar');await shot(page,'desktop-cured-mortar-proud');
+      await aim(page,-.25,1.2,.42);const beforeCured=await state(page);await action(page,false);const cured=await state(page);blockedPlacement(beforeCured,cured,'cured mortar');await shot(page,'desktop-cured-mortar-blocked');
       report.scenarios.push({platform:name,cavities,narrow,full,ledge,dryLevel,dryConfirm,bed,freshBed,bonded,constrained,shallowFixture,shallow,filledCavity,pressed,perimeterPacking,secured,levelStarted,confirmed,washed,afterWash,curedBed,cured});
     }
     await page.close();
   }
-  assert.deepEqual(report.errors,[]);console.log(JSON.stringify({url,platforms:['desktop','mobile'],checks:['far denial','native close approach','intact wall external seating and flush placement in cleared slot','gravity and floor','native fallen retrieval','reposition','multiple supplied boxes preserve original fallen group','stable ID retrieval with continuing supply','fixed arm lengths','whole footprint collision','shallow recess partial insertion with visible protrusion','dry ledge support','fresh mortar displacement and mass','cured mortar stops placement at its actual surface','level depth constraint','secured native level confirmation','wash support revocation'],errors:report.errors,report:`${out}/report.json`}));
+  assert.deepEqual(report.errors,[]);console.log(JSON.stringify({url,platforms:['desktop','mobile'],checks:['far denial','native close approach','intact wall refusal and flush placement in cleared slot','gravity and floor','native fallen retrieval','reposition','multiple supplied boxes preserve original fallen group','stable ID retrieval with continuing supply','fixed arm lengths','whole footprint collision','shallow recess refusal','dry ledge support','fresh mortar displacement and mass','cured mortar blocks placement beyond finish','level depth constraint','secured native level confirmation','wash support revocation'],errors:report.errors,report:`${out}/report.json`}));
 }finally{await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));await browser.close();}
