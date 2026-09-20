@@ -74,6 +74,7 @@ export class HUD {
           <div id="settings-scrim" aria-hidden="true"></div>
           <section id="settings-panel" class="hud-card" aria-label="Game settings" aria-hidden="true">
             <header><div><span>GAME</span><strong>SETTINGS</strong></div><button id="settings-close" type="button" aria-label="Close settings">×</button></header>
+            <label class="hammer-speed-setting frame-rate-setting" for="frame-rate-limit"><span>FRAME RATE</span><select id="frame-rate-limit" aria-label="Frame rate limit"><option value="60">60 FPS · lower load</option><option value="120">120 FPS · smoother motion</option><option value="0">Display refresh rate</option></select><small>60 FPS reduces CPU/GPU load. Higher rates favour smoother motion. Graphics quality stays the same.</small></label>
             <div id="spray-controls" aria-label="Spray settings">
               <button id="spray-color" type="button" aria-label="Change spray color"><span>SPRAY COLOR</span><span class="setting-value"><i></i><b>BLUE</b></span></button>
             </div>
@@ -320,6 +321,9 @@ export class HUD {
       if (kind === 'hammer') window.dispatchEvent(new CustomEvent('wirehouse:cycle-hammer-mode'));
     });
     const settingsToggle = root.querySelector<HTMLButtonElement>('#settings-toggle');
+    root.querySelector<HTMLSelectElement>('#frame-rate-limit')?.addEventListener('change', event => {
+      window.dispatchEvent(new CustomEvent('wirehouse:frame-rate-limit', { detail: Number((event.currentTarget as HTMLSelectElement).value) }));
+    });
     const settingsPanel = root.querySelector<HTMLElement>('#settings-panel');
     const setSettingsOpen = (open: boolean): void => {
       settingsPanel?.classList.toggle('open', open);
@@ -333,6 +337,11 @@ export class HUD {
     bindHammerButton('#settings-close',()=>setSettingsOpen(false));
     root.querySelector('#settings-scrim')?.addEventListener('click', () => setSettingsOpen(false));
     addEventListener('keydown', event => { if (event.key === 'Escape' && settingsToggle?.getAttribute('aria-expanded') === 'true') { event.preventDefault(); setSettingsOpen(false); } });
+  }
+
+  setFrameRateLimit(limit: number): void {
+    const select = this.shell.querySelector<HTMLSelectElement>('#frame-rate-limit');
+    if (select) select.value = String(limit);
   }
 
   updateWorkReticle(point: { x: number; y: number; z: number } | null): void {

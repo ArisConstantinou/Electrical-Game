@@ -798,3 +798,14 @@ Original prompt for this task: Selecting BOX should show an initial box in the l
 - Replaced the captured laser wrist solve with a laser-only straight-forearm grip. At level aim the elbow opens to 159.5 degrees desktop and 156.5 degrees portrait; wrist bend remains below 0.001 degrees and hand/contact error below 0.001 mm.
 - The focused regression passes ten desktop/portrait level, up, down, left and right cases with zero housing tilt, valid contact and the wrist inside the viewport. The 18-case worker-tool smoke, reference laser logic, twelve drill/driver working-grip states, TypeScript and production build pass.
 - The older full `laser-level-ui` suite currently stops in its initial measurement fixture because the prepared wall returns `out-of-reach` where that test expects `ready`; it does not reach the laser pose or placement assertions. Focused laser pose, logic and drill/driver integration checks pass. Evidence: `output/arm-chain/laser-current`, `output/arm-chain/laser-final`, and `output/laser-held-pose-final`.
+
+## 2026-09-20 · Chrome frame pacing preview
+
+- User reported Chrome load/stalls, approved diagnosis, then said "do it" for the frame-limit/menu-load fix.
+- Protected base: dc723642d7a5fc89a4311bdd9c2b1ce328bd18e1, codex/prepared-multi-pipe-wall, active port 5365. Candidate isolated at C:/Users/arz0r/.codex/worktrees/chrome-frame-pacing/Electrical-Game, codex/chrome-frame-pacing, strict port 5366.
+- Added saved 60/120/display FPS setting (default 60), 15 FPS welcome screen, deadline pacing and reset on resume/settings/start. No asset or graphics quality changes.
+- Initial controlled comparison: main-thread occupancy 99.7% -> 18.2% menu and 99.7% -> 47.9% gameplay at 60 FPS. Final repeat: 45.3% gameplay; p95 18.4 ms, max 21.1 ms. These are desktop thread metrics, not whole-PC CPU.
+- Passed frame-pacer cases, renderer lifecycle, throw timing/physics, Studio contract, typecheck/build and the dedicated native-input UI suite; inspected screenshots and mobile layout. See docs/frame-pacing-validation.md for exact scope.
+- Native tab visibility remains unverified: inspected Chrome reports visible across real tab changes/minimize, even with focus emulation disabled and native-profile CDP probes. Explicit freeze/resume passes but is not equivalent evidence. Do not claim all stalls fixed or promote before that gap and promotion approval are handled.
+- Bundled client ran twice, WebGPU/WebGL; its fixed 5s start click preceded readiness. These are startup captures only. Dedicated UI tests wait for readiness and pass gameplay. Managed cleanup verified no owned browser PIDs remain.
+- No new agents, installations, paid credits, or dependency changes. Task-attributable usage is unavailable.

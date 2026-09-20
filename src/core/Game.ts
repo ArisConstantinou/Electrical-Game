@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Renderer } from './Renderer';
 import { Input } from './Input';
+import { FramePacer, readFrameRateLimit, FRAME_RATE_STORAGE_KEY, type FrameRateLimit } from './FramePacer';
 import { AssetManager } from './AssetManager';
 import { HammerWorkStance } from '../player/HammerWorkStance';
 import { PlayerController } from '../player/PlayerController';
@@ -97,6 +98,8 @@ export class Game {
   wallAssistEnabled = true;
   aimInputMode: AimInputMode = 'stick';
   started = false;
+  frameRateLimit: FrameRateLimit = readFrameRateLimit();
+  private readonly framePacer = new FramePacer();
   private readonly chasing: ChasingSystem;
   private readonly interaction: InteractionSystem;
   private lastTime = performance.now();
@@ -168,6 +171,7 @@ export class Game {
     this.mobileControls.setAimInputMode(this.aimInputMode);
     new MobileHUD();
     this.bindEvents();
+    this.hud.setFrameRateLimit(this.frameRateLimit);
     this.modelInspector=new ModelInspector(this);
     const bodyBanner=document.createElement('button');bodyBanner.id='body-view-banner';bodyBanner.hidden=true;bodyBanner.textContent='Ολόσωμη μπροστινή προβολή · C επιστροφή';bodyBanner.addEventListener('click',()=>window.dispatchEvent(new CustomEvent('wirehouse:front-body-view')));this.hud.shell.append(bodyBanner);
     addEventListener('wirehouse:front-body-view',()=>{if(!this.started)return;if(this.modelInspector.active){this.modelInspector.faceFront();return;}this.frontBodyView=!this.frontBodyView;bodyBanner.hidden=!this.frontBodyView;this.hud.shell.classList.toggle('front-body-view',this.frontBodyView);});
@@ -180,6 +184,8 @@ export class Game {
     addEventListener('wirehouse:graphics-lost',()=>{this.suspendLifecycle();if(!document.hidden)queueMicrotask(()=>void this.resumeLifecycle());});
     this.hud.onStart(() => {
       this.started = true;
+      this.framePacer.reset();
+      this.lastTime = performance.now();
       if (matchMedia('(any-pointer: fine)').matches) this.desktopControls.requestLock();
     });
     addEventListener('resize', this.renderer.resize);
@@ -403,6 +409,7 @@ export class Game {
   renderState(): string {
     const point = this.mission.activePoint;
     return JSON.stringify({
+      framePacing: { limit: this.frameRateLimit, effectiveLimit: this.started ? this.frameRateLimit : 15, paused: this.lifecyclePaused },
       mortar: this.mortar.telemetry,
       mixing: this.mixing.telemetry,
       boxPlacement:this.boxPlacement.telemetry,
@@ -534,6 +541,14 @@ export class Game {
   }
 
   private bindEvents(): void {
+    addEventListener('wirehouse:frame-rate-limit', event => {
+      const limit = (event as CustomEvent<number>).detail;
+      if (limit !== 0 && limit !== 60 && limit !== 120) return;
+      this.frameRateLimit = limit;
+      this.framePacer.reset();
+      this.hud.setFrameRateLimit(limit);
+      try { localStorage.setItem(FRAME_RATE_STORAGE_KEY, String(limit)); } catch { /* Keep the session choice. */ }
+    });
     addEventListener('wirehouse:box-preset',event=>{
       const preset=(event as CustomEvent<string>).detail;
       if(preset!=='1G'&&preset!=='2G'&&preset!=='2G+1G')return;
@@ -764,6 +779,7 @@ export class Game {
       // Phone lock time is not simulation time: no queued strikes, throws or
       // water emission may catch up when the screen wakes.
       this.lastTime=performance.now();this.actionCooldown=0;this.lifecyclePaused=false;
+      this.framePacer.reset();
       this.animationFrame=requestAnimationFrame(this.loop);
     }catch(error){
       this.renderer.renderError=String(error);
@@ -779,6 +795,11 @@ export class Game {
     // positions and shadows. Keep elapsed time until the next accepted frame;
     // keyboard/touch intent and mouse angles continue to accumulate meanwhile.
     if(this.renderer.framePending){this.animationFrame=requestAnimationFrame(this.loop);return;}
+    // The welcome screen stays animated at 15 FPS. During play the saved
+    // preference caps simulation/render work, while input continues to arrive.
+    if(!this.framePacer.accept(time,this.started?this.frameRateLimit:15)){
+      this.animationFrame=requestAnimationFrame(this.loop);return;
+    }
     const elapsed = Math.max(0,Math.min((time - this.lastTime) / 1000,.25));
     this.lastTime = time;
     // Preserve simulation time on slow GPUs using bounded physics steps, with
