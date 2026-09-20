@@ -1,0 +1,7 @@
+#pvc-prompt[hidden],#pvc-live-measure[hidden],#pvc-touch-controls[hidden],#pvc-touch-controls [hidden]{display:none!important}
+#pvc-live-measure{position:absolute;z-index:23;padding:5px 8px;border:1px solid #ffce67;border-radius:4px;background:#14241fd9;color:#ffdc91;font:600 16px/1.4 system-ui,sans-serif;font-variant-numeric:tabular-nums;white-space:pre;pointer-events:none}
+#pvc-prompt{position:absolute;z-index:23;left:50%;bottom:118px;transform:translateX(-50%);max-width:calc(100% - 30px);padding:5px 9px;border:0;border-radius:3px;background:#13231cc9;color:#f8f3e2;text-shadow:0 1px 2px #000;font:14px/1.4 system-ui,sans-serif;cursor:pointer}
+#pvc-touch-controls{display:none}
+.pvc-focused #mobile-controls{display:none!important}
+.pvc-working #top-hud,.pvc-working #tool-status,.pvc-working #mixing-receipt,.pvc-working #mixing-toolbelt,.pvc-working #mixing-world-prompt,.pvc-working #desktop-key-guide,.pvc-working #mixing-finish{display:none!important}
+@media(pointer:coarse){#pvc-touch-controls:not([hidden]){display:flex;position:absolute;z-index:24;left:10px;right:10px;bottom:22px;gap:6px;justify-content:center;flex-wrap:wrap;pointer-events:auto}#pvc-touch-controls button{min-height:44px;padding:7px 10px;border:1px solid #cbb782;border-radius:4px;background:#14241fcc;color:#fff8e8;font:600 12px/1.3 system-ui,sans-serif;touch-action:none}#pvc-prompt{bottom:138px;width:calc(100% - 20px);font-size:14px;background:transparent;text-shadow:0 1px 3px #000,0 0 4px #000}#pvc-live-measure{font-size:14px}}

@@ -138,8 +138,15 @@ export class DesktopControls {
     });
   }
 
-  requestLock(): void {
+  requestLock(preferRawInput = true): void {
     if (document.pointerLockElement === this.lockTarget) return;
+    if (!preferRawInput) {
+      // The initial Start press must complete in this exact user gesture.
+      // Falling back from an async raw-input rejection can otherwise require
+      // a second click in browsers that do not support unadjustedMovement.
+      void this.lockTarget.requestPointerLock();
+      return;
+    }
     try {
       const request = this.lockTarget.requestPointerLock({ unadjustedMovement: true });
       if (request) void request.catch(error => {

@@ -220,12 +220,21 @@ export class HUD {
             </nav>
           </div>
           <section id="start-screen" class="screen-panel">
-            <div class="eyebrow">CYPRUS · RESIDENTIAL FIRST FIX</div>
-            <h1>WIRE<br><span>THE HOUSE</span></h1>
-            <p>The main wall is already chased with wide multi-pipe routes. All three boxes are level, flush and secured in mortar. Start directly with the 20 mm rigid PVC routes; the untouched masonry is now on the right.</p>
-            <div class="brief-grid"><span>200 mm clear chases</span><span>Boxes ready for PVC</span><span>Desktop + mobile</span></div>
-            <button id="start-button">ENTER THE SITE</button>
-            <small>WASD · MOUSE LOOK · LEFT CLICK USE TOOL · E INTERACT / ALT USE · 9 MEASURE · M MARK · 0 DRILL · B DRIVER · L LASER · WHEEL SWITCH TOOL</small>
+            <div class="start-content">
+              <div class="eyebrow">CYPRUS · RESIDENTIAL FIRST FIX</div>
+              <h1>WIRE <span>THE HOUSE</span></h1>
+              <div class="start-actions">
+                <button id="start-button" type="button">START</button>
+                <div class="start-utilities" aria-label="Preview and settings">
+                  <button id="start-models" type="button" aria-label="Open 3D models" title="3D Models">
+                    <svg viewBox="0 0 32 32" aria-hidden="true"><path d="m16 3 11 6-11 6L5 9zM5 9v13l11 7 11-7V9M16 15v14"/></svg><span>3D MODELS</span>
+                  </button>
+                  <button id="start-settings" type="button" aria-label="Open settings" title="Settings">
+                    <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M13.2 3.5h5.6l.8 3.1 2.3 1.3 3-.9 2.8 4.8-2.2 2.2v2.7l2.2 2.2-2.8 4.8-3-.9-2.3 1.3-.8 3.1h-5.6l-.8-3.1-2.3-1.3-3 .9-2.8-4.8 2.2-2.2V14l-2.2-2.2L7.1 7l3 .9 2.3-1.3z"/><circle cx="16" cy="15.4" r="4.2"/></svg><span>SETTINGS</span>
+                  </button>
+                </div>
+              </div>
+            </div>
           </section>
           <section id="result-panel" class="screen-panel result-panel">
             <div class="eyebrow">LIVING ROOM · INSPECTION PASSED</div>
@@ -332,6 +341,8 @@ export class HUD {
     bindHammerButton('#settings-toggle',()=>setSettingsOpen(settingsToggle?.getAttribute('aria-expanded')!=='true'));
     bindHammerButton('#settings-close',()=>setSettingsOpen(false));
     root.querySelector('#settings-scrim')?.addEventListener('click', () => setSettingsOpen(false));
+    root.querySelector('#start-settings')?.addEventListener('click', () => settingsToggle?.click());
+    root.querySelector('#start-models')?.addEventListener('click', () => document.querySelector<HTMLButtonElement>('#model-inspector-open')?.click());
     addEventListener('keydown', event => { if (event.key === 'Escape' && settingsToggle?.getAttribute('aria-expanded') === 'true') { event.preventDefault(); setSettingsOpen(false); } });
   }
 

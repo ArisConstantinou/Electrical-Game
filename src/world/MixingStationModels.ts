@@ -224,7 +224,9 @@ export function createMixingStationModels(): MixingStationModels {
   const sand = sandMound(); sand.position.set(-2.40, 0, 0); group.add(sand);
   const sacks = Array.from({ length: 3 }, (_, i) => { const sack = cementSack(i); sack.position.set(2.05 + i * .28, i === 1 ? .19 : 0, .65); sack.rotation.y = -.10 + i * .17; group.add(sack); return sack; });
   const shovel = createShovelModel(); shovel.position.set(-1.55, .13, -.25); shovel.rotation.set(-.13, -.3, -.32); group.add(shovel);
-  const mixer = createMixerModel(); mixer.position.set(.90, .016, .73); mixer.rotation.z = -.12; group.add(mixer);
+  // Park the paddle inside the green mixing bucket, above its base. This is
+  // only its resting transform; taking/using it still requires interaction.
+  const mixer = createMixerModel(); mixer.position.copy(bucket.position).add(new THREE.Vector3(0,.06,0)); group.add(mixer);
   const paddle = mixer.getObjectByName('mixing-paddle') as THREE.Group;
   const rinseParts = bucketModel(0x548492, 'mixing-rinse-pail'); const rinse = rinseParts.bucket; rinse.position.set(2.20, 0, -.03); rinse.scale.setScalar(.8);
   rinseParts.fill.visible = true; rinseParts.fill.position.y = .23; rinseParts.fill.scale.setScalar(.162);

@@ -5,6 +5,7 @@ import { GAME_CONFIG } from '../data/gameConfig';
 export type MobileAimProfile = 'precise' | 'normal' | 'fast';
 
 export class PlayerController {
+  lookHandler:((dx:number,dy:number)=>boolean)|null=null;
   wallWorkEnabled = false;
   wallWorkDistance = .76;
   /** Feed along the wall while the hammer is held; null retains free walking. */
@@ -32,6 +33,7 @@ export class PlayerController {
   // All tools share direct aiming. A hard eye-only window prevents precise
   // placement of the work point and introduces a dead zone on every reversal.
   look(deltaX: number, deltaY: number, sensitivity = 0.0023): void {
+    if(this.lookHandler?.(deltaX,deltaY))return;
     this.yaw -= deltaX * sensitivity;
     this.pitch = THREE.MathUtils.clamp(this.pitch - deltaY * sensitivity, -1.18, 1.18);
     // Input remains responsive while an optical pass is pending, but its scene

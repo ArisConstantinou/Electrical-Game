@@ -122,6 +122,23 @@ button {
 .brief-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
 .brief-grid span { padding: 7px 10px; border: 1px solid rgba(255,255,255,.18); color: #c8c2b9; font-size: 13px; }
 #start-button { min-height: 54px; padding: 0 26px; border: 1px solid #e69468; color: #fff; background: #b7552e; font: 800 19px/1 'Barlow Condensed', sans-serif; letter-spacing: .08em; cursor: pointer; }
+.start-content { position: relative; z-index: 1; width: min(760px, calc(100% - 36px)); display: flex; flex-direction: column; align-items: center; text-align: center; }
+#start-screen { align-items: center; isolation: isolate; overflow: hidden; background-color: #2d241d; background-image: linear-gradient(180deg, rgba(18,15,12,.12), rgba(18,15,12,.3)), url('/Electrical-Game/assets/ui/start-site-cinematic.webp'); background-position: center; background-size: cover; }
+#start-screen::before { content: ''; position: absolute; inset: 0; z-index: -1; background: radial-gradient(ellipse at center, rgba(14,12,10,.1) 0%, rgba(14,12,10,.08) 38%, rgba(14,12,10,.38) 100%); }
+#start-screen h1 { margin: 12px 0 30px; font-size: clamp(58px, 8.5vw, 118px); line-height: .86; }
+#start-screen h1 span { display: inline; }
+.start-actions { width: min(420px, 100%); display: grid; justify-items: center; gap: 12px; }
+#start-button { width: 100%; min-height: 72px; padding: 0 36px; border: 2px solid #efb07e; border-radius: 4px; background: linear-gradient(180deg, #c96134, #a74625); box-shadow: 0 10px 34px rgba(0,0,0,.35), inset 0 1px rgba(255,255,255,.18); font-size: 28px; letter-spacing: .14em; }
+#start-button:focus-visible { outline: 3px solid #f7d29f; outline-offset: 4px; }
+#start-button:disabled { cursor: wait; opacity: .62; filter: grayscale(.25); }
+.start-utilities { display: flex; justify-content: center; gap: 12px; }
+.start-utilities button { width: 92px; min-height: 76px; display: grid; place-items: center; gap: 5px; padding: 9px 7px; color: #eee7dc; border: 1px solid rgba(236,193,145,.45); border-radius: 5px; background: rgba(34,31,26,.88); box-shadow: 0 7px 22px rgba(0,0,0,.25); cursor: pointer; }
+.start-utilities svg { width: 30px; height: 30px; fill: none; stroke: #e4a16b; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.start-utilities span { font: 800 12px/1 'Barlow Condensed', sans-serif; letter-spacing: .07em; }
+@media (hover: hover) and (pointer: fine) { #start-button:hover { background: linear-gradient(180deg,#dc7446,#b9542c); transform: translateY(-1px); } .start-utilities button:hover { border-color: #e6a36d; background: #373027; } }
+@media (orientation: portrait) and (max-width: 1100px) {
+  #start-screen { background-image: linear-gradient(180deg, rgba(18,15,12,.1), rgba(18,15,12,.28)), url('/Electrical-Game/assets/ui/start-site-cinematic-portrait.webp'); background-position: center; }
+}
 .screen-panel small { margin-top: 13px; color: #aaa39a; font: 600 12px/1.2 'Barlow Condensed', sans-serif; letter-spacing: .09em; }
 .result-panel { visibility: hidden; opacity: 0; align-items: center; text-align: center; background: rgba(18,18,15,.94); }
 .result-panel.visible { visibility: visible; opacity: 1; }
@@ -148,6 +165,9 @@ button {
   .screen-panel { padding: 24px; justify-content: center; background: linear-gradient(90deg, rgba(20,18,15,.95), rgba(20,18,15,.68)); }
   .screen-panel h1 { font-size: clamp(62px, 20vw, 100px); }
   .screen-panel p { font-size: 16px; line-height: 1.45; }
+  #start-screen { padding: 22px; }
+  #start-screen h1 { font-size: clamp(52px, 15vw, 78px); }
+  #start-button { min-height: 64px; font-size: 24px; }
 }
 
 @media (max-height: 650px) and (pointer: coarse) {

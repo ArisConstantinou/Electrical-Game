@@ -4,6 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "dev:pvc": "node scripts/start-worker-preview.mjs",
+    "test:pvc": "node tests/manual-pvc-logic.mjs && node tests/manual-pvc-ui.mjs",
     "dev:worker": "node scripts/start-worker-preview.mjs",
     "dev:mortar-preview": "node scripts/start-mortar-preview.mjs",
     "dev": "node scripts/start-worker-preview.mjs",

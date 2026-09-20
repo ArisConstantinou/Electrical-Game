@@ -419,8 +419,8 @@ export class MixingStation {
     const station=this.models.group.getWorldPosition(this.stationPoint),camera=this.game.renderer.camera.position;
     const distance=Math.hypot(station.x-camera.x,station.z-camera.z);
     const stageNearby=this.game.started&&distance<2.35&&!this.finished;this.toolbelt.hidden=!stageNearby;this.game.hud.shell.classList.toggle('mixing-stage',stageNearby);
-    this.receipt.update(this.workingBatch,this.game.started&&(this.active||stageNearby&&this.game.selectedTool!=='trowel'),dt,this.destination==='drum'?this.drum.running?`Μπετονιέρα σε λειτουργία · ${Math.round(this.drum.batch.mixProgress*100)}%`:this.drum.batch.ready?'Έτοιμο · FINISH για χρήση':'20 L νερό · 18 μιστριές τσιμέντο · 36 φτυαριές άμμο':this.recipeHint(),this.destination==='drum'?'ΣΤΗ ΜΠΕΤΟΝΙΕΡΑ':'ΣΤΗ ΣΥΚΛΑ');
     if(this.active&&distance>this.activationDistance+1.2)this.setActive(false);
+    this.receipt.update(this.workingBatch,this.game.started&&this.active,dt,this.destination==='drum'?this.drum.running?`Μπετονιέρα σε λειτουργία · ${Math.round(this.drum.batch.mixProgress*100)}%`:this.drum.batch.ready?'Έτοιμο · FINISH για χρήση':'20 L νερό · 18 μιστριές τσιμέντο · 36 φτυαριές άμμο':this.recipeHint(),this.destination==='drum'?'ΣΤΗ ΜΠΕΤΟΝΙΕΡΑ':'ΣΤΗ ΣΥΚΛΑ');
     const aimed=this.aimedObject(),prompt=this.promptFor(aimed),interactAvailable=Boolean(prompt);this.prompt.hidden=!prompt;this.prompt.textContent=prompt;
     this.mixerControlHint=prompt.replace(/^.*? · /,'');
     if(this.mobileInteract){this.mobileInteract.hidden=!interactAvailable;this.mobileInteract.querySelector('small')!.textContent=this.carrying?'ΑΦΗΣΕ ΣΥΚΛΑ':prompt?.replace(/^.*? · /,'')||'ΣΤΟΧΕΥΣΕ ΑΝΤΙΚΕΙΜΕΝΟ';}
