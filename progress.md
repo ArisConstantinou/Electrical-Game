@@ -1,5 +1,13 @@
 Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web game named WIRE THE HOUSE, based on real Cyprus residential first-fix practices, editable in Web Game Studio, playable on desktop/mobile, deployed to arisconstantinou/Electrical-Game via GitHub Pages, and ending at FIRST FIX COMPLETE without cable pulling.
 
+## 2026-09-21 · Corrected PVC marking input and close bend view
+
+- User rejected the distant full-body bending camera and clarified that E performs the marker stroke; it is not a post-stroke confirmation.
+- Marking now keeps the live movable guide, ignores LMB, starts the visible marker pass with E, and automatically continues to spring when the pass finishes. The action reads `E · ΣΗΜΑΔΕΨΕ ΤΙΣ ΣΩΛΗΝΕΣ` before the stroke.
+- Spring insertion and progressive bending use the close camera-local work view. The full worker is hidden from spring through extraction so the body cannot cover the bend; the current body asset remains unchanged.
+- Full PVC workflow through 90 degrees, pause/resume, batch, cutting and installation passes. Desktop/mobile marking layouts, stock geometry, TypeScript/build and the develop-web-game client pass with no browser errors. Close bend span is 0.397 NDC; PVC simulation P95 is 3.1 ms stock and 2.9 ms marking on the measured headless desktop run.
+- Evidence: `output/manual-pvc/after`, `output/manual-pvc/visual`, `output/pvc-correction-skill`, and `output/manual-pvc/performance.json`. Preview remains `http://127.0.0.1:5365/Electrical-Game/`.
+
 ## 2026-09-21 · Real relief, directional balance and shifted mortar weight
 
 - User rejected smooth textured hills and the sparse/cut-looking surface; supplied four real mortar references. Subsequent steering required all-direction spill/tip behavior, no instant tip from ordinary sprinting, and downhill bulk/weight transfer during side tilt.

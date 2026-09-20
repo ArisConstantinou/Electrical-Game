@@ -394,16 +394,15 @@ export class Game {
     this.pvc.present();
     this.workerBody.overview=this.frontBodyView||this.modelInspector.live;
     const bodyPlayer=this.mixing.wheelbarrow.driving?{eyeHeight:1.65,velocity:this.player.velocity,yaw:this.mixing.wheelbarrow.telemetry.yaw+Math.PI,pitch:-.60}:this.pvc.focused?{eyeHeight:this.renderer.camera.position.y,velocity:this.player.velocity,yaw:this.player.yaw,pitch:this.player.pitch}:this.player;
-    const overheadPvc=this.pvc.focused&&['marking','spreading'].includes(this.pvc.phase)&&!this.workerBody.overview;
-    if(!overheadPvc&&(this.selectedTool!=='hose'||mixingOwnedInput||pvcOwnedInput))this.workerBody.update(dt,this.renderer.camera,bodyPlayer,this.fpsRig,this.selectedTool,this.input.actionHeld,mixingOwnedInput||this.pvc.blocksWork,this.pvc.blocksWork?this.pvc.anatomicalGrips():this.mixing.anatomicalGrips(),this.workSurfaces.frontForBounds);
+    const bodylessPvc=this.pvc.focused&&['marking','spreading','spring','inserting','bending','review','extracting'].includes(this.pvc.phase)&&!this.workerBody.overview;
+    if(!bodylessPvc&&(this.selectedTool!=='hose'||mixingOwnedInput||pvcOwnedInput))this.workerBody.update(dt,this.renderer.camera,bodyPlayer,this.fpsRig,this.selectedTool,this.input.actionHeld,mixingOwnedInput||this.pvc.blocksWork,this.pvc.blocksWork?this.pvc.anatomicalGrips():this.mixing.anatomicalGrips(),this.workSurfaces.frontForBounds);
     this.mixing.useAnatomicalBody(this.workerBody.loaded);
     this.pvc.useAnatomicalBody();
-    // Dedicated overhead measuring view: the authored worker stays intact,
-    // but never occludes the pipes. Normal and full-body inspection restore it.
-    if(overheadPvc)this.workerBody.visible=false;
+    // Pipe work owns a clean close-up: keep the authored worker intact but
+    // hide it so neither torso nor head can cover marking, spring or bending.
+    if(bodylessPvc)this.workerBody.visible=false;
     if(this.modelInspector.active&&this.modelInspector.live)this.modelInspector.afterWorld(dt);
     else if(this.frontBodyView)this.updateFrontBodyCamera();
-    else if(this.pvc.presentationCamera)this.renderer.viewCamera=this.pvc.presentationCamera;
     else this.renderer.viewCamera=null;
     if(this.renderer.viewCamera&&!this.renderer.modelScene)this.hideInspectionObstructions(this.renderer.viewCamera);
     // Catch-up physics may run several times per image. Build wet surfaces

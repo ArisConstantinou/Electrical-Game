@@ -3,7 +3,7 @@ import { chromium } from 'playwright';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { blockPointerLock } from './browser-safety.mjs';
 
-const url = process.argv.find(value => value.startsWith('http')) ?? 'http://127.0.0.1:5370/Electrical-Game/';
+const url = process.argv.find(value => value.startsWith('http')) ?? 'http://127.0.0.1:5365/Electrical-Game/';
 const baseline = process.argv.includes('--baseline');
 const out = `output/pvc-stock-bundle/${baseline ? 'before' : 'after'}`;
 await mkdir(out, { recursive: true });

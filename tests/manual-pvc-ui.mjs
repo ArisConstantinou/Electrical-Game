@@ -17,6 +17,7 @@ try{
  const aim=async(position,target)=>{await page.evaluate(({position,target})=>{const g=window.__wireTheHouse,c=g.renderer.camera;c.position.fromArray(position);c.lookAt(...target);g.player.pitch=c.rotation.x;g.player.yaw=c.rotation.y;c.updateMatrixWorld(true);},{position,target});await step(2);};
  const snap=async name=>{await page.evaluate(async()=>{const r=window.__wireTheHouse.renderer;await r.waitForFrame();r.render();await r.waitForFrame();});await page.screenshot({path:`${out}/${name}.png`});report.poses??={};report.poses[name]=await page.evaluate(()=>({pvc:window.__wireTheHouse.pvc?.telemetry,body:window.__wireTheHouse.workerBody.telemetry}));};
  const state=()=>page.evaluate(()=>window.__wireTheHouse.pvc.telemetry);
+ const bendFocusSpan=()=>page.evaluate(()=>{const g=window.__wireTheHouse,pvc=g.pvc,mark=pvc.bend.mark,a=pvc.bend.at(Math.max(0,mark-.2)),b=pvc.bend.at(Math.min(3,mark+.2)),camera=g.renderer.renderCamera,pa=pvc.pipe.localToWorld(g.renderer.camera.position.clone().set(a.x,a.y,0)).project(camera),pb=pvc.pipe.localToWorld(g.renderer.camera.position.clone().set(b.x,b.y,0)).project(camera);return pa.distanceTo(pb);});
  const key=async(code,n=2)=>{await page.keyboard.down(code);await step(n);await page.keyboard.up(code);await step(2);};
  const use=async(n=2)=>{await page.mouse.down();await step(n);await page.mouse.up();await step(2);};
  let cutMouseY=400;
@@ -31,28 +32,28 @@ try{
   await key('KeyE');await step(110);assert.equal((await state()).phase,'marking');await snap('04-marking');
   assert.equal(await page.locator('#pvc-panel').count(),0,'No PVC sidebar panel');
   await key('Tab');assert.equal((await state()).markCm,140);await key('Tab');assert.equal((await state()).markCm,50);
-  await page.mouse.move(1000,350);await step(2);const beforeMove=(await state()).markCm;
-  await page.mouse.move(1000,355,{steps:5});await step(5);const custom=(await state()).markCm;assert(custom>beforeMove,'Small mouse movements must move the guide');
+  await page.mouse.move(800,350);await step(2);const beforeMove=(await state()).markCm;
+  await page.mouse.move(800,355,{steps:5});await step(5);const custom=(await state()).markCm;assert(custom>beforeMove,'Small mouse movements must move the guide');
   assert.match(await page.locator('#pvc-live-measure').textContent(),new RegExp(custom.toFixed(1)));
   await key('KeyP');assert(await page.evaluate(cm=>window.__wireTheHouse.pvc.presets.some(p=>Math.abs(p.cm-cm)<.05&&!p.builtin),custom));
   assert(await page.evaluate(()=>window.__wireTheHouse.pvc.stock.liveMarks.visible));await snap('04b-live-mark');
   await page.mouse.move(1000,400);await step(2);
   for(let i=0;i<5&&(await state()).markCm!==50;i++)await key('Tab');
-  assert.equal((await state()).markCm,50);await page.mouse.down();await step(60);await page.mouse.up();await step(2);
-  assert.equal((await state()).markingProgress,1);assert.equal((await state()).phase,'marking','Finished marker line must wait for explicit E confirmation');
-  await expectVisibleConfirm(page);await snap('05-marked-awaiting-e');
-  await page.keyboard.down('KeyE');await step(2);assert.equal((await state()).phase,'spring');assert.equal((await state()).springInsertion,0,'E confirmation must not leak into spring insertion');
-  await page.mouse.down();await step(20);await page.mouse.up();await step(2);assert((await state()).springInsertion>0,'The first LMB must work even if E has not yet been released');
-  await page.keyboard.up('KeyE');await step(2);await snap('05-marked-spring-ready');
+  assert.equal((await state()).markCm,50);await expectVisibleMarkButton(page);await snap('05-ready-to-mark');
+  await page.mouse.down();await step(20);await page.mouse.up();await step(2);assert.equal((await state()).markingProgress,0,'LMB must not mark the pipes');
+  await page.keyboard.down('KeyE');await step(12);assert.equal((await state()).phase,'marking');assert((await state()).markingProgress>0,'E must start the marker stroke');
+  await page.keyboard.up('KeyE');await step(55);assert.equal((await state()).phase,'spring','Completed E marker stroke must continue automatically to spring');assert.equal((await state()).springInsertion,0);
+  assert.equal(await page.evaluate(()=>window.__wireTheHouse.workerBody.visible),false,'The full body must be hidden during pipe work');await snap('05-marked-spring-ready');
   await use();await step(100);assert.equal((await state()).phase,'bending');assert.equal((await state()).springInsertion,1);
-  assert.equal((await state()).pipeFrame.inside,true,'The complete straight pipe must fit inside the bending camera');
+  assert.equal(await page.evaluate(()=>window.__wireTheHouse.workerBody.visible),false,'The full body must stay hidden while bending');
+  const focusSpan=await bendFocusSpan();assert(focusSpan>.35,`Bend area must remain close and readable instead of a distant full-body view (${focusSpan.toFixed(3)} NDC)`);
   assert.equal(await page.evaluate(()=>window.__wireTheHouse.pvc.pipe.material.opacity),1);await key('KeyR');assert.equal(await page.evaluate(()=>window.__wireTheHouse.pvc.pipe.material.opacity),.4);await snap('07-spring-inside');
   await key('KeyE');assert.equal((await state()).phase,'bending','E must not bend automatically');
   await page.mouse.move(1000,400);await page.mouse.down();await step(65);await page.mouse.up();await step(2);assert.equal((await state()).angle,9,'Holding in one place must stop locally');
   for(let cell=1;cell<10;cell++){
     await key('KeyD');assert.equal((await state()).grip,cell);
     await page.mouse.down();await step(30);await page.mouse.up();await step(2);
-    assert.equal((await state()).pipeFrame.inside,true,`The complete pipe must remain framed at bend cell ${cell}`);
+    assert.equal(await page.evaluate(()=>window.__wireTheHouse.workerBody.visible),false,`Body must remain hidden at bend cell ${cell}`);
     if(cell===4)await snap('08-progressive-bend');
   }
   assert(Math.abs((await state()).angle-90)<1e-6);await snap('09-bent-90');
@@ -90,8 +91,8 @@ try{
 }finally{await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));await browser.close();}
 console.log(JSON.stringify({url,baseline,errors:report.errors,checks:report.checks,workshopPresent:report.workshopPresent}));
 
-async function expectVisibleConfirm(page){
+async function expectVisibleMarkButton(page){
  const confirm=page.locator('#pvc-mark-confirm');
- assert.equal(await confirm.isVisible(),true,'A visible E confirmation must appear after marking all pipes');
- assert.match(await confirm.textContent(),/^E\b/,'Marker confirmation must be labelled with E');
+ assert.equal(await confirm.isVisible(),true,'A visible E marking action must be available before the stroke');
+ assert.match(await confirm.textContent(),/^E\b.*ΣΗΜΑΔΕΨΕ/,'The E button must say that it marks the pipes, not confirms a mark');
 }
