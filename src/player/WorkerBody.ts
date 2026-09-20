@@ -33,6 +33,7 @@ export class WorkerBody extends THREE.Group {
   private thumbOpposition=new Map<string,THREE.Vector3>();
   private thumbSurface=new Map<string,{mesh:THREE.SkinnedMesh;index:number}[]>();
   private thumbPoseCache=new Map<string,{key:string;angles:number[]}>();
+  private boxFingerAxes=new Map<string,THREE.Vector3>();
   private fingerAxes=new Map<string,THREE.Vector3>();
   private lengths=new Map<string,number>();
   private fingerFit:Record<string,unknown>={};
@@ -82,6 +83,8 @@ export class WorkerBody extends THREE.Group {
         for(const digit of ['index','middle','ring','little','thumb'])for(let j=1;j<=3;j++){
           const name=`${digit}.0${j}.${side}`,joint=this.bone(name);
           this.fingerAxes.set(name,worldRadial.clone().applyQuaternion(joint.getWorldQuaternion(new THREE.Quaternion()).invert()));
+          // Remove the longitudinal component: a hinge may bend, not twist.
+          this.boxFingerAxes.set(name,this.fingerAxes.get(name)!.clone().setY(0).normalize());
           if(j===1)this.fingerSplay.set(digit+side,radial.clone().cross(long).applyQuaternion(q).applyQuaternion(joint.getWorldQuaternion(new THREE.Quaternion()).invert()));
           if(j===1&&digit!=='thumb'){
             const normal=radial.clone().cross(long).applyQuaternion(q),d=Y.clone().applyQuaternion(joint.getWorldQuaternion(new THREE.Quaternion())),l=long.clone().applyQuaternion(q);
@@ -287,6 +290,8 @@ export class WorkerBody extends THREE.Group {
           section=[Math.hypot(grip.section[0]*across.dot(oldAcross),grip.section[1]*across.dot(oldBack)),Math.hypot(grip.section[0]*back.dot(oldAcross),grip.section[1]*back.dot(oldBack))];
           const radial=axis.clone().addScaledVector(long,-axis.dot(long)).normalize();
           const q=this.handOrientation(side,radial,long),middle=grip.center.clone().addScaledVector(across,-sign*section[0]*.6).addScaledVector(back,-section[1]-.012);
+          // Calibrated palm clearance for a casing pinch, not a handle wrap.
+          if(rigidContact)middle.add((side==='R'?new THREE.Vector3(.0591,-.0009,.0019):new THREE.Vector3(-.0619,-.0019,-.0028)).applyQuaternion(grip.rotation));
           const wrist=middle.sub(this.handFrames.get(side)!.knuckle.clone().applyQuaternion(q));
           this.reachWithShoulder(side,wrist);
           this.limb('upper_arm.'+side,'forearm.'+side,'hand.'+side,wrist,right.clone().multiplyScalar(sign*.45).add(new THREE.Vector3(0,-1,0)));
@@ -294,7 +299,8 @@ export class WorkerBody extends THREE.Group {
           this.gripErrors[side]=this.point('hand.'+side).distanceTo(wrist);
           if(pass===0&&!rigidContact)long=this.point('hand.'+side).sub(this.point('forearm.'+side)).normalize();
         }
-        this.wrapGrip(side,grip.center,rotation,section,false,working,grip.shape,grip.trigger);
+        if(rigidContact)this.pinchBox(side,grip.center,grip.rotation);
+        else this.wrapGrip(side,grip.center,rotation,section,false,working,grip.shape,grip.trigger);
       }else{
         // Free arms counter-swing from the clavicle through the full chain.
         // Side steps keep a smaller fore/aft arc and add lateral balance;
@@ -335,7 +341,7 @@ export class WorkerBody extends THREE.Group {
         const neutralQ=handQ.clone().multiply(this.handFrames.get(name)!.foreToHand.clone().invert());
         neutralQ.premultiply(new THREE.Quaternion().setFromUnitVectors(Y.clone().applyQuaternion(neutralQ),long));
         const shoulder=this.point('upper_arm.'+name);
-        return{name,handSign:grip.side,shoulder,upperLength:shoulder.distanceTo(oldElbow),elbow:elbow.sub(primary.center).applyQuaternion(inverse),wrist:wrist.sub(primary.center).applyQuaternion(inverse),foreQ:inverse.clone().multiply(neutralQ),handQ:inverse.clone().multiply(handQ)};
+        return{name,handSign:grip.side,lockRotation:true,shoulder,upperLength:shoulder.distanceTo(oldElbow),elbow:elbow.sub(primary.center).applyQuaternion(inverse),wrist:wrist.sub(primary.center).applyQuaternion(inverse),foreQ:inverse.clone().multiply(neutralQ),handQ:inverse.clone().multiply(handQ)};
       });
       if(primary.contactLocked)continue;
       const bounds=new THREE.Box3().setFromObject(object),corners:THREE.Vector3[]=[];
@@ -343,10 +349,8 @@ export class WorkerBody extends THREE.Group {
       // Start with the arm, as with spray: position the elbow first,
       // palm continuing the forearm. Carry the captured contact with it.
       const forward=camera.getWorldDirection(new THREE.Vector3()),flat=forward.clone();flat.y=0;flat.normalize();
-      const side=primary.side,long=forward.clone().addScaledVector(Y,.55).normalize();
-      const radial=Y.clone().addScaledVector(long,-long.y).normalize();
-      const handQ=this.handOrientation(side>0?'R':'L',radial,long);
-      const desiredRotation=handQ.multiply(frames[0].handQ.clone().invert());
+      const side=primary.side;
+      const desiredRotation=camera.getWorldQuaternion(new THREE.Quaternion());
       const pole=flat.clone().multiplyScalar(1.15).addScaledVector(right,-side*(camera.aspect<1?.65:.20)).addScaledVector(Y,-.05).normalize();
       const elbow=frames[0].shoulder.clone().addScaledVector(pole,frames[0].upperLength);
       const desiredCenter=elbow.sub(frames[0].elbow.clone().applyQuaternion(desiredRotation));
@@ -469,6 +473,17 @@ export class WorkerBody extends THREE.Group {
     const thumbEnd=this.bone('thumb.03.'+side),end=this.point('thumb.03.'+side).add(Y.clone().applyQuaternion(thumbEnd.getWorldQuaternion(new THREE.Quaternion())).multiplyScalar(this.lengths.get('thumb.03.'+side)!));
     this.fingerFit['thumbContact'+side]={center:center.toArray(),axis:axis.toArray(),across:across.toArray(),back:back.toArray(),tip:end.toArray(),section};
   }
+  private pinchBox(side:string,center:THREE.Vector3,rotation:THREE.Quaternion):void {
+    const sign=side==='R'?1:-1;
+    // Thumb inside, index/middle outside the side wall. The other fingers
+    // fold toward the palm; none of these joints twist about their length.
+    const target=(x:number,y:number,z:number)=>new THREE.Vector3(x,y,z).applyQuaternion(rotation).add(center);
+    this.fitFinger('index',side,target(sign*.010,.020,0),false,this.boxFingerAxes);
+    this.fitFinger('middle',side,target(sign*.010,side==='R'?-.006:-.012,0),false,this.boxFingerAxes);
+    this.fitFinger('ring',side,target(sign*.050,-.033,.035),false,this.boxFingerAxes);
+    this.fitFinger('little',side,target(sign*.047,-.055,.040),false,this.boxFingerAxes);
+    this.fitThumb(side,target(-sign*.010,.020,0));
+  }
   private closeFinger(digit:string,side:string,center:THREE.Vector3,rotation:THREE.Quaternion,section:[number,number],shape:string):void {
     const sign=side==='R'?1:-1,axis=Y.clone().applyQuaternion(rotation),across=new THREE.Vector3(1,0,0).applyQuaternion(rotation),back=new THREE.Vector3(0,0,1).applyQuaternion(rotation),rx=section[0]+.010,rz=section[1]+.010;
     const height=this.point(`${digit}.01.${side}`).sub(center).dot(axis);
@@ -542,10 +557,10 @@ export class WorkerBody extends THREE.Group {
     }
     this.fingerFit['thumb'+side]={error:tip().distanceTo(target),angles:angles.map(a=>a*180/Math.PI)};
   }
-  private fitFinger(digit:string,side:string,target:THREE.Vector3,actuator=false):void {
+  private fitFinger(digit:string,side:string,target:THREE.Vector3,actuator=false,hinges=this.fingerAxes):void {
     const sign=side==='R'?1:-1,adduction=this.fingerAdduction.get(digit+side)??0,angles=[adduction,.3,.5,.3],names=[1,2,3].map(j=>`${digit}.0${j}.${side}`);
     const spread=actuator?.55:.35;
-    const axes=[this.fingerSplay.get(digit+side)!,...names.map(n=>this.fingerAxes.get(n)!)],indices=[0,0,1,2],limits=[[adduction-spread,adduction+spread],[actuator?-.45:0,1.35],[0,1.75],[0,1.25]];
+    const axes=[this.fingerSplay.get(digit+side)!,...names.map(n=>hinges.get(n)!)],indices=[0,0,1,2],limits=[[adduction-spread,adduction+spread],[actuator?-.45:0,1.35],[0,1.75],[0,1.25]];
     const pose=()=>{for(let j=0;j<3;j++){const b=this.bone(names[j]);b.quaternion.copy(this.rest.get(b)!.q);if(j===0)b.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(axes[0],angles[0]));b.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(axes[j+1],sign*angles[j+1]));b.updateWorldMatrix(false,true);}};
     const tip=()=>{const b=this.bone(names[2]);return this.point(names[2]).add(Y.clone().applyQuaternion(b.getWorldQuaternion(new THREE.Quaternion())).multiplyScalar(this.lengths.get(names[2])!));};
     pose();
