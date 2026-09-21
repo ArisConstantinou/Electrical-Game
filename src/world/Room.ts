@@ -141,6 +141,9 @@ export class Room extends THREE.Group {
     this.add(this.exterior);
 
     const columnMaterial = siteMaterial('concrete', 0xf0ede7, .1, .75);
+    // The first tenth of the scan is unusually dark; sample its cleaner
+    // central shutter panel at the same physical scale as the slab.
+    if (columnMaterial.map) columnMaterial.map.offset.x = .2;
     columnMaterial.userData.referenceLaserReceiver=true;
     for (const x of [-2.72, 2.72]) {
       const column = new THREE.Mesh(new RoundedBoxGeometry(0.36, GAME_CONFIG.room.height, 0.38, 2, .009), columnMaterial);
@@ -364,15 +367,20 @@ export class Room extends THREE.Group {
     // The screed is pressed into the rough wall base. A low, uneven cove
     // connects the horizontal pour to the vertical substrate instead of
     // leaving two photo-textured planes intersecting at a razor-sharp edge.
-    const material = siteMaterial('concrete', 0x817f79, 2.1, .25);
+    const material = siteMaterial('concrete', 0xb0aca5, 2.1, .25);
     material.side = THREE.DoubleSide;
-    const strips: Array<{from: THREE.Vector3; to: THREE.Vector3; inward: THREE.Vector3}> = [
+    const strips: Array<{from: THREE.Vector3; to: THREE.Vector3; inward: THREE.Vector3; column?: boolean}> = [
       {from:new THREE.Vector3(-3.78,0,3.485),to:new THREE.Vector3(3.78,0,3.485),inward:new THREE.Vector3(0,0,-1)},
       {from:new THREE.Vector3(-3.79,0,-3.58),to:new THREE.Vector3(3.79,0,-3.58),inward:new THREE.Vector3(0,0,1)},
       {from:new THREE.Vector3(-3.785,0,-3.58),to:new THREE.Vector3(-3.785,0,3.48),inward:new THREE.Vector3(1,0,0)},
       {from:new THREE.Vector3(3.785,0,-3.58),to:new THREE.Vector3(3.785,0,3.48),inward:new THREE.Vector3(-1,0,0)},
     ];
-    for(const x of [-2.72,2.72])strips.push({from:new THREE.Vector3(x-.18,0,-2.18),to:new THREE.Vector3(x+.18,0,-2.18),inward:new THREE.Vector3(0,0,1)});
+    for(const x of [-2.72,2.72]){
+      strips.push({from:new THREE.Vector3(x-.18,0,-2.18),to:new THREE.Vector3(x+.18,0,-2.18),inward:new THREE.Vector3(0,0,1),column:true});
+      strips.push({from:new THREE.Vector3(x-.18,0,-2.56),to:new THREE.Vector3(x-.18,0,-2.18),inward:new THREE.Vector3(-1,0,0),column:true});
+      strips.push({from:new THREE.Vector3(x+.18,0,-2.56),to:new THREE.Vector3(x+.18,0,-2.18),inward:new THREE.Vector3(1,0,0),column:true});
+      strips.push({from:new THREE.Vector3(x-.18,0,-2.56),to:new THREE.Vector3(x+.18,0,-2.56),inward:new THREE.Vector3(0,0,-1),column:true});
+    }
     const positions:number[]=[],uvs:number[]=[],indices:number[]=[];
     let vertex=0;
     for(const [edge,strip] of strips.entries()){
@@ -380,7 +388,8 @@ export class Room extends THREE.Group {
       for(let i=0;i<=steps;i++){
         const t=i/steps,point=strip.from.clone().lerp(strip.to,t);
         const variation=Math.sin(i*2.73+edge*4.1)*.012+Math.sin(i*6.71+edge)*.005;
-        const width=Math.max(.035,.085+variation),height=Math.max(.025,.054+variation*.35);
+        const width=strip.column?Math.max(.017,.025+variation*.45):Math.max(.035,.085+variation);
+        const height=strip.column?Math.max(.012,.019+variation*.25):Math.max(.025,.054+variation*.35);
         const foot=point.clone().addScaledVector(strip.inward,width);
         positions.push(foot.x,.002,foot.z, point.x,height,point.z);
         uvs.push(t*length/2.1,0,t*length/2.1,.25);
