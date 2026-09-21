@@ -1,5 +1,12 @@
 Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web game named WIRE THE HOUSE, based on real Cyprus residential first-fix practices, editable in Web Game Studio, playable on desktop/mobile, deployed to arisconstantinou/Electrical-Game via GitHub Pages, and ending at FIRST FIX COMPLETE without cable pulling.
 
+## 2026-09-21 · Mobile interaction, mixing receipt and PVC visibility/bending correction
+
+- User supplied four physical iPhone screenshots showing duplicate mixing prompts, an idle ingredient receipt, undersized strap/layout instructions, the body covering the laid-out pipes and difficulty reaching a 90-degree bend.
+- Confirmed these are current-code regressions, not cache: mixing rendered both its world prompt and mobile button; a second per-frame receipt update reopened the panel while merely nearby; commit 58e519d intentionally restored the torso during overhead pipe layout. The existing `mixing-engagement-ui` failed before repair while the pure PVC solver still reached 90 degrees only after ten 9-degree work positions.
+- Approved repair delivered locally: one contextual prompt per device, receipt only during explicit mixing engagement, 54 px / 16 px mobile PVC start actions, body-free overhead spreading/marking, and a hard-capped exact 90-degree bend distributed across eight positions at up to 12 degrees each. Screenshots confirm all twenty laid-out pipes are visible without the torso and the 90-degree hands/pipe remain visible.
+- Before/after receipt regression, actionable desktop/mobile prompt checks, full portrait/landscape PVC hands flow, full desktop produce/carry/cut/install flow, desktop/portrait/landscape mixing tool switching, typecheck, production build and the bundled web-game client pass with no page errors. The client closed every owned browser process. Host marking profile: 2.4 ms simulation P95, 123 draw calls and 39,325 triangles; this is not physical-iPhone performance proof. Unrelated dirty `src/player/FPSRig.ts` and `assets/source-images/` remain untouched.
+
 ## 2026-09-21 · Walking direction while carrying tools
 
 - Reproduced carried-tool A/D shuffle and diagonal body-axis mismatch on the verified shared 5365 checkout. Any active grip suppressed travel yaw; low walking speeds also disabled it. No port replacement caused this behavior.

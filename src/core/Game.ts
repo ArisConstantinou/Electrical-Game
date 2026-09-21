@@ -397,9 +397,14 @@ export class Game {
     this.pvc.present();
     this.workerBody.overview=this.frontBodyView||this.modelInspector.live;
     const bodyPlayer=this.mixing.wheelbarrow.driving?{eyeHeight:1.65,velocity:this.player.velocity,yaw:this.mixing.wheelbarrow.telemetry.yaw+Math.PI,pitch:-.60}:this.pvc.focused?{eyeHeight:this.renderer.camera.position.y,velocity:this.player.velocity,yaw:this.player.yaw,pitch:this.player.pitch}:this.player;
-    if(this.selectedTool!=='hose'||mixingOwnedInput||pvcOwnedInput)this.workerBody.update(dt,this.renderer.camera,bodyPlayer,this.fpsRig,this.selectedTool,this.input.actionHeld,mixingOwnedInput||this.pvc.blocksWork,this.pvc.blocksWork?this.pvc.anatomicalGrips():this.mixing.anatomicalGrips(),this.workSurfaces.frontForBounds);
+    const clearPipeLayout=this.pvc.focused&&['spreading','marking'].includes(this.pvc.phase)&&!this.workerBody.overview;
+    if(!clearPipeLayout&&(this.selectedTool!=='hose'||mixingOwnedInput||pvcOwnedInput))this.workerBody.update(dt,this.renderer.camera,bodyPlayer,this.fpsRig,this.selectedTool,this.input.actionHeld,mixingOwnedInput||this.pvc.blocksWork,this.pvc.blocksWork?this.pvc.anatomicalGrips():this.mixing.anatomicalGrips(),this.workSurfaces.frontForBounds);
     this.mixing.useAnatomicalBody(this.workerBody.loaded);
     this.pvc.useAnatomicalBody();
+    // The overhead layout view is for reading all twenty pipes and their live
+    // marks. The full torso has no useful contact here and otherwise fills the
+    // phone viewport; anatomical hands return for spring insertion and bend.
+    if(clearPipeLayout)this.workerBody.visible=false;
     this.hoseSupply.update(this.selectedTool==='hose'&&this.fpsRig.visible&&!mixingOwnedInput&&!pvcOwnedInput);
     if(this.modelInspector.active&&this.modelInspector.live)this.modelInspector.afterWorld(dt);
     else if(this.frontBodyView)this.updateFrontBodyCamera();

@@ -1,7 +1,7 @@
 /** Material-space centreline. Each cell is a short circular arc, not a hinge.
  * Arc length is invariant; the spring protects a 40 cm region around the mark.
  * Limits are gameplay parameters, not structural/regulatory certification. */
-export const PVC = { count:20, length:3, diameter:.02, springLength:.4, cableLength:2, cell:.025, cells:16, maxCellDegrees:9, tolerance:2 } as const;
+export const PVC = { count:20, length:3, diameter:.02, springLength:.4, cableLength:2, cell:.025, cells:16, maxCellDegrees:12, tolerance:2 } as const;
 export interface PipeRecipe { mark:number; angles:number[] }
 export class PvcBend {
   readonly angles = Array<number>(PVC.cells).fill(0);
@@ -16,7 +16,7 @@ export class PvcBend {
   press(seconds:number):boolean{
     if(!Number.isFinite(seconds)||seconds<=0)return false;
     const old=this.angles[this.grip];
-    this.angles[this.grip]=Math.min(PVC.maxCellDegrees,old+Math.min(seconds,.05)*18,old+Math.max(0,92-this.angle));
+    this.angles[this.grip]=Math.min(PVC.maxCellDegrees,old+Math.min(seconds,.05)*24,old+Math.max(0,90-this.angle));
     if(this.angles[this.grip]===old)return false;
     this.revision++;return true;
   }

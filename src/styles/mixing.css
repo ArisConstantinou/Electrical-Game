@@ -28,5 +28,6 @@
 .mixing-active #mortar-panel,.mixing-active #tool-status,.mixing-active #aim-quick-controls,.mixing-stage #tool-quick-controls,.mixing-stage #mobile-tool-slider,.mixing-active #chisel-orientation,.mixing-active #desktop-key-guide{visibility:hidden}
 .mixing-active #box-supply,.mixing-target #box-supply,.mixing-active #interaction-prompt,.mixing-target #interaction-prompt{display:none!important}
 @media(max-width:700px){#mixing-panel{left:8px;bottom:82px;width:calc(100% - 16px);padding:9px 11px}#mixing-panel .mix-readout{font-size:14px}#mixing-panel .mix-feedback{font-size:14px}#mixing-world-prompt{top:42%;font-size:15px}#mixing-finish{bottom:158px;min-width:210px}#mixing-toolbelt{left:8px;right:8px;bottom:7px;transform:none;gap:4px}#mixing-toolbelt button{width:auto;flex:1;min-width:0;min-height:64px;padding:4px 2px}#mixing-toolbelt span{font-size:12px}}
+@media(pointer:coarse){.mixing-target #mixing-world-prompt{display:none!important}}
 @media(max-height:540px){#mixing-panel{left:8px;bottom:78px;width:300px;max-width:42vw}#mixing-world-prompt{top:42%;font-size:14px}#mixing-finish{bottom:82px;left:63%}#mixing-toolbelt{left:8px;right:8px;transform:none;justify-content:center}}
 @media(max-height:540px) and (min-width:540px){.mixing-stage #mixing-world-prompt{left:calc(50% + 150px);max-width:calc(100% - 330px)}}

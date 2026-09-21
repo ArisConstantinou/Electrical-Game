@@ -49,8 +49,8 @@ try{
   const focusSpan=await bendFocusSpan();assert(focusSpan>.35,`Bend area must remain close and readable instead of a distant full-body view (${focusSpan.toFixed(3)} NDC)`);
   assert.equal(await page.evaluate(()=>window.__wireTheHouse.pvc.pipe.material.opacity),1);await key('KeyR');assert.equal(await page.evaluate(()=>window.__wireTheHouse.pvc.pipe.material.opacity),.4);await snap('07-spring-inside');
   await key('KeyE');assert.equal((await state()).phase,'bending','E must not bend automatically');
-  await page.mouse.move(1000,400);await page.mouse.down();await step(65);await page.mouse.up();await step(2);assert.equal((await state()).angle,9,'Holding in one place must stop locally');
-  for(let cell=1;cell<10;cell++){
+  await page.mouse.move(1000,400);await page.mouse.down();await step(65);await page.mouse.up();await step(2);assert.equal((await state()).angle,12,'Holding in one place must stop locally');
+  for(let cell=1;cell<8;cell++){
     await key('KeyD');assert.equal((await state()).grip,cell);
     await page.mouse.down();await step(30);await page.mouse.up();await step(2);
     assert.equal(await page.evaluate(()=>window.__wireTheHouse.workerBody.visible),true,`Hands must remain visible at bend cell ${cell}`);
@@ -62,8 +62,9 @@ try{
   await key('KeyE');assert.equal((await state()).phase,'review');await snap('10-review');
   for(let i=0;i<19;i++)await key('Equal',1);assert.equal((await state()).quantity,20);
   await key('KeyE');await step(100);assert.equal((await state()).phase,'batch');assert.equal((await state()).prepared,20);assert.equal((await state()).raw,0);assert.equal((await state()).total,20);
-  await aim([1.7,1.65,.4],[2.85,.03,.1]);await snap('11-batch');await key('KeyE');assert.equal((await state()).phase,'carrying');assert.equal((await state()).prepared,19);await snap('12-carry');
- report.checks.push('stock -> marking -> spring -> ten local bends -> 90 degrees -> pause/resume -> batch 20 -> carry');
+  const preparedAim=await page.evaluate(()=>{const g=window.__wireTheHouse,mesh=g.pvc.prepared[0].mesh,c=g.renderer.camera,pos=mesh.geometry.getAttribute('position'),index=mesh.geometry.index,target=c.position.clone().set(0,0,0),vertex=c.position.clone();mesh.updateWorldMatrix(true,false);const triangle=(80*10)*6;for(let k=0;k<3;k++)target.add(vertex.fromBufferAttribute(pos,index.getX(triangle+k)));target.multiplyScalar(1/3);mesh.localToWorld(target);return{camera:[target.x-1.15,1.65,target.z+.85],target:target.toArray()};});
+  await aim(preparedAim.camera,preparedAim.target);report.pickupProbe=await page.evaluate(()=>{const g=window.__wireTheHouse,p=g.pvc,c=g.renderer.camera,V=c.position.constructor;c.updateMatrixWorld(true);p.stock.updateMatrixWorld(true);p.preparedRoot.updateMatrixWorld(true);p.ray.setFromCamera({x:0,y:0},c);const hits=p.ray.intersectObjects([...p.stock.pipes.filter(x=>x.visible),...p.preparedRoot.children],true).map(h=>({distance:h.distance,name:h.object.name,point:h.point.toArray()})),wall=g.room.brickWall.aim(c);return{aimed:p.stockAimed(),camera:c.position.toArray(),direction:c.getWorldDirection(new V()).toArray(),prepared:p.prepared.length,hits:hits.slice(0,5),wall:wall?{distance:c.position.distanceTo(new V(wall.point.x,wall.point.y,wall.point.z)),point:[wall.point.x,wall.point.y,wall.point.z]}:null,target:p.telemetry};});console.log('PVC pickup probe',JSON.stringify(report.pickupProbe));assert.equal(report.pickupProbe.aimed,true,'Prepared pipe surface must be aimable before pickup');await snap('11-batch');await key('KeyE');assert.equal((await state()).phase,'carrying');assert.equal((await state()).prepared,19);await snap('12-carry');
+ report.checks.push('stock -> marking -> spring -> eight local bends -> exact 90 degrees -> pause/resume -> batch 20 -> carry');
   // This checkout already supplies real bonded boxes and physically carved lanes.
   const targetPose=await page.evaluate(()=>{
     const g=window.__wireTheHouse,p=g.mission.points[0],pos=p.boxGroup.getWorldPosition(g.renderer.camera.position.clone());

@@ -463,7 +463,7 @@ export class PvcWorkshop {
     const tips:Partial<Record<Phase,string>>={
       marking:'Mouse: γωνία · E: σημάδεψε όλες τις σωλήνες · P: preset · Tab: επόμενο',
       spring:'LMB: βάλε το spring · R: διαφάνεια · ESC: πίσω',
-      bending:'A / D: χέρι · LMB: λύγισε εδώ · Z: διόρθωση · E: έλεγχος · R: διαφάνεια',
+      bending:'A / D: χέρι · LMB: λύγισε εδώ · 8 θέσεις για 90° · Z: διόρθωση · E: έλεγχος · R: διαφάνεια',
       review:'Ροδέλα ή − / +: ποσότητα · E: παραγωγή · R: διαφάνεια',
       fitting:'Mouse πάνω/κάτω: cutter · LMB: κόψε · E: εφαρμογή · R: διαφάνεια',
       cut:'E: εφάρμοσε · R: διαφάνεια · ESC: πίσω',
@@ -474,7 +474,7 @@ export class PvcWorkshop {
     if(this.touch)Object.assign(tips,{
       marking:'Σύρε πάνω/κάτω για μήκος · ΣΗΜΑΔΕΨΕ για μαρκάρισμα',
       spring:'Κράτα SPRING για εισαγωγή',
-      bending:'ΧΕΡΙΑ: άλλαξε θέση · Κράτα ΛΥΓΙΣΕ · ΕΛΕΓΧΟΣ στις 90°',
+      bending:'8 ΘΕΣΕΙΣ ΧΕΡΙΩΝ · Κράτα ΛΥΓΙΣΕ · ΕΛΕΓΧΟΣ στις 90°',
       review:'− / +: ποσότητα · ΠΑΡΑΓΩΓΗ για ετοιμασία',
       fitting:'Σύρε πάνω/κάτω το cutter · Κράτα ΚΟΨΕ',cut:'ΕΦΑΡΜΟΣΕ στο κουτί ή ΠΙΣΩ',
     });
@@ -483,6 +483,8 @@ export class PvcWorkshop {
       this.phase==='sealed'?`${key} · ΚΟΨΕ ΤΑ ΔΕΣΙΜΑΤΑ · 20 × 3 m`:this.phase==='loose'?`${key} · ΑΠΛΩΣΕ ΤΙΣ ΣΩΛΗΝΕΣ`:
       this.phase==='batch'?`${key} · ${this.prepared.length?'ΠΑΡΕ ΣΩΛΗΝΑ':'ΝΕΑ ΠΡΟΕΤΟΙΜΑΣΙΑ'} · ${this.prepared.length} έτοιμες / ${this.rawCount} άκοπες`:
       this.phase==='carrying'?(this.message||this.instruction('E στο κουτί: εφαρμογή · E στη μάτσα: επιστροφή · R: διαφάνεια','Στόχευσε κουτί ή μάτσα και άγγιξε εδώ')):`${key} · ΣΥΝΕΧΙΣΕ`;
+    this.prompt.dataset.phase=this.phase;
+    this.prompt.classList.toggle('pvc-primary-action',this.touch&&!show&&['sealed','loose'].includes(this.phase));
     this.markConfirm.textContent=this.touch?'ΣΗΜΑΔΕΨΕ ΤΙΣ ΣΩΛΗΝΕΣ':'E · ΣΗΜΑΔΕΨΕ ΤΙΣ ΣΩΛΗΝΕΣ';
     this.controls.querySelector('[data-pvc="confirm"]')!.textContent=this.phase==='review'?'ΠΑΡΑΓΩΓΗ':this.phase==='cut'?'ΕΦΑΡΜΟΣΕ':'ΕΛΕΓΧΟΣ';
     if(this.prompt.textContent!==hint)this.prompt.textContent=hint;

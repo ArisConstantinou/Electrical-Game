@@ -15,16 +15,18 @@ try{for(const viewport of [{width:390,height:680},{width:844,height:390}]){
  const snap=async label=>{await page.evaluate(async()=>{const r=window.__wireTheHouse.renderer;await r.waitForFrame();r.render();await r.waitForFrame();});await page.screenshot({path:`${out}/${name}-${label}.png`});};
  const cdp=await context.newCDPSession(page);
  const hold=async n=>{const r=await page.locator('#pvc-use').boundingBox();await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:r.x+r.width/2,y:r.y+r.height/2,id:1}]});await step(n);await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await step();};
- await step();await tap('#pvc-prompt');await step(130);assert.equal((await state()).phase,'loose');await tap('#pvc-prompt');await step(110);assert.equal((await state()).phase,'marking');await snap('marking');
+ await step();const sealedAction=await page.locator('#pvc-prompt').evaluate(el=>{const r=el.getBoundingClientRect(),s=getComputedStyle(el);return{height:r.height,font:parseFloat(s.fontSize),text:el.textContent};});assert(sealedAction.height>=52&&sealedAction.font>=16);assert.match(sealedAction.text,/ΚΟΨΕ ΤΑ ΔΕΣΙΜΑΤΑ/);await snap('sealed-action');
+ await tap('#pvc-prompt');await step(130);assert.equal((await state()).phase,'loose');const looseAction=await page.locator('#pvc-prompt').evaluate(el=>({height:el.getBoundingClientRect().height,font:parseFloat(getComputedStyle(el).fontSize),text:el.textContent}));assert(looseAction.height>=52&&looseAction.font>=16);assert.match(looseAction.text,/ΑΠΛΩΣΕ ΤΙΣ ΣΩΛΗΝΕΣ/);await snap('loose-action');
+ await tap('#pvc-prompt');await step(110);assert.equal((await state()).phase,'marking');const layoutView=await page.evaluate(()=>{const g=window.__wireTheHouse;return{body:g.workerBody.visible,pipes:g.pvc.stock.pipes.filter(p=>p.visible).length};});assert.equal(layoutView.body,false,'Full torso must not cover the overhead pipe layout');assert.equal(layoutView.pipes,20);await snap('marking');
  await tap('#pvc-mark-confirm');await step(60);assert.equal((await state()).phase,'spring');await snap('spring');await hold(100);assert.equal((await state()).phase,'bending');
  const poses=[];
- for(let i=0;i<10;i++){
+ for(let i=0;i<8;i++){
   if(i)await tap('[data-pvc="forward"]');await hold(30);
   const pose=await page.evaluate(()=>{const g=window.__wireTheHouse;return{thumbRise:g.workerBody.point('thumb.03.R').y-g.workerBody.point('thumb.01.R').y,contacts:g.pvc.anatomicalGrips().map(c=>({side:c.side,point:c.center.toArray()})),body:g.workerBody.telemetry,hands:['L','R'].map(s=>g.workerBody.point('hand.'+s).project(g.renderer.camera).toArray())};});
   assert(pose.body.visible);for(const side of ['L','R'])assert(pose.body.fingerFit['pipeWrist'+side].bendDegrees<5,'Wrist retains its anatomical rest alignment');for(const e of Object.values(pose.body.gripReachErrors))assert(e<.008,'Hands remain seated');
   if(pose.hands.some(p=>Math.abs(p[0])>=1||Math.abs(p[1])>=1))await snap('out-of-view');
   for(const p of pose.hands)assert(Math.abs(p[0])<1&&Math.abs(p[1])<1,`Both wrists remain in view: ${name}, bend ${i+1}, ${JSON.stringify(p)}`);poses.push(pose);
-  if(i===4||i===9){assert(pose.thumbRise>0,'Right thumb points upward toward the bend');assert(pose.contacts.find(c=>c.side===1).point[1]<pose.contacts.find(c=>c.side===-1).point[1],'Working hand bends downward');}if(i===4||i===9)await snap(i===4?'bend-45':'bend-90');
+  if(i===3||i===7){assert(pose.thumbRise>0,'Right thumb points upward toward the bend');assert(pose.contacts.find(c=>c.side===1).point[1]<pose.contacts.find(c=>c.side===-1).point[1],'Working hand bends downward');}if(i===3||i===7)await snap(i===3?'bend-48':'bend-90');
  }
  assert(Math.abs((await state()).angle-90)<.01);await tap('[data-pvc="undo"]');assert((await state()).angle<90);await hold(30);await tap('[data-pvc="confirm"]');assert.equal((await state()).phase,'review');
  const text=await page.locator('#pvc-prompt').textContent();assert(!/\b(E|LMB|RMB|ESC|Mouse)\b/.test(text));await snap('review');

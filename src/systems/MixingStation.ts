@@ -502,9 +502,8 @@ export class MixingStation {
     this.game.hud.shell.classList.toggle('mixing-stage',mixingUiAvailable);
     this.game.hud.shell.classList.toggle('mixing-target',interactAvailable);
     this.game.hud.shell.dataset.mixingInteract=String(interactAvailable);
-    this.receipt.update(this.workingBatch,this.game.started&&(this.active||mixingUiAvailable&&this.game.selectedTool!=='trowel'),dt,this.destination==='drum'?this.drum.running?`Μπετονιέρα σε λειτουργία · ${Math.round(this.drum.batch.mixProgress*100)}%`:this.drum.batch.ready?'Έτοιμο · FINISH για χρήση':'20 L νερό · 18 μιστριές τσιμέντο · 36 φτυαριές άμμο':this.recipeHint(),this.destination==='drum'?'ΣΤΗ ΜΠΕΤΟΝΙΕΡΑ':'ΣΤΗ ΣΥΚΛΑ');
     this.mixerControlHint=prompt.replace(/^.*? · /,'');
-    if(this.mobileInteract){this.mobileInteract.hidden=!interactAvailable;this.mobileInteract.querySelector('small')!.textContent=this.carrying?'ΑΦΗΣΕ ΣΥΚΛΑ':prompt?.replace(/^.*? · /,'')||'ΣΤΟΧΕΥΣΕ ΑΝΤΙΚΕΙΜΕΝΟ';}
+    if(this.mobileInteract){this.mobileInteract.hidden=!interactAvailable||!matchMedia('(pointer:coarse)').matches;this.mobileInteract.querySelector('small')!.textContent=this.carrying?'ΑΦΗΣΕ ΣΥΚΛΑ':prompt?.replace(/^.*? · /,'')||'ΣΤΟΧΕΥΣΕ ΑΝΤΙΚΕΙΜΕΝΟ';}
     this.toggle.hidden=true;this.actionTime=Math.max(0,this.actionTime-dt);
     if(this.carrying){const c=this.game.renderer.camera,d=c.getWorldDirection(new THREE.Vector3());d.y=0;d.normalize();const p=c.position.clone().addScaledVector(d,.42);p.y=Math.max(.35,c.position.y-.95);this.models.bucket.position.copy(this.models.group.worldToLocal(p));}
     if(this.carrying&&requested)this.placeBucket();

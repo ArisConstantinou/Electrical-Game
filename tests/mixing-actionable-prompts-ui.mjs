@@ -23,7 +23,7 @@ for(const layout of [{name:'desktop',width:1366,height:768,mobile:false},{name:'
  await page.goto(url);await page.waitForFunction(()=>window.__wireTheHouse?.mixing,undefined,{timeout:120000});await page.locator('#start-button')[layout.mobile?'tap':'click']();
  await page.evaluate(()=>{const g=window.__wireTheHouse;window.__promptStep=g.step.bind(g);g.step=()=>{};g.mixing.setActive(true);g.mixing.chooseTool('shovel');});
  const step=(n=2)=>page.evaluate(n=>{for(let i=0;i<n;i++)window.__promptStep(1/60);},n);
- const state=()=>page.evaluate(()=>{const m=window.__wireTheHouse.mixing,p=document.querySelector('#mixing-world-prompt');return{target:m.telemetry.aimedTarget,tool:m.tool,prompt:p.textContent,hidden:p.hidden,mobileHidden:document.querySelector('#mobile-interact').hidden,activity:m.telemetry.activity,sand:m.batch.sandScoops};});
+ const state=()=>page.evaluate(()=>{const m=window.__wireTheHouse.mixing,p=document.querySelector('#mixing-world-prompt'),mobile=document.querySelector('#mobile-interact');return{target:m.telemetry.aimedTarget,tool:m.tool,prompt:p.textContent,hidden:p.hidden,worldVisible:getComputedStyle(p).display!=='none',mobileHidden:mobile.hidden,mobileVisible:getComputedStyle(mobile).display!=='none',activity:m.telemetry.activity,sand:m.batch.sandScoops};});
  await step();
  const freshAim=await page.evaluate(()=>{
   const g=window.__wireTheHouse,m=g.mixing,c=g.renderer.camera;
@@ -42,7 +42,7 @@ for(const layout of [{name:'desktop',width:1366,height:768,mobile:false},{name:'
  assert.equal(freshAim,'sand','A new look must raycast current camera rotation before rendering');
  const samples=[];
  for(const x of [-.55,-.28,0,.28,.55]){
-  const geometry=await page.evaluate(x=>{const g=window.__wireTheHouse,m=g.mixing,c=g.renderer.camera;m.models.group.updateMatrixWorld(true);const p=m.models.sand.getWorldPosition(c.position.clone());c.position.set(p.x,1.65,p.z-1.9);const aim=p.clone();aim.x+=x;aim.y=.20;c.lookAt(aim);c.updateMatrixWorld(true);g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;g.player.crouched=false;return{camera:c.position.toArray(),aim:aim.toArray()};},x);await step();const before=await state();samples.push({x,geometry,before});assert.equal(before.target,'sand','Every visible central sand sample must remain sand from the same position');assert.match(before.prompt,/ΠΑΡΕ ΜΙΑ ΦΤΥΑΡΙΑ/);
+  const geometry=await page.evaluate(x=>{const g=window.__wireTheHouse,m=g.mixing,c=g.renderer.camera;m.models.group.updateMatrixWorld(true);const p=m.models.sand.getWorldPosition(c.position.clone());c.position.set(p.x,1.65,p.z-1.9);const aim=p.clone();aim.x+=x;aim.y=.20;c.lookAt(aim);c.updateMatrixWorld(true);g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;g.player.crouched=false;return{camera:c.position.toArray(),aim:aim.toArray()};},x);await step();const before=await state();samples.push({x,geometry,before});assert.equal(before.target,'sand','Every visible central sand sample must remain sand from the same position');assert.match(before.prompt,/ΠΑΡΕ ΜΙΑ ΦΤΥΑΡΙΑ/);assert.equal(before.worldVisible,!layout.mobile,'Only desktop may show the central world prompt');assert.equal(before.mobileVisible,layout.mobile,'Only touch layout may show the mobile interaction button');
  }
  const press=async()=>{if(layout.mobile){await page.locator('#mobile-interact').tap();await step();}else{await page.keyboard.down('KeyE');await step();await page.keyboard.up('KeyE');}await step(105);};
  await press();assert.equal((await state()).sand,1,'Native interaction takes a scoop from last sample');
