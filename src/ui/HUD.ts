@@ -94,11 +94,12 @@ export class HUD {
             <button type="button" id="work-height">CROUCH · LOW WORK</button><small id="mortar-hint"></small>
             </details>
             <div id="mobile-control-settings" aria-label="Mobile aim settings">
+              <button id="movement-stick-mode" type="button" aria-label="Change movement joystick style"><span>MOVE JOYSTICK</span><b>FLOATING</b></button>
               <button id="aim-input-mode" type="button" aria-label="Change aim input style"><span>AIM INPUT</span><b>DRAG</b></button>
 
               <button id="aim-speed" type="button" aria-label="Change aim sensitivity"><span>AIM SPEED</span><b>NORMAL</b></button>
               <button id="wall-assist" type="button" aria-label="Toggle automatic wall precision"><span>WALL ASSIST</span><b>AUTO</b></button>
-              <small>Use AIM to look without working. Hold USE and drag to aim while working; MOVE can stay held. A third AIM finger is optional. Choose DRAG or STICK for the AIM pad.</small>
+              <small>FLOATING places MOVE under your thumb; FIXED keeps it at the corner. Drag the right side to look. Hold USE and drag to aim while moving; a third AIM finger is optional.</small>
             </div>
           </section>
           <aside id="desktop-key-guide" class="hud-card" aria-label="Keyboard and mouse controls">
@@ -345,6 +346,7 @@ export class HUD {
     root.querySelector('#spray-color')?.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:cycle-spray-color')));
     root.querySelector('#aim-control-mode')?.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:cycle-aim-control')));
     root.querySelector('#aim-input-mode')?.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:cycle-aim-input')));
+    root.querySelector('#movement-stick-mode')?.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:cycle-movement-stick')));
     root.querySelector('#aim-speed')?.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:cycle-aim-speed')));
     root.querySelector('#wall-assist')?.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:toggle-wall-assist')));
     root.querySelector('#tool-mode-toggle')?.addEventListener('click', event => {
@@ -391,7 +393,9 @@ export class HUD {
       if (open && document.pointerLockElement) void document.exitPointerLock();
     };
     bindHammerButton('#settings-toggle',()=>setSettingsOpen(settingsToggle?.getAttribute('aria-expanded')!=='true'));
-    bindHammerButton('#settings-close',()=>setSettingsOpen(false));
+    // Keep the panel in place through the compatibility click after a touch
+    // release, so that click cannot land on an underlying game control.
+    bindHammerButton('#settings-close',()=>setTimeout(()=>setSettingsOpen(false),0));
     root.querySelector('#settings-scrim')?.addEventListener('click', () => setSettingsOpen(false));
     root.querySelector('#start-settings')?.addEventListener('click', () => settingsToggle?.click());
     root.querySelector('#start-models')?.addEventListener('click', () => document.querySelector<HTMLButtonElement>('#model-inspector-open')?.click());
@@ -710,5 +714,9 @@ export class HUD {
     look?.setAttribute('aria-label',mode==='drag'?'Drag to aim; hold USE separately to work':'Steer to aim; hold USE separately to work');
     this.shell.querySelector('#quick-aim-input b')!.textContent=mode.toUpperCase();
     this.shell.querySelector('#aim-control-label')!.textContent=mode==='drag'?'DRAG TO AIM':'STICK TO AIM';
+  }
+  updateMovementStick(mode: 'floating' | 'fixed'): void {
+    this.shell.querySelector('#movement-stick-mode b')!.textContent = mode.toUpperCase();
+    this.shell.querySelector('#joystick')!.setAttribute('aria-label', mode === 'floating' ? 'Floating movement joystick' : 'Fixed movement joystick');
   }
 }

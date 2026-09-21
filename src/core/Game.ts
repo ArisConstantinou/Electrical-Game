@@ -103,6 +103,10 @@ export class Game {
   aimProfile: MobileAimProfile = 'normal';
   wallAssistEnabled = true;
   aimInputMode: AimInputMode = 'stick';
+  movementStickMode: 'floating' | 'fixed' = (() => {
+    try { return localStorage.getItem('wirehouse:movement-stick-mode') === 'fixed' ? 'fixed' : 'floating'; }
+    catch { return 'floating'; }
+  })();
   started = false;
   private readonly chasing: ChasingSystem;
   private readonly interaction: InteractionSystem;
@@ -196,6 +200,7 @@ export class Game {
     );
     this.mobileControls.setAimControlMode(this.aimControlMode);
     this.mobileControls.setAimInputMode(this.aimInputMode);
+    this.mobileControls.setMovementStickMode(this.movementStickMode);
     this.pvc = new PvcWorkshop(this);
     this.apprentice = new ApprenticeSystem(this, this.chasing);
     new MobileHUD();
@@ -405,7 +410,7 @@ export class Game {
     // controls visibly flash while INTERACT was held on the mixer.
     if(!mixingOwnedInput)this.hud.updateMobileUseStatus(useStatus,this.selectedTool==='hammer'?hammerReady:true,useHeld&&this.selectedTool!=='measure');
     const sprayColor = SPRAY_COLORS[this.sprayColorIndex];
-    const settingsKey=[this.selectedTool,this.sprayMode,this.sprayColorIndex,this.hammerMode,this.room.brickWall.chiselTiltDegrees<0,this.room.brickWall.chiselWidthM,this.room.brickWall.chiselType,this.aimControlMode,this.aimProfile,this.wallAssistEnabled,this.aimInputMode].join(':');
+    const settingsKey=[this.selectedTool,this.sprayMode,this.sprayColorIndex,this.hammerMode,this.room.brickWall.chiselTiltDegrees<0,this.room.brickWall.chiselWidthM,this.room.brickWall.chiselType,this.aimControlMode,this.aimProfile,this.wallAssistEnabled,this.aimInputMode,this.movementStickMode].join(':');
     if(settingsKey!==this.hudSettingsKey){
       this.hudSettingsKey=settingsKey;
       this.hud.updateSprayControls(this.sprayMode, sprayColor.name, sprayColor.css, this.selectedTool === 'spray');
@@ -415,6 +420,7 @@ export class Game {
       this.hud.updateAimSpeed(this.aimProfile);
       this.hud.updateWallAssist(this.wallAssistEnabled);
       this.hud.updateAimInput(this.aimInputMode);
+      this.hud.updateMovementStick(this.movementStickMode);
     }
     this.hud.updateChiselOrientation(this.room.brickWall.chiselEdgeAngle*180/Math.PI,this.fpsRig.actualTiltDegrees,this.room.brickWall.chiselSideDegrees,this.room.brickWall.chiselWidthM,this.room.brickWall.chiselTiltDegrees);
     this.hud.updateHammerSide(this.room.brickWall.chiselSideDegrees,this.hammerAutoSide);
@@ -768,6 +774,12 @@ export class Game {
       this.aimInputMode = this.aimInputMode === 'drag' ? 'stick' : 'drag';
       this.mobileControls.setAimInputMode(this.aimInputMode);
       this.hud.notify(`Aim input: ${this.aimInputMode.toUpperCase()}`);
+    });
+    addEventListener('wirehouse:cycle-movement-stick', () => {
+      this.movementStickMode = this.movementStickMode === 'floating' ? 'fixed' : 'floating';
+      this.mobileControls.setMovementStickMode(this.movementStickMode);
+      try { localStorage.setItem('wirehouse:movement-stick-mode', this.movementStickMode); } catch { /* Private browsing can block storage. */ }
+      this.hud.notify(`Move joystick: ${this.movementStickMode.toUpperCase()}`);
     });
     addEventListener('wirehouse:level', event => {
       const detail = (event as CustomEvent<LevelDirection | 'confirm' | 'cancel'>).detail;

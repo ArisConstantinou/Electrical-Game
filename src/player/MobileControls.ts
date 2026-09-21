@@ -4,6 +4,7 @@ import type { MobileAimProfile, PlayerController } from './PlayerController';
 /** Old saved settings remain readable; every mode requires explicit USE. */
 export type AimControlMode = 'manual' | 'auto-use' | 'double-tap';
 export type AimInputMode = 'drag' | 'stick';
+export type MovementStickMode = 'floating' | 'fixed';
 
 export class MobileControls {
   private joystickPointer: number | null = null;
@@ -21,6 +22,7 @@ export class MobileControls {
   private moveY = 0;
   private aimProfile: MobileAimProfile = 'normal';
   private aimInputMode: AimInputMode = 'stick';
+  private movementStickMode: MovementStickMode = 'floating';
   private readonly captures = new Map<number, HTMLElement>();
 
   constructor(private readonly surface: HTMLElement, private readonly input: Input, private readonly player: PlayerController, _selectedToolIsContinuous: () => boolean) {
@@ -130,6 +132,7 @@ export class MobileControls {
   setAimControlMode(_mode: AimControlMode): void { this.cancelActiveGestures(); }
   setAimProfile(profile: MobileAimProfile): void { this.aimProfile = profile; this.player.setMobileAimProfile(profile); }
   setAimInputMode(mode: AimInputMode): void { this.cancelActiveGestures(); this.aimInputMode = mode; }
+  setMovementStickMode(mode: MovementStickMode): void { this.cancelActiveGestures(); this.movementStickMode = mode; }
 
   /** Cancellation discards a pending cast; ordinary USE release still casts. */
   cancelActiveGestures(): void {
@@ -177,14 +180,23 @@ export class MobileControls {
     event.preventDefault();
     if (this.inMoveZone(event)) {
       if (this.joystickPointer !== null) return;
-      this.joystickPointer = event.pointerId; this.moveX = event.clientX; this.moveY = event.clientY;
       const joystick = this.surface.querySelector<HTMLElement>('#joystick');
+      if (this.movementStickMode === 'fixed' && joystick && !joystick.contains(target)) return;
+      this.joystickPointer = event.pointerId;
       if (joystick) {
-        // The visible pad stays aligned with AIM. Touching anywhere in the
-        // move zone still starts neutral, with travel measured from that touch.
+        if (this.movementStickMode === 'floating') {
+          const width = joystick.getBoundingClientRect().width;
+          joystick.style.left = `${event.clientX - width / 2}px`;
+          joystick.style.top = `${event.clientY - width / 2}px`;
+          joystick.style.right = 'auto'; joystick.style.bottom = 'auto';
+        }
         joystick.classList.add('active');
       }
+      const center = joystick?.getBoundingClientRect();
+      this.moveX = this.movementStickMode === 'fixed' && center ? center.left + center.width / 2 : event.clientX;
+      this.moveY = this.movementStickMode === 'fixed' && center ? center.top + center.height / 2 : event.clientY;
       this.capture(joystick ?? this.surface, event.pointerId); this.input.resetMobileMove();
+      if (this.movementStickMode === 'fixed') this.updateMovement(event);
     } else if (this.lookPointer === null) {
       this.lookPointer = event.pointerId; this.lookX = event.clientX; this.lookY = event.clientY;
       this.capture(this.surface, event.pointerId);
@@ -200,14 +212,7 @@ export class MobileControls {
     if (event.pointerType === 'mouse') return;
     if (event.pointerId === this.joystickPointer) {
       event.preventDefault();
-      const joystick = this.surface.querySelector<HTMLElement>('#joystick');
-      const radius = Math.max(1, (joystick?.getBoundingClientRect().width ?? 112) / 2);
-      let x = event.clientX - this.moveX, y = event.clientY - this.moveY;
-      const length = Math.hypot(x, y); if (length > radius) { x *= radius / length; y *= radius / length; }
-      const raw=Math.min(1,length/radius),amount=raw<=.08?0:((raw-.08)/.92)**1.35;
-      this.input.mobileMove = { x: length>0?x/Math.min(length,radius)*amount:0, y: length>0?y/Math.min(length,radius)*amount:0 };
-      const thumb = this.surface.querySelector<HTMLElement>('#joystick-thumb');
-      if (thumb) thumb.style.transform = `translate(calc(-50% + ${x*.52}px), calc(-50% + ${y*.52}px))`;
+      this.updateMovement(event);
     } else if (event.pointerId === this.lookActionPointer) {
       event.preventDefault();
       const action = this.surface.querySelector<HTMLElement>('#look-joystick');
@@ -262,6 +267,16 @@ export class MobileControls {
     action?.classList.remove('active'); action?.setAttribute('aria-pressed', 'false');
     const thumb = this.surface.querySelector<HTMLElement>('#look-joystick-thumb'); if (thumb) thumb.style.transform = 'translate(-50%, -50%)';
     this.releaseCapture(pointer);
+  }
+  private updateMovement(event: PointerEvent): void {
+    const joystick = this.surface.querySelector<HTMLElement>('#joystick');
+    const radius = Math.max(1, (joystick?.getBoundingClientRect().width ?? 112) / 2);
+    let x = event.clientX - this.moveX, y = event.clientY - this.moveY;
+    const length = Math.hypot(x, y); if (length > radius) { x *= radius / length; y *= radius / length; }
+    const raw = Math.min(1, length / radius), amount = raw <= .08 ? 0 : ((raw - .08) / .92) ** 1.35;
+    this.input.mobileMove = { x: length > 0 ? x / Math.min(length, radius) * amount : 0, y: length > 0 ? y / Math.min(length, radius) * amount : 0 };
+    const thumb = this.surface.querySelector<HTMLElement>('#joystick-thumb');
+    if (thumb) thumb.style.transform = `translate(calc(-50% + ${x * .52}px), calc(-50% + ${y * .52}px))`;
   }
   private releaseAction(cancel: boolean): void {
     if (this.usePointer === null) return;
