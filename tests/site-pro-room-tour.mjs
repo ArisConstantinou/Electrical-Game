@@ -15,6 +15,7 @@ const views = [
   { name: 'floor-detail', x: 0, z: -.25, yaw: Math.PI, pitch: -.83 },
   { name: 'supplies', x: 0, z: -.35, yaw: -2.28, pitch: -.39 },
   { name: 'left-room', x: 0, z: -.35, yaw: 2.28, pitch: -.16 },
+  { name: 'open-left-window', x: -1.45, z: 2.0, yaw: Math.PI / 2, pitch: -.04 },
 ];
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch({ channel: 'chrome', headless: true });

@@ -44,6 +44,23 @@ try {
       const use = state.controls['#site-pro-use'];
       assert.ok(aim?.visible && use?.visible && use.width >= 48 && use.height >= 48, `${size.name}: touch controls unavailable`);
       assert.ok(use.bottom <= aim.y, `${size.name}: USE overlaps AIM`);
+      const actionLayout = await page.evaluate(() => {
+        const action = document.querySelector('#mobile-interact');
+        const wasHidden = action.hidden;
+        const label = action.querySelector('small');
+        const originalLabel = label.textContent;
+        label.textContent = 'ΠΑΡΕ ΜΙΑ ΦΤΥΑΡΙΑ → ΣΥΚΛΑ';
+        action.hidden = false;
+        const box = selector => document.querySelector(selector).getBoundingClientRect();
+        const interact = box('#mobile-interact');
+        const controls = ['#mobile-stance-controls', '#site-pro-use', '#joystick', '#look-joystick'].map(box);
+        const overlaps = controls.map(rect => Math.max(0, Math.min(interact.right, rect.right) - Math.max(interact.left, rect.left)) * Math.max(0, Math.min(interact.bottom, rect.bottom) - Math.max(interact.top, rect.top)));
+        action.hidden = wasHidden;
+        label.textContent = originalLabel;
+        return { x: interact.x, y: interact.y, right: interact.right, bottom: interact.bottom, overlaps };
+      });
+      assert.ok(actionLayout.x >= 0 && actionLayout.right <= size.width && actionLayout.y >= 0 && actionLayout.bottom <= size.height, `${size.name}: INTERACT leaves viewport`);
+      assert.ok(actionLayout.overlaps.every(area => area < 1), `${size.name}: INTERACT covers stance, USE or joystick: ${JSON.stringify(actionLayout)}`);
       const button = page.locator('#site-pro-tools');
       assert.equal(await button.getAttribute('aria-expanded'), 'false');
       await button.tap();

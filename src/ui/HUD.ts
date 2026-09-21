@@ -360,7 +360,25 @@ export class HUD {
       toolsToggle.setAttribute('aria-label', open ? 'Close tools' : 'Open tools');
       toolsToggle.querySelector('span')!.textContent = open ? 'CLOSE' : 'TOOLS';
     };
-    toolsToggle.addEventListener('click', () => setToolsOpen(this.shell.dataset.toolsOpen !== 'true'));
+    const toggleTools = (): void => setToolsOpen(this.shell.dataset.toolsOpen !== 'true');
+    let toolsTouch: { id: number; x: number; y: number; travel: number } | null = null;
+    toolsToggle.addEventListener('pointerdown', event => {
+      if (event.pointerType === 'mouse') return;
+      toolsTouch = { id: event.pointerId, x: event.clientX, y: event.clientY, travel: 0 };
+      toolsToggle.setPointerCapture(event.pointerId);
+    });
+    toolsToggle.addEventListener('pointermove', event => {
+      if (toolsTouch?.id === event.pointerId)
+        toolsTouch.travel = Math.max(toolsTouch.travel, Math.hypot(event.clientX - toolsTouch.x, event.clientY - toolsTouch.y));
+    });
+    toolsToggle.addEventListener('pointerup', event => {
+      if (toolsTouch?.id !== event.pointerId) return;
+      const touch = toolsTouch; toolsTouch = null;
+      const bounds = toolsToggle.getBoundingClientRect();
+      if (touch.travel <= 10 && event.clientX >= bounds.left && event.clientX <= bounds.right && event.clientY >= bounds.top && event.clientY <= bounds.bottom) toggleTools();
+    });
+    toolsToggle.addEventListener('pointercancel', event => { if (toolsTouch?.id === event.pointerId) toolsTouch = null; });
+    toolsToggle.addEventListener('click', event => { if (event instanceof PointerEvent && event.pointerType !== 'mouse') return; toggleTools(); });
     window.addEventListener('wirehouse:select-tool', () => setToolsOpen(false));
     const settingsToggle = root.querySelector<HTMLButtonElement>('#settings-toggle');
     const settingsPanel = root.querySelector<HTMLElement>('#settings-panel');

@@ -93,6 +93,17 @@ html, body { background: #151a1d; }
   #site-pro-tools { width: 164px; }
 }
 
+@media (pointer:coarse) and (orientation:portrait) and (max-width:699px) {
+  /* Keep the aim target visible while a Greek work hint wraps inside its pad. */
+  #mobile-interact:not([hidden]) { width: 120px; min-width: 112px; max-width: 120px; }
+  #mobile-interact small { max-width: 100%; text-align: center; overflow-wrap: break-word; }
+}
+
+@media (pointer:coarse) and (orientation:portrait) and (max-width:374px) {
+  /* At 320 px the stance and USE pads leave no 120 px centre lane. */
+  #mobile-interact:not([hidden]) { bottom: calc(333px + env(safe-area-inset-bottom)); }
+}
+
 @media (pointer:coarse) and (max-height:520px) {
   #joystick, #look-joystick, #game-shell.aim-input-drag #look-joystick { width: 94px; height: 94px; bottom: calc(68px + env(safe-area-inset-bottom)); }
   #mobile-stance-controls { bottom: calc(174px + env(safe-area-inset-bottom)); }

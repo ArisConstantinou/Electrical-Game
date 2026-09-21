@@ -243,6 +243,7 @@ export class Game {
       this.modelInspector.update(dt);if(present)this.renderer.render();return;
     }
     this.modelInspector.beforeWorld(dt);
+    this.room.update(dt);
     this.hammerWorkStance.restore(this.renderer.camera);
     const active = this.mission.activePoint;
     const leveling = active?.stage === 'leveling';

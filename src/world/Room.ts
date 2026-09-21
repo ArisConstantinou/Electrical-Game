@@ -5,11 +5,13 @@ import { BrickWall } from './BrickWall';
 import { addLighting } from './Lighting';
 import { matteMaterial, siteMaterial } from './SiteMaterials';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { ExteriorCourtyard } from './ExteriorCourtyard';
 
 export class Room extends THREE.Group {
   readonly brickWall: BrickWall;
   readonly intactPracticeWall: BrickWall;
   readonly referenceWalls: THREE.Object3D[] = [];
+  readonly exterior: ExteriorCourtyard;
 
   constructor(scene: THREE.Scene) {
     super();
@@ -49,14 +51,42 @@ export class Room extends THREE.Group {
     sideMaterial.userData.referenceLaserReceiver=true;
     const sideGeometry = new THREE.BoxGeometry(0.22, GAME_CONFIG.room.height, GAME_CONFIG.room.depth);
     for (const [name, x] of [['Left concrete wall', -GAME_CONFIG.room.width / 2 - 0.11], ['Right concrete wall', GAME_CONFIG.room.width / 2 + 0.11]] as const) {
-      const side = new THREE.Mesh(sideGeometry, sideMaterial);
-      side.position.set(x, GAME_CONFIG.room.height / 2, 0);
+      const side = new THREE.Group();
+      if (x < 0) {
+        // Four solid pieces leave a true 1.9 x 1.3 m opening through the
+        // 22 cm cast wall. No transparent panel or flat exterior image.
+        const openingHalfZ = .95, openingZ = 2, sillY = 1.05, lintelY = 2.35;
+        const wallPart = (label: string, y: number, z: number, height: number, depth: number) => {
+          const piece = new THREE.Mesh(new THREE.BoxGeometry(.22, height, depth), sideMaterial);
+          piece.name = label; piece.position.set(x, y, z);
+          piece.castShadow = piece.receiveShadow = true; side.add(piece);
+        };
+        const beforeLength = GAME_CONFIG.room.depth / 2 + openingZ - openingHalfZ;
+        const afterLength = GAME_CONFIG.room.depth / 2 - openingZ - openingHalfZ;
+        wallPart('Solid wall before window opening', 1.5, (-GAME_CONFIG.room.depth / 2 + openingZ - openingHalfZ) / 2, 3, beforeLength);
+        wallPart('Solid wall after window opening', 1.5, (openingZ + openingHalfZ + GAME_CONFIG.room.depth / 2) / 2, 3, afterLength);
+        wallPart('Solid cast sill below opening', sillY / 2, openingZ, sillY, openingHalfZ * 2);
+        wallPart('Solid lintel above opening', (lintelY + 3) / 2, openingZ, 3 - lintelY, openingHalfZ * 2);
+        const revealMaterial = matteMaterial(0xaaa99f, .97);
+        const sill = new THREE.Mesh(new RoundedBoxGeometry(.40, .085, 1.98, 2, .009), revealMaterial);
+        sill.name = 'Raw concrete opening sill with exterior drip edge';
+        sill.position.set(x, sillY + .012, openingZ); sill.castShadow = sill.receiveShadow = true; side.add(sill);
+        const lintel = new THREE.Mesh(new RoundedBoxGeometry(.30, .13, 2.02, 2, .006), revealMaterial);
+        lintel.name = 'Structural exposed concrete window lintel';
+        lintel.position.set(x, lintelY + .055, openingZ); lintel.castShadow = lintel.receiveShadow = true; side.add(lintel);
+      } else {
+        const solid = new THREE.Mesh(sideGeometry, sideMaterial);
+        solid.position.set(x, GAME_CONFIG.room.height / 2, 0);
+        solid.receiveShadow = true; side.add(solid);
+      }
       side.name = name;
       side.userData.studioEntityId = `world:${name.toLowerCase().replaceAll(' ', '-')}`;
       side.receiveShadow = true;
       this.referenceWalls.push(side);
       this.add(side);
     }
+    this.exterior = new ExteriorCourtyard();
+    this.add(this.exterior);
 
     const columnMaterial = siteMaterial('concrete', 0xf0ede7, .1, .75);
     columnMaterial.userData.referenceLaserReceiver=true;
@@ -111,6 +141,8 @@ export class Room extends THREE.Group {
     this.add(rubble);
     addLighting(scene);
   }
+
+  update(dt: number): void { this.exterior.update(dt); }
 
   private addRearWall(): void {
     // The player already stops at this elevation. Keep the room enclosed until
@@ -304,8 +336,16 @@ export class Room extends THREE.Group {
     // side walls. They establish construction scale instead of leaving the
     // large concrete surfaces as uninterrupted texture planes.
     for(const x of [-3.795,3.795]){
-      for(const z of [-2.4,-1.2,0,1.2,2.4])segments.push({position:new THREE.Vector3(x,1.5,z),size:new THREE.Vector3(.0015,2.97,.0025)});
-      for(const y of [1.2,2.4])segments.push({position:new THREE.Vector3(x,y,0),size:new THREE.Vector3(.0015,.0025,7.05)});
+      for(const z of [-2.4,-1.2,0,1.2,2.4]){
+        if(x<0&&z>1.05&&z<2.95)continue;
+        segments.push({position:new THREE.Vector3(x,1.5,z),size:new THREE.Vector3(.0015,2.97,.0025)});
+      }
+      for(const y of [1.2,2.4]){
+        if(x<0&&y<2.35){
+          segments.push({position:new THREE.Vector3(x,y,-1.2375),size:new THREE.Vector3(.0015,.0025,4.575)});
+          segments.push({position:new THREE.Vector3(x,y,3.2375),size:new THREE.Vector3(.0015,.0025,.575)});
+        }else segments.push({position:new THREE.Vector3(x,y,0),size:new THREE.Vector3(.0015,.0025,7.05)});
+      }
     }
     const seams = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), matteMaterial(0x55554d), segments.length);
     seams.name = 'Board joints in poured concrete';
