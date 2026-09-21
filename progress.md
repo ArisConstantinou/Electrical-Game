@@ -1,5 +1,14 @@
 Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web game named WIRE THE HOUSE, based on real Cyprus residential first-fix practices, editable in Web Game Studio, playable on desktop/mobile, deployed to arisconstantinou/Electrical-Game via GitHub Pages, and ending at FIRST FIX COMPLETE without cable pulling.
 
+## 2026-09-21 · PVC mobile carry, targeting, stance and quantity follow-up
+
+- Physical iPhone screenshots showed non-action text styled like controls, the full torso covering carried/fitted PVC, exact hollow-casing raycasts missing boxes, no nearby crouch/stand controls, one-by-one quantity selection and a second pickup after production.
+- Approved changes: 48 px STAND/CROUCH buttons above the move joystick; quantity presets 1/5/ALL; production automatically puts one bent pipe in hand; exact crosshair remains authoritative with a bounded nearby-box fallback; the closest eligible box receives an orange world outline while carrying.
+- User explicitly rejected the neutral orange carry warning. It is now hidden unless a real action is available; the large button appears only as APPLY TO BOX or RETURN TO STACK.
+- Carry uses one hand/contact instead of two and keeps the torso 30 cm behind the camera. Fitting/cutting retain both hands but use the same clear first-person offset. Portrait/landscape screenshots show the pipe, box and cutter without the torso blocking them.
+- Focused tests cover exact-90 bend, 1/5/ALL selection, auto-carry conservation, near-box fallback, no-warning carry state, actionable CTA size/non-overlap, stance controls, clear fitting and full cut/install. Headless mobile CPU comparison improved carry simulation mean 2.084 to 1.838 ms and p95 3.0 to 2.6 ms; this is not physical-iPhone FPS/GPU evidence.
+- Known unrelated/stale checks: prepared-wall test still expects removed start-screen paragraph on protected HEAD. The broad mobile-manual test passes portrait and most landscape cases but times out reopening Settings after its blur/lost-capture sequence; focused stance/PVC controls pass.
+
 ## 2026-09-21 · Mobile interaction, mixing receipt and PVC visibility/bending correction
 
 - User supplied four physical iPhone screenshots showing duplicate mixing prompts, an idle ingredient receipt, undersized strap/layout instructions, the body covering the laid-out pipes and difficulty reaching a 90-degree bend.

@@ -167,6 +167,7 @@ export interface WorkerGripTarget {
   object?:THREE.Object3D;
   contactLocked?:boolean;
   surfaceContact?:boolean;
+  firstPersonClearance?:number;
   straightWrist?:boolean;
   palmDirection?:THREE.Vector3;
   bodyFrame?:{position:THREE.Vector3;quaternion:THREE.Quaternion};

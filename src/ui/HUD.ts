@@ -184,6 +184,10 @@ export class HUD {
           <div id="mobile-controls" aria-label="Mobile controls">
             <button id="mobile-interact" type="button" aria-label="Interact with nearby mixing object" aria-pressed="false" hidden><b>INTERACT</b><small>ΣΤΑΘΜΟΣ</small></button>
             <div id="mobile-move-zone" aria-label="Touch here to move"></div><div id="joystick" aria-label="Movement joystick"><div class="joystick-ring"></div><div id="joystick-thumb"></div></div>
+            <nav id="mobile-stance-controls" aria-label="Player height">
+              <button id="mobile-stand" type="button" data-height="stand" aria-label="Stand up" aria-pressed="true"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 27V5M8 13l8-8 8 8"/></svg><span>STAND</span></button>
+              <button id="mobile-crouch" type="button" data-height="crouch" aria-label="Crouch" aria-pressed="false"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M19 6a3 3 0 1 0 0 .1M17 12l-5 7h10l-3 9M13 18l-7 7M16 13l7 3 5-4"/></svg><span>CROUCH</span></button>
+            </nav>
             <div id="look-joystick" role="button" tabindex="0" aria-label="Hold to use selected tool; drag to aim"><div class="look-joystick-ring"></div><div id="look-joystick-thumb"><span id="mobile-action" aria-hidden="true">USE</span><small aria-hidden="true">+ AIM</small></div><div id="drag-aim-cue" aria-hidden="true"></div><small id="aim-control-label">HOLD + AIM</small><output id="mobile-use-status">READY</output></div>
             <nav id="aim-quick-controls" aria-label="Aim controls">
               ${quickButton('quick-aim-input','AIM','STICK','aim','all','cycle-aim-input')}
@@ -310,6 +314,7 @@ export class HUD {
     root.querySelector<HTMLInputElement>('#chisel-width')!.addEventListener('input',event=>dispatchEvent(new CustomEvent('wirehouse:chisel-width',{detail:Number((event.target as HTMLInputElement).value)/1000})));
     root.querySelector<HTMLInputElement>('#hammer-speed')!.addEventListener('input',event=>dispatchEvent(new CustomEvent('wirehouse:hammer-speed',{detail:Number((event.target as HTMLInputElement).value)/100})));
     root.querySelector('#work-height')!.addEventListener('click',()=>dispatchEvent(new CustomEvent('wirehouse:work-height')));
+    root.querySelectorAll<HTMLButtonElement>('#mobile-stance-controls [data-height]').forEach(button=>bindHammerButton(`#${button.id}`,()=>dispatchEvent(new CustomEvent('wirehouse:work-height-set',{detail:button.dataset.height==='crouch'}))));
     root.querySelector('#mortar-angle-down')!.addEventListener('click',()=>dispatchEvent(new CustomEvent('wirehouse:mortar-angle',{detail:-5})));
     root.querySelector('#mortar-angle-up')!.addEventListener('click',()=>dispatchEvent(new CustomEvent('wirehouse:mortar-angle',{detail:5})));
     this.shell = root.querySelector('#game-shell')!;
@@ -637,6 +642,8 @@ export class HUD {
     if(!this.displayChanged('work-height',String(crouched)))return;
     this.shell.querySelector('#work-height')!.textContent=crouched?'STAND UP':'CROUCH · LOW WORK';
     this.shell.querySelector('#quick-work-height b')!.textContent=crouched?'STAND':'CROUCH';
+    this.shell.querySelector('#mobile-stand')!.setAttribute('aria-pressed',String(!crouched));
+    this.shell.querySelector('#mobile-crouch')!.setAttribute('aria-pressed',String(crouched));
   }
 
   updateMobileUseStatus(message:string,ready:boolean,active:boolean):void {

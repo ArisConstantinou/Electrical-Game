@@ -28,6 +28,7 @@ export class BoxPlacementSystem {
   private boxesRevision=0;
   constructor(private readonly wall:BrickWall,private readonly mortar:MortarSystem,private readonly points:InstallationPoint[]){}
   get fitRevision():string{return `${this.wall.volume.options.hollowProfile}:${this.wall.volume.impactCount}:${this.wall.volume.removedNodeCount}:${this.mortar.field.revision}:${this.boxesRevision}`;}
+  get installationPoints():readonly InstallationPoint[]{return this.points;}
 
   /** Place a supplied box group in an authored, already-cleared cavity. The
    * mortar field is populated immediately afterwards by Game construction. */
@@ -55,6 +56,24 @@ export class BoxPlacementSystem {
     let target:InstallationPoint|null=null,distance=Infinity;
     for(const point of this.points){if(!point.boxGroup.visible)continue;point.updateWorldMatrix(true,true);
       const hit=ray.intersectObjects(point.boxGroup.boxes,true)[0];if(hit&&hit.distance<distance){distance=hit.distance;target=point;}}
+    return target;
+  }
+
+  /** Keep exact crosshair selection authoritative, then allow a bounded
+   * first-person fallback around the hollow casing opening. */
+  targetNear(camera:THREE.Camera,maxDistance=1.6,maxNdcX=.32,maxNdcY=.20):InstallationPoint|null{
+    const exact=this.target(camera);if(exact)return exact;
+    camera.updateMatrixWorld(true);
+    let target:InstallationPoint|null=null,score=Infinity;
+    for(const point of this.points){
+      if(!point.boxGroup.visible)continue;
+      const world=point.boxGroup.getWorldPosition(new THREE.Vector3()),distance=world.distanceTo(camera.getWorldPosition(new THREE.Vector3()));
+      if(distance>maxDistance)continue;
+      const projected=world.clone().project(camera);
+      if(projected.z< -1||projected.z>1||Math.abs(projected.x)>maxNdcX||Math.abs(projected.y)>maxNdcY)continue;
+      const candidate=Math.hypot(projected.x/maxNdcX,projected.y/maxNdcY)+distance*.04;
+      if(candidate<score){score=candidate;target=point;}
+    }
     return target;
   }
 

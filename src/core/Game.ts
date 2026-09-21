@@ -610,6 +610,7 @@ export class Game {
       if(event.code === 'Minus' || event.code === 'Equal') {event.preventDefault();setHammerSpeed(this.hammerSpeed + (event.code === 'Equal' ? .25 : -.25));}
     });
     addEventListener('wirehouse:work-height',()=>{this.mixing.releaseAutomaticStance();this.player.crouched=!this.player.crouched;this.hud.updateWorkHeight(this.player.crouched);});
+    addEventListener('wirehouse:work-height-set',event=>{this.mixing.releaseAutomaticStance();this.player.crouched=Boolean((event as CustomEvent<boolean>).detail);this.hud.updateWorkHeight(this.player.crouched);});
     addEventListener('keydown',event=>{
       if(!this.started||event.code!=='KeyV'||event.repeat||(event.target instanceof Element&&event.target.closest('input,textarea,select,[contenteditable="true"]')))return;
       event.preventDefault();window.dispatchEvent(new CustomEvent('wirehouse:work-height'));

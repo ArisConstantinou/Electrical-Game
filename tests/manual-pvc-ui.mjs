@@ -61,17 +61,20 @@ try{
   await aim([1.2,1.65,.6],[2.2,.02,.15]);await key('KeyE');assert.equal((await state()).focused,true);assert.equal((await state()).angle,saved);
   await key('KeyE');assert.equal((await state()).phase,'review');await snap('10-review');
   for(let i=0;i<19;i++)await key('Equal',1);assert.equal((await state()).quantity,20);
-  await key('KeyE');await step(100);assert.equal((await state()).phase,'batch');assert.equal((await state()).prepared,20);assert.equal((await state()).raw,0);assert.equal((await state()).total,20);
-  const preparedAim=await page.evaluate(()=>{const g=window.__wireTheHouse,mesh=g.pvc.prepared[0].mesh,c=g.renderer.camera,pos=mesh.geometry.getAttribute('position'),index=mesh.geometry.index,target=c.position.clone().set(0,0,0),vertex=c.position.clone();mesh.updateWorldMatrix(true,false);const triangle=(80*10)*6;for(let k=0;k<3;k++)target.add(vertex.fromBufferAttribute(pos,index.getX(triangle+k)));target.multiplyScalar(1/3);mesh.localToWorld(target);return{camera:[target.x-1.15,1.65,target.z+.85],target:target.toArray()};});
-  await aim(preparedAim.camera,preparedAim.target);report.pickupProbe=await page.evaluate(()=>{const g=window.__wireTheHouse,p=g.pvc,c=g.renderer.camera,V=c.position.constructor;c.updateMatrixWorld(true);p.stock.updateMatrixWorld(true);p.preparedRoot.updateMatrixWorld(true);p.ray.setFromCamera({x:0,y:0},c);const hits=p.ray.intersectObjects([...p.stock.pipes.filter(x=>x.visible),...p.preparedRoot.children],true).map(h=>({distance:h.distance,name:h.object.name,point:h.point.toArray()})),wall=g.room.brickWall.aim(c);return{aimed:p.stockAimed(),camera:c.position.toArray(),direction:c.getWorldDirection(new V()).toArray(),prepared:p.prepared.length,hits:hits.slice(0,5),wall:wall?{distance:c.position.distanceTo(new V(wall.point.x,wall.point.y,wall.point.z)),point:[wall.point.x,wall.point.y,wall.point.z]}:null,target:p.telemetry};});console.log('PVC pickup probe',JSON.stringify(report.pickupProbe));assert.equal(report.pickupProbe.aimed,true,'Prepared pipe surface must be aimable before pickup');await snap('11-batch');await key('KeyE');assert.equal((await state()).phase,'carrying');assert.equal((await state()).prepared,19);await snap('12-carry');
- report.checks.push('stock -> marking -> spring -> eight local bends -> exact 90 degrees -> pause/resume -> batch 20 -> carry');
+  await key('KeyE');await step(100);assert.equal((await state()).phase,'carrying','Finishing a batch must continue with one bent pipe in hand');assert.equal((await state()).prepared,19);assert.equal((await state()).raw,0);assert.equal((await state()).total,20);
+  const carryPresentation=await page.evaluate(()=>{const g=window.__wireTheHouse,delta=g.workerBody.position.clone().sub(g.renderer.camera.position);return{bodyOffset:Math.hypot(delta.x,delta.z),activeGrips:g.pvc.anatomicalGrips().filter(x=>x.active).length};});
+  assert(carryPresentation.bodyOffset>.26,'The torso must stay behind the first-person camera while carrying PVC');assert.equal(carryPresentation.activeGrips,1,'Carrying uses one visible hand instead of solving two hidden contacts');await snap('12-carry');
+ report.checks.push('stock -> marking -> spring -> eight local bends -> exact 90 degrees -> batch 20 -> automatically carry one');
   // This checkout already supplies real bonded boxes and physically carved lanes.
   const targetPose=await page.evaluate(()=>{
     const g=window.__wireTheHouse,p=g.mission.points[0],pos=p.boxGroup.getWorldPosition(g.renderer.camera.position.clone());
     return{camera:[pos.x,.95,pos.z+.95],target:[pos.x,pos.y,pos.z],ready:g.mortar.ready(p)};
   });assert(targetPose.ready);
   await page.evaluate(()=>{window.__wireTheHouse.player.crouched=true;});
-  await aim(targetPose.camera,targetPose.target);await key('KeyE');await step(70);assert.equal((await state()).phase,'fitting',JSON.stringify(await state()));await snap('13-fitting');
+  await aim(targetPose.camera,[targetPose.target[0]+.12,targetPose.target[1],targetPose.target[2]]);
+  const assisted=await page.evaluate(()=>{const g=window.__wireTheHouse;return{exact:g.boxPlacement.target(g.renderer.camera)?.definition.id??null,near:g.boxPlacement.targetNear(g.renderer.camera)?.definition.id??null};});
+  assert.equal(assisted.exact,null,'Fixture must miss the hollow casing exactly');assert.equal(assisted.near,'A','A nearby visible casing must remain an eligible PVC target');
+  await key('KeyE');await step(70);assert.equal((await state()).phase,'fitting',JSON.stringify(await state()));await snap('13-fitting');
   await use();assert.equal((await state()).phase,'fitting','Cannot cut zero-length offcut');
   // Deliberately long: keep an extra 15 mm, then trim using the live readout.
   let desired=await page.evaluate(()=>{const g=window.__wireTheHouse,p=g.pvc.target;return g.pvc.bend.topHeight-(p.boxGroup.getWorldPosition(g.renderer.camera.position.clone()).y-p.boxGroup.groupHeight/2+.015);});

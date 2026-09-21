@@ -20,6 +20,9 @@ export class PvcWorkshop {
   readonly work=new THREE.Group();
   readonly pipe=new PvcTube(pvcMaterial.clone());
   readonly preparedRoot=new THREE.Group();
+  private readonly targetGuideBounds=new THREE.Box3();
+  private readonly targetGuide=new THREE.Box3Helper(this.targetGuideBounds,0xffa52f);
+  private guideTarget:InstallationPoint|null=null;
   readonly prepared:StockPipe[]=[];
   readonly cutter=buildToolModel('cutter');
   readonly marker=new THREE.Group();
@@ -69,7 +72,9 @@ export class PvcWorkshop {
   private instruction(desktop:string,touch:string):string{return this.touch?touch:desktop;}
 
   constructor(private readonly game:Game){
-    game.renderer.scene.add(this.stock,this.preparedRoot,this.previewRoot);
+    game.renderer.scene.add(this.stock,this.preparedRoot,this.previewRoot,this.targetGuide);
+    this.targetGuide.name='PVC eligible box guide';this.targetGuide.visible=false;this.targetGuide.renderOrder=30;this.targetGuide.raycast=()=>{};
+    const guideMaterial=this.targetGuide.material as THREE.LineBasicMaterial;guideMaterial.depthTest=false;guideMaterial.transparent=true;guideMaterial.opacity=.95;
     game.room.traverse(o=>{if(o.userData.studioEntityId==='world:site-spare-pvc')o.visible=false;});
     this.work.name='PVC physical working piece';this.work.userData.studioEntityId='pvc:held-work';
     game.renderer.scene.add(this.work);this.work.add(this.pipe,this.spring,this.cutter,this.marker);
@@ -82,7 +87,7 @@ export class PvcWorkshop {
     this.markRing=new THREE.Mesh(new THREE.TorusGeometry(.0103,.0015,4,24),new THREE.MeshBasicMaterial({color:0x13171a}));this.markRing.name='Actual black marker at spring centre';this.work.add(this.markRing);
     for(const side of [-1,1]){const hand=workerHand(side,'spring'),arm=workerArm(side,hand,v());this.arms.push(arm);game.renderer.scene.add(arm.group,hand);}
     this.controls=document.createElement('div');this.controls.id='pvc-touch-controls';this.controls.hidden=true;
-    this.controls.innerHTML='<button data-pvc="back" aria-label="Προηγούμενη θέση χεριών">← ΧΕΡΙΑ</button><button data-pvc="forward" aria-label="Επόμενη θέση χεριών">ΧΕΡΙΑ →</button><button id="pvc-use">ΚΡΑΤΑ</button><button data-pvc="confirm">ΕΛΕΓΧΟΣ</button><button data-pvc="undo">ΑΝΑΙΡΕΣΗ</button><button data-pvc="save">PRESET</button><button data-pvc="transparent">ΔΙΑΦΑΝΕΙΑ</button><button data-pvc="less">−</button><button data-pvc="more">+</button><button data-pvc="pause">ΠΙΣΩ</button>';
+    this.controls.innerHTML='<button data-pvc="back" aria-label="Προηγούμενη θέση χεριών">← ΧΕΡΙΑ</button><button data-pvc="forward" aria-label="Επόμενη θέση χεριών">ΧΕΡΙΑ →</button><button id="pvc-use">ΚΡΑΤΑ</button><button data-pvc="confirm">ΕΛΕΓΧΟΣ</button><button data-pvc="undo">ΑΝΑΙΡΕΣΗ</button><button data-pvc="save">PRESET</button><button data-pvc="transparent">ΔΙΑΦΑΝΕΙΑ</button><button data-pvc="qty-1" aria-label="Ετοίμασε μία σωλήνα">1</button><button data-pvc="qty-5" aria-label="Ετοίμασε πέντε σωλήνες">5</button><button data-pvc="qty-all" aria-label="Ετοίμασε όλες τις σωλήνες">ΟΛΕΣ</button><button data-pvc="pause">ΠΙΣΩ</button>';
     this.prompt=document.createElement('button');this.prompt.id='pvc-prompt';this.prompt.hidden=true;
     this.liveMeasure=document.createElement('output');this.liveMeasure.id='pvc-live-measure';this.liveMeasure.hidden=true;this.liveMeasure.setAttribute('aria-label','Ζωντανή μέτρηση σωλήνας');
     this.markConfirm=document.createElement('button');this.markConfirm.id='pvc-mark-confirm';this.markConfirm.textContent='E · ΣΗΜΑΔΕΨΕ ΤΙΣ ΣΩΛΗΝΕΣ';this.markConfirm.hidden=true;
@@ -223,7 +228,7 @@ export class PvcWorkshop {
   private command(command:string):void{
     if(command==='save'){this.savePreset();return;}
     if(command==='transparent'){this.toggleTransparent();return;}
-    if(this.phase==='review'&&['less','more'].includes(command)){this.changeQuantity(command==='more'?1:-1);return;}
+    if(this.phase==='review'&&command.startsWith('qty-')){this.quantity=command==='qty-all'?this.rawCount:Math.min(this.rawCount,Number(command.slice(4)));return;}
     if(command==='pause'){this.pause();return;}
     if(command==='confirm'){this.interact();return;}
     if(command==='socket')this.setMark(.5);
@@ -274,8 +279,8 @@ export class PvcWorkshop {
     }
     if(this.phase==='carrying'){
       if(this.stockAimed()){if(this.carried){this.prepared.unshift(this.carried);this.preparedRoot.add(this.carried.mesh);this.carried=null;this.arrangePrepared();}this.transition('batch');return;}
-      const p=this.game.boxPlacement.target(this.game.renderer.camera);
-      if(!p){this.message='Στόχευσε το κουτί όπου θα εφαρμόσεις τη σωλήνα.';return;}
+      const p=this.game.boxPlacement.targetNear(this.game.renderer.camera);
+      if(!p){this.message=this.instruction('Στόχευσε το κουτί όπου θα εφαρμόσεις τη σωλήνα.','Βρες το κουτί με το πορτοκαλί περίγραμμα και φέρε το στο κέντρο.');return;}
       if(p.conduit||p.stage==='complete'){this.message='Αυτό το κουτί έχει ήδη σωλήνα.';return;}
       if(!['leveled','conduit'].includes(p.stage)||!this.game.mortar.ready(p)||p.boxGroup.userData.placement&&!p.boxGroup.userData.placement.secured){this.message='Στερέωσε και αλφάδιασε το κουτί πριν εφαρμόσεις PVC.';return;}
       const pos=p.boxGroup.getWorldPosition(v());
@@ -308,8 +313,12 @@ export class PvcWorkshop {
       if(this.insertion===0){
         const count=Math.min(this.rawCount,Math.max(1,this.quantity));
         for(let i=0;i<count;i++){const mesh=new PvcTube();mesh.update(this.bend);this.prepared.push({recipe:this.bend.recipe(),mesh,cutFrom:0});this.preparedRoot.add(mesh);}
-        this.rawCount-=count;this.arrangePrepared();this.stock.pipes.forEach((p,i)=>p.visible=i<this.rawCount);
-        this.focused=false;this.transition('batch');
+        this.rawCount-=count;this.stock.pipes.forEach((p,i)=>p.visible=i<this.rawCount);
+        // Production completes in the player's hand. One bent pipe continues
+        // directly to installation; only the remainder is laid on the stack.
+        this.carried=this.prepared.shift()??null;
+        if(this.carried){this.carried.mesh.removeFromParent();this.bend=PvcBend.from(this.carried.recipe);this.cutFrom=this.carried.cutFrom;}
+        this.arrangePrepared();this.focused=false;this.transition(this.carried?'carrying':'batch');
       }
     }else if(this.phase==='cutting'&&this.elapsed>=.45){
       const offcut=new PvcTube();offcut.update(this.bend,this.cutFrom,this.cutS);const p=this.target!.boxGroup.getWorldPosition(v());
@@ -356,10 +365,26 @@ export class PvcWorkshop {
     this.stock.liveMarks.visible=this.stock.straightedge.visible&&this.markingProgress<1;
     this.previewRoot.visible=this.focused&&Boolean(this.target);
     if(active){this.game.fpsRig.visible=false;this.pose();}
+    this.updateTargetGuide();
     this.renderUI();
   }
+  private updateTargetGuide():void{
+    this.guideTarget=null;this.targetGuide.visible=false;
+    if(this.phase!=='carrying')return;
+    const camera=this.game.renderer.camera,eye=camera.getWorldPosition(v());let score=Infinity;
+    for(const point of this.game.boxPlacement.installationPoints){
+      if(!point.boxGroup.visible||point.conduit||point.stage==='complete'||!['leveled','conduit'].includes(point.stage)||!this.game.mortar.ready(point))continue;
+      const placement=point.boxGroup.userData.placement;if(placement&&!placement.secured)continue;
+      const world=point.boxGroup.getWorldPosition(v()),distance=world.distanceTo(eye);if(distance>6)continue;
+      const projected=world.clone().project(camera);if(projected.z< -1||projected.z>1)continue;
+      const candidate=Math.hypot(projected.x,projected.y)+distance*.025;if(candidate<score){score=candidate;this.guideTarget=point;}
+    }
+    if(!this.guideTarget)return;
+    this.targetGuideBounds.setFromObject(this.guideTarget.boxGroup).expandByScalar(.018);this.targetGuide.visible=true;this.targetGuide.updateMatrixWorld(true);
+  }
   anatomicalGrips():WorkerGripTarget[]{
-    return this.arms.map(arm=>({...workerGripTarget(arm,this.work.visible),section:[.01,.01] as [number,number],shape:'round' as const,contactLocked:true,surfaceContact:true}));
+    const clearFirstPerson=['carrying','fitting','cutting','cut','installing'].includes(this.phase);
+    return this.arms.map(arm=>({...workerGripTarget(arm,this.work.visible&&(this.phase!=='carrying'||arm.side>0)),section:[.01,.01] as [number,number],shape:'round' as const,contactLocked:true,surfaceContact:true,firstPersonClearance:clearFirstPerson?.30:undefined}));
   }
   useAnatomicalBody():void{
     // Legacy arm geometry is only a transform driver, never a visible fallback.
@@ -455,11 +480,11 @@ export class PvcWorkshop {
     }
   }
   private renderUI():void{
-    const near=this.game.started&&this.stockAimed(),show=this.focused;
+    const near=this.game.started&&this.stockAimed(),show=this.focused,nearBox=this.phase==='carrying'?this.game.boxPlacement.targetNear(this.game.renderer.camera):null;
     this.controls.hidden=!show;this.controls.dataset.phase=this.phase;
     this.game.hud.shell.classList.toggle('pvc-working',this.blocksWork);
     this.game.hud.shell.classList.toggle('pvc-focused',this.focused);
-    this.prompt.hidden=!this.game.started||(!show&&!near&&this.phase!=='carrying');
+    this.prompt.hidden=!this.game.started||(!show&&!near&&this.phase!=='carrying')||(this.phase==='carrying'&&!near&&!nearBox);
     const tips:Partial<Record<Phase,string>>={
       marking:'Mouse: γωνία · E: σημάδεψε όλες τις σωλήνες · P: preset · Tab: επόμενο',
       spring:'LMB: βάλε το spring · R: διαφάνεια · ESC: πίσω',
@@ -475,18 +500,18 @@ export class PvcWorkshop {
       marking:'Σύρε πάνω/κάτω για μήκος · ΣΗΜΑΔΕΨΕ για μαρκάρισμα',
       spring:'Κράτα SPRING για εισαγωγή',
       bending:'8 ΘΕΣΕΙΣ ΧΕΡΙΩΝ · Κράτα ΛΥΓΙΣΕ · ΕΛΕΓΧΟΣ στις 90°',
-      review:'− / +: ποσότητα · ΠΑΡΑΓΩΓΗ για ετοιμασία',
+      review:'Διάλεξε 1, 5 ή ΟΛΕΣ · μετά ΕΤΟΙΜΑΣΕ ΚΑΙ ΚΡΑΤΑ',
       fitting:'Σύρε πάνω/κάτω το cutter · Κράτα ΚΟΨΕ',cut:'ΕΦΑΡΜΟΣΕ στο κουτί ή ΠΙΣΩ',
     });
     const key=this.touch?'ΑΓΓΙΞΕ':'E';
     const hint=show?(this.message||tips[this.phase]||`${key}: συνέχεια`):
       this.phase==='sealed'?`${key} · ΚΟΨΕ ΤΑ ΔΕΣΙΜΑΤΑ · 20 × 3 m`:this.phase==='loose'?`${key} · ΑΠΛΩΣΕ ΤΙΣ ΣΩΛΗΝΕΣ`:
       this.phase==='batch'?`${key} · ${this.prepared.length?'ΠΑΡΕ ΣΩΛΗΝΑ':'ΝΕΑ ΠΡΟΕΤΟΙΜΑΣΙΑ'} · ${this.prepared.length} έτοιμες / ${this.rawCount} άκοπες`:
-      this.phase==='carrying'?(this.message||this.instruction('E στο κουτί: εφαρμογή · E στη μάτσα: επιστροφή · R: διαφάνεια','Στόχευσε κουτί ή μάτσα και άγγιξε εδώ')):`${key} · ΣΥΝΕΧΙΣΕ`;
+      this.phase==='carrying'?(this.message||(near?`${key} · ΕΠΙΣΤΡΟΦΗ ΣΤΗ ΜΑΤΣΑ`:nearBox?`${key} · ΕΦΑΡΜΟΣΕ ΣΤΟ ΚΟΥΤΙ`:'')):`${key} · ΣΥΝΕΧΙΣΕ`;
     this.prompt.dataset.phase=this.phase;
-    this.prompt.classList.toggle('pvc-primary-action',this.touch&&!show&&['sealed','loose'].includes(this.phase));
+    this.prompt.classList.toggle('pvc-primary-action',this.touch&&!show&&['sealed','loose','batch','carrying'].includes(this.phase));
     this.markConfirm.textContent=this.touch?'ΣΗΜΑΔΕΨΕ ΤΙΣ ΣΩΛΗΝΕΣ':'E · ΣΗΜΑΔΕΨΕ ΤΙΣ ΣΩΛΗΝΕΣ';
-    this.controls.querySelector('[data-pvc="confirm"]')!.textContent=this.phase==='review'?'ΠΑΡΑΓΩΓΗ':this.phase==='cut'?'ΕΦΑΡΜΟΣΕ':'ΕΛΕΓΧΟΣ';
+    this.controls.querySelector('[data-pvc="confirm"]')!.textContent=this.phase==='review'?`ΕΤΟΙΜΑΣΕ ×${this.quantity} ΚΑΙ ΚΡΑΤΑ 1`:this.phase==='cut'?'ΕΦΑΡΜΟΣΕ':'ΕΛΕΓΧΟΣ';
     if(this.prompt.textContent!==hint)this.prompt.textContent=hint;
     this.markConfirm.hidden=!show||this.phase!=='marking'||this.markingActive;
     this.liveMeasure.hidden=!show||!['marking','bending','review','fitting','cut'].includes(this.phase);
@@ -507,11 +532,12 @@ export class PvcWorkshop {
     }
     for(const button of this.controls.querySelectorAll<HTMLButtonElement>('[data-pvc]')){
       const action=button.dataset.pvc;
-      button.hidden=action==='save'?this.phase!=='marking':['back','forward','undo'].includes(action!)?this.phase!=='bending':['less','more'].includes(action!)?this.phase!=='review':false;
+      button.hidden=action==='save'?this.phase!=='marking':['back','forward','undo'].includes(action!)?this.phase!=='bending':action?.startsWith('qty-')?this.phase!=='review':false;
+      if(action?.startsWith('qty-')){const value=action==='qty-all'?this.rawCount:Number(action.slice(4));button.setAttribute('aria-pressed',String(this.quantity===Math.min(this.rawCount,value)));}
     }
     const use=this.controls.querySelector<HTMLButtonElement>('#pvc-use')!;
     use.hidden=!['spring','bending','fitting'].includes(this.phase);
     use.textContent=this.phase==='fitting'?'ΚΟΨΕ':this.phase==='bending'?'ΛΥΓΙΣΕ':'SPRING';
   }
-  get telemetry(){return{phase:this.phase,focused:this.focused,raw:this.rawCount,prepared:this.prepared.length,carrying:Boolean(this.carried),installed:this.installedCount,total:this.rawCount+this.prepared.length+Number(Boolean(this.carried))+this.installedCount,markCm:this.bend.mark*100,markingProgress:this.markingProgress,markingActive:this.markingActive,springInsertion:this.insertion,springCentreM:this.bend.mark,springLengthM:PVC.springLength,retrievalCableM:PVC.cableLength,grip:this.bend.grip,angle:this.bend.angle,radiusMm:this.bend.radius?this.bend.radius*1000:null,ready:this.bend.ready,angles:[...this.bend.angles],quantity:this.quantity,target:this.target?.definition.id??null,cutCm:this.cutS*100,cutFromCm:this.cutFrom*100,fitErrorMm:this.fitError(),offcuts:this.offcuts.length,message:this.message,preview:this.pipe.visible,arms:this.arms.map(a=>({side:a.side,reach:a.shoulder.distanceTo(a.wrist)}))};}
+  get telemetry(){return{phase:this.phase,focused:this.focused,raw:this.rawCount,prepared:this.prepared.length,carrying:Boolean(this.carried),installed:this.installedCount,total:this.rawCount+this.prepared.length+Number(Boolean(this.carried))+this.installedCount,markCm:this.bend.mark*100,markingProgress:this.markingProgress,markingActive:this.markingActive,springInsertion:this.insertion,springCentreM:this.bend.mark,springLengthM:PVC.springLength,retrievalCableM:PVC.cableLength,grip:this.bend.grip,angle:this.bend.angle,radiusMm:this.bend.radius?this.bend.radius*1000:null,ready:this.bend.ready,angles:[...this.bend.angles],quantity:this.quantity,target:this.target?.definition.id??null,guideTarget:this.guideTarget?.definition.id??null,cutCm:this.cutS*100,cutFromCm:this.cutFrom*100,fitErrorMm:this.fitError(),offcuts:this.offcuts.length,message:this.message,preview:this.pipe.visible,arms:this.arms.map(a=>({side:a.side,reach:a.shoulder.distanceTo(a.wrist)}))};}
 }

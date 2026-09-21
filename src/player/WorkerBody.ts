@@ -171,7 +171,9 @@ export class WorkerBody extends THREE.Group {
     // Pipe work is held in front of the chest. Step the body under the eyes
     // instead of retaining the rearward walking stance and overreaching.
     const pipeWork=grips.some(grip=>grip.active&&grip.surfaceContact);
-    const bodyOffset=pipeWork?.05:.17;
+    // Keep the chest behind the first-person camera during pipe work. The old
+    // five-centimetre offset put the camera inside the shirt and hid the pipe.
+    const bodyOffset=grips.find(grip=>grip.active&&grip.firstPersonClearance)?.firstPersonClearance??(pipeWork?.05:.17);
     this.position.set(camera.position.x+Math.sin(player.yaw)*bodyOffset,0,camera.position.z+Math.cos(player.yaw)*bodyOffset);this.rotation.set(0,bodyYaw,0);
     if(cartFrame){this.position.copy(cartFrame.position);this.quaternion.copy(cartFrame.quaternion);}
     this.updateMatrixWorld(true);
