@@ -65,6 +65,7 @@ html, body { background: #151a1d; }
   #mobile-use-status[data-ready="false"] { color: #ffdc32; }
   #mobile-stance-controls { bottom: calc(240px + env(safe-area-inset-bottom)); }
   #mobile-stance-controls button { border-color: #a0aeb1; background: #1b2529e8; }
+  #mobile-stance-controls span { font-size: 12px; line-height: 12px; }
   #mobile-stance-controls button[aria-pressed="true"] { border-color: #ffdc32; background: #4a431d; }
   #site-pro-tools { position: absolute; z-index: 9; left: 50%; bottom: max(9px, env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(154px, 37vw); height: 56px; display: flex; align-items: center; justify-content: center; gap: 10px; border: 2px solid #ffdc32; border-radius: 14px; color: #fff9dd; background: #192126f2; box-shadow: 0 5px 20px #0009; font: 900 16px/1 'Barlow Condensed', Arial, sans-serif; letter-spacing: .08em; pointer-events: auto; touch-action: manipulation; }
   #site-pro-tools svg { width: 24px; height: 24px; fill: none; stroke: #ffdc32; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
