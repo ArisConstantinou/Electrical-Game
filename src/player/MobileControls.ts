@@ -9,11 +9,14 @@ export class MobileControls {
   private joystickPointer: number | null = null;
   private lookPointer: number | null = null;
   private lookActionPointer: number | null = null;
+  private usePointer: number | null = null;
   private interactionPointer: number | null = null;
   private lookX = 0;
   private lookY = 0;
   private actionX = 0;
   private actionY = 0;
+  private useX = 0;
+  private useY = 0;
   private moveX = 0;
   private moveY = 0;
   private aimProfile: MobileAimProfile = 'normal';
@@ -36,7 +39,7 @@ export class MobileControls {
     new MutationObserver(() => {
       const open = surface.classList.contains('settings-open');
       if (open && !settingsOpen) {
-        const hadAction = this.lookActionPointer !== null;
+        const hadAction = this.usePointer !== null;
         this.cancelActiveGestures();
         // Button-up may already have committed the short casting animation.
         // Opening settings cancels that pending cast too, before it emits.
@@ -44,7 +47,7 @@ export class MobileControls {
       }
       settingsOpen = open;
     }).observe(surface, { attributes: true, attributeFilter: ['class'] });
-    surface.querySelectorAll<HTMLElement>('#joystick, #look-joystick, #mobile-move-zone').forEach(pad => {
+    surface.querySelectorAll<HTMLElement>('#joystick, #look-joystick, #site-pro-use, #mobile-move-zone').forEach(pad => {
       for (const type of ['touchstart', 'touchmove'] as const) {
         pad.addEventListener(type, event => { if (event.cancelable) event.preventDefault(); }, { passive: false });
       }
@@ -82,18 +85,31 @@ export class MobileControls {
         select();
       });
     });
-    const action = surface.querySelector<HTMLElement>('#look-joystick');
-    action?.addEventListener('keydown', event => {
-      if (!surface.classList.contains('settings-open') && (event.code === 'Space' || event.code === 'Enter') && !event.repeat && this.lookActionPointer === null) {
-        event.preventDefault(); this.lookActionPointer = -1; this.beginAction();
+    const use = surface.querySelector<HTMLButtonElement>('#site-pro-use');
+    use?.addEventListener('keydown', event => {
+      if (!surface.classList.contains('settings-open') && (event.code === 'Space' || event.code === 'Enter') && !event.repeat && this.usePointer === null) {
+        event.preventDefault(); this.usePointer = -1; this.beginAction();
       }
     });
-    action?.addEventListener('keyup', event => {
-      if ((event.code === 'Space' || event.code === 'Enter') && this.lookActionPointer === -1) {
+    use?.addEventListener('keyup', event => {
+      if ((event.code === 'Space' || event.code === 'Enter') && this.usePointer === -1) {
         event.preventDefault(); this.releaseAction(false);
       }
     });
-    action?.addEventListener('blur', () => { if (this.lookActionPointer === -1) this.releaseAction(true); });
+    use?.addEventListener('blur', () => { if (this.usePointer === -1) this.releaseAction(true); });
+    use?.addEventListener('pointerdown', event => {
+      if (surface.classList.contains('settings-open') || this.usePointer !== null) return;
+      event.preventDefault(); event.stopPropagation();
+      this.usePointer = event.pointerId;
+      this.useX = event.clientX; this.useY = event.clientY;
+      this.capture(use, event.pointerId);
+      this.beginAction();
+    });
+    for (const kind of ['pointerup', 'pointercancel', 'lostpointercapture'] as const) use?.addEventListener(kind, event => {
+      if ((event as PointerEvent).pointerId !== this.usePointer) return;
+      event.preventDefault(); event.stopPropagation();
+      this.releaseAction(kind !== 'pointerup');
+    });
     const interact = surface.querySelector<HTMLButtonElement>('#mobile-interact');
     interact?.addEventListener('pointerdown', event => {
       if (event.pointerType === 'mouse' || this.interactionPointer !== null) return;
@@ -119,6 +135,7 @@ export class MobileControls {
   cancelActiveGestures(): void {
     this.releaseAction(true);
     this.releaseInteraction(true);
+    this.releaseAim();
     this.releaseLook();
     this.releaseJoystick();
   }
@@ -151,7 +168,8 @@ export class MobileControls {
       if (this.lookActionPointer !== null) return;
       event.preventDefault(); this.lookActionPointer = event.pointerId;
       this.actionX = event.clientX; this.actionY = event.clientY;
-      this.capture(action, event.pointerId); this.beginAction();
+      this.capture(action, event.pointerId);
+      action.classList.add('active'); action.setAttribute('aria-pressed', 'true');
       if (this.aimInputMode === 'stick') this.updateLookJoystick(event, action);
       return;
     }
@@ -175,7 +193,7 @@ export class MobileControls {
 
   private beginAction(): void {
     this.input.actionHeld = true; this.input.actionRequested = true;
-    const action = this.surface.querySelector<HTMLElement>('#look-joystick');
+    const action = this.surface.querySelector<HTMLElement>('#site-pro-use');
     action?.classList.add('active'); action?.setAttribute('aria-pressed', 'true');
   }
   private onPointerMove = (event: PointerEvent): void => {
@@ -198,6 +216,12 @@ export class MobileControls {
         this.player.lookMobileDrag(event.clientX - this.actionX, event.clientY - this.actionY);
         this.actionX = event.clientX; this.actionY = event.clientY;
       }
+    } else if (event.pointerId === this.usePointer) {
+      event.preventDefault();
+      // Two-thumb play: MOVE stays held while dragging USE also aims. A
+      // separate AIM finger, when present, owns the camera instead.
+      if (this.lookActionPointer === null) this.player.lookMobileDrag(event.clientX - this.useX, event.clientY - this.useY);
+      this.useX = event.clientX; this.useY = event.clientY;
     } else if (event.pointerId === this.lookPointer) {
       event.preventDefault();
       const coalesced = typeof event.getCoalescedEvents === 'function' ? event.getCoalescedEvents() : [];
@@ -211,12 +235,14 @@ export class MobileControls {
     if (event.pointerType === 'mouse') return;
     if (event.pointerId === this.joystickPointer) { event.preventDefault(); this.releaseJoystick(); }
     if (event.pointerId === this.lookPointer) { event.preventDefault(); this.releaseLook(); }
-    if (event.pointerId === this.lookActionPointer) { event.preventDefault(); this.releaseAction(event.type === 'pointercancel'); }
+    if (event.pointerId === this.lookActionPointer) { event.preventDefault(); this.releaseAim(); }
+    if (event.pointerId === this.usePointer) { event.preventDefault(); this.releaseAction(event.type === 'pointercancel'); }
   };
   private onLostCapture = (event: PointerEvent): void => {
     if (event.pointerId === this.joystickPointer) this.releaseJoystick();
     if (event.pointerId === this.lookPointer) this.releaseLook();
-    if (event.pointerId === this.lookActionPointer) this.releaseAction(true);
+    if (event.pointerId === this.lookActionPointer) this.releaseAim();
+    if (event.pointerId === this.usePointer) this.releaseAction(true);
   };
   private releaseJoystick(): void {
     const pointer = this.joystickPointer; this.joystickPointer = null; this.input.resetMobileMove();
@@ -228,14 +254,21 @@ export class MobileControls {
   private releaseLook(): void {
     const pointer = this.lookPointer; this.lookPointer = null; this.releaseCapture(pointer);
   }
-  private releaseAction(cancel: boolean): void {
+  private releaseAim(): void {
     if (this.lookActionPointer === null) return;
     const pointer = this.lookActionPointer; this.lookActionPointer = null;
-    this.input.actionHeld = false; if (cancel) this.input.actionRequested = false;
     this.input.resetMobileLook();
     const action = this.surface.querySelector<HTMLElement>('#look-joystick');
     action?.classList.remove('active'); action?.setAttribute('aria-pressed', 'false');
     const thumb = this.surface.querySelector<HTMLElement>('#look-joystick-thumb'); if (thumb) thumb.style.transform = 'translate(-50%, -50%)';
+    this.releaseCapture(pointer);
+  }
+  private releaseAction(cancel: boolean): void {
+    if (this.usePointer === null) return;
+    const pointer = this.usePointer; this.usePointer = null;
+    this.input.actionHeld = false; if (cancel) this.input.actionRequested = false;
+    const action = this.surface.querySelector<HTMLElement>('#site-pro-use');
+    action?.classList.remove('active'); action?.setAttribute('aria-pressed', 'false');
     if (cancel) window.dispatchEvent(new CustomEvent('wirehouse:cancel-mobile-action'));
     this.releaseCapture(pointer);
   }
@@ -249,8 +282,8 @@ export class MobileControls {
   }
   private updateLookJoystick(event: PointerEvent, joystick: HTMLElement): void {
     const rect = joystick.getBoundingClientRect(), radius = Math.max(1, rect.width / 2);
-    // USE starts neutral wherever the thumb lands. Only deliberate travel
-    // from that press steers the camera while charging or using a tool.
+    // AIM starts neutral wherever the thumb lands. Only deliberate travel
+    // from that press steers the camera while USE remains independent.
     const rawX = (event.clientX - this.actionX) / radius;
     const rawY = (event.clientY - this.actionY) / radius;
     const length = Math.hypot(rawX, rawY);

@@ -24,17 +24,22 @@ try {
     page.on('pageerror', error => report.errors.push(`${size.name}: ${error.message}`));
     await page.goto(url);
     await page.waitForFunction(() => window.__wireTheHouse?.renderer.renderCamera, null, { timeout: 120000 });
+    await page.locator('#apprentice-count').selectOption('0');
     const start = page.locator('#start-button');
     if (size.touch) await start.tap(); else await start.click();
     await page.waitForTimeout(500);
     const state = await page.evaluate(() => {
       const bounds = selector => { const element = document.querySelector(selector); if (!element) return null; const r = element.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height, right: r.right, bottom: r.bottom, visible: element.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) }; };
-      return { viewport: { width: innerWidth, height: innerHeight }, scrollWidth: document.documentElement.scrollWidth, objective: document.querySelector('#objective-compact')?.textContent, tool: window.__wireTheHouse.selectedTool, renderError: window.__wireTheHouse.renderer.renderError, controls: Object.fromEntries(['#top-hud', '#settings-toggle', '#joystick', '#look-joystick', '#site-pro-tools', '#mobile-tool-slider'].map(id => [id, bounds(id)])) };
+      return { viewport: { width: innerWidth, height: innerHeight }, scrollWidth: document.documentElement.scrollWidth, objective: document.querySelector('#objective-compact')?.textContent, tool: window.__wireTheHouse.selectedTool, renderError: window.__wireTheHouse.renderer.renderError, controls: Object.fromEntries(['#top-hud', '#settings-toggle', '#joystick', '#look-joystick', '#site-pro-use', '#site-pro-tools', '#mobile-tool-slider'].map(id => [id, bounds(id)])) };
     });
     assert.ok(!state.renderError, `${size.name}: renderer error`);
     assert.ok(state.scrollWidth <= state.viewport.width + 1, `${size.name}: horizontal overflow`);
     await page.screenshot({ path: `${output}/${size.name}.png` });
     if (checkSitePro && size.touch) {
+      const aim = state.controls['#look-joystick'];
+      const use = state.controls['#site-pro-use'];
+      assert.ok(aim?.visible && use?.visible && use.width >= 48 && use.height >= 48, `${size.name}: touch controls unavailable`);
+      assert.ok(use.bottom <= aim.y, `${size.name}: USE overlaps AIM`);
       const button = page.locator('#site-pro-tools');
       assert.equal(await button.getAttribute('aria-expanded'), 'false');
       await button.tap();

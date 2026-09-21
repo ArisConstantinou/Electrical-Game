@@ -89,7 +89,7 @@ export class HUD {
             </div>
             <label class="hammer-speed-setting" for="water-gun-mode"><span>WATER GUN | FLOW</span><select id="water-gun-mode" aria-label="Water gun flow mode">${WATER_GUN_MODES.map(mode=>`<option value="${mode.id}" ${mode.id==='flood'?'selected':''}>${mode.label} | ${mode.flowLitresPerSecond} L/s</option>`).join('')}</select><small>FLOOD fills the room with boosted game flow. Choose MIST for gentle chase wetting.</small></label>
             <details id="mortar-settings"><summary>TROWEL / WATER</summary>
-              <p>Hold the aim pad or mouse button, then release in the green zone. The wrist flips and throws the mortar into the chase.</p>
+              <p>Hold USE or the mouse button, then release in the green zone. The wrist flips and throws the mortar into the chase.</p>
             <div class="mortar-buttons"><button type="button" id="mortar-angle-down" aria-label="Lower trowel throw angle">− ANGLE</button><button type="button" id="mortar-swing">HOLD · RELEASE</button><button type="button" id="mortar-angle-up" aria-label="Raise trowel throw angle">+ ANGLE</button></div>
             <button type="button" id="work-height">CROUCH · LOW WORK</button><small id="mortar-hint"></small>
             </details>
@@ -98,7 +98,7 @@ export class HUD {
 
               <button id="aim-speed" type="button" aria-label="Change aim sensitivity"><span>AIM SPEED</span><b>NORMAL</b></button>
               <button id="wall-assist" type="button" aria-label="Toggle automatic wall precision"><span>WALL ASSIST</span><b>AUTO</b></button>
-              <small>Touch the right USE + AIM circle to work. Drag the wall to look without using a tool. Choose DRAG for direct aim or STICK for continuous turning.</small>
+              <small>Use AIM to look without working. Hold USE and drag to aim while working; MOVE can stay held. A third AIM finger is optional. Choose DRAG or STICK for the AIM pad.</small>
             </div>
           </section>
           <aside id="desktop-key-guide" class="hud-card" aria-label="Keyboard and mouse controls">
@@ -188,7 +188,8 @@ export class HUD {
               <button id="mobile-stand" type="button" data-height="stand" aria-label="Stand up" aria-pressed="true"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 27V5M8 13l8-8 8 8"/></svg><span>STAND</span></button>
               <button id="mobile-crouch" type="button" data-height="crouch" aria-label="Crouch" aria-pressed="false"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M19 6a3 3 0 1 0 0 .1M17 12l-5 7h10l-3 9M13 18l-7 7M16 13l7 3 5-4"/></svg><span>CROUCH</span></button>
             </nav>
-            <div id="look-joystick" role="button" tabindex="0" aria-label="Hold to use selected tool; drag to aim"><div class="look-joystick-ring"></div><div id="look-joystick-thumb"><span id="mobile-action" aria-hidden="true">USE</span><small aria-hidden="true">+ AIM</small></div><div id="drag-aim-cue" aria-hidden="true"></div><small id="aim-control-label">HOLD + AIM</small><output id="mobile-use-status">READY</output></div>
+            <div id="look-joystick" role="button" tabindex="0" aria-label="Drag to aim"><div class="look-joystick-ring"></div><div id="look-joystick-thumb"><span id="mobile-action" aria-hidden="true">AIM</span><small aria-hidden="true">LOOK</small></div><div id="drag-aim-cue" aria-hidden="true"></div><small id="aim-control-label">AIM</small></div>
+            <button id="site-pro-use" type="button" aria-label="Hold to use selected tool" aria-pressed="false"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 25h18M12 22V8h8v14M9 8h14M16 3v5"/></svg><span>USE</span><output id="mobile-use-status">READY</output></button>
             <nav id="aim-quick-controls" aria-label="Aim controls">
               ${quickButton('quick-aim-input','AIM','STICK','aim','all','cycle-aim-input')}
               ${quickButton('quick-aim-speed','LOOK','NORMAL','speed','all','cycle-aim-speed')}
@@ -621,9 +622,9 @@ export class HUD {
 
   updateAimControl(_mode: 'manual' | 'auto-use' | 'double-tap'): void {
     if(!this.displayChanged('manual-aim','manual'))return;
-    this.shell.querySelector('#mobile-action')!.textContent='USE';
-    this.shell.querySelector('#aim-control-label')!.textContent='HOLD + AIM';
-    this.shell.querySelector('#look-joystick')!.setAttribute('aria-label','Hold to use selected tool; drag to aim');
+    this.shell.querySelector('#mobile-action')!.textContent='AIM';
+    this.shell.querySelector('#aim-control-label')!.textContent='AIM';
+    this.shell.querySelector('#look-joystick')!.setAttribute('aria-label','Drag to aim');
   }
   updateHeightMeasure(active:boolean,height:number|null,ready:boolean):void {
     const value=height===null?'—':height.toFixed(2);
@@ -632,9 +633,9 @@ export class HUD {
     this.shell.querySelector('#measure-height')!.textContent=value;
     this.shell.querySelector('#measure-hint')!.textContent=ready?'Aim up or down to choose height':height===null?'Aim at a wall':'Move closer to measure';
     this.shell.querySelector<HTMLButtonElement>('#measure-mark')!.disabled=!ready;
-    this.shell.querySelector('#mobile-action')!.textContent=active?'AIM':'USE';
-    this.shell.querySelector('#look-joystick-thumb small')!.textContent=active?'MEASURE':'+ AIM';
-    this.shell.querySelector('#look-joystick')!.setAttribute('aria-label',active?'Drag to aim the tape measure':'Hold to use selected tool; drag to aim');
+    this.shell.querySelector('#mobile-action')!.textContent='AIM';
+    this.shell.querySelector('#look-joystick-thumb small')!.textContent=active?'MEASURE':'LOOK';
+    this.shell.querySelector('#look-joystick')!.setAttribute('aria-label',active?'Drag to aim the tape measure':'Drag to aim');
   }
   updateLaser(tool:RigTool,state:{phase:string;hint:string;heightM:number|null;progress:number;active:boolean;mounted:boolean}):void {
     const visible=['drill','driver','laser'].includes(tool),height=state.heightM===null?'—':`${state.heightM.toFixed(2)} m`;
@@ -662,7 +663,7 @@ export class HUD {
     if(!this.displayChanged('mobile-use-status',`${message}:${ready}:${active}`))return;
     const status=this.shell.querySelector<HTMLElement>('#mobile-use-status')!;
     status.textContent=message;status.dataset.ready=String(ready);status.dataset.active=String(active);
-    this.shell.querySelector('#look-joystick')!.classList.toggle('using-tool',active);
+    this.shell.querySelector('#site-pro-use')!.classList.toggle('using-tool',active);
   }
 
   updateAimSpeed(profile: 'precise' | 'normal' | 'fast'): void {
@@ -681,8 +682,8 @@ export class HUD {
     if (inputText) inputText.textContent = mode.toUpperCase();
     this.shell.classList.toggle('aim-input-drag', mode === 'drag');
     const look = this.shell.querySelector<HTMLElement>('#look-joystick');
-    look?.setAttribute('aria-label',mode==='drag'?'Hold USE and drag to aim; swipe the wall to look only':'Hold USE and steer to aim; swipe the wall to look only');
+    look?.setAttribute('aria-label',mode==='drag'?'Drag to aim; hold USE separately to work':'Steer to aim; hold USE separately to work');
     this.shell.querySelector('#quick-aim-input b')!.textContent=mode.toUpperCase();
-    this.shell.querySelector('#aim-control-label')!.textContent=mode==='drag'?'HOLD + DRAG':'HOLD + STICK';
+    this.shell.querySelector('#aim-control-label')!.textContent=mode==='drag'?'DRAG TO AIM':'STICK TO AIM';
   }
 }
