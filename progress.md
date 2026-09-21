@@ -1,5 +1,13 @@
 Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web game named WIRE THE HOUSE, based on real Cyprus residential first-fix practices, editable in Web Game Studio, playable on desktop/mobile, deployed to arisconstantinou/Electrical-Game via GitHub Pages, and ending at FIRST FIX COMPLETE without cable pulling.
 
+## 2026-09-21 · PVC tying wire conforms to the installed conduit
+
+- Two user photos clarified that the wall fixing is thin galvanized tying wire, not a rigid rebar span: each tie must close around the conduit, show a short twisted tail, and repeat along the route.
+- Replaced the old depth-scale illusion, which floated roughly 66 mm ahead of the pipe centre, with a topology-matched open-to-tight morph. Each of the two independently anchored wires now closes to an 11.5 mm centreline radius around the 20 mm PVC and leaves a side twist; anchor positions stay fixed.
+- Removed the remaining player-facing `rebar` wording from the PVC fastening directions. The existing four-hole preparation, independent wire staging, pipe insertion order, inventory and desktop/mobile controls remain unchanged.
+- Full PVC logic/UI flow, portrait and landscape mobile PVC flow, TypeScript and production build pass. Desktop, portrait and landscape tied-wire screenshots were inspected; no browser errors occurred. The bundled game client also completed and cleaned up all owned browser processes, although its bounded capture remained on the asset-preparation start screen.
+- Visual evidence: `output/manual-pvc/after/18-open-rebar.png`, `19-pipe-in-open-rebar.png`, `20-tightened-wire.png`, plus `output/mobile-pvc-hands/*wire-fully-tied.png`. No physical-phone or GPU/FPS claim; the morph adds no draw call per tie and increases each wire tube from 48 to 64 longitudinal segments.
+
 ## 2026-09-21 · Accept physically seated PVC at -4 mm preferred-depth error
 
 - User screenshot showed a cut at `-4 mm` rejected as unable to reach the box. The value is relative to the preferred 15 mm insertion, so the pipe still has about 11 mm of real seating; the old 3 mm negative tolerance incorrectly classified it as short.

@@ -50,16 +50,39 @@ export function buildHeldRebar():THREE.Group{
   group.userData.gripPoint=[0,-.02,0];return group;
 }
 
-export function buildRebarHug(left:THREE.Vector3,right:THREE.Vector3,frontZ:number):THREE.Group{
-  // Store vertices around the strap centre. Scaling during tightening must
-  // deform the bow without scaling its absolute wall coordinates toward 0.
-  const middle=left.clone().add(right).multiplyScalar(.5),local=(point:THREE.Vector3)=>point.clone().sub(middle),curve=new THREE.CatmullRomCurve3([
-    local(left),local(new THREE.Vector3(left.x+.025,left.y,frontZ)),local(new THREE.Vector3(middle.x-.021,middle.y,frontZ+.030)),
-    local(new THREE.Vector3(middle.x,middle.y,frontZ+.038)),local(new THREE.Vector3(middle.x+.021,middle.y,frontZ+.030)),local(new THREE.Vector3(right.x-.025,right.y,frontZ)),local(right),
-  ]);
-  const group=new THREE.Group();group.name='Galvanized conduit tying wire';group.position.copy(middle);group.userData.leftHole=left.toArray();group.userData.rightHole=right.toArray();
-  const wire=new THREE.Mesh(new THREE.TubeGeometry(curve,48,.00115,6,false),steel(0x777d7b,.58));wire.name='Open wall-anchored tying wire';group.add(wire);
-  const twist=new THREE.Group();twist.name='tie-wire-twist';twist.visible=false;twist.position.set(0,0,frontZ-middle.z);group.add(twist);
-  for(const phase of [0,Math.PI]){const points=Array.from({length:25},(_,i)=>{const t=i/24,a=phase+t*Math.PI*5;return new THREE.Vector3(Math.cos(a)*.0022,-t*.018,Math.sin(a)*.0022);});const strand=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points),24,.00065,5,false),steel(0x6c7270,.5));strand.name='Twisted tying-wire strand';twist.add(strand);}
+/** Wall-anchored wire which morphs into contact with a vertical 20 mm PVC. */
+export function buildConduitTie(left:THREE.Vector3,right:THREE.Vector3,pipeCentreX:number,pipeCentreZ:number):THREE.Group{
+  const middle=left.clone().add(right).multiplyScalar(.5),local=(point:THREE.Vector3)=>point.clone().sub(middle);
+  const tieY=middle.y,openRadius=.050,contactRadius=.0115;
+  const openPoints=[
+    left.clone(),new THREE.Vector3(left.x+.018,left.y,pipeCentreZ+.010),
+    new THREE.Vector3(pipeCentreX-openRadius,tieY-.016,pipeCentreZ+.018),new THREE.Vector3(pipeCentreX,tieY-.042,pipeCentreZ+openRadius),
+    new THREE.Vector3(pipeCentreX+openRadius,tieY-.016,pipeCentreZ+.018),new THREE.Vector3(right.x-.018,right.y,pipeCentreZ+.010),right.clone(),
+  ].map(local);
+  const tightPoints=[left.clone(),new THREE.Vector3(pipeCentreX-contactRadius-.008,tieY,pipeCentreZ)].concat(
+    Array.from({length:9},(_,i)=>{const angle=Math.PI-i*Math.PI/8;return new THREE.Vector3(pipeCentreX+Math.cos(angle)*contactRadius,tieY,pipeCentreZ+Math.sin(angle)*contactRadius);}),
+    [new THREE.Vector3(pipeCentreX+contactRadius+.008,tieY,pipeCentreZ),right.clone()],
+  ).map(local);
+  const openGeometry=new THREE.TubeGeometry(new THREE.CatmullRomCurve3(openPoints,false,'centripetal'),64,.00115,6,false);
+  const tightGeometry=new THREE.TubeGeometry(new THREE.CatmullRomCurve3(tightPoints,false,'centripetal'),64,.00115,6,false);
+  openGeometry.morphAttributes.position=[tightGeometry.getAttribute('position').clone()];
+  openGeometry.morphAttributes.normal=[tightGeometry.getAttribute('normal').clone()];
+  tightGeometry.dispose();
+  const group=new THREE.Group();group.name='Galvanized PVC tying-wire loop';group.position.copy(middle);
+  group.userData.leftHole=left.toArray();group.userData.rightHole=right.toArray();group.userData.pipeCentre=[pipeCentreX,tieY,pipeCentreZ];group.userData.contactRadiusMm=contactRadius*1000;group.userData.tightness=0;
+  const wire=new THREE.Mesh(openGeometry,steel(0x666d6b,.52));wire.name='Morphing PVC tying-wire loop';wire.updateMorphTargets();group.add(wire);
+  const twist=new THREE.Group();twist.name='tie-wire-twist';twist.visible=false;twist.position.copy(local(new THREE.Vector3(pipeCentreX+contactRadius*.72,tieY-.001,pipeCentreZ+contactRadius*.72)));group.add(twist);
+  for(const phase of [0,Math.PI]){
+    const points=Array.from({length:25},(_,i)=>{const t=i/24,a=phase+t*Math.PI*5;return new THREE.Vector3(Math.cos(a)*.0021,-t*.020,Math.sin(a)*.0021);});
+    const strand=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points),24,.00065,5,false),steel(0x5f6664,.48));strand.name='Twisted tying-wire tail';twist.add(strand);
+  }
   return group;
+}
+
+export function setConduitTieTightness(group:THREE.Group,value:number):void{
+  const tightness=THREE.MathUtils.clamp(value,0,1),wire=group.getObjectByName('Morphing PVC tying-wire loop') as THREE.Mesh|undefined;
+  if(wire?.morphTargetInfluences)wire.morphTargetInfluences[0]=tightness;
+  const twist=group.getObjectByName('tie-wire-twist');
+  if(twist){twist.visible=tightness>.52;twist.scale.y=THREE.MathUtils.smoothstep(tightness,.52,1);twist.rotation.y=tightness*Math.PI*3;}
+  group.userData.tightness=tightness;
 }
