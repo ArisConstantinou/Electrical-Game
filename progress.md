@@ -1,5 +1,13 @@
 Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web game named WIRE THE HOUSE, based on real Cyprus residential first-fix practices, editable in Web Game Studio, playable on desktop/mobile, deployed to arisconstantinou/Electrical-Game via GitHub Pages, and ending at FIRST FIX COMPLETE without cable pulling.
 
+## 2026-09-21 · Site Pro 04 implementation (in progress)
+
+- User selected concept 04, Site Pro, for portrait/landscape mobile, tablet and desktop. The complete request includes visual quality, compact responsive UI, simultaneous move/aim/tool use, performance, smoothness and better target hitboxes. This is a staged implementation, not a finished release.
+- Protected base: origin/main 6905ef0 in isolated worktree `codex/site-pro-04`. Main checkout has unrelated dirty edits. Port 5365 remains on the pre-existing Vite preview and was not replaced; current live assets include `index-BuFVG3vn.js` and `index-CG8cRyZI.css`, matching the apprentice-ground-command dist. No other Electrical-Game thread was active when checked.
+- First slice: `site-pro.css` overlays the UI with graphite/yellow Site Pro styling across screen sizes. Mobile/tablet get an on-demand tool drawer, larger high-contrast sticks, and the work surface remains more visible. Existing gameplay input, 3D assets, camera, hitboxes and render policy have not yet been changed.
+- TypeScript and Vite production build passed via existing local Node packages. Vite reported pre-existing unresolved start-screen image paths and chunk-size warnings. The legacy browser layout test targets the existing live port, not this worktree, so its timeout does not validate or refute this slice. No visual/gameplay/performance proof of the new branch yet.
+- Next: test the isolated build at the approved 5365 route when live-preview coordination allows, inspect comparable portrait/landscape/tablet/desktop screenshots, verify drawer/tool input and simultaneous controls, then work on scene assets and measured engine/hitbox improvements. Keep the original live version recoverable.
+
 ## 2026-09-21 · PVC mobile carry, targeting, stance and quantity follow-up
 
 - Physical iPhone screenshots showed non-action text styled like controls, the full torso covering carried/fitted PVC, exact hollow-casing raycasts missing boxes, no nearby crouch/stand controls, one-by-one quantity selection and a second pickup after production.

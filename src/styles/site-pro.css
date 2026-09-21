@@ -1,0 +1,76 @@
+/* Site Pro 04: graphite controls and one safety-yellow interaction accent.
+   Only UI layers change here; world materials and camera remain independent. */
+:root { color: #f5f4ec; background: #151a1d; }
+html, body { background: #151a1d; }
+.hud-card { border-color: rgba(220, 229, 229, .25); border-radius: 12px; background: linear-gradient(150deg, rgba(26, 32, 36, .94), rgba(21, 27, 31, .83)); box-shadow: 0 10px 30px #090d1159; backdrop-filter: blur(5px); }
+#top-hud { border-left: 4px solid #ffda28; }
+.mission-kicker, .eyebrow, .level-title, #tool-status em { color: #ffdf40; }
+#mission-progress { background: #ffda28; }
+#settings-toggle { color: #ffdf40; border-color: #95a3a7; border-radius: 14px; background: #1a2226eb; }
+#settings-toggle[aria-expanded="true"] { color: #171b1d; border-color: #ffda28; background: #ffda28; }
+#settings-panel { border-color: #829095; background: #192126f2; }
+#settings-panel header span { color: #ffda28; }
+#settings-close, #spray-controls button, #mobile-control-settings button { border-radius: 8px; }
+#reticle.active span { background: #ffdc32; }
+#interaction-prompt { border-left-color: #ffda28; border-radius: 7px; background: #182025ea; }
+#mobile-interact { border-color: #ffda28; border-radius: 12px; color: #ffed87; background: #1a2226f2; }
+#mobile-interact[aria-pressed="true"] { color: #191c1e; background: #ffda28; }
+.tool-quick-button:active, .tool-quick-button[aria-pressed="true"] { border-color: #ffda28; background: #343b2a; }
+#mobile-tool-slider button.selected svg { color: #171b1d; background: #ffda28; }
+#mobile-tool-slider button.selected { color: #ffec83; }
+#start-button { border-color: #ffe34c; border-radius: 10px; color: #171b1d; background: #ffda28; }
+.screen-panel { background: linear-gradient(90deg, #151a1df7, #151a1dd9 45%, #151a1d38), linear-gradient(0deg, #ffda281c, transparent); }
+.screen-panel h1 span { color: #ffda28; }
+#site-pro-tools { display: none; }
+
+@media (pointer:coarse), (max-width:760px) {
+  #top-hud { top: max(10px, env(safe-area-inset-top)); left: max(10px, env(safe-area-inset-left)); width: min(322px, calc(100% - 78px)); min-height: 54px; padding: 9px 12px; border-left-width: 3px; }
+  #objective-compact { color: #fff; font-size: 16px; line-height: 20px; letter-spacing: .03em; }
+  #top-hud .progress-track { height: 3px; background: #ffffff35; }
+  #settings-toggle { width: 48px; height: 48px; }
+  #mobile-controls::before { content: ''; position: absolute; inset: auto 0 0; height: 195px; background: linear-gradient(transparent, #11181c47); pointer-events: none; }
+  #mobile-move-zone { top: 30dvh; bottom: 76px; }
+  #joystick, #look-joystick, #game-shell.aim-input-drag #look-joystick { bottom: calc(105px + env(safe-area-inset-bottom)); width: clamp(104px, 29vw, 130px); height: clamp(104px, 29vw, 130px); opacity: 1; }
+  #joystick { left: max(14px, env(safe-area-inset-left)); }
+  #look-joystick, #game-shell.aim-input-drag #look-joystick { right: max(14px, env(safe-area-inset-right)); }
+  .joystick-ring, #look-joystick .look-joystick-ring, #game-shell.aim-input-drag .look-joystick-ring { border: 2px solid #9da9aeb3; background: radial-gradient(circle, #29323855 28%, #111a20b8 100%); box-shadow: inset 0 0 0 8px #ffffff08, 0 6px 18px #05090c77; }
+  #joystick-thumb, #look-joystick-thumb, #game-shell.aim-input-drag #look-joystick-thumb { width: 56px; height: 56px; border: 2px solid #ffdc32; background: radial-gradient(circle at 35% 30%, #ffe65d, #eebd08); box-shadow: 0 4px 14px #0008; }
+  #look-joystick-thumb span, #look-joystick-thumb small { color: #1a2022; font-weight: 900; }
+  #look-joystick.using-tool .look-joystick-ring { border-color: #ffdc32; background: #6a571b70; }
+  #mobile-use-status { top: calc(100% + 4px); color: #f5f1dc; font-size: 12px; }
+  #mobile-use-status[data-ready="false"] { color: #ffdc32; }
+  #mobile-stance-controls { bottom: calc(240px + env(safe-area-inset-bottom)); }
+  #mobile-stance-controls button { border-color: #a0aeb1; background: #1b2529e8; }
+  #mobile-stance-controls button[aria-pressed="true"] { border-color: #ffdc32; background: #4a431d; }
+  #site-pro-tools { position: absolute; z-index: 9; left: 50%; bottom: max(9px, env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(154px, 37vw); height: 56px; display: flex; align-items: center; justify-content: center; gap: 10px; border: 2px solid #ffdc32; border-radius: 14px; color: #fff9dd; background: #192126f2; box-shadow: 0 5px 20px #0009; font: 900 16px/1 'Barlow Condensed', Arial, sans-serif; letter-spacing: .08em; pointer-events: auto; touch-action: manipulation; }
+  #site-pro-tools svg { width: 24px; height: 24px; fill: none; stroke: #ffdc32; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+  #site-pro-tools[aria-expanded="true"] { color: #161c20; background: #ffdc32; }
+  #site-pro-tools[aria-expanded="true"] svg { stroke: #161c20; }
+  #mobile-tool-slider { display: none; left: max(8px, env(safe-area-inset-left)); right: max(8px, env(safe-area-inset-right)); bottom: calc(70px + env(safe-area-inset-bottom)); height: 69px; padding: 3px 5px; border: 1px solid #adb6af70; border-radius: 12px; background: #151e23f2; box-shadow: 0 6px 20px #000a; }
+  #game-shell[data-tools-open="true"] #mobile-tool-slider { display: flex; }
+  #mobile-tool-slider button { flex-basis: 65px; min-width: 65px; min-height: 60px; }
+  #mobile-tool-slider svg { background: #293238; }
+  #tool-quick-controls { display: none; }
+  #game-shell[data-tools-open="true"] #tool-quick-controls { display: flex; bottom: calc(142px + env(safe-area-inset-bottom)); left: 8px; right: 8px; height: 56px; border-radius: 8px; }
+  #tool-quick-controls .tool-quick-button { color: #fff; border-color: #a0aba970; background: #1a2429ed; }
+  #tool-quick-controls .tool-quick-button svg { stroke: #ffdc32; }
+  #aim-quick-controls { display: none; }
+  #game-shell[data-tools-open="true"] #aim-quick-controls { display: grid; top: max(70px, calc(env(safe-area-inset-top) + 64px)); }
+  #game-shell.settings-open #site-pro-tools, #game-shell.settings-open #mobile-tool-slider { visibility: hidden; }
+  #game-shell[data-box-assembly="true"] #site-pro-tools { display: none; }
+}
+
+@media (pointer:coarse) and (min-width:700px) {
+  #top-hud { width: min(365px, calc(100% - 100px)); }
+  #joystick, #look-joystick, #game-shell.aim-input-drag #look-joystick { width: 124px; height: 124px; bottom: calc(98px + env(safe-area-inset-bottom)); }
+  #site-pro-tools { width: 164px; }
+}
+
+@media (pointer:coarse) and (max-height:520px) {
+  #joystick, #look-joystick, #game-shell.aim-input-drag #look-joystick { width: 94px; height: 94px; bottom: calc(68px + env(safe-area-inset-bottom)); }
+  #mobile-stance-controls { bottom: calc(174px + env(safe-area-inset-bottom)); }
+  #site-pro-tools { height: 48px; bottom: max(6px, env(safe-area-inset-bottom)); }
+  #mobile-tool-slider { bottom: calc(60px + env(safe-area-inset-bottom)); }
+  #game-shell[data-tools-open="true"] #tool-quick-controls { bottom: calc(132px + env(safe-area-inset-bottom)); left: 104px; right: 104px; }
+  #game-shell[data-tools-open="true"] #aim-quick-controls { top: max(62px, env(safe-area-inset-top)); }
+}

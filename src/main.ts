@@ -1,5 +1,6 @@
 import './styles/main.css';
 import './styles/apprentice.css';
+import './styles/site-pro.css';
 import './studio/webGameStudioAdapter';
 import { Game } from './core/Game';
 

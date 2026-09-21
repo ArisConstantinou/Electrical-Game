@@ -210,6 +210,7 @@ export class HUD {
             <button id="tool-mode-toggle" type="button" aria-label="Change selected tool mode">
               <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 10h15l-3-3m3 3-3 3M25 22H10l3 3m-3-3 3-3"/></svg><span>LIVE</span>
             </button>
+            <button id="site-pro-tools" type="button" aria-label="Open tools" aria-controls="mobile-tool-slider" aria-expanded="false"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="m6 24 13-13M18 9a6 6 0 0 0 8-7l-4 4-4-2-2-4a6 6 0 0 0-7 8L3 15a5 5 0 0 0 7 7l8-8"/></svg><span>TOOLS</span></button>
             <nav id="mobile-tool-slider" aria-label="Select tool">
               <button type="button" data-tool="measure" aria-label="Tape measure"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 5h17a5 5 0 0 1 5 5v10H5zM8 20v8h11M12 6v7M17 6v4M22 6v7M8 24h4"/><circle cx="17" cy="14" r="3"/></svg><span>MEASURE</span></button>
               <button type="button" data-tool="drill" aria-label="Drill fixing hole"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 7h15v10H3zM18 10h7M25 9v4M6 17v10h9v-4l-3-6M5 27h12"/></svg><span>DRILL</span></button>
@@ -344,6 +345,15 @@ export class HUD {
       if (kind === 'hose') window.dispatchEvent(new CustomEvent('wirehouse:cycle-water-mode'));
       if (kind === 'hammer') window.dispatchEvent(new CustomEvent('wirehouse:cycle-hammer-mode'));
     });
+    const toolsToggle = root.querySelector<HTMLButtonElement>('#site-pro-tools')!;
+    const setToolsOpen = (open: boolean): void => {
+      this.shell.dataset.toolsOpen = String(open);
+      toolsToggle.setAttribute('aria-expanded', String(open));
+      toolsToggle.setAttribute('aria-label', open ? 'Close tools' : 'Open tools');
+      toolsToggle.querySelector('span')!.textContent = open ? 'CLOSE' : 'TOOLS';
+    };
+    toolsToggle.addEventListener('click', () => setToolsOpen(this.shell.dataset.toolsOpen !== 'true'));
+    window.addEventListener('wirehouse:select-tool', () => setToolsOpen(false));
     const settingsToggle = root.querySelector<HTMLButtonElement>('#settings-toggle');
     const settingsPanel = root.querySelector<HTMLElement>('#settings-panel');
     const setSettingsOpen = (open: boolean): void => {
