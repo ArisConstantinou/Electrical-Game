@@ -11,8 +11,8 @@ try{
   for(const layout of [{name:'desktop',width:1366,height:768,mobile:false},{name:'portrait',width:390,height:844,mobile:true},{name:'landscape',width:844,height:390,mobile:true}]){
     const context=await browser.newContext({viewport:{width:layout.width,height:layout.height},isMobile:layout.mobile,hasTouch:layout.mobile});await blockPointerLock(context);
     const page=await context.newPage();page.on('pageerror',error=>report.errors.push(error.message));
-    await page.goto(url);await page.waitForFunction(()=>window.__wireTheHouse?.mixing,undefined,{timeout:120000});await page.locator('#start-button').click();await page.waitForFunction(()=>getComputedStyle(document.querySelector('#start-screen')).opacity==='0');
-    await page.evaluate(()=>{const g=window.__wireTheHouse,m=g.mixing,c=g.renderer.camera;g.step=()=>{};c.position.set(-.75,g.player.eyeHeight,1.36);c.lookAt(-.75,.3,2.28);c.updateMatrixWorld(true);m.setActive(true);m.update(0,false,false);m.present();});
+    await page.goto(url);await page.waitForFunction(()=>window.__wireTheHouse?.mixing,undefined,{timeout:120000});await page.selectOption('#apprentice-count','0');await page.locator('#start-button').click();await page.waitForFunction(()=>getComputedStyle(document.querySelector('#start-screen')).opacity==='0');
+    await page.evaluate(()=>{const g=window.__wireTheHouse,m=g.mixing,c=g.renderer.camera,b=m.models.bucket.getWorldPosition(c.position.clone());g.step=()=>{};c.position.set(b.x-.55,g.player.eyeHeight,b.z-1.12);c.lookAt(b.x,.3,b.z);c.updateMatrixWorld(true);m.setActive(true);m.update(0,false,false);m.present();});
     const sample=()=>page.evaluate(()=>{
       const g=window.__wireTheHouse,m=g.mixing,model=m.heldTools.get(m.tool);
       m.present();
@@ -35,7 +35,7 @@ try{
           const g=window.__wireTheHouse,m=g.mixing,c=g.renderer.camera;
           const acceptedRequest=m.action('insert');const pending=Boolean(m.mixerApproach)&&!m.inserted;m.chooseTool('mixer');
           m.useAimedObject({kind:'bucket',object:m.models.bucket});const aimedPending=Boolean(m.mixerApproach)&&!m.inserted;m.chooseTool('mixer');
-          g.player.crouched=true;c.position.set(-.75,.95,1.88);c.lookAt(-.75,.3,2.28);c.updateMatrixWorld(true);
+          const b=m.models.bucket.getWorldPosition(c.position.clone());g.player.crouched=true;c.position.set(b.x-.18,.95,b.z-.32);c.lookAt(b.x,.3,b.z);c.updateMatrixWorld(true);
           const accepted=m.action('insert');m.present();
           return{acceptedRequest,pending,aimedPending,accepted,hands:m.arms.map(a=>({reach:a.shoulder.distanceTo(a.wrist),forearm:a.elbow.distanceTo(a.wrist),upperVisible:a.upper.visible}))};
         });
@@ -45,7 +45,10 @@ try{
         assert(inserted.hands.every(hand=>!hand.upperVisible),'Mounted mixer keeps hidden shoulder caps behind the first-person camera');
         await shot('mixer-inserted');
         const left=await page.evaluate(()=>{const g=window.__wireTheHouse,m=g.mixing;g.renderer.camera.position.z-=1;m.update(1/60,false,true);m.present();return{inserted:m.inserted,running:m.mixerRunning,held:m.telemetry.heldToolVisible};});
-        assert(!left.inserted&&!left.running&&left.held,'Walking away lifts the mixer into reachable hands and stops motor');cases.push({inserted,left});continue;
+        assert(!left.inserted&&!left.running&&left.held,'Walking away lifts the mixer into reachable hands and stops motor');
+        const edge=await page.evaluate(()=>{const g=window.__wireTheHouse,m=g.mixing,c=g.renderer.camera,b=m.models.bucket.getWorldPosition(c.position.clone());g.player.crouched=true;c.position.set(b.x-.3,.95,b.z-.55);c.lookAt(b.x,.3,b.z);g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;c.updateMatrixWorld(true);const initiallyReachable=m.canReachMixer(m.models.bucket),accepted=m.action('insert'),pending=m.telemetry.approaching;for(let i=0;i<50;i++)m.update(1/60,false,false);m.present();return{initiallyReachable,accepted,pending,inserted:m.inserted,hands:m.arms.map(a=>({reach:a.shoulder.distanceTo(a.wrist),forearm:a.elbow.distanceTo(a.wrist)}))};});
+        assert(!edge.initiallyReachable&&edge.accepted&&edge.pending&&edge.inserted,'Marginal crouched stance must first move into reach');
+        assert(edge.hands.every(hand=>hand.reach<.57&&Math.abs(hand.forearm-.27)<.001),'Automatic mixer stance keeps both forearms connected');cases.push({inserted,left,edge});continue;
       }
       await page.evaluate(tool=>{const m=window.__wireTheHouse.mixing;m.beginActivity(tool==='trowel'?'tear':'sand',tool==='trowel'?m.models.sacks[0]:m.models.sand);},tool);
       const frames=[];

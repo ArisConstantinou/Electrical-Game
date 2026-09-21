@@ -222,16 +222,22 @@ export class MixingStation {
     const point=object.getWorldPosition(new THREE.Vector3()),eye=this.game.renderer.camera.position;
     return Math.hypot(point.x-eye.x,point.z-eye.z)<=range;
   }
+  private mixerWorkPosition(object:THREE.Object3D):THREE.Vector3{
+    const origin=object.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0,.06,0));
+    const toward=this.game.renderer.camera.position.clone().sub(origin);toward.y=0;
+    if(toward.lengthSq()>.001)origin.addScaledVector(toward.normalize(),.12);
+    return origin;
+  }
   private canReachMixer(object:THREE.Object3D):boolean{
     const c=this.game.renderer.camera,right=new THREE.Vector3(1,0,0).applyQuaternion(c.quaternion);
-    const origin=object.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0,.06,0));
+    const origin=this.mixerWorkPosition(object);
     const facing=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),Math.atan2(-right.z,right.x));
     for(const side of [1,-1]){
       const key=side===1?'gripPoint':'secondaryGripPoint',rotationKey=side===1?'gripQuaternion':'secondaryGripQuaternion';
       const hand=this.toolHands.get('mixer')![side===1?0:1];
       const wrist=new THREE.Vector3().fromArray(hand.userData.wristPoint).applyQuaternion(new THREE.Quaternion().fromArray(this.models.mixer.userData[rotationKey])).add(new THREE.Vector3().fromArray(this.models.mixer.userData[key])).applyQuaternion(facing).add(origin);
-      const shoulder=c.position.clone().addScaledVector(right,side*.18).add(new THREE.Vector3(0,-.3,0));
-      if(wrist.distanceTo(shoulder)>.63)return false;
+      const shoulder=new THREE.Vector3(side*.18,-.10,.03).applyQuaternion(c.quaternion).add(c.position);
+      if(wrist.distanceTo(shoulder)>.545)return false;
     }
     return true;
   }
@@ -247,7 +253,7 @@ export class MixingStation {
     const offset=c.position.clone().sub(origin);offset.y=0;
     if(offset.lengthSq()<.001){c.getWorldDirection(offset).negate();offset.y=0;}
     offset.normalize();
-    const to=origin.clone().addScaledVector(offset,.49);to.y=.95;
+    const to=origin.clone().addScaledVector(offset,.45);to.y=.95;
     const {room,player:config}=GAME_CONFIG;
     // Never slide the work stance beyond the same room bounds as normal walking.
     if(Math.abs(to.x)>room.width/2-config.radius||to.z< -room.depth/2+config.radius+.25||to.z>room.depth/2-config.radius){this.mixerReachHint(object);return false;}
@@ -592,7 +598,7 @@ export class MixingStation {
     m.sacks.forEach((sack,i)=>{setCementSackOpen(sack,state.sacks[i].open);sack.visible=i===activeSack;});
     // The visible heightfield owns the finite source; whole-pile scaling
     // would erase the player's cut and make every scoop look identical.
-    if(this.inserted||this.cleanSeconds>0){const right=new THREE.Vector3(1,0,0).applyQuaternion(this.game.renderer.camera.quaternion);m.mixer.position.copy(this.inserted?m.bucket.position:m.rinse.position);m.mixer.position.y+=.06;m.mixer.rotation.set(0,Math.atan2(-right.z,right.x),0);m.paddle.rotation.y+=this.mixingNow||this.cleanSeconds>0?.31:0;}
+    if(this.inserted||this.cleanSeconds>0){const right=new THREE.Vector3(1,0,0).applyQuaternion(this.game.renderer.camera.quaternion);m.mixer.position.copy(m.group.worldToLocal(this.mixerWorkPosition(this.inserted?m.bucket:m.rinse)));m.mixer.rotation.set(0,Math.atan2(-right.z,right.x),0);m.paddle.rotation.y+=this.mixingNow||this.cleanSeconds>0?.31:0;}
     else{m.mixer.position.copy(this.mixerHome);m.mixer.rotation.copy(this.mixerRotation);}
     m.mixer.visible=this.inserted||this.cleanSeconds>0||this.tool!=='mixer'||!this.active;m.shovel.visible=this.tool!=='shovel'||!this.active;
     this.game.fpsRig.visible=!this.blocksWork&&!(this.interactionTargeted&&this.game.selectedTool==='fitting');
