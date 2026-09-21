@@ -102,11 +102,11 @@ export class HUD {
             </div>
           </section>
           <aside id="desktop-key-guide" class="hud-card" aria-label="Keyboard and mouse controls">
-            <div><kbd>WASD</kbd><span>MOVE</span><kbd>MOUSE</kbd><span>LOOK</span><kbd>SHIFT</kbd><span>FAST</span><kbd>V</kbd><span>CROUCH / STAND</span></div>
+            <div><kbd>WASD</kbd><span>MOVE</span><kbd>MOUSE</kbd><span>LOOK</span><kbd>SHIFT</kbd><span>FAST</span><kbd>H</kbd><span>CROUCH / STAND</span></div>
             <div><kbd>LMB</kbd><span>USE / HOLD</span><kbd>E</kbd><span>INTERACT</span><kbd>WHEEL</kbd><span>SWITCH TOOL</span></div>
             <div><kbd>1–9</kbd><span>SELECT TOOL</span><kbd>9 / M</kbd><span>MEASURE / MARK</span><kbd>C</kbd><span>FULL BODY VIEW</span></div>
             <div><kbd>0</kbd><span>DRILL</span><kbd>B</kbd><span>DRIVER</span><kbd>L</kbd><span>LASER</span></div>
-            <div><kbd>Q</kbd><span>TOOL SIDE</span><kbd>T / R</kbd><span>CHISEL / ANGLE</span><kbd>F</kbd><span>FULLSCREEN</span><kbd>ESC</kbd><span>RELEASE MOUSE</span></div>
+            <div><kbd>T</kbd><span>POINT</span><kbd>V</kbd><span>PLAN</span><kbd>SHIFT T / R</kbd><span>CHISEL / ANGLE</span><kbd>F</kbd><span>FULLSCREEN</span></div>
           </aside>
           <div id="mortar-panel" class="hud-card" hidden>
             <strong id="mortar-readout"></strong><div id="water-gun-readout" hidden></div>
