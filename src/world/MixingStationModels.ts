@@ -2,10 +2,20 @@ import * as THREE from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import { attribute, mix, texture as sampleTexture, uv, vec3 } from 'three/tsl';
 import { createConcreteMixer, createWheelbarrow, type WheelbarrowModel } from './SiteEquipmentModels';
+import { SandPileSimulation } from './SandPileSimulation';
 
 type Point = readonly [number, number, number];
 const material = (color: number, roughness = .8, metalness = 0): THREE.MeshStandardMaterial => new THREE.MeshStandardMaterial({ color, roughness, metalness });
 const steel = (): THREE.MeshStandardMaterial => material(0x9ca5a2, .34, .76);
+let sandScan: THREE.Texture | null = null;
+function sandAlbedo(): THREE.Texture {
+  if (sandScan) return sandScan;
+  sandScan = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}assets/site-materials/gravelly_sand-albedo-512.webp`);
+  sandScan.colorSpace = THREE.SRGBColorSpace;
+  sandScan.wrapS = sandScan.wrapT = THREE.RepeatWrapping;
+  sandScan.anisotropy = 4;
+  return sandScan;
+}
 
 function part(parent: THREE.Object3D, geometry: THREE.BufferGeometry, mat: THREE.Material, at: Point, name: string): THREE.Mesh {
   const mesh = new THREE.Mesh(geometry, mat);
@@ -108,8 +118,16 @@ export function createShovelModel(): THREE.Group {
   rod(group, [0, .95, .022], [-.063, 1.08, .022], .014, black, 'shovel-D-left');
   rod(group, [0, .95, .022], [.063, 1.08, .022], .014, black, 'shovel-D-right');
   rod(group, [-.063, 1.08, .022], [.063, 1.08, .022], .020, black, 'shovel-D-grip');
-  const load = part(group, new THREE.SphereGeometry(1, 16, 8), material(0xb89a67, 1), [0, .135, .029], 'shovel-sand-load');
-  load.scale.set(.081, .077, .026); load.visible = false; load.userData.shovelLoadPart = true;
+  const loadGeometry = new THREE.SphereGeometry(1, 22, 12);
+  const grains = loadGeometry.getAttribute('position');
+  for (let i = 0; i < grains.count; i++) {
+    const x = grains.getX(i), y = grains.getY(i), z = grains.getZ(i);
+    const rough = 1 + .075 * Math.sin(x * 17 + y * 11) * Math.cos(y * 23 - z * 9);
+    grains.setXYZ(i, x * rough, y * rough, z * rough);
+  }
+  loadGeometry.computeVertexNormals();
+  const load = part(group, loadGeometry, new THREE.MeshStandardMaterial({ map: sandAlbedo(), roughness: 1 }), [0, .145, .052], 'shovel-sand-load');
+  load.scale.set(.103, .107, .040); load.visible = false; load.userData.shovelLoadPart = true;
   group.userData.gripPoint = [0, 1.08, .022]; group.userData.secondaryGripPoint = [0, .60, .022]; group.userData.tipPoint = [0, .055, .022];
   group.userData.gripQuaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),new THREE.Vector3(-1,0,0)).toArray();
   group.userData.secondaryGripQuaternion = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),Math.PI).toArray();
@@ -161,36 +179,13 @@ export function createMixerModel(): THREE.Group {
   return group;
 }
 
-function sandMound(): THREE.Mesh {
-  const vertices: number[] = [], uvs: number[] = [], colors: number[] = [], indices: number[] = [];
-  const rings = 24, sides = 80, base = new THREE.Color(0xffffff);
-  for (let ring = 0; ring <= rings; ring++) for (let side = 0; side <= sides; side++) {
-    const t = ring / rings, angle = side / sides * Math.PI * 2;
-    const irregular = 1 + Math.sin(angle * 3 + .3) * .068 + Math.cos(angle * 7) * .028;
-    const x = Math.cos(angle) * t * 1.12 * irregular + (1 - t) * .10;
-    const z = Math.sin(angle) * t * .91 * irregular - (1 - t) * .09;
-    const main = .55 * Math.pow(1 - t, 1.02);
-    const secondaryRadius = Math.hypot((x + .36) / .62, (z - .12) / .54);
-    const secondary = .22 * Math.pow(Math.max(0, 1 - secondaryRadius), 1.12);
-    const interruption = Math.sin(angle * 6 + t * 13) * .013 * t * (1 - t)
-      + Math.cos(angle * 11 - t * 18) * .008 * t * (1 - t);
-    const height = Math.max(main, secondary) + interruption;
-    vertices.push(x, height + .008, z);
-    uvs.push(.5 + x / 2.5, .5 + z / 2.5);
-    const shade = .96 + Math.sin(side * 13.47 + ring * 37.71) * .024;
-    colors.push(base.r * shade, base.g * shade, base.b * shade);
-    if (ring < rings && side < sides) { const a = ring * (sides + 1) + side, b = a + sides + 1; indices.push(a, a + 1, b, a + 1, b + 1, b); }
-  }
-  const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3)); geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2)); geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); geometry.setIndex(indices); geometry.computeVertexNormals();
+function sandMound(): SandPileSimulation {
   const mat = new MeshStandardNodeMaterial({roughness:1,metalness:0});
   mat.name = 'Scanned construction sand and warm fine aggregate';
-  const scan = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}assets/site-materials/gravelly_sand-albedo-512.webp`);
-  scan.colorSpace = THREE.SRGBColorSpace;
-  scan.wrapS = scan.wrapT = THREE.RepeatWrapping;
-  scan.anisotropy = 4;
+  const scan = sandAlbedo();
   const fineSand = new THREE.Color(0xe0c393);
   mat.colorNode = mix(vec3(fineSand.r,fineSand.g,fineSand.b),sampleTexture(scan,uv()).rgb,.66).mul(attribute<'vec3'>('color','vec3'));
-  const sand = new THREE.Mesh(geometry, mat); sand.name = 'mixing-large-sand-mound'; sand.userData.studioEntityId = 'mixing:sand'; sand.castShadow = true; sand.receiveShadow = true; return sand;
+  return new SandPileSimulation(mat);
 }
 
 function cementSack(index: number): THREE.Group {
@@ -221,7 +216,7 @@ export interface MixingStationModels {
   group: THREE.Group;
   bucket: THREE.Group;
   fill: THREE.Mesh;
-  sand: THREE.Object3D;
+  sand: SandPileSimulation;
   sacks: THREE.Group[];
   shovel: THREE.Group;
   mixer: THREE.Group;

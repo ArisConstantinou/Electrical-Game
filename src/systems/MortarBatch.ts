@@ -54,6 +54,7 @@ export class MortarBatch {
   get waterLitres(): number { return this.waterKg; }
   get cementScoops(): number { return this.cementKg / (MORTAR_RECIPE.cementLitresPerScoop * MORTAR_RECIPE.cementBulkKgPerLitre); }
   get sandScoops(): number { return this.sandKg / (MORTAR_RECIPE.sandLitresPerScoop * MORTAR_RECIPE.sandBulkKgPerLitre); }
+  get sandRemainingKg(): number { return this.sandStock; }
   get volumeLitres(): number { return this.volume(this.waterKg, this.cementKg, this.sandKg); }
   get mixProgress(): number { return this.mixingTime / MORTAR_RECIPE.mixingSeconds; }
   get ready(): boolean { return this.hasIngredients && this.mixingTime >= MORTAR_RECIPE.mixingSeconds; }
