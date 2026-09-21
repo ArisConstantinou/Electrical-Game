@@ -11,14 +11,24 @@ const browser=await chromium.launch({channel:'chrome',headless:true});
 const steps=(page,n=3)=>page.evaluate(n=>{for(let i=0;i<n;i++)window.__laserStep(1/60,1/60,false);},n);
 const keys={measure:'Digit9',drill:'Digit0',laser:'KeyL',driver:'KeyB',hammer:'Digit4'};
 async function select(page,tool,mobile){
-  if(mobile)await page.locator(`[data-tool="${tool}"]`).tap();else await page.keyboard.press(keys[tool]);
+  if(mobile){
+    if(!await page.locator('#mobile-tool-slider').isVisible())await page.locator('#site-pro-tools').tap();
+    const button=page.locator(`#mobile-tool-slider [data-tool="${tool}"]`);
+    await button.scrollIntoViewIfNeeded();await button.tap();
+  }else await page.keyboard.press(keys[tool]);
   await steps(page,60);await page.waitForTimeout(1300);
 }
 async function aim(page,kind='side',height=1.2,distance=.43){
   await page.evaluate(({kind,height,distance})=>{
     const g=window.__wireTheHouse,c=g.renderer.camera;
     g.hammerWorkStance.restore(c);
-    if(kind==='side'){const wall=g.room.getObjectByName('Left concrete wall'),surface=wall.position.x+wall.geometry.parameters.width/2;c.position.set(surface+distance,g.player.eyeHeight,0);c.lookAt(surface,height,0);}
+    if(kind==='side'){
+      const side=g.room.getObjectByName('Left concrete wall');
+      const segment=side?.getObjectByName('Solid wall before window opening');
+      if(!segment?.geometry?.parameters?.width)throw new Error('Left wall segment is missing');
+      const surface=segment.position.x+segment.geometry.parameters.width/2+.02;
+      c.position.set(surface+distance,g.player.eyeHeight,0);c.lookAt(surface,height,0);
+    }
     else{c.position.set(0,g.player.eyeHeight,g.room.brickWall.volume.frontZ+distance);c.lookAt(0,height,g.room.brickWall.volume.frontZ);}
     g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;
     g.player.workPosition.locked=false;g.player.workPosition.released=false;
@@ -27,7 +37,7 @@ async function aim(page,kind='side',height=1.2,distance=.43){
 }
 async function hold(page,mobile,n){
   if(mobile){
-    const b=await page.locator('#look-joystick').boundingBox(),cdp=await page.context().newCDPSession(page);
+    const b=await page.locator('#site-pro-use').boundingBox(),cdp=await page.context().newCDPSession(page);
     await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:b.x+b.width/2,y:b.y+b.height/2,id:77}]});
     await steps(page,n);await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await cdp.detach();
   }else{await page.keyboard.down('KeyE');await steps(page,n);await page.keyboard.up('KeyE');}

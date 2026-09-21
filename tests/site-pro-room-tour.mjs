@@ -79,8 +79,33 @@ try {
     assert.equal(rearContact.withoutRear, 'no-wall', `${device.name}: rear surface is required for the hit`);
     assert.equal(rearContact.withRear.mode, 'ready', `${device.name}: rear surface can be measured`);
     assert.equal(rearContact.withRear.targetStable, true, `${device.name}: rear wall has stable backing`);
-    assert(Math.abs(rearContact.withRear.target[2] - 3.596) < .02, `${device.name}: tape contacts the visible rear elevation`);
+    assert(Math.abs(rearContact.withRear.target[2] - 3.576) < .005, `${device.name}: tape must contact the visible rear brick face, not the backing`);
     report.cases.push({ device: device.name, view: 'rear-work-contact', state: rearContact });
+    const faceContacts = await page.evaluate(() => {
+      const game = window.__wireTheHouse, camera = game.renderer.camera;
+      const course = 3 / 23;
+      const hit = (x, y, z, yaw) => {
+        camera.position.set(x, y, z); camera.rotation.set(0, yaw, 0, 'YXZ'); camera.updateMatrixWorld(true);
+        game.heightMeasure.update(camera, true, () => true);
+        return game.heightMeasure.telemetry;
+      };
+      return {
+        rearBrick: hit(0, 1.35, 3, Math.PI),
+        rearJoint: hit(0, course * 10, 3, Math.PI),
+        leftBrick: hit(-2.35, 1.35, .18, Math.PI / 2),
+        leftJoint: hit(-2.35, course * 10, .18, Math.PI / 2),
+        leftOpening: hit(-2.35, 1.65, 2, Math.PI / 2),
+        rightBrick: hit(2.35, 1.35, .18, -Math.PI / 2),
+      };
+    });
+    assert(Math.abs(faceContacts.rearBrick.target?.[2] - 3.576) < .005 && Math.abs(faceContacts.rearJoint.target?.[2] - 3.596) < .005,
+      `${device.name}: rear clay face and recessed joint do not match the visible geometry: ${JSON.stringify(faceContacts)}`);
+    assert(Math.abs(faceContacts.leftBrick.target?.[0] + 3.776) < .005 && Math.abs(faceContacts.leftJoint.target?.[0] + 3.796) < .005,
+      `${device.name}: left clay face and recessed joint do not match the visible geometry: ${JSON.stringify(faceContacts)}`);
+    assert.equal(faceContacts.leftOpening.mode, 'no-wall', `${device.name}: window opening has an invisible hitbox`);
+    assert(Math.abs(faceContacts.rightBrick.target?.[0] - 3.776) < .005,
+      `${device.name}: right brick contact misses its visible face: ${JSON.stringify(faceContacts.rightBrick)}`);
+    report.cases.push({ device: device.name, view: 'face-joint-and-opening-contact', state: faceContacts });
     const masonry = await page.evaluate(() => {
       const room = window.__wireTheHouse.room;
       const left = room.referenceWalls.find(wall => wall.name === 'Left concrete wall');
