@@ -29,7 +29,6 @@ export class ExteriorCourtyard extends THREE.Group {
     const plaster = siteMaterial('plaster', 0xf2e8d5, 2.6, 1.4);
     const concrete = siteMaterial('concrete', 0xdbd6c9, 1.8, 1.4);
     const paving = siteMaterial('floor', 0xe2ddd4, .4, .4);
-    const recess = new THREE.MeshStandardMaterial({ color: 0x4b504a, roughness: 1 });
     const steel = new THREE.MeshStandardMaterial({ color: 0x444844, metalness: .45, roughness: .65 });
     const barkAlbedo = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}assets/site-materials/bark-willow-512.webp`);
     barkAlbedo.colorSpace = THREE.SRGBColorSpace;
@@ -131,6 +130,13 @@ export class ExteriorCourtyard extends THREE.Group {
     const neighbour = new THREE.Group(); neighbour.name = 'Offset adjacent residential block';
     neighbour.position.z = -4.2; this.add(neighbour); parent = neighbour;
     const facadeX = -11.15, wallThickness = .31, facadeWidth = 10.4;
+    const bayBackMaterial = siteMaterial('plaster', 0xb7b6aa, 1.3, .8);
+    const baySideMaterial = siteMaterial('plaster', 0xd2cabe, 1.1, .8);
+    const baySideWalls: Array<{ x: number; y: number; z: number; sx: number; sy: number; sz: number }> = [];
+    const baySlabs: typeof baySideWalls = [];
+    const bayBacks: typeof baySideWalls = [];
+    const addBaySurface = (parts: typeof baySideWalls, x: number, y: number, z: number, sx: number, sy: number, sz: number) =>
+      parts.push({ x, y, z, sx, sy, sz });
     for (const storey of [0, 1]) {
       const base = storey * 2.64;
       block('Neighbour facade below open bays', plaster, facadeX, base + .43, 0, wallThickness, .86, facadeWidth);
@@ -138,11 +144,32 @@ export class ExteriorCourtyard extends THREE.Group {
       for (const [z, width] of [[-4.415, 1.57], [-.25, 2.44], [4.165, 2.07]] as const)
         block('Solid masonry between neighbouring openings', plaster, facadeX, base + 1.51, z, wallThickness, 1.30, width);
       for (const z of [-2.55, 2.05]) {
-        block('Deep unglazed room behind exterior opening', recess, facadeX - .30, base + 1.51, z, .035, 1.30, 2.16, false);
+        // The aperture opens into a real 1.5 m-deep unfinished room. Its side
+        // returns, floor and ceiling move against the rear wall with parallax.
+        addBaySurface(bayBacks, facadeX - 1.51, base + 1.51, z, .12, 1.30, 2.16);
+        for (const edge of [-1, 1])
+          addBaySurface(baySideWalls, facadeX - .78, base + 1.51, z + edge * 1.04, 1.48, 1.30, .12);
+        addBaySurface(baySlabs, facadeX - .78, base + .855, z, 1.48, .09, 2.16);
+        addBaySurface(baySlabs, facadeX - .78, base + 2.165, z, 1.48, .09, 2.16);
         block('Cast sill under exterior opening', concrete, facadeX + .04, base + .86, z, .46, .09, 2.28);
         block('Cast lintel over exterior opening', concrete, facadeX + .04, base + 2.11, z, .46, .12, 2.28);
       }
       block('Exposed horizontal concrete frame', concrete, facadeX + .18, base + 2.62, 0, .67, .18, facadeWidth + .15);
+    }
+    for (const [name, material, parts] of [
+      ['Recessed plaster rear walls in open bays', bayBackMaterial, bayBacks],
+      ['Plastered side returns inside open bays', baySideMaterial, baySideWalls],
+      ['Structural slab returns inside open bays', concrete, baySlabs],
+    ] as const) {
+      const interiors = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), material, parts.length);
+      interiors.name = name;
+      for (let i = 0; i < parts.length; i++) {
+        const { x, y, z, sx, sy, sz } = parts[i];
+        interiors.setMatrixAt(i, matrix.compose(new THREE.Vector3(x, y, z), new THREE.Quaternion(), new THREE.Vector3(sx, sy, sz)));
+      }
+      interiors.receiveShadow = true;
+      interiors.raycast = () => undefined;
+      interiors.computeBoundingSphere(); neighbour.add(interiors);
     }
     for (const z of [-5.12, -.25, 5.12])
       block('Neighbouring reinforced-concrete pier', concrete, facadeX + .10, 2.68, z, .51, 5.36, .26);
