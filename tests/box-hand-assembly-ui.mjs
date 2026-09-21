@@ -34,7 +34,7 @@ try{
     await page.goto(url);await page.waitForFunction(()=>window.__wireTheHouse?.roomWater.waterProActive,undefined,{timeout:120000});await page.locator('#start-button')[mobile?'tap':'click']();const prepared=await fixture(page);assert(prepared.removed>0);
     if(mobile)await page.locator('[data-tool="fitting"]').tap();else await page.keyboard.press('Digit5');await step(page,4);
     const toolOnly=await read(page);assert.equal(toolOnly.selected,'fitting');assert.equal(toolOnly.assemblyActive,false,'selecting BOX must not enter assembly');assert.equal(toolOnly.datasetAssembly,'false');assert.equal(toolOnly.zoneRootVisible,false,'inactive BOX must not show assembly zones');assert(toolOnly.toolInstruction.includes('Q · LIVE ASSEMBLY'));
-    assert.equal(await page.locator('#box-assembly-toggle').textContent(),'Q · OPEN LIVE ASSEMBLY');
+    assert.equal(await page.locator('#box-assembly-toggle').textContent(),mobile?'ΣΥΝΑΡΜΟΛΟΓΗΣΗ ΚΟΥΤΙΩΝ':'Q · OPEN LIVE ASSEMBLY');
     await page.evaluate(async()=>{const r=window.__wireTheHouse.renderer;await r.waitForFrame();r.render();await r.waitForFrame();});await page.screenshot({path:`${out}/${name}-tool-only.png`});
     if(mobile)await page.locator('#box-assembly-toggle').tap();else{
       await page.mouse.move(viewport.width*.5,viewport.height*.5);await page.mouse.wheel(0,100);await step(page,2);assert.equal((await read(page)).selected,'level','wheel must pass the inactive BOX tool');
@@ -42,7 +42,7 @@ try{
     }
     await step(page,4);
     const initial=await read(page),initialVisibleIds=new Set(initial.visible.map(point=>point.id));assert.equal(initial.assemblyActive,true,'Q/touch control must enter live assembly');assert.equal(initial.zoneRootVisible,true);assert.equal(initial.worker?.loaded,true,'new anatomical body must load alongside box assembly');assert.equal(initial.worker.bones,52);assert.equal(initial.legacySkinVisible,false,'legacy segmented skin must stay hidden');assert.deepEqual(initial.referenceKeys,[null,null],'independent fitting hands must not replay the old one-box reference');assert.equal(initial.selected,'fitting');assert.equal(initial.assembly.modules.length,1);assert.deepEqual(initial.arms.map(a=>a.gripRole).sort(),['assembly','candidate']);assert.equal(initial.zones.length,4);
-    assert.equal(await page.locator('#box-assembly-toggle').textContent(),'ESC · CLOSE ASSEMBLY');assert(await page.locator('#box-undo').isVisible());assert(await page.locator('#box-reset').isVisible());assert(await page.locator('#box-undo').isDisabled(),'UNDO is disabled when only the starting box remains');
+    assert.equal(await page.locator('#box-assembly-toggle').textContent(),mobile?'ΚΛΕΙΣΕ':'ESC · CLOSE ASSEMBLY');assert(await page.locator('#box-undo').isVisible());assert(await page.locator('#box-reset').isVisible());assert(await page.locator('#box-undo').isDisabled(),'UNDO is disabled when only the starting box remains');
     if(mobile){
       await page.locator('[data-box-zone="2"]').tap();await step(page,30);assert.equal((await read(page)).assembly.modules.length,2);assert.equal(await page.locator('#box-undo').isDisabled(),false);
       await page.locator('#box-undo').tap();await step(page,2);assert.equal((await read(page)).assembly.modules.length,1,'touch UNDO removes the last box');

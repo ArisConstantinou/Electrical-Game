@@ -365,7 +365,7 @@ export class Game {
       :this.selectedTool==='laser'?(this.laserLevel.telemetry.mounted?'TAP TO PICK UP':'TAP TO MOUNT')
       :this.selectedTool==='hammer'?(this.hammerSpeed===0?'SPEED 0 · PAUSED':hammerStatus[this.fpsRig.contactStatus])
       :this.selectedTool==='trowel'?(this.mortar.throwFeedback.overheld?'RELEASE TO RESET':this.mortar.recovery>0?'RELOADING':useHeld?'RELEASE TO THROW':'HOLD TO LOAD')
-      :this.selectedTool==='fitting'?(!this.boxAssemblyActive?'PRESS Q · LIVE ASSEMBLY':aimedBox?'TAP TO PICK UP':this.boxFitPreview.mode==='fits'?'TAP TO PLACE BOX':this.boxFitPreview.mode==='proud'?`PLACE · +${this.boxFitPreview.telemetry.proudDepthMm} mm`:this.boxFitPreview.mode==='blocked'?'POSITION BLOCKED':'MOVE INTO REACH')
+      :this.selectedTool==='fitting'?(!this.boxAssemblyActive?'ΣΥΝΑΡΜΟΛΟΓΗΣΗ':aimedBox?'TAP TO PICK UP':this.boxFitPreview.mode==='fits'?'TAP TO PLACE BOX':this.boxFitPreview.mode==='proud'?`PLACE · +${this.boxFitPreview.telemetry.proudDepthMm} mm`:this.boxFitPreview.mode==='blocked'?'POSITION BLOCKED':'MOVE INTO REACH')
       :this.selectedTool==='level'?(this.mission.activePoint?.stage==='leveling'?'ADJUST SELECTED BOX':aimedBox?'TAP TO PLACE LEVEL':'AIM AT A BOX')
       :useHeld?'USING TOOL':'HOLD TO USE';
     // While the preparation bay owns input, MixingStation is the sole writer
@@ -397,13 +397,9 @@ export class Game {
     this.pvc.present();
     this.workerBody.overview=this.frontBodyView||this.modelInspector.live;
     const bodyPlayer=this.mixing.wheelbarrow.driving?{eyeHeight:1.65,velocity:this.player.velocity,yaw:this.mixing.wheelbarrow.telemetry.yaw+Math.PI,pitch:-.60}:this.pvc.focused?{eyeHeight:this.renderer.camera.position.y,velocity:this.player.velocity,yaw:this.player.yaw,pitch:this.player.pitch}:this.player;
-    const bodylessPvc=this.pvc.focused&&['marking','spreading','spring','inserting','bending','review','extracting'].includes(this.pvc.phase)&&!this.workerBody.overview;
-    if(!bodylessPvc&&(this.selectedTool!=='hose'||mixingOwnedInput||pvcOwnedInput))this.workerBody.update(dt,this.renderer.camera,bodyPlayer,this.fpsRig,this.selectedTool,this.input.actionHeld,mixingOwnedInput||this.pvc.blocksWork,this.pvc.blocksWork?this.pvc.anatomicalGrips():this.mixing.anatomicalGrips(),this.workSurfaces.frontForBounds);
+    if(this.selectedTool!=='hose'||mixingOwnedInput||pvcOwnedInput)this.workerBody.update(dt,this.renderer.camera,bodyPlayer,this.fpsRig,this.selectedTool,this.input.actionHeld,mixingOwnedInput||this.pvc.blocksWork,this.pvc.blocksWork?this.pvc.anatomicalGrips():this.mixing.anatomicalGrips(),this.workSurfaces.frontForBounds);
     this.mixing.useAnatomicalBody(this.workerBody.loaded);
     this.pvc.useAnatomicalBody();
-    // Pipe work owns a clean close-up: keep the authored worker intact but
-    // hide it so neither torso nor head can cover marking, spring or bending.
-    if(bodylessPvc)this.workerBody.visible=false;
     this.hoseSupply.update(this.selectedTool==='hose'&&this.fpsRig.visible&&!mixingOwnedInput&&!pvcOwnedInput);
     if(this.modelInspector.active&&this.modelInspector.live)this.modelInspector.afterWorld(dt);
     else if(this.frontBodyView)this.updateFrontBodyCamera();
@@ -766,7 +762,8 @@ export class Game {
     // one hammer strike rather than turning a held pointer into auto-repeat.
     if (changed && tool === 'hammer' && this.input.actionHeld) this.input.actionRequested = true;
     if (tool === 'spring' || tool === 'cutter') this.conduit.selectTool(tool as PvcTool);
-    this.hud.notify(TOOL_HINTS[tool], true, 1200);
+    const touchHint=tool==='fitting'?'ΚΟΥΤΙΑ · άγγιξε ΣΥΝΑΡΜΟΛΟΓΗΣΗ':tool==='measure'?'ΜΕΤΡΗΣΗ · στόχευσε τον τοίχο και άγγιξε ΣΗΜΑΔΙ':tool==='trowel'?'ΜΙΣΤΡΙ · κράτα και άφησε στην πράσινη περιοχή':TOOL_HINTS[tool];
+    this.hud.notify(matchMedia('(pointer:coarse)').matches?touchHint:TOOL_HINTS[tool], true, 1200);
   }
 
   private setBoxAssemblyActive(active:boolean):void {
@@ -774,7 +771,7 @@ export class Game {
     this.fpsRig.setFittingAssemblyActive(this.boxAssemblyActive);
     this.hud.updateBoxAssemblyMode(this.boxAssemblyActive);
     this.boxFitPreview.clearGuide();this.boxFitPreview.invalidate();
-    if(this.boxAssemblyActive)this.hud.notify('LIVE BOX ASSEMBLY · Q or ESC to return to tool switching',true,1500);
+    if(this.boxAssemblyActive)this.hud.notify(matchMedia('(pointer:coarse)').matches?'Διάλεξε πλευρά για σύνδεση · ΤΟΠΟΘ. στον τοίχο':'LIVE BOX ASSEMBLY · Q or ESC to return to tool switching',true,1500);
   }
 
   private cycleTool(direction: number): void {

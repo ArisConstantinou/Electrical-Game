@@ -251,6 +251,12 @@ export class HUD {
     // A completed touch can lack a compatibility click after repeated aim
     // drags. Activate these stance controls on release, once; retain normal
     // mouse and keyboard clicks without a timer that could swallow new input.
+    // Opening the touch toolbar moves its buttons. Swallow the compatibility
+    // click at the container: it may target a DIFFERENT button after reflow.
+    let boxTouchClickPending=false;
+    root.addEventListener('pointerdown',()=>{boxTouchClickPending=false;},true);
+    root.addEventListener('pointerup',event=>{if(event.pointerType!=='mouse'&&(event.target as Element).closest('#box-supply'))boxTouchClickPending=true;},true);
+    root.addEventListener('click',event=>{if(boxTouchClickPending&&event.detail!==0){boxTouchClickPending=false;event.preventDefault();event.stopImmediatePropagation();}},true);
     const bindHammerButton=(selector:string,action:()=>void)=>{
       const button=root.querySelector<HTMLButtonElement>(selector)!;
       let touchClickPending=false;
@@ -435,13 +441,19 @@ export class HUD {
 
   updateBoxAssemblyMode(active:boolean):void {
     this.shell.dataset.boxAssembly=String(active);
+    const touch=matchMedia('(pointer:coarse)').matches;
     this.shell.querySelector('#box-supply-title')!.textContent=active?'LIVE BOX ASSEMBLY':'BACK BOX TOOL';
-    this.shell.querySelector('#box-assembly-toggle')!.textContent=active?'ESC · CLOSE ASSEMBLY':'Q · OPEN LIVE ASSEMBLY';
+    this.shell.querySelector('#box-assembly-toggle')!.textContent=touch?(active?'ΚΛΕΙΣΕ':'ΣΥΝΑΡΜΟΛΟΓΗΣΗ ΚΟΥΤΙΩΝ'):(active?'ESC · CLOSE ASSEMBLY':'Q · OPEN LIVE ASSEMBLY');
+    if(touch){
+      for(const [id,text]of Object.entries({'box-undo':'ΑΝΑΙΡ.','box-reset':'RESET','box-preset-1G':'ΑΡΧΗ 1G','box-preset-2G':'ΑΡΧΗ 2G','box-next-kind':'1G / 2G','box-rotate-candidate':'ΣΤΡΟΦΗ','box-place-assembly':'ΤΟΠΟΘ.'}))this.shell.querySelector('#'+id)!.textContent=text;
+      for(const [zone,text]of [[1,'↑ ΠΑΝΩ'],[4,'← ΑΡΙΣΤ.'],[2,'ΔΕΞΙΑ →'],[3,'↓ ΚΑΤΩ']] as const)this.shell.querySelector(`[data-box-zone="${zone}"] span`)!.textContent=text;
+    }
     this.shell.querySelector<HTMLElement>('#box-history-actions')!.hidden=!active;
     if(this.selectedTool==='fitting')this.tool.querySelector('em')!.textContent=active?'BUILD 1–4 · PLACE RMB':'Q · LIVE ASSEMBLY · WHEEL SWITCHES TOOL';
   }
 
   updateBoxAssembly(snapshot:{modules:Array<{kind:string}>;candidateKind:string;candidateRotation:number},zones:Array<{zone:number;available:boolean}>):void {
+    if(matchMedia('(pointer:coarse)').matches)this.shell.querySelector('#box-next-kind')!.textContent=`${snapshot.candidateKind} · ${snapshot.candidateRotation*90}°`;
     this.shell.querySelector('#box-assembly-count')!.textContent=`${snapshot.modules.length} ${snapshot.modules.length===1?'BOX':'BOXES'}`;
     this.shell.querySelector('#box-candidate-kind')!.textContent=`${snapshot.candidateKind} · ${snapshot.candidateRotation*90}°`;
     this.shell.querySelector<HTMLButtonElement>('#box-undo')!.disabled=snapshot.modules.length<=1;

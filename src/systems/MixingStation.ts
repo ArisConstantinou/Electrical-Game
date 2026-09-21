@@ -456,13 +456,13 @@ export class MixingStation {
   }
   get bondFactor():number{const b=this.supplyBatch;return !b||b.quality==='balanced'?1:b.quality==='wet'?.45:b.quality==='dry'?.55:.65;}
   private promptFor(target:StationTarget|null):string{
-    if(this.wheelbarrow.driving)return'E · ΑΦΗΣΕ ΤΟ ΚΑΡΟΤΣΙ';
+    const key=matchMedia('(pointer:coarse)').matches?'INTERACT':'E';
+    if(this.wheelbarrow.driving)return`${key} · ΑΦΗΣΕ ΤΟ ΚΑΡΟΤΣΙ`;
     if(this.wheelbarrow.state==='righting')return'ΕΠΑΝΑΦΟΡΑ ΚΑΡΟΤΣΙΟΥ';
-    if(target?.kind==='wheelbarrow')return this.wheelbarrow.state==='tipping'?'':this.wheelbarrow.state==='flipped'?'E · ΣΗΚΩΣΕ ΤΟ ΚΑΡΟΤΣΙ':this.active&&this.tool==='shovel'&&this.wheelbarrow.shovelKg>0?'E · ΡΙΞΕ ΤΟΝ ΠΥΛΟ ΣΤΟ ΚΑΡΟΤΣΙ':'E · ΠΙΑΣΕ ΤΟ ΚΑΡΟΤΣΙ';
-    if(target?.kind==='spill')return this.active&&this.tool==='shovel'?(this.wheelbarrow.shovelKg>0?'ΦΟΡΤΩΜΕΝΟ ΦΤΥΑΡΙ · ΣΤΟΧΕΥΣΕ ΤΟ ΚΑΡΟΤΣΙ':'E · ΜΑΖΕΨΕ ΤΟΝ ΠΥΛΟ'):'';
+    if(target?.kind==='wheelbarrow')return this.wheelbarrow.state==='tipping'?'':this.wheelbarrow.state==='flipped'?`${key} · ΣΗΚΩΣΕ ΤΟ ΚΑΡΟΤΣΙ`:this.active&&this.tool==='shovel'&&this.wheelbarrow.shovelKg>0?`${key} · ΡΙΞΕ ΤΟΝ ΠΥΛΟ ΣΤΟ ΚΑΡΟΤΣΙ`:`${key} · ΠΙΑΣΕ ΤΟ ΚΑΡΟΤΣΙ`;
+    if(target?.kind==='spill')return this.active&&this.tool==='shovel'?(this.wheelbarrow.shovelKg>0?'ΦΟΡΤΩΜΕΝΟ ΦΤΥΑΡΙ · ΣΤΟΧΕΥΣΕ ΤΟ ΚΑΡΟΤΣΙ':`${key} · ΜΑΖΕΨΕ ΤΟΝ ΠΥΛΟ`):'';
     if(this.mixerApproach)return'ΠΑΙΡΝΕΙΣ ΘΕΣΗ';
     if(this.activity&&this.pendingTool!==null)return this.pendingTool==='hands'?'ΟΛΟΚΛΗΡΩΝΕΤΑΙ Η ΚΙΝΗΣΗ · ΑΦΗΝΕΙΣ ΤΟ ΕΡΓΑΛΕΙΟ':`ΟΛΟΚΛΗΡΩΝΕΤΑΙ Η ΚΙΝΗΣΗ · ΜΕΤΑ ${names[this.pendingTool]}`;
-    const key=matchMedia('(any-pointer: coarse)').matches?'INTERACT':'E';
     if(!target)return this.carrying?`${key} · ΑΦΗΣΕ ΤΗ ΣΥΚΛΑ`:'';
     if((target.kind==='drum'||target.kind==='bucket')&&((this.tool==='shovel'&&this.batch.getState().heldShovel)||(this.tool==='trowel'&&this.batch.getState().heldTrowel)))return`${key} · ΡΙΞΕ ΤΗ ΔΟΣΗ ${target.kind==='drum'?'ΣΤΟΝ ΚΑΔΟ':'ΣΤΗ ΣΥΚΛΑ'}`;
     if(target.kind==='drum')return`${key} · ${this.tool==='water'?'ΠΡΟΣΘΕΣΕ 5 L ΝΕΡΟ ΣΤΟΝ ΚΑΔΟ':this.tool==='hands'?(this.drum.running?'ΣΤΑΜΑΤΗΣΕ ΜΠΕΤΟΝΙΕΡΑ':'ΞΕΚΙΝΗΣΕ ΜΠΕΤΟΝΙΕΡΑ'):'ΕΠΙΛΟΓΗ ΜΠΕΤΟΝΙΕΡΑΣ'}`;

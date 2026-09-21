@@ -71,12 +71,6 @@ export class PvcStock extends THREE.Group{
       strap.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),STOCK_DIRECTION);
       this.straps.push(strap);
     }
-    const card=label('PVC Ø20 · 3 m · 20 ΤΕΜΑΧΙΑ',.64,.08);
-    const cardNormal=new THREE.Vector3(-STOCK_DIRECTION.y,STOCK_DIRECTION.x,0);
-    card.position.copy(STOCK_CENTER).addScaledVector(STOCK_DIRECTION,1.53).addScaledVector(cardNormal,.064);
-    card.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3(0,0,1),STOCK_DIRECTION,cardNormal));
-    this.add(card);
-    this.userData.stockLabel=card;
     const metal=new THREE.MeshStandardMaterial({color:0xa6b4b4,roughness:.4,metalness:.6});
     part(this.straightedge,new THREE.BoxGeometry(.66,.012,.04),metal,'Straightedge');
     part(this.straightedge,new THREE.BoxGeometry(.04,.025,.22),metal,'Carpenter square heel',[-.33,0,.09]);
@@ -96,7 +90,6 @@ export class PvcStock extends THREE.Group{
       p.position.set(THREE.MathUtils.lerp(STOCK_CENTER.x+offset.x,1.94+i*.028,progress),STOCK_CENTER.y,THREE.MathUtils.lerp(STOCK_CENTER.z+offset.y,-.35,progress));
       p.rotation.z=THREE.MathUtils.lerp(-STOCK_LEAN,0,progress);p.rotation.x=progress*Math.PI/2;
     }
-    (this.userData.stockLabel as THREE.Object3D).visible=progress<.8;
     this.ruler.visible=progress===1;
     this.presetMarks.visible=progress===1;
   }

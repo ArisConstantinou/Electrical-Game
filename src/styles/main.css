@@ -548,3 +548,20 @@ button {
 /* These work cards already provide the action hint. Avoid a second overlay. */
 @media(pointer:coarse){#game-shell:is([data-active-tool="measure"],[data-active-tool="laser"],[data-active-tool="drill"],[data-active-tool="driver"]) #interaction-prompt{display:none}}
 @media(pointer:coarse) and (max-height:520px){#mobile-interact{top:62px;bottom:auto;right:108px;min-height:44px}}
+
+/* Touch assembly stays beside the toolbelt, leaving the live objects exposed. */
+@media(pointer:coarse){
+  #game-shell #box-supply{top:auto;bottom:8px;left:8px;right:8px;width:auto;transform:none;padding:4px;gap:4px;grid-template-columns:repeat(6,minmax(0,1fr));background:#181e20cc;border:0}
+  #game-shell[data-box-assembly="false"] #box-supply{width:auto;bottom:76px;left:50%;right:8px;grid-template-columns:1fr}
+  #box-supply #box-supply-title,#box-supply #box-assembly-state,#box-supply #box-fit-size,#box-supply #box-fit-legend{display:none}
+  #box-supply .box-presets,#box-supply #box-history-actions,#box-supply #box-zone-buttons,#box-supply #box-assembly-actions{display:contents}
+  #box-supply #box-zone-buttons i,#box-supply kbd{display:none}
+  #box-supply button{min-height:44px;padding:3px 1px;font:700 12px/1.2 Arial,sans-serif;min-width:0;touch-action:manipulation}
+  #box-supply .box-presets button{order:0}
+  #box-supply [data-box-zone]{order:1}
+  #box-supply #box-assembly-toggle,#box-supply #box-history-actions button,#box-supply #box-assembly-actions button{order:2}
+  #box-supply #box-fit-status{order:3;grid-column:1/-1;font-size:12px;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #game-shell[data-box-assembly="true"] #mobile-tool-slider,#game-shell[data-box-assembly="true"] #mixing-toolbelt,#game-shell[data-box-assembly="true"] #tool-quick-controls,#game-shell[data-box-assembly="true"] #aim-quick-controls,#game-shell[data-box-assembly="true"] #mobile-use-status,#game-shell[data-box-assembly="true"] #pvc-prompt{display:none!important}
+  #game-shell[data-box-assembly="true"] #joystick,#game-shell[data-box-assembly="true"] #look-joystick{bottom:152px}
+  #game-shell[data-active-tool="fitting"] #interaction-prompt{top:70px;font-size:14px}
+}

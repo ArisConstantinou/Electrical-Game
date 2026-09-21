@@ -6,7 +6,7 @@ export interface GraspArm {
   handSign?:number;
   /** Preserve the calibrated hand/object orientation; solve arm placement only. */
   lockRotation?:boolean;
-  screenRegion?:{minX:number;maxX:number};
+  screenRegion?:{minX:number;maxX:number;minY?:number;maxY?:number};
   screenObstacles?:THREE.Box2[];
   elbow:THREE.Vector3;
   wrist:THREE.Vector3;
@@ -36,7 +36,7 @@ export function solveRigidGrasp(
     const points=corners.map(c=>c.clone().applyQuaternion(q).add(p));
     if(arm.handSign!==undefined)for(const point of points){
       const projected=point.clone().project(camera),view=point.clone().applyMatrix4(inverseCamera);
-      violation+=Math.max(0,(arm.screenRegion?.minX??-.90)-projected.x,projected.x-(arm.screenRegion?.maxX??.90),Math.abs(projected.y)-.90)**2*(arm.screenRegion?40:1)+Math.max(0,.15+view.z)**2*100;
+      violation+=Math.max(0,(arm.screenRegion?.minX??-.90)-projected.x,projected.x-(arm.screenRegion?.maxX??.90),(arm.screenRegion?.minY??-.90)-projected.y,projected.y-(arm.screenRegion?.maxY??.90))**2*(arm.screenRegion?40:1)+Math.max(0,.15+view.z)**2*100;
     }
     if(arm.screenObstacles?.length){
       const screen=new THREE.Box2().setFromPoints(points.map(point=>{const p=point.clone().project(camera);return new THREE.Vector2(p.x,p.y);}));

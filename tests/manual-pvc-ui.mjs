@@ -43,9 +43,9 @@ try{
   await page.mouse.down();await step(20);await page.mouse.up();await step(2);assert.equal((await state()).markingProgress,0,'LMB must not mark the pipes');
   await page.keyboard.down('KeyE');await step(12);assert.equal((await state()).phase,'marking');assert((await state()).markingProgress>0,'E must start the marker stroke');
   await page.keyboard.up('KeyE');await step(55);assert.equal((await state()).phase,'spring','Completed E marker stroke must continue automatically to spring');assert.equal((await state()).springInsertion,0);
-  assert.equal(await page.evaluate(()=>window.__wireTheHouse.workerBody.visible),false,'The full body must be hidden during pipe work');await snap('05-marked-spring-ready');
+  assert.equal(await page.evaluate(()=>window.__wireTheHouse.workerBody.visible),true,'Hands must be present during pipe work');await snap('05-marked-spring-ready');
   await use();await step(100);assert.equal((await state()).phase,'bending');assert.equal((await state()).springInsertion,1);
-  assert.equal(await page.evaluate(()=>window.__wireTheHouse.workerBody.visible),false,'The full body must stay hidden while bending');
+  assert.equal(await page.evaluate(()=>window.__wireTheHouse.workerBody.visible),true,'Hands must remain visible while bending');
   const focusSpan=await bendFocusSpan();assert(focusSpan>.35,`Bend area must remain close and readable instead of a distant full-body view (${focusSpan.toFixed(3)} NDC)`);
   assert.equal(await page.evaluate(()=>window.__wireTheHouse.pvc.pipe.material.opacity),1);await key('KeyR');assert.equal(await page.evaluate(()=>window.__wireTheHouse.pvc.pipe.material.opacity),.4);await snap('07-spring-inside');
   await key('KeyE');assert.equal((await state()).phase,'bending','E must not bend automatically');
@@ -53,7 +53,7 @@ try{
   for(let cell=1;cell<10;cell++){
     await key('KeyD');assert.equal((await state()).grip,cell);
     await page.mouse.down();await step(30);await page.mouse.up();await step(2);
-    assert.equal(await page.evaluate(()=>window.__wireTheHouse.workerBody.visible),false,`Body must remain hidden at bend cell ${cell}`);
+    assert.equal(await page.evaluate(()=>window.__wireTheHouse.workerBody.visible),true,`Hands must remain visible at bend cell ${cell}`);
     if(cell===4)await snap('08-progressive-bend');
   }
   assert(Math.abs((await state()).angle-90)<1e-6);await snap('09-bent-90');
