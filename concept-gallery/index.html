@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="el">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light">
+  <title>Electrical Game — 5 visual concepts</title>
+  <style>
+    :root { font-family: system-ui, -apple-system, Segoe UI, sans-serif; color:#17231e; background:#f3f5f1; }
+    * { box-sizing:border-box; }
+    body { margin:0; }
+    header { padding:22px max(18px,env(safe-area-inset-left)); background:#19322b; color:#fff; }
+    h1 { font-size:clamp(24px,5vw,38px); line-height:1.14; margin:0 0 12px; }
+    header p { max-width:64ch; margin:0; font-size:16px; line-height:1.5; color:#dfe9e2; }
+    nav { display:flex; gap:10px; overflow:auto; padding:14px 18px; position:sticky; top:0; z-index:2; background:#f3f5f1; border-bottom:1px solid #cbd7ce; }
+    nav a { flex:none; padding:10px 14px; border-radius:20px; background:white; color:#173b2e; font-size:14px; font-weight:700; text-decoration:none; }
+    main { max-width:1140px; margin:auto; padding:10px 16px 44px; }
+    section { scroll-margin-top:90px; margin:22px 0 32px; padding:16px; border-radius:16px; background:white; box-shadow:0 3px 16px #142a2012; }
+    h2 { margin:0 0 6px; font-size:24px; }
+    p { font-size:16px; line-height:1.45; }
+    .view { margin:18px 0 28px; }
+    h3 { margin:0 0 10px; font-size:17px; }
+    img { display:block; max-width:100%; height:auto; margin:auto; border:1px solid #d8ddd8; border-radius:8px; }
+    .portrait img { width:min(100%,430px); }
+    .board img { width:min(100%,720px); }
+    .open { display:inline-block; padding:11px 14px; margin-top:9px; border-radius:8px; background:#173b2e; color:white; font-size:14px; font-weight:700; text-decoration:none; }
+    footer { padding:16px; text-align:center; color:#486155; font-size:14px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Electrical Game — 5 visual concepts</h1>
+    <p>Κάθε κατεύθυνση έχει δική της οθόνη mobile portrait και πινακίδα για mobile landscape, tablet και desktop. Αυτές είναι εικόνες σχεδιασμού, όχι στιγμιότυπα από νέο runtime.</p>
+  </header>
+  <nav aria-label="Concepts">
+    <a href="#c1">01 Mediterranean</a><a href="#c2">02 Softcraft</a><a href="#c3">03 Blueprint</a><a href="#c4">04 Site Pro</a><a href="#c5">05 Quiet Focus</a>
+  </nav>
+  <main>
+    <section id="c1"><h2>01 Mediterranean Workshop</h2><p>Φυσικά υλικά και διακριτικό θερμό UI.</p><div class="view portrait"><h3>Mobile portrait</h3><img src="images/01-mediterranean-workshop-portrait.png" alt="Mediterranean Workshop, mobile portrait" fetchpriority="high"><a class="open" href="images/01-mediterranean-workshop-portrait.png">Άνοιγμα εικόνας</a></div><div class="view board"><h3>Mobile landscape · Tablet · Desktop</h3><img src="images/01-mediterranean-workshop.png" loading="lazy" alt="Mediterranean Workshop σε τρεις οθόνες"><a class="open" href="images/01-mediterranean-workshop.png">Άνοιγμα εικόνας</a></div></section>
+    <section id="c2"><h2>02 Softcraft</h2><p>Φωτεινό stylized 3D και ήπιο, ευανάγνωστο UI.</p><div class="view portrait"><h3>Mobile portrait</h3><img src="images/02-softcraft-portrait.png" loading="lazy" alt="Softcraft, mobile portrait"><a class="open" href="images/02-softcraft-portrait.png">Άνοιγμα εικόνας</a></div><div class="view board"><h3>Mobile landscape · Tablet · Desktop</h3><img src="images/02-softcraft.png" loading="lazy" alt="Softcraft σε τρεις οθόνες"><a class="open" href="images/02-softcraft.png">Άνοιγμα εικόνας</a></div></section>
+    <section id="c3"><h2>03 Blueprint Precision</h2><p>Τοπικές μετρήσεις και τεχνικό μπλε UI.</p><div class="view portrait"><h3>Mobile portrait</h3><img src="images/03-blueprint-precision-portrait.png" loading="lazy" alt="Blueprint Precision, mobile portrait"><a class="open" href="images/03-blueprint-precision-portrait.png">Άνοιγμα εικόνας</a></div><div class="view board"><h3>Mobile landscape · Tablet · Desktop</h3><img src="images/03-blueprint-precision.png" loading="lazy" alt="Blueprint Precision σε τρεις οθόνες"><a class="open" href="images/03-blueprint-precision.png">Άνοιγμα εικόνας</a></div></section>
+    <section id="c4"><h2>04 Site Pro</h2><p>Εργοταξιακό ύφος με έντονη κίτρινη επισήμανση.</p><div class="view portrait"><h3>Mobile portrait</h3><img src="images/04-site-pro-portrait.png" loading="lazy" alt="Site Pro, mobile portrait"><a class="open" href="images/04-site-pro-portrait.png">Άνοιγμα εικόνας</a></div><div class="view board"><h3>Mobile landscape · Tablet · Desktop</h3><img src="images/04-site-pro.png" loading="lazy" alt="Site Pro σε τρεις οθόνες"><a class="open" href="images/04-site-pro.png">Άνοιγμα εικόνας</a></div></section>
+    <section id="c5"><h2>05 Quiet Focus</h2><p>Ελάχιστο UI, περισσότερος χώρος για τη σκηνή.</p><div class="view portrait"><h3>Mobile portrait</h3><img src="images/05-quiet-focus-portrait.png" loading="lazy" alt="Quiet Focus, mobile portrait"><a class="open" href="images/05-quiet-focus-portrait.png">Άνοιγμα εικόνας</a></div><div class="view board"><h3>Mobile landscape · Tablet · Desktop</h3><img src="images/05-quiet-focus.png" loading="lazy" alt="Quiet Focus σε τρεις οθόνες"><a class="open" href="images/05-quiet-focus.png">Άνοιγμα εικόνας</a></div></section>
+  </main>
+  <footer>Visual concepts · 21 September 2026</footer>
+</body>
+</html>
