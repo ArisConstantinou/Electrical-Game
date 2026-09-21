@@ -20,7 +20,11 @@ try{
    const start=performance.now();try{return original.apply(this,args);}finally{if(p.active){const a=p.methods[label]??={calls:0,total:0,worst:0};const d=performance.now()-start;a.calls++;a.total+=d;a.worst=Math.max(a.worst,d);}}
   };};
   for(const [object,prefix,names] of [[g,'game',['step','performAction']],[g.player,'player',['update']],[g.fpsRig,'rig',['update','contact','poseArms','poseTrowel','aimWaterGun','constrainWorkSurfaces']],[g.workerBody,'body',['update']],[g.chasing,'debris',['update','spawnDebris','overlapsWall','hasWallSupport','supportContact']],[g.room.brickWall,'wall',['aim','removeAtAim','processPendingSupport','flushPendingMeshes']],[g.mortar,'mortar',['update','preview','coverage','swing','flushWetGeometry']],[g.roomWater,'water',['update']],[g.boxPlacement,'box',['update','target']],[g.boxFitPreview,'fit',['update']],[g.mixing,'mixing',['update','present']],[g.pvc,'pvc',['present','handleInput']],[g.apprentice,'apprentice',['update','presentPlayer']],[g.hud,'hud',['update','updateMobileUseStatus','updateMortar','updateWaterGun','updateWorkReticle']],[g.renderer,'render',['render']]])for(const name of names)wrap(object,name,prefix+'.'+name);
-  if(location.search.includes('bodyDiagnostic'))for(const name of ['fitThumb','fitFinger','pinchBox','poseBoxGrasps','wrapGrip','limb','posePipeGrip'])wrap(g.workerBody,name,'body.'+name);
+  if(location.search.includes('bodyDiagnostic')){
+   for(const name of ['fitThumb','fitFinger','pinchBox','poseBoxGrasps','wrapGrip','limb','posePipeGrip','boxViewportCorrection','boxObstacleCorrection','clampBoxComposition'])wrap(g.workerBody,name,'body.'+name);
+   wrap(g.workSurfaces,'frontForBounds','clearance.frontForBounds');
+   for(const name of ['boxGraspScreenObstacles','boxGraspViewCorners','clampFittingZones'])wrap(g.fpsRig,name,'rig.'+name);
+  }
   const render=g.renderer.gpu.render.bind(g.renderer.gpu);
   g.renderer.gpu.render=(scene,camera)=>{const result=render(scene,camera);if(p.active&&scene===g.renderer.scene&&!g.renderer.gpu.getRenderTarget()){p.draws.push(g.renderer.webgl.info.render.calls);p.presentations.push(performance.now());}return result;};
  });

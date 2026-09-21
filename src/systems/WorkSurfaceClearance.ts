@@ -8,8 +8,20 @@ export class WorkSurfaceClearance {
   private readonly geometryBounds = new WeakMap<THREE.BufferGeometry, THREE.Box3>();
   private readonly boxBounds = new WeakMap<THREE.Object3D, { local: THREE.Box3; world: THREE.Box3; matrix: THREE.Matrix4 }>();
   private readonly scratch = new THREE.Box3();
+  private snapshot: THREE.Box3[] | null = null;
 
   constructor(private readonly mortar: MortarSystem, private readonly points: InstallationPoint[]) {}
+
+  /** The installed surfaces do not move while a rigid hand/tool pose is
+   * solved. Snapshot their bounds once for its many candidate evaluations;
+   * all ordinary queries remain live after the callback returns. */
+  withSnapshot<T>(run: () => T): T {
+    const previous = this.snapshot;
+    const bounds: THREE.Box3[] = [];
+    this.forEachObstacle(box => bounds.push(box.clone()));
+    this.snapshot = bounds;
+    try { return run(); } finally { this.snapshot = previous; }
+  }
 
   readonly frontForBounds = (held: THREE.Box3): number | null => {
     if (held.isEmpty()) return null;
@@ -19,6 +31,12 @@ export class WorkSurfaceClearance {
       if (held.max.x < bounds.min.x || held.min.x > bounds.max.x || held.max.y < bounds.min.y || held.min.y > bounds.max.y) return;
       front = Math.max(front ?? -Infinity, bounds.max.z);
     };
+    if (this.snapshot) for (const bounds of this.snapshot) include(bounds);
+    else this.forEachObstacle(include);
+    return front;
+  };
+
+  private forEachObstacle(include: (bounds: THREE.Box3) => void): void {
     for (const deposit of this.mortar.deposits) {
       const mesh = deposit.mesh;
       if (!mesh.visible) continue;
@@ -56,6 +74,5 @@ export class WorkSurfaceClearance {
         include(cached.world);
       }
     }
-    return front;
-  };
+  }
 }

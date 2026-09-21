@@ -19,6 +19,16 @@ const helper=new THREE.Mesh(new THREE.BoxGeometry(1,1,1));helper.visible=false;h
 assert(Math.abs(surfaces.frontForBounds(held)+2.3325)<1e-7);
 group.position.z=.02;assert(Math.abs(surfaces.frontForBounds(held)+2.3125)<1e-7,'Depth adjustment invalidates cached world bounds');
 group.rotation.z=.2;assert(Number.isFinite(surfaces.frontForBounds(held)));
+const expected=surfaces.frontForBounds(held),originalUpdate=box.updateWorldMatrix.bind(box);let updates=0;
+box.updateWorldMatrix=(...args)=>{updates++;return originalUpdate(...args);};
+assert.equal(surfaces.withSnapshot(()=>{
+ for(let i=0;i<50;i++)assert.equal(surfaces.frontForBounds(held),expected,'Batched rigid-grasp queries keep the same physical clearance');
+ return 'complete';
+}),'complete');
+assert(updates<10,`Stable obstacles should be updated once per solve, received ${updates} matrix updates`);
+box.updateWorldMatrix=originalUpdate;
+assert.throws(()=>surfaces.withSnapshot(()=>{throw Error('interrupted pose');}),/interrupted pose/);
+group.position.z=.03;assert.notEqual(surfaces.frontForBounds(held),expected,'Interrupted solve restores live clearance queries');
 group.visible=false;assert.equal(surfaces.frontForBounds(held),-2.41,'Retrieved box stops being an obstacle');
 held.translate(new THREE.Vector3(10,0,0));assert.equal(surfaces.frontForBounds(held),null);
-console.log(JSON.stringify({passed:true,checks:11}));
+console.log(JSON.stringify({passed:true,checks:14}));

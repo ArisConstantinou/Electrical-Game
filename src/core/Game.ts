@@ -429,7 +429,14 @@ export class Game {
     this.workerBody.overview=this.frontBodyView||this.modelInspector.live;
     const bodyPlayer=this.mixing.wheelbarrow.driving?{eyeHeight:1.65,velocity:this.player.velocity,yaw:this.mixing.wheelbarrow.telemetry.yaw+Math.PI,pitch:-.60}:this.pvc.focused?{eyeHeight:this.renderer.camera.position.y,velocity:this.player.velocity,yaw:this.player.yaw,pitch:this.player.pitch}:this.player;
     const clearPipeLayout=this.pvc.focused&&['spreading','marking','fastener-marking','pipe-install-ready'].includes(this.pvc.phase)&&!this.workerBody.overview;
-    if(!clearPipeLayout&&(this.selectedTool!=='hose'||mixingOwnedInput||pvcOwnedInput))this.workerBody.update(dt,this.renderer.camera,bodyPlayer,this.fpsRig,this.selectedTool,this.input.actionHeld,mixingOwnedInput||this.pvc.blocksWork,this.pvc.blocksWork?this.pvc.anatomicalGrips():this.mixing.anatomicalGrips(),this.workSurfaces.frontForBounds);
+    if(!clearPipeLayout&&(this.selectedTool!=='hose'||mixingOwnedInput||pvcOwnedInput)){
+      const poseBody=()=>this.workerBody.update(dt,this.renderer.camera,bodyPlayer,this.fpsRig,this.selectedTool,this.input.actionHeld,mixingOwnedInput||this.pvc.blocksWork,this.pvc.blocksWork?this.pvc.anatomicalGrips():this.mixing.anatomicalGrips(),this.workSurfaces.frontForBounds);
+      // The two-handed box solver tests hundreds of candidate poses. Installed
+      // casings and mortar stay fixed for this synchronous solve, so reuse their
+      // bounds without changing any of the contact or collision decisions.
+      if(this.selectedTool==='fitting'&&!mixingOwnedInput&&!pvcOwnedInput)this.workSurfaces.withSnapshot(poseBody);
+      else poseBody();
+    }
     this.mixing.useAnatomicalBody(this.workerBody.loaded);
     this.pvc.useAnatomicalBody();
     this.apprentice.update(dt);
