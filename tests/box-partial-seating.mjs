@@ -11,7 +11,6 @@ try{
  const {MortarSystem}=await server.ssrLoadModule('/src/systems/MortarSystem.ts');
  const {InstallationPoint}=await server.ssrLoadModule('/src/electrical/InstallationPoint.ts');
  const {BoxPlacementSystem}=await server.ssrLoadModule('/src/systems/BoxPlacementSystem.ts');
- const {LevelingSystem}=await server.ssrLoadModule('/src/systems/LevelingSystem.ts');
  let id=0;
  function fixture(kinds=['2G','1G'],options={}){
   const points=[],scene=new THREE.Scene(),wall={volume:new MasonryVolume({seed:190319,solidMaterial:1,...options})};
@@ -44,25 +43,21 @@ try{
    if(bed==='cured')for(const node of f.mortar.field.nodes.values())node.age=4000;
   }
   const before=pose(f),a=f.system.assess(f.point,f.camera);assert.deepEqual(pose(f),before,'Preview does not change pose, stage, or mortar');
-  assert.equal(a.fits,false);assert.equal(a.canPlace,true);assert(a.proudDepthM>.026,'Only 10 mm of the 37 mm casing can enter');assert(a.blockedCells.length);
+  assert.equal(a.fits,false);assert.equal(a.canPlace,false);assert(a.proudDepthM>.0012,'Casing protrudes beyond the local finish plane');assert(a.blockedCells.length);
   if(bed==='dry')assert(Math.abs(a.proudDepthM-.0282)<.00005,'10 mm cavity stops 37 mm casing 27 mm proud plus collision clearance');
-  const mass=f.mortar.field.mass,result=f.system.place(f.point,f.camera);assert(result.success);assert.match(result.message,/protruding/);assert(!result.message.includes('inserted flush'));assert.equal(f.point.boxGroup.position.z,a.proudDepthM);assert.equal(f.point.boxGroup.userData.minimumDepth,a.proudDepthM);
-  const physicalRear=new THREE.Vector3(0,0,-.037).applyMatrix4(f.point.boxGroup.boxes[0].matrixWorld);assert(physicalRear.z>=f.front-.01+.0011,'Backing stays in front of hard cavity floor');
-  if(bed==='fresh')assert(Math.abs(f.mortar.field.mass+f.mortar.telemetry.movingKg+f.mortar.telemetry.floorKg+f.mortar.telemetry.restingKg-mass)<1e-6,'Partial placement conserves mortar mass');
-  const placement=f.point.boxGroup.userData.placement;placement.state='supported';placement.secured=true;placement.contactMaterial='mortar';const previous=f.point.boxGroup.position.clone();f.point.boxGroup.position.z-=.02;assert.equal(f.system.constrainAdjustment(f.point,previous,0),false,'Depth adjustment cannot drive box through backing');assert.deepEqual(f.point.boxGroup.position.toArray(),previous.toArray());
-  const leveling=new LevelingSystem();leveling.placementSystem=f.system;assert(leveling.begin(f.point),'Supported partial box can carry the level');assert.equal(leveling.confirm(f.point),false,'A secured but protruding box cannot complete the flush installation mission');assert.equal(f.point.stage,'leveling');leveling.cancel(f.point);
-  report.checks.push({kinds,bed,cavityMm:10,protrusionMm:a.proudDepthM*1000,reason:a.reason,proudCompletionRefused:true});
+  const mass=f.mortar.field.mass,result=f.system.place(f.point,f.camera);assert.equal(result.success,false);assert.match(result.message,/protrude/);assert.deepEqual(pose(f),before,'Refused proud placement preserves box pose, stage and mortar');assert.equal(f.mortar.field.mass,mass,'Refused placement conserves mortar mass');
+  report.checks.push({kinds,bed,cavityMm:10,blockedProtrusionMm:a.proudDepthM*1000,reason:a.reason,proudPlacementRefused:true});
  }
  {
   const f=fixture();f.mortar.stuckMass+=f.mortar.field.add(new THREE.Vector3(0,1.2,f.front+.008),new THREE.Vector3(0,0,1),1,()=>false);
-  const a=f.system.assess(f.point,f.camera);assert(a.canPlace&&!a.fits);assert(a.proudDepthM>=.037,'Mortar on untouched brick does not create a cavity');assert(f.system.place(f.point,f.camera).success);assert(f.point.boxGroup.position.z>=.037);report.checks.push({untouchedWallWithFreshMortar:true,protrusionMm:a.proudDepthM*1000});
+  const before=pose(f),a=f.system.assess(f.point,f.camera);assert(!a.canPlace&&!a.fits);assert(a.proudDepthM>.0012,'Mortar on untouched brick does not create a cavity');assert.equal(f.system.place(f.point,f.camera).success,false);assert.deepEqual(pose(f),before);report.checks.push({untouchedWallWithFreshMortar:true,blockedProtrusionMm:a.proudDepthM*1000});
  }
  {
   const f=fixture();excavate(f.wall.volume,.3,.15,.07);const a=f.system.assess(f.point,f.camera);assert(a.canPlace&&a.fits);assert(f.system.place(f.point,f.camera).success);assert(f.point.boxGroup.position.z<=.0012);report.checks.push('Deep cavity still places flush');
  }
  {
   const f=fixture(),fixed=f.add();fixed.position.set(0,1.2,f.front-.014);fixed.boxGroup.position.set(0,0,0);fixed.boxGroup.visible=true;fixed.updateWorldMatrix(true,true);
-  const a=f.system.assess(f.point,f.camera);assert(a.canPlace&&!a.fits,'An older casing behind the actual masonry stop is not on the insertion path');
+  const a=f.system.assess(f.point,f.camera);assert(!a.canPlace&&!a.fits&&a.reason!=='other-box','An older casing behind the actual masonry stop is not on the insertion path');
   fixed.position.z=f.front+.05;fixed.updateWorldMatrix(true,true);const b=f.system.assess(f.point,f.camera);assert(!b.canPlace);assert.equal(b.reason,'other-box');assert.equal(f.system.place(f.point,f.camera).success,false);report.checks.push('Casing sweep uses physical proud endpoint and still rejects actual overlap');
  }
  report.passed=true;console.log(JSON.stringify(report,null,2));
