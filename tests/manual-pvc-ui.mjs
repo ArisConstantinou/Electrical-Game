@@ -74,12 +74,11 @@ try{
   await aim(targetPose.camera,[targetPose.target[0]+.12,targetPose.target[1],targetPose.target[2]]);
   const assisted=await page.evaluate(()=>{const g=window.__wireTheHouse;return{exact:g.boxPlacement.target(g.renderer.camera)?.definition.id??null,near:g.boxPlacement.targetNear(g.renderer.camera)?.definition.id??null};});
   assert.equal(assisted.exact,null,'Fixture must miss the hollow casing exactly');assert.equal(assisted.near,'A','A nearby visible casing must remain an eligible PVC target');
-  await key('KeyE');await step(70);assert.equal((await state()).phase,'fitting',JSON.stringify(await state()));await snap('13-fitting');
-  await use();assert.equal((await state()).phase,'fitting','Cannot cut zero-length offcut');
-  // Deliberately long: keep an extra 15 mm, then trim using the live readout.
+  await key('KeyE');await step(70);assert.equal((await state()).phase,'fitting',JSON.stringify(await state()));assert.equal((await state()).fitReady,true,'The cutter must open at the measured box-entry position');assert((await state()).cutCm>(await state()).cutFromCm);await snap('13-fitting');
+  // A realistic 15 mm insertion is accepted inside the box instead of forcing
+  // an impractical zero-millimetre touchscreen cut.
   let desired=await page.evaluate(()=>{const g=window.__wireTheHouse,p=g.pvc.target;return g.pvc.bend.topHeight-(p.boxGroup.getWorldPosition(g.renderer.camera.position.clone()).y-p.boxGroup.groupHeight/2+.015);});
-  await cutAt((desired-.015)*100);await use();await step(32);assert.equal((await state()).phase,'cut');assert((await state()).fitErrorMm>10);await snap('14-long-cut');
-  await key('KeyE');assert.equal((await state()).phase,'fitting');await cutAt(desired*100);await use();await step(32);assert.equal((await state()).phase,'cut');assert(Math.abs((await state()).fitErrorMm)<1);await snap('15-cut-to-fit');
+  await cutAt((desired-.015)*100);await use();await step(32);assert.equal((await state()).phase,'cut');assert((await state()).fitErrorMm>10);assert.equal((await state()).fitReady,true);await snap('14-box-entry-cut');
   // Reject a blocked lane, then restore the same real collision implementation.
   await page.evaluate(()=>{const v=window.__wireTheHouse.room.brickWall.volume;window.pvcCavity=v.cavityBox.bind(v);v.cavityBox=()=>({clear:false});});
   await key('KeyE');assert.equal((await state()).phase,'cut','Blocked channel must reject installation');assert.match((await state()).message,/τούβλο|δάπεδο/);
@@ -92,7 +91,7 @@ try{
   const installed=await page.evaluate(()=>{const p=window.__wireTheHouse.mission.points[0];return{stage:p.stage,recipe:p.conduit?.userData.pvcRecipe};});assert.equal(installed.stage,'complete');assert.equal(installed.recipe.angles.reduce((a,b)=>a+b,0),90);
   await key('KeyR');assert.equal(await page.evaluate(()=>window.__wireTheHouse.mission.points[0].conduit.children[0].material.opacity),1);
   await key('KeyR');assert.equal(await page.evaluate(()=>window.__wireTheHouse.mission.points[0].conduit.children[0].material.opacity),.4);
-  report.checks.push('prepared bonded box -> fit -> long cut -> re-cut -> blocked-lane rejection -> formed pipe -> four physical 12 mm holes -> two sequential rebar hugs -> sequential plier tightening; R toggles held and installed PVC');report.pvc=await state();
+  report.checks.push('prepared bonded box -> measured default cut -> accepted 15 mm box insertion -> blocked-lane rejection -> formed pipe -> four physical 12 mm holes -> two sequential rebar hugs -> sequential plier tightening; R toggles held and installed PVC');report.pvc=await state();
  }
  report.errors=report.errors.filter(message=>message!=='Pointer Lock disabled for automated verification');
  assert.equal(report.errors.length,0,report.errors.join('\n'));
