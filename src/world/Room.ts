@@ -33,7 +33,8 @@ const concreteBeam = (size: THREE.Vector3, material: THREE.Material): THREE.Mesh
     const nx = Math.abs(normals.getX(i)), ny = Math.abs(normals.getY(i));
     // Every face receives approximately 0.75 m of scanned concrete per tile.
     // A long, shallow beam must not stretch one square texture along its span.
-    uvs.setXY(i, (nx > .5 ? z : x) / .75, (ny > .5 ? z : y) / .75);
+    if (ny > .5) uvs.setXY(i, x / .75, z / .75);
+    else uvs.setXY(i, .37 + y / .75, (nx > .5 ? z : x) / .75);
   }
   return new THREE.Mesh(geometry, material);
 };
@@ -267,7 +268,7 @@ export class Room extends THREE.Group {
     // Its upper half enters the slab; the lower edge is a visible construction
     // joint, so clay no longer intersects the ceiling as two unrelated skins.
     const width = GAME_CONFIG.room.width, depth = GAME_CONFIG.room.depth;
-    const material = siteMaterial('floor', 0xbdb7ad);
+    const material = siteMaterial('concrete', 0xc7c0b5);
     const beams = new THREE.Group();
     const parts = [
       { x: 0, z: GAME_CONFIG.room.wallFrontZ - .01, sx: width, sz: .27 },
@@ -304,7 +305,7 @@ export class Room extends THREE.Group {
     this.add(cuts);
 
     const beams = new THREE.Group();
-    const beamMaterial = siteMaterial('floor', 0xbdb7ad);
+    const beamMaterial = siteMaterial('concrete', 0xc7c0b5);
     for (const z of [-2.65, .1, 2.65]) {
       const beam = concreteBeam(new THREE.Vector3(width, .17, .24), beamMaterial);
       beam.position.set(0, GAME_CONFIG.room.height - .085, z);

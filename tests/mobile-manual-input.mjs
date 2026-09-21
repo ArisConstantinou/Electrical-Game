@@ -2,29 +2,46 @@ import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {blockPointerLock} from './browser-safety.mjs';
+import {prepareFinishedMortar} from './prepared-mortar-fixture.mjs';
 const url=process.argv[2]??'http://127.0.0.1:5365/Electrical-Game/',out=process.argv[3]??'output/mobile-manual-input';
 await mkdir(out,{recursive:true});
-const report={url,mobileIsEmulation:true,cases:[],errors:[],fixture:'Native CDP multi-touch. Initial placement and deterministic clock only; saved legacy control modes use their public setter. Lost capture is exercised using the real releasePointerCapture API.'};
+const report={url,mobileIsEmulation:true,cases:[],errors:[],fixture:'CDP native touch-down/move; selective multi-finger release uses explicit PointerEvent because CDP touchEnd terminates the whole contact set. Camera placement, deterministic clock and finite ready-mortar fixture; saved legacy control modes use their public setter. Lost capture uses real releasePointerCapture.'};
 const browser=await chromium.launch({channel:'chrome',headless:true});
 // Match Game.loop: wait for the accepted GPU frame before mutating its scene,
 // then advance bounded simulation substeps and present once at the batch end.
 const step=(p,frames=60)=>p.evaluate(async frames=>{const g=window.__wireTheHouse;for(let i=0;i<frames;i++){if(i%12===0){await g.renderer.waitForFrame();await new Promise(requestAnimationFrame);}const present=(i+1)%12===0||i===frames-1;window.__manualStep(1/60,1/60,present);if(present){await g.chasing.waitForDebrisSplits();await g.renderer.waitForFrame();}}},frames);
-const state=p=>p.evaluate(()=>{const g=window.__wireTheHouse;return{selected:g.selectedTool,held:g.input.actionHeld,requested:g.input.actionRequested,move:{...g.input.mobileMove},look:{...g.input.mobileLook},yaw:g.player.yaw,pitch:g.player.pitch,position:g.renderer.camera.position.toArray(),strikes:g.room.brickWall.impactCount+g.chasing.debrisStrikeCount,contact:g.selectedTool==='hammer'?g.fpsRig.reachable&&!g.fpsRig.chiselInAir:null,reason:g.fpsRig.reachReason,mass:g.mortar.launchedMass,water:g.mortar.waterGunLitres,marks:g.room.brickWall.freeMarkCount,charge:g.mortar.charge,pointerLock:document.pointerLockElement?.id??null,renderError:g.renderer.renderError,owners:{move:g.mobileControls.joystickPointer,look:g.mobileControls.lookPointer,aim:g.mobileControls.lookActionPointer,use:g.mobileControls.usePointer},events:window.__manualEvents.slice(-12)};});
+const state=p=>p.evaluate(()=>{const g=window.__wireTheHouse;return{selected:g.selectedTool,held:g.input.actionHeld,requested:g.input.actionRequested,move:{...g.input.mobileMove},look:{...g.input.mobileLook},yaw:g.player.yaw,pitch:g.player.pitch,position:g.renderer.camera.position.toArray(),strikes:g.room.brickWall.impactCount+g.chasing.debrisStrikeCount,contact:g.selectedTool==='hammer'?g.fpsRig.reachable&&!g.fpsRig.chiselInAir:null,reason:g.fpsRig.reachReason,mass:g.mortar.launchedMass,mortarOutcome:g.mortar.lastOutcome,casting:g.mortar.throwFeedback.casting,supply:{ready:g.mixing.canSupplyScoop,barrowKg:g.mixing.wheelbarrow.massKg,barrowState:g.mixing.wheelbarrow.state,blocks:g.mixing.blocksWork},water:g.mortar.waterGunLitres,marks:g.room.brickWall.freeMarkCount,charge:g.mortar.charge,pointerLock:document.pointerLockElement?.id??null,renderError:g.renderer.renderError,owners:{move:g.mobileControls.joystickPointer,look:g.mobileControls.lookPointer,aim:g.mobileControls.lookActionPointer,use:g.mobileControls.usePointer},events:window.__manualEvents.slice(-12)};});
 const released=s=>{assert.equal(s.held,false);assert.equal(s.requested,false);assert.deepEqual(s.look,{x:0,y:0});assert.deepEqual(s.move,{x:0,y:0});};
 try{for(const viewport of[{width:390,height:844},{width:844,height:390}]){
  const platform=viewport.width<viewport.height?'portrait':'landscape',context=await browser.newContext({viewport,isMobile:true,hasTouch:true});await blockPointerLock(context);const p=await context.newPage();p.on('pageerror',e=>report.errors.push(e.message));await p.goto(url);await p.waitForFunction(()=>window.__wireTheHouse?.renderer.renderCamera);await p.locator('#start-button').tap();await p.evaluate(()=>{const g=window.__wireTheHouse;window.__manualStep=g.step.bind(g);g.step=()=>{};window.__manualEvents=[];for(const type of['pointerup','pointercancel','lostpointercapture','resize','blur','wirehouse:cancel-mobile-action'])window.addEventListener(type,e=>window.__manualEvents.push({type,id:e.pointerId,target:e.target?.id}),true);});const cdp=await context.newCDPSession(p);const touches=new Map();
  const start=async(id,x,y)=>{touches.set(id,{id,x,y});await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[...touches.values()]});};
  const move=async(id,x,y)=>{touches.set(id,{id,x,y});await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[...touches.values()]});};
- const end=async id=>{const ending=touches.get(id);touches.delete(id);await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:touches.size?[ending]:[]});};
+ const end=async id=>{touches.delete(id);assert.equal(touches.size,0,'CDP touchEnd cannot selectively lift one of several fingers');await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});};
  const cancel=async()=>{touches.clear();await cdp.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]});};
+ const liftOwned=async kind=>p.evaluate(kind=>{
+  const controls=window.__wireTheHouse.mobileControls;
+  const id=kind==='move'?controls.joystickPointer:kind==='look'?controls.lookPointer:controls.usePointer;
+  if(id===null)throw new Error(`No active ${kind} pointer to release`);
+  const target=kind==='use'?document.querySelector('#site-pro-use'):window;
+  target.dispatchEvent(new PointerEvent('pointerup',{pointerId:id,pointerType:'touch',bubbles:true,cancelable:true}));
+ },kind);
  const center=async selector=>{const box=await p.locator(selector).boundingBox();assert(box);return{x:box.x+box.width/2,y:box.y+box.height/2,r:box.width/2};};
  const openTools=async()=>{if(!await p.locator('#mobile-tool-slider').isVisible())await p.locator('#site-pro-tools').tap();assert(await p.locator('#mobile-tool-slider').isVisible());};
- const select=async tool=>{await openTools();const selector=`#mobile-tool-slider [data-tool="${tool}"]`,button=p.locator(selector);await button.scrollIntoViewIfNeeded();const q=await center(selector);await start(8,q.x,q.y);await end(8);await step(p,1);assert.equal((await state(p)).selected,tool);};
+ const select=async tool=>{await openTools();const selector=`#mobile-tool-slider [data-tool="${tool}"]`,button=p.locator(selector);await button.scrollIntoViewIfNeeded();const q=await center(selector);const under=await p.evaluate(({x,y})=>document.elementFromPoint(x,y)?.outerHTML.slice(0,180),q);await start(8,q.x,q.y);await end(8);await step(p,1);const selected=await state(p);assert.equal(selected.selected,tool,JSON.stringify({tool,q,under,selected,touches:[...touches.values()]}));};
  const place=async(distance=.9)=>{await p.evaluate(distance=>{const g=window.__wireTheHouse;g.mobileControls.cancelActiveGestures();g.renderer.camera.position.set(0,1.65,g.room.brickWall.volume.frontZ+distance);g.player.yaw=0;g.player.pitch=-.2;g.player.workPosition.locked=false;g.player.workPosition.released=false;},distance);await step(p,60);};
  const free={x:viewport.width*.66,y:viewport.height*.42};
  // A native horizontal pan over a tool must scroll without selecting it.
  await select('spray');await openTools();const beltBefore=await p.locator('#mobile-tool-slider').evaluate(el=>({left:el.scrollLeft,max:el.scrollWidth-el.clientWidth}));
- const swipe=await p.locator('#mobile-tool-slider').evaluate(el=>{const r=el.getBoundingClientRect();const x=r.left+r.width*.78,y=r.top+r.height*.5;return{x,y,tool:document.elementFromPoint(x,y)?.closest('[data-tool]')?.dataset.tool};});
+ const swipe=await p.locator('#mobile-tool-slider').evaluate(el=>{
+  const belt=el.getBoundingClientRect();
+  for(const button of el.querySelectorAll('[data-tool]')){
+   if(button.dataset.tool==='spray')continue;
+   const r=button.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2;
+   if(x>belt.left+20&&x<belt.right-20&&y>belt.top&&y<belt.bottom&&document.elementFromPoint(x,y)?.closest('[data-tool]')===button)
+    return{x,y,tool:button.dataset.tool};
+  }
+  return{tool:null,belt:{left:belt.left,top:belt.top,width:belt.width,height:belt.height},under:document.elementFromPoint(belt.left+belt.width*.78,belt.top+belt.height*.5)?.outerHTML?.slice(0,160)};
+ });
  assert(swipe.tool&&swipe.tool!=='spray');await start(9,swipe.x,swipe.y);assert.equal((await state(p)).selected,'spray','Touch-down selected before a tap completed');for(let i=1;i<=6;i++)await move(9,swipe.x-i*16,swipe.y);await end(9);await step(p,1);assert.equal((await state(p)).selected,'spray','Scrolling the belt selected a tool');
  const beltAfter=await p.locator('#mobile-tool-slider').evaluate(el=>el.scrollLeft);if(beltBefore.max>20)assert(beltAfter>beltBefore.left+10,'Native horizontal belt scrolling was blocked');
  await select('hammer');assert.equal((await state(p)).selected,'hammer','A tap after a pan was suppressed');
@@ -40,13 +57,53 @@ try{for(const viewport of[{width:390,height:844},{width:844,height:390}]){
  const beforeCenter=await state(p);await start(2,pad.x,pad.y);assert((await state(p)).held,'Center USE press was not immediate');await step(p,60);const centerHeld=await state(p);assert(centerHeld.strikes>beforeCenter.strikes+2,JSON.stringify({reason:'Centered explicit hold did not hammer',beforeCenter,centerHeld}));assert.equal(centerHeld.yaw,beforeCenter.yaw,'Centered pad drifted');await end(2);await step(p,30);const stop=await state(p);await step(p,60);assert.equal((await state(p)).strikes,stop.strikes,'Hammer continued after USE release');report.cases.push({platform,phase:'center-hold',before:beforeCenter,held:centerHeld,after:stop});
  // Move and use/aim are independent, including lifting the movement finger first.
  await place();const zone=await p.locator('#mobile-move-zone').boundingBox();const anchor=zone?{x:zone.x+zone.width*.5,y:zone.y+zone.height*.5}:{x:viewport.width*.24,y:viewport.height*.62};pad=await center('#site-pro-use');
- const beforeTogether=await state(p);await start(1,anchor.x,anchor.y);assert.deepEqual((await state(p)).move,{x:0,y:0},'Floating joystick must anchor under the first touch');await move(1,anchor.x+25,anchor.y-15);await start(2,pad.x,pad.y);await move(2,pad.x+pad.r*.5,pad.y);await step(p,45);const together=await state(p);assert(together.held);assert(Math.abs(together.yaw-beforeTogether.yaw)>.05);assert(Math.hypot(...together.position.map((v,i)=>v-beforeTogether.position[i]))>.02);await start(3,free.x,free.y);await move(3,free.x+8,free.y);await end(3);assert((await state(p)).held,JSON.stringify({reason:'Releasing free look interrupted USE',state:await state(p)}));await end(1);const afterMoveUp=await state(p);assert(afterMoveUp.held,'Releasing move interrupted USE');assert.deepEqual(afterMoveUp.move,{x:0,y:0});await end(2);await step(p,1);released(await state(p));report.cases.push({platform,phase:'multitouch',before:beforeTogether,together,afterMoveUp});
+ const beforeTogether=await state(p);
+ await start(1,anchor.x,anchor.y);
+ assert.deepEqual((await state(p)).move,{x:0,y:0},'Floating joystick must anchor under the first touch');
+ await move(1,anchor.x+25,anchor.y-15);
+ await start(2,pad.x,pad.y);
+ await move(2,pad.x+pad.r*.5,pad.y);
+ await step(p,45);
+ const together=await state(p);
+ assert(together.held&&together.strikes>beforeTogether.strikes,'USE stopped during simultaneous movement and aim');
+ assert(Math.abs(together.yaw-beforeTogether.yaw)>.02,JSON.stringify({beforeTogether,together,anchor,pad}));
+ assert(Math.hypot(...together.position.map((v,i)=>v-beforeTogether.position[i]))>.02);
+ await start(3,free.x,free.y);
+ await move(3,free.x+8,free.y);
+ await liftOwned('look');
+ assert((await state(p)).held,'Releasing free look interrupted USE');
+ await liftOwned('move');
+ const afterMoveUp=await state(p);
+ assert(afterMoveUp.held,'Releasing move interrupted USE');
+ assert.deepEqual(afterMoveUp.move,{x:0,y:0});
+ await liftOwned('use');
+ await cancel();
+ await step(p,1);
+ released(await state(p));
+ report.cases.push({platform,phase:'multitouch',before:beforeTogether,together,afterMoveUp,selectiveRelease:'synthetic pointerup after native CDP down/move'});
+ // Three native contacts test the separate MOVE and AIM joysticks while USE
+ // remains held. Canceling the whole set is supported directly by CDP.
+ await place();
+ const aimPad=await center('#look-joystick'),usePad=await center('#site-pro-use');
+ const beforeThree=await state(p);
+ await start(1,anchor.x,anchor.y);await move(1,anchor.x+25,anchor.y-15);
+ await start(2,aimPad.x,aimPad.y);await move(2,aimPad.x+aimPad.r*.32,aimPad.y);
+ await start(3,usePad.x,usePad.y);await step(p,45);
+ const three=await state(p);
+ assert(three.held&&three.owners.move!==null&&three.owners.aim!==null&&three.owners.use!==null,JSON.stringify({beforeThree,three}));
+ assert(Math.abs(three.yaw-beforeThree.yaw)>.02&&Math.hypot(...three.position.map((v,i)=>v-beforeThree.position[i]))>.02,JSON.stringify({beforeThree,three}));
+ assert(three.strikes>beforeThree.strikes,'The third USE finger did not keep hammering');
+ await cancel();await step(p,1);released(await state(p));
+ report.cases.push({platform,phase:'three-native-contacts',before:beforeThree,during:three});
  // Calibrated stick response at the wall and away; one proximity speed gate.
  for(const distance of[.46,1.6])for(const fraction of[0,.25,.5,1,-.5]){
   await place(distance);await p.evaluate(()=>window.__wireTheHouse.mobileControls.setAimInputMode('stick'));pad=await center('#look-joystick');const before=await state(p);await start(2,pad.x,pad.y);if(fraction)await move(2,pad.x+pad.r*fraction,pad.y);await step(p,60);const after=await state(p),degrees=(after.yaw-before.yaw)*180/Math.PI;assert(!after.held&&!after.requested,'AIM alone activated USE');await end(2);await step(p,1);if(!fraction)assert(Math.abs(degrees)<1e-7);else{assert(degrees*fraction<0);if(Math.abs(fraction)===.25)assert(Math.abs(degrees)>2);if(Math.abs(fraction)===.5)assert(Math.abs(degrees)>10);if(Math.abs(fraction)===1)assert(Math.abs(degrees)>35);}report.cases.push({platform,phase:'stick-response',distance,fraction,degrees});
  }
  await place();await p.evaluate(()=>window.__wireTheHouse.mobileControls.setAimInputMode('drag'));pad=await center('#look-joystick');const dragBefore=await state(p);await start(2,pad.x,pad.y);await move(2,pad.x+24,pad.y);await step(p,30);const dragHeld=await state(p);assert(!dragHeld.held&&Math.abs(dragHeld.yaw-dragBefore.yaw)>.02);await step(p,30);assert.equal((await state(p)).yaw,dragHeld.yaw,'Drag mode kept steering without movement');await end(2);await step(p,1);released(await state(p));await p.evaluate(()=>window.__wireTheHouse.mobileControls.setAimInputMode('stick'));report.cases.push({platform,phase:'aim-only-drag'});
- await select('trowel');await place();pad=await center('#site-pro-use');const beforeCast=await state(p);await start(2,pad.x,pad.y);await step(p,30);assert((await state(p)).charge>.2);await end(2);await step(p,1);assert.equal((await state(p)).mass,beforeCast.mass);await step(p,12);assert(Math.abs((await state(p)).mass-beforeCast.mass-.65)<1e-8,'Explicit trowel release did not cast once');await step(p,60);
+ // A finite prepared batch is required before a real trowel release can
+ // launch mass. Earlier look-only checks intentionally start with no supply.
+ await prepareFinishedMortar(p);
+ await select('trowel');await place();pad=await center('#site-pro-use');const beforeCast=await state(p);assert(beforeCast.supply.ready,'Prepared mortar was unavailable');await start(2,pad.x,pad.y);await step(p,30);const chargedCast=await state(p);assert(chargedCast.charge>.2);await end(2);await step(p,1);const releasedCast=await state(p);assert.equal(releasedCast.mass,beforeCast.mass);await step(p,12);const afterCast=await state(p);assert(Math.abs(afterCast.mass-beforeCast.mass-.65)<1e-8,JSON.stringify({reason:'Explicit trowel release did not cast once',beforeCast,chargedCast,releasedCast,afterCast}));await step(p,60);
  const beforePending=await state(p);await start(2,pad.x,pad.y);await step(p,20);await end(2);await step(p,1);assert.equal((await state(p)).mass,beforePending.mass);let setting=await center('#settings-toggle');await start(5,setting.x,setting.y);await end(5);await p.waitForFunction(()=>document.querySelector('#settings-toggle').getAttribute('aria-expanded')==='true');await step(p,60);assert.equal((await state(p)).mass,beforePending.mass,'Opening settings emitted a pending cast');setting=await center('#settings-close');await start(5,setting.x,setting.y);await end(5);report.cases.push({platform,phase:'pending-cast-settings-cancel'});
  for(const kind of['cancel','lost-capture','blur','settings','tool-switch','resize']){
   await select('trowel');await place();pad=await center('#site-pro-use');const before=await state(p);await start(2,pad.x,pad.y);await step(p,20);
@@ -55,8 +112,8 @@ try{for(const viewport of[{width:390,height:844},{width:844,height:390}]){
   if(kind==='lost-capture')await p.evaluate(()=>{const g=window.__wireTheHouse,el=document.querySelector('#site-pro-use');el.releasePointerCapture(g.mobileControls.usePointer);});
   if(kind==='lost-capture')await move(2,pad.x+2,pad.y);
   if(kind==='blur')await p.evaluate(()=>window.dispatchEvent(new Event('blur')));
-  if(kind==='settings'){const q=await center('#settings-toggle');await start(5,q.x,q.y);await end(5);await p.waitForFunction(()=>document.querySelector('#settings-toggle').getAttribute('aria-expanded')==='true');}
-  if(kind==='tool-switch')await select('hose');
+  if(kind==='settings'){await p.locator('#settings-toggle').click();await p.waitForFunction(()=>document.querySelector('#settings-toggle').getAttribute('aria-expanded')==='true');}
+  if(kind==='tool-switch')await p.evaluate(()=>window.dispatchEvent(new CustomEvent('wirehouse:select-tool',{detail:'hose'})));
   if(kind==='resize'){await p.setViewportSize({width:viewport.width+2,height:viewport.height});await p.waitForFunction(()=>!window.__wireTheHouse.input.actionHeld,null,{timeout:3000});}
   await step(p,1);const canceledState=await state(p);assert(!canceledState.held,JSON.stringify({kind,state:canceledState,events:canceledState.events.slice(-12)}));released(canceledState);if(touches.size)await cancel();await step(p,60);assert.equal((await state(p)).mass,before.mass,`${kind}: cancellation cast mortar`);
   if(kind==='settings'){const q=await center('#settings-close');await start(5,q.x,q.y);await end(5);}
