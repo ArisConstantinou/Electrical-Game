@@ -16,6 +16,7 @@ try{
   const step=async n=>page.evaluate(n=>{for(let i=0;i<n;i++)window.testStep(1/60);},n);
   await step(3);
   const before=await page.evaluate(()=>({paint:window.__wireTheHouse.room.brickWall.freeMarkCount,removed:window.__wireTheHouse.room.brickWall.telemetry.removedVolume,crouched:window.__wireTheHouse.player.crouched}));
+  if(scenario==='zero')await page.locator('[data-apprentice="point"]').click();
   if(mobile){await page.locator('[data-apprentice="point"]').tap();await page.locator('#look-joystick').tap();}else{await page.mouse.click(680,380);}
   await step(4);
   // Short touch is edge-triggered; hold is covered by the desktop gameplay test.

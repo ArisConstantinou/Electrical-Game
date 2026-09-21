@@ -25,7 +25,7 @@ try{
         const resolved=specifier==='three'?three:specifier.startsWith('.')?new URL(specifier+(/\.css$/.test(specifier)?'':'.ts'),route.request().url()).pathname:specifier;return `${prefix}${quote}${resolved}${quote}`;
       });await route.fulfill({response:live,body:compiled,contentType:'application/javascript'});
     });
-    await page.goto(url);await page.waitForFunction(()=>window.__wireTheHouse?.mixing,undefined,{timeout:120000});await page.locator('#start-button')[layout.mobile?'tap':'click']();await page.waitForTimeout(350);
+    await page.goto(url);await page.waitForFunction(()=>window.__wireTheHouse?.mixing,undefined,{timeout:120000});await page.selectOption('#apprentice-count','0');await page.locator('#start-button')[layout.mobile?'tap':'click']();await page.waitForTimeout(350);
     await page.evaluate(()=>{const g=window.__wireTheHouse;window.__switchStep=g.step.bind(g);g.step=()=>{};window.__wallCalls=0;const perform=g.performAction.bind(g);g.performAction=(...args)=>{window.__wallCalls++;return perform(...args);};});
     // The production horseshoe deliberately separates the sacks and shovel.
     // Retain the original competing-target regression with an explicit nearby

@@ -201,6 +201,14 @@ export class MortarSystem {
     this.syncFieldGeometry();
     return added-removed;
   }
+  /** Apply one finite worker trowel load to supported masonry. The caller only
+   * removes the retained amount from its vessel; rejected material stays there. */
+  pressWorkerScoop(point:THREE.Vector3,requestedKg:number):number {
+    if(!Number.isFinite(requestedKg)||requestedKg<=0)return 0;
+    const held=this.deposit(point,Math.min(.10,requestedKg),Z,true,Math.min(.10,requestedKg),undefined,this.releaseCount++,true);
+    if(held>0){this.launchedMass+=held;this.stuckMass+=held;}
+    return held;
+  }
   cancel(): void {
     this.wasHeld = false; this.charge = 0; this.heldSeconds = 0; this.overheld = false;
     if (this.pendingCast) { this.pendingCast = null; this.releasedPhase = 0; this.recoveringThrow = false; }
