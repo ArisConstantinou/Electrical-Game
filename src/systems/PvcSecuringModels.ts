@@ -50,9 +50,11 @@ export function buildHeldRebar():THREE.Group{
 }
 
 export function buildRebarHug(left:THREE.Vector3,right:THREE.Vector3,frontZ:number):THREE.Mesh{
-  const middle=left.clone().add(right).multiplyScalar(.5),curve=new THREE.CatmullRomCurve3([
-    left.clone(),new THREE.Vector3(left.x+.025,left.y,frontZ),new THREE.Vector3(middle.x-.021,middle.y,frontZ+.030),
-    new THREE.Vector3(middle.x,middle.y,frontZ+.038),new THREE.Vector3(middle.x+.021,middle.y,frontZ+.030),new THREE.Vector3(right.x-.025,right.y,frontZ),right.clone(),
+  // Store vertices around the strap centre. Scaling during tightening must
+  // deform the bow without scaling its absolute wall coordinates toward 0.
+  const middle=left.clone().add(right).multiplyScalar(.5),local=(point:THREE.Vector3)=>point.clone().sub(middle),curve=new THREE.CatmullRomCurve3([
+    local(left),local(new THREE.Vector3(left.x+.025,left.y,frontZ)),local(new THREE.Vector3(middle.x-.021,middle.y,frontZ+.030)),
+    local(new THREE.Vector3(middle.x,middle.y,frontZ+.038)),local(new THREE.Vector3(middle.x+.021,middle.y,frontZ+.030)),local(new THREE.Vector3(right.x-.025,right.y,frontZ)),local(right),
   ]);
-  const mesh=new THREE.Mesh(new THREE.TubeGeometry(curve,36,.004,8,false),steel(0x676d6b,.52));mesh.name='8 mm rebar conduit wall strap';mesh.userData.leftHole=left.toArray();mesh.userData.rightHole=right.toArray();return mesh;
+  const mesh=new THREE.Mesh(new THREE.TubeGeometry(curve,36,.004,8,false),steel(0x676d6b,.52));mesh.name='8 mm rebar conduit wall strap';mesh.position.copy(middle);mesh.userData.leftHole=left.toArray();mesh.userData.rightHole=right.toArray();return mesh;
 }

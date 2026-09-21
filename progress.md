@@ -977,3 +977,10 @@ Original prompt for this task: Selecting BOX should show an initial box in the l
 - Reproduced the real usability gap hidden by the previous exact-cut fixture: placement rejected any cut more than 4 mm long, while the automated path authored an almost zero-error cut. On touch this looked like an unresponsive ΕΦΑΡΜΟΣΕ action.
 - The cutter now opens at the measured box-entry position (0 mm planned error), while remaining freely adjustable. Up to 30 mm of extra conduit is accepted into the 37 mm-deep box; a short conduit or blocked chase is still rejected.
 - Desktop acceptance proves a deliberately 15 mm-long cut seats and continues through the complete drilling/rebar sequence. Portrait and landscape tests assert the initial cutter position is immediately box-ready. Focused PVC logic/UI, mobile hands, production build and the bounded skill-client run pass; the fitting and installed-pipe screenshots were inspected. Public deployment is pending.
+
+## 2026-09-21 · Manual chase holes and open-rebar order
+
+- Corrected the fixed-slot fastener cursor. Both coordinates now follow manual aim while every mark remains strictly inside the 200 mm chased wall area, outside the conduit centre gap and nudged off horizontal mortar joints.
+- Reordered the physical sequence to mark/drill without an installed pipe, insert each rebar strap open, apply the cut pipe through those open straps, and only then tighten each strap with the pliers.
+- Rebuilt strap geometry around a local centre so tightening deforms its bow without scaling absolute wall coordinates. Automated assertions keep every rebar world position unchanged through tightening and require both straps to remain visible after closure.
+- Focused desktop and portrait/landscape mobile PVC workflows pass. Inspected frames show chase-only marks, forward drilling, open straps without pipe, pipe insertion and both fully tied straps. Production/publication checks pending.
