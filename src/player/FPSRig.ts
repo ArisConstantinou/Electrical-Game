@@ -469,10 +469,26 @@ export class FPSRig extends THREE.Group {
   }
   private zoneLabel(value:number,available:boolean):THREE.Sprite{
     const canvas=document.createElement('canvas');canvas.width=96;canvas.height=96;const context=canvas.getContext('2d')!;
-    context.fillStyle=available?'#12343c':'#3b2d2b';context.strokeStyle=available?'#a8f2ff':'#9d7771';context.lineWidth=6;context.beginPath();context.roundRect(5,5,86,86,18);context.fill();context.stroke();
-    context.fillStyle=available?'#ffffff':'#c7aaa5';context.font='bold 56px Arial';context.textAlign='center';context.textBaseline='middle';context.fillText(String(value),48,52);
+    context.shadowColor='#05171ccc';context.shadowBlur=12;
+    context.fillStyle=available?'#173a42e8':'#352d2ba8';context.strokeStyle=available?'#a8f2ff':'#9d7771';context.lineWidth=5;context.beginPath();context.arc(48,48,38,0,Math.PI*2);context.fill();context.stroke();
+    context.shadowBlur=0;context.strokeStyle=available?'#6fbfca88':'#80696677';context.lineWidth=2;context.beginPath();context.arc(48,48,30,0,Math.PI*2);context.stroke();
+    context.fillStyle=available?'#ffffff':'#c7aaa5';context.font='bold 50px Arial';context.textAlign='center';context.textBaseline='middle';context.fillText(String(value),48,52);
     const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
-    const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,depthTest:false,depthWrite:false,transparent:true}));sprite.scale.set(.030,.030,1);sprite.renderOrder=24;sprite.frustumCulled=false;return sprite;
+    const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,depthTest:false,depthWrite:false,transparent:true}));sprite.scale.set(.034,.034,1);sprite.renderOrder=24;sprite.frustumCulled=false;return sprite;
+  }
+  fittingZoneAtScreen(camera:THREE.Camera,rect:DOMRect,x:number,y:number):number|null{
+    if(!this.fittingZonesRoot.visible)return null;
+    this.fittingZonesRoot.updateWorldMatrix(true,true);
+    let selected:number|null=null,distance=28;
+    for(const zone of this.fittingZonesRoot.children){
+      if(!zone.userData.available)continue;
+      const point=zone.getWorldPosition(new THREE.Vector3()).project(camera);
+      if(point.z<-1||point.z>1)continue;
+      const px=rect.left+(point.x+1)*rect.width/2,py=rect.top+(1-point.y)*rect.height/2;
+      const delta=Math.hypot(px-x,py-y);
+      if(delta<distance){distance=delta;selected=zone.userData.zone as number;}
+    }
+    return selected;
   }
   private rebuildFittingZones():void{
     this.clearFittingRoot(this.fittingZonesRoot);

@@ -458,7 +458,9 @@ export class HUD {
   }
 
   updateBoxAssembly(snapshot:{modules:Array<{kind:string}>;candidateKind:string;candidateRotation:number},zones:Array<{zone:number;available:boolean}>):void {
-    if(matchMedia('(pointer:coarse)').matches)this.shell.querySelector('#box-next-kind')!.textContent=`${snapshot.candidateKind} · ${snapshot.candidateRotation*90}°`;
+    const kindButton=this.shell.querySelector<HTMLElement>('#box-next-kind')!;
+    kindButton.dataset.boxKind=snapshot.candidateKind;kindButton.dataset.boxAngle=`${snapshot.candidateRotation*90}°`;
+    if(matchMedia('(pointer:coarse)').matches)kindButton.textContent=`${snapshot.candidateKind} · ${snapshot.candidateRotation*90}°`;
     this.shell.querySelector('#box-assembly-count')!.textContent=`${snapshot.modules.length} ${snapshot.modules.length===1?'BOX':'BOXES'}`;
     this.shell.querySelector('#box-candidate-kind')!.textContent=`${snapshot.candidateKind} · ${snapshot.candidateRotation*90}°`;
     this.shell.querySelector<HTMLButtonElement>('#box-undo')!.disabled=snapshot.modules.length<=1;

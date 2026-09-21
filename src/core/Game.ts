@@ -127,6 +127,27 @@ export class Game {
     root.addEventListener('pointerdown',()=>this.audio.unlock(),{capture:true});
     addEventListener('keydown',()=>this.audio.unlock(),{capture:true});
     this.renderer = new Renderer(stage);
+    let boxZoneTouch:{id:number;zone:number;x:number;y:number}|null=null;
+    let boxZoneClick:{x:number;y:number;until:number}|null=null;
+    this.hud.shell.addEventListener('pointerdown',event=>{
+      if((event.pointerType!=='touch'&&event.pointerType!=='pen')||!this.started||!this.boxAssemblyActive||this.selectedTool!=='fitting')return;
+      if((event.target as Element).closest('#box-supply'))return;
+      const zone=this.fpsRig.fittingZoneAtScreen(this.renderer.renderCamera,this.renderer.webgl.domElement.getBoundingClientRect(),event.clientX,event.clientY);
+      if(zone===null)return;
+      boxZoneTouch={id:event.pointerId,zone,x:event.clientX,y:event.clientY};this.hud.shell.setPointerCapture(event.pointerId);
+      event.preventDefault();event.stopImmediatePropagation();
+    },true);
+    this.hud.shell.addEventListener('pointerup',event=>{
+      if(!boxZoneTouch||event.pointerId!==boxZoneTouch.id)return;
+      const touch=boxZoneTouch;boxZoneTouch=null;
+      event.preventDefault();event.stopImmediatePropagation();
+      if(Math.hypot(event.clientX-touch.x,event.clientY-touch.y)<=14){boxZoneClick={x:event.clientX,y:event.clientY,until:performance.now()+500};dispatchEvent(new CustomEvent('wirehouse:box-attach',{detail:touch.zone}));}
+    },true);
+    this.hud.shell.addEventListener('pointercancel',event=>{if(boxZoneTouch?.id===event.pointerId)boxZoneTouch=null;},true);
+    this.hud.shell.addEventListener('click',event=>{
+      if(!boxZoneClick||performance.now()>boxZoneClick.until||Math.hypot(event.clientX-boxZoneClick.x,event.clientY-boxZoneClick.y)>30)return;
+      boxZoneClick=null;event.preventDefault();event.stopImmediatePropagation();
+    },true);
     this.player = new PlayerController(this.renderer.camera, this.input);
     this.renderer.camera.add(this.fpsRig);
     this.renderer.scene.add(this.renderer.camera);

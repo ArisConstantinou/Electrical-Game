@@ -108,12 +108,13 @@ button {
 #tool-mode-toggle { position: absolute; z-index: 8; right: max(8px, env(safe-area-inset-right)); bottom: calc(max(7px, env(safe-area-inset-bottom)) + 65px); min-width: 142px; height: 52px; display: none; align-items: center; justify-content: center; gap: 9px; padding: 0 14px; color: #fff; border: 1px solid #d88a58; background: rgba(39,34,28,.94); box-shadow: 0 7px 20px rgba(0,0,0,.3); font: 800 14px/1 'Barlow Condensed', sans-serif; letter-spacing: .08em; pointer-events: auto; }
 #tool-mode-toggle.visible { display: flex; }
 #tool-mode-toggle svg { width: 24px; height: 24px; fill: none; stroke: #f1aa78; stroke-width: 2.3; stroke-linecap: round; stroke-linejoin: round; }
-#mobile-tool-slider { position: absolute; z-index: 8; left: max(8px, env(safe-area-inset-left)); right: max(8px, env(safe-area-inset-right)); bottom: max(7px, env(safe-area-inset-bottom)); display: flex; gap: 5px; height: 60px; padding: 5px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; background: rgba(25,23,20,.9); border: 1px solid rgba(224,169,121,.52); box-shadow: 0 8px 24px rgba(0,0,0,.28); pointer-events: auto; scroll-snap-type: x mandatory; }
+#mobile-tool-slider { position: absolute; z-index: 8; left: max(8px, env(safe-area-inset-left)); right: max(8px, env(safe-area-inset-right)); bottom: max(7px, env(safe-area-inset-bottom)); display: flex; gap: 7px; height: 66px; padding: 0 4px; overflow-x: auto; overflow-y:hidden; overscroll-behavior-x: contain; scrollbar-width: none; background: transparent; border: 0; box-shadow: none; pointer-events: auto; scroll-snap-type: x mandatory; }
 #mobile-tool-slider::-webkit-scrollbar { display: none; }
-#mobile-tool-slider button { flex: 1 0 52px; min-width: 52px; min-height: 48px; display: grid; place-items: center; gap: 1px; padding: 3px 2px; color: #d4d0c8; background: #2d2923; border: 1px solid #655b4f; scroll-snap-align: center; }
-#mobile-tool-slider button.selected { color: #fff; background: #9f4828; border-color: #f0a06f; box-shadow: inset 0 0 0 1px rgba(255,255,255,.18); }
-#mobile-tool-slider svg { width: 25px; height: 25px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-#mobile-tool-slider span { font: 800 12px/1 'Barlow Condensed', sans-serif; letter-spacing: .03em; }
+#mobile-tool-slider button { flex: 0 0 68px; width:68px; min-width:68px; min-height: 62px; display: flex; flex-direction:column; align-items:center; justify-content:center; gap: 2px; padding: 0; color: #f3f3ec; background: transparent; border: 0; scroll-snap-align: center; text-shadow:0 1px 3px #000,0 0 5px #000; }
+#mobile-tool-slider button.selected { color: #ffe1ad; background: transparent; border: 0; box-shadow: none; }
+#mobile-tool-slider svg { box-sizing:content-box; width: 25px; height: 25px; padding:8px; border-radius:50%; background:#1d2b2bcc; box-shadow:0 3px 10px #0008; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+#mobile-tool-slider button.selected svg {background:#ae5937;color:#fff4e8;}
+#mobile-tool-slider span { display:block;width:100%;overflow:hidden;text-align:center;white-space:nowrap;text-overflow:clip;font: 800 12px/1.1 'Barlow Condensed', sans-serif; letter-spacing: 0; }
 .screen-panel { position: absolute; z-index: 10; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: clamp(28px, 7vw, 110px); background: linear-gradient(90deg, rgba(20,18,15,.96) 0%, rgba(20,18,15,.86) 44%, rgba(20,18,15,.2) 100%), linear-gradient(0deg, rgba(146,67,33,.22), transparent); transition: opacity .35s ease, visibility .35s ease; }
 .screen-panel.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
 .screen-panel h1, .screen-panel h2 { margin: 10px 0 14px; font: 800 clamp(64px, 11vw, 148px)/.75 'Barlow Condensed', sans-serif; letter-spacing: -.045em; text-shadow: 0 8px 40px rgba(0,0,0,.45); }
@@ -554,19 +555,48 @@ button {
 @media(pointer:coarse){#game-shell:is([data-active-tool="measure"],[data-active-tool="laser"],[data-active-tool="drill"],[data-active-tool="driver"]) #interaction-prompt{display:none}}
 @media(pointer:coarse) and (max-height:520px){#mobile-interact{top:62px;bottom:auto;right:108px;min-height:44px}}
 
-/* Touch assembly stays beside the toolbelt, leaving the live objects exposed. */
+/* Touch assembly uses the numbered markers on the held boxes and a small,
+   panel-free dock for the remaining actions. */
 @media(pointer:coarse){
-  #game-shell #box-supply{top:auto;bottom:8px;left:8px;right:8px;width:auto;transform:none;padding:4px;gap:4px;grid-template-columns:repeat(6,minmax(0,1fr));background:#181e20cc;border:0}
-  #game-shell[data-box-assembly="false"] #box-supply{width:auto;bottom:76px;left:50%;right:8px;grid-template-columns:1fr}
-  #box-supply #box-supply-title,#box-supply #box-assembly-state,#box-supply #box-fit-size,#box-supply #box-fit-legend{display:none}
-  #box-supply .box-presets,#box-supply #box-history-actions,#box-supply #box-zone-buttons,#box-supply #box-assembly-actions{display:contents}
-  #box-supply #box-zone-buttons i,#box-supply kbd{display:none}
-  #box-supply button{min-height:44px;padding:3px 1px;font:700 12px/1.2 Arial,sans-serif;min-width:0;touch-action:manipulation}
-  #box-supply .box-presets button{order:0}
-  #box-supply [data-box-zone]{order:1}
-  #box-supply #box-assembly-toggle,#box-supply #box-history-actions button,#box-supply #box-assembly-actions button{order:2}
-  #box-supply #box-fit-status{order:3;grid-column:1/-1;font-size:12px;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #game-shell #box-supply{top:auto;bottom:0;left:0;right:0;width:auto;height:146px;transform:none;padding:0;display:block;background:transparent;border:0;box-shadow:none;backdrop-filter:none;pointer-events:none}
+  #game-shell #box-supply[hidden]{display:none}
+  #game-shell[data-box-assembly="false"] #box-supply{bottom:calc(76px + env(safe-area-inset-bottom));height:66px}
+  #box-supply #box-supply-title,#box-supply #box-assembly-state,#box-supply #box-fit-size,#box-supply #box-fit-legend,#box-supply #box-zone-buttons{display:none}
+  #box-supply .box-presets,#box-supply #box-history-actions,#box-supply #box-assembly-actions{position:absolute;top:auto;width:128px;display:flex;gap:4px;pointer-events:auto}
+  #box-supply .box-presets{left:calc(50% - 128px);bottom:calc(75px + env(safe-area-inset-bottom))}
+  #box-supply #box-history-actions{left:50%;bottom:calc(75px + env(safe-area-inset-bottom))}
+  #box-supply #box-history-actions[hidden]{display:none}
+  #box-supply #box-assembly-actions{left:calc(50% - 128px);bottom:calc(5px + env(safe-area-inset-bottom));width:192px;grid-template-columns:none}
+  #box-supply #box-assembly-toggle{position:absolute;left:calc(50% + 64px);bottom:calc(5px + env(safe-area-inset-bottom));pointer-events:auto}
+  #game-shell[data-box-assembly="false"] #box-assembly-toggle{left:auto;right:14px;bottom:0}
+  #box-supply button{box-sizing:border-box;flex:0 0 60px;width:60px;min-width:60px;min-height:65px;height:65px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:2px;padding:0;border:0;background:none!important;box-shadow:none!important;color:transparent;font-size:0!important;line-height:1;touch-action:manipulation;pointer-events:auto}
+  #box-supply button::before{box-sizing:border-box;content:'';display:grid;place-items:center;flex:0 0 43px;width:43px;height:43px;border:1px solid #74969a;border-radius:50%;background:#1c3438eb;box-shadow:0 3px 10px #0009;color:#fff;font:800 20px/1 Arial,sans-serif;text-shadow:none}
+  #box-supply button::after{content:'';display:block;width:68px;min-height:14px;color:#fff;text-align:center;white-space:nowrap;font:800 12px/1.1 'Barlow Condensed',Arial,sans-serif;text-shadow:0 1px 3px #000,0 0 5px #000}
+  #box-supply button:disabled{opacity:.42}
+  #box-supply .box-presets button[aria-pressed="true"]::before{background:#ad5e39;border-color:#ffe2ab}
+  #box-preset-1G::before{content:'1G'!important}#box-preset-2G::before{content:'2G'!important}
+  #box-preset-1G::after,#box-preset-2G::after{content:'ΑΡΧΗ'!important}
+  #box-undo::before{content:'↶'!important}#box-undo::after{content:'ΠΙΣΩ'!important}
+  #box-reset::before{content:'↺'!important}#box-reset::after{content:'RESET'!important}
+  #box-next-kind::before{content:attr(data-box-kind)!important;font-size:15px!important}
+  #box-next-kind::after{content:'ΤΥΠΟΣ ' attr(data-box-angle)!important}
+  #box-rotate-candidate::before{content:'↻'!important}#box-rotate-candidate::after{content:'ΣΤΡΟΦΗ'!important}
+  #box-place-assembly::before{content:'✓'!important;background:#ad5e39!important;border-color:#ffe2ab!important}
+  #box-place-assembly::after{content:'ΒΑΛΕ'!important}
+  #box-assembly-toggle::before{content:'×'!important;font-size:27px!important}
+  #box-assembly-toggle::after{content:'ΚΛΕΙΣΕ'!important}
+  #game-shell[data-box-assembly="false"] #box-assembly-toggle::before{content:'▣'!important;font-size:21px!important}
+  #game-shell[data-box-assembly="false"] #box-assembly-toggle::after{content:'ΣΥΝΑΡΜ.'!important}
+  #box-supply #box-fit-status{position:absolute;left:50%;bottom:calc(146px + env(safe-area-inset-bottom));transform:translateX(-50%);width:max-content;max-width:calc(100% - 24px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:none;font-size:12px;text-shadow:0 1px 3px #000,0 0 5px #000;pointer-events:none}
+  #game-shell[data-box-assembly="false"] #box-fit-status{display:none}
   #game-shell[data-box-assembly="true"] #mobile-tool-slider,#game-shell[data-box-assembly="true"] #mixing-toolbelt,#game-shell[data-box-assembly="true"] #tool-quick-controls,#game-shell[data-box-assembly="true"] #aim-quick-controls,#game-shell[data-box-assembly="true"] #mobile-use-status,#game-shell[data-box-assembly="true"] #pvc-prompt{display:none!important}
   #game-shell[data-box-assembly="true"] #joystick,#game-shell[data-box-assembly="true"] #look-joystick{bottom:152px}
   #game-shell[data-active-tool="fitting"] #interaction-prompt{top:70px;font-size:14px}
+}
+@media(pointer:coarse) and (max-height:500px){
+  #box-supply #box-fit-status{display:none}
+  #box-supply .box-presets{left:auto;right:140px}
+  #box-supply #box-history-actions{left:auto;right:12px}
+  #box-supply #box-assembly-actions{left:auto;right:76px}
+  #box-supply #box-assembly-toggle{left:auto;right:12px}
 }

@@ -6,6 +6,18 @@ import { blockPointerLock } from './browser-safety.mjs';
 const url=process.env.QA_BASE??'http://127.0.0.1:5365/Electrical-Game/',out=process.argv[2]??'output/box-hand-assembly-ui';await mkdir(out,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:true}),report={url,mobileIsEmulation:true,cases:[],errors:[]};
 const step=(page,n=2)=>page.evaluate(n=>{for(let i=0;i<n;i++)window.__boxAssemblyStep(1/60);},n);
+const tapWorldZone=async(page,zone)=>{
+  const target=await page.evaluate(zone=>{
+    const game=window.__wireTheHouse,marker=game.fpsRig.fittingZonesRoot.children.find(item=>item.userData.zone===zone);
+    marker.updateWorldMatrix(true,true);game.renderer.renderCamera.updateMatrixWorld(true);
+    const point=marker.getWorldPosition(marker.position.clone()).project(game.renderer.renderCamera),rect=game.renderer.webgl.domElement.getBoundingClientRect();
+    const x=rect.left+(point.x+1)*rect.width/2,y=rect.top+(1-point.y)*rect.height/2;
+    return{x,y,available:marker.userData.available,hit:document.elementFromPoint(x,y)?.id,picked:game.fpsRig.fittingZoneAtScreen(game.renderer.renderCamera,rect,x,y)};
+  },zone);
+  assert(target.available,`zone ${zone} unavailable: ${JSON.stringify(target)}`);
+  assert.equal(target.picked,zone,`zone ${zone} screen projection mismatch`);
+  await page.touchscreen.tap(target.x,target.y);
+};
 async function fixture(page){return page.evaluate(async()=>{
   const g=window.__wireTheHouse,v=g.room.brickWall.volume;window.__boxAssemblyStep=g.step.bind(g);g.step=()=>{};await g.renderer.waitForFrame();
   const area={x:0,y:1.3,width:.58,height:.62,depth:.09},save=v.serialize(),chunks=new Map(save.chunks.map(c=>[c.key,new Map(c.edits.map(e=>[e[0],e]))]));let removed=0;
@@ -29,10 +41,16 @@ const read=page=>page.evaluate(()=>{
   return{boxScreenBounds,worker:g.workerBody?.telemetry,legacySkinVisible,referenceKeys:g.fpsRig.anatomicalGrips().map(grip=>grip.referenceKey??null),selected:state.mission.selectedTool,assemblyActive:state.mission.boxAssemblyActive,datasetAssembly:document.querySelector('#game-shell').dataset.boxAssembly,zoneRootVisible:g.fpsRig.fittingZonesRoot.visible,toolInstruction:document.querySelector('#tool-status em').textContent,input:{action:g.input.actionRequested,actionHeld:g.input.actionHeld,interaction:g.input.interactionRequested,interactionHeld:g.input.interactionHeld},assembly:state.mission.boxAssembly,arms:g.fpsRig.debugPose().arms,zones,fit:g.boxFitPreview.telemetry,visible:g.mission.points.filter(p=>p.boxGroup.visible).map(p=>({id:p.definition.id,layout:p.definition.boxLayout??p.boxGroup.layout,position:p.boxGroup.position.toArray()})),overflow:document.documentElement.scrollWidth>innerWidth,error:g.renderer.renderError};
 });
 try{
-  for(const [name,viewport,mobile] of [['desktop',{width:1366,height:768},false],['mobile',{width:390,height:844},true]]){
+  for(const [name,viewport,mobile] of [['desktop',{width:1366,height:768},false],['mobile',{width:390,height:844},true],['landscape',{width:844,height:390},true]].filter(([name])=>process.argv.includes('--mobile-only')?name==='mobile':process.argv.includes('--landscape-only')?name==='landscape':name!=='landscape')){
     const context=await browser.newContext({viewport,isMobile:mobile,hasTouch:mobile});await blockPointerLock(context);const page=await context.newPage();page.on('pageerror',e=>report.errors.push(`${name}: ${e.message}`));page.on('console',message=>{if(message.type()==='error')report.errors.push(`${name}: ${message.text()}`);});await page.routeWebSocket('**',()=>{});
-    await page.goto(url);await page.waitForFunction(()=>window.__wireTheHouse?.roomWater.waterProActive,undefined,{timeout:120000});await page.locator('#start-button')[mobile?'tap':'click']();const prepared=await fixture(page);assert(prepared.removed>0);
-    if(mobile)await page.locator('[data-tool="fitting"]').tap();else await page.keyboard.press('Digit5');await step(page,4);
+    await page.goto(url);await page.waitForFunction(()=>window.__wireTheHouse?.roomWater.waterProActive,undefined,{timeout:120000});await page.locator('#start-button')[mobile?'tap':'click']();
+    if(mobile)await page.waitForFunction(()=>window.__wireTheHouse?.started&&!document.querySelector('#apprentice-controls').hidden,undefined,{timeout:120000});
+    const prepared=await fixture(page);assert(prepared.removed>0);
+    if(mobile){await page.locator('[data-apprentice="cancel"]').tap();await step(page,2);await page.locator('[data-tool="fitting"]').tap();}else await page.keyboard.press('Digit5');await step(page,4);
+    if(mobile){
+      const tools=await page.locator('#mobile-tool-slider').evaluate(node=>({background:getComputedStyle(node).backgroundColor,widths:[...node.querySelectorAll('button')].map(button=>button.getBoundingClientRect().width),labels:[...node.querySelectorAll('button span')].map(label=>({width:label.clientWidth,text:label.scrollWidth}))}));
+      assert.equal(tools.background,'rgba(0, 0, 0, 0)');assert(tools.widths.every(width=>width===tools.widths[0]&&width>=68));assert(tools.labels.every(label=>label.text<=label.width+1),`tool labels must fit their equal-width controls: ${JSON.stringify(tools.labels)}`);
+    }
     const toolOnly=await read(page);assert.equal(toolOnly.selected,'fitting');assert.equal(toolOnly.assemblyActive,false,'selecting BOX must not enter assembly');assert.equal(toolOnly.datasetAssembly,'false');assert.equal(toolOnly.zoneRootVisible,false,'inactive BOX must not show assembly zones');assert(toolOnly.toolInstruction.includes('Q · LIVE ASSEMBLY'));
     assert.equal(await page.locator('#box-assembly-toggle').textContent(),mobile?'ΣΥΝΑΡΜΟΛΟΓΗΣΗ ΚΟΥΤΙΩΝ':'Q · OPEN LIVE ASSEMBLY');
     await page.evaluate(async()=>{const r=window.__wireTheHouse.renderer;await r.waitForFrame();r.render();await r.waitForFrame();});await page.screenshot({path:`${out}/${name}-tool-only.png`});
@@ -42,11 +60,15 @@ try{
     }
     await step(page,4);
     const initial=await read(page),initialVisibleIds=new Set(initial.visible.map(point=>point.id));assert.equal(initial.assemblyActive,true,'Q/touch control must enter live assembly');assert.equal(initial.zoneRootVisible,true);assert.equal(initial.worker?.loaded,true,'new anatomical body must load alongside box assembly');assert.equal(initial.worker.bones,52);assert.equal(initial.legacySkinVisible,false,'legacy segmented skin must stay hidden');assert.deepEqual(initial.referenceKeys,[null,null],'independent fitting hands must not replay the old one-box reference');assert.equal(initial.selected,'fitting');assert.equal(initial.assembly.modules.length,1);assert.deepEqual(initial.arms.map(a=>a.gripRole).sort(),['assembly','candidate']);assert.equal(initial.zones.length,4);
+    if(mobile){const dock=await page.locator('#box-supply').evaluate(node=>({background:getComputedStyle(node).backgroundColor,blur:getComputedStyle(node).backdropFilter,zones:getComputedStyle(node.querySelector('#box-zone-buttons')).display}));assert.equal(dock.background,'rgba(0, 0, 0, 0)');assert.equal(dock.blur,'none');assert.equal(dock.zones,'none');}
     assert.equal(await page.locator('#box-assembly-toggle').textContent(),mobile?'ΚΛΕΙΣΕ':'ESC · CLOSE ASSEMBLY');assert(await page.locator('#box-undo').isVisible());assert(await page.locator('#box-reset').isVisible());assert(await page.locator('#box-undo').isDisabled(),'UNDO is disabled when only the starting box remains');
     if(mobile){
-      await page.locator('[data-box-zone="2"]').tap();await step(page,30);assert.equal((await read(page)).assembly.modules.length,2);assert.equal(await page.locator('#box-undo').isDisabled(),false);
-      await page.locator('#box-undo').tap();await step(page,2);assert.equal((await read(page)).assembly.modules.length,1,'touch UNDO removes the last box');
-      await page.locator('[data-box-zone="2"]').tap();await step(page,30);await page.locator('#box-reset').tap();await step(page,2);const reset=await read(page);assert.equal(reset.assembly.modules.length,1);assert.equal(reset.assembly.modules[0].kind,'1G');
+      for(const zone of [1,2,3,4]){
+        await tapWorldZone(page,zone);await step(page,30);assert.equal((await read(page)).assembly.modules.length,2,`touch zone ${zone} must attach a box`);assert.equal(await page.locator('#box-undo').isDisabled(),false);
+        await page.locator('#box-undo').tap();await step(page,2);assert.equal((await read(page)).assembly.modules.length,1,'touch UNDO removes the last box');
+        assert((await page.evaluate(()=>window.__wireTheHouse.renderer.camera.position.y))>1.5,`zone ${zone} must not press crouch beneath it`);
+      }
+      await tapWorldZone(page,2);await step(page,30);await page.locator('#box-reset').tap();await step(page,2);const reset=await read(page);assert.equal(reset.assembly.modules.length,1);assert.equal(reset.assembly.modules[0].kind,'1G');
     }else{
       await page.keyboard.press('Digit2');await step(page,30);assert.equal((await read(page)).assembly.modules.length,2);
       await page.keyboard.press('KeyQ');await step(page,2);assert.equal((await read(page)).assembly.modules.length,1,'Q removes the last box without closing assembly');
@@ -55,7 +77,7 @@ try{
     await page.waitForTimeout(1300);
     await page.evaluate(async()=>{const r=window.__wireTheHouse.renderer;await r.waitForFrame();r.render();await r.waitForFrame();});await page.screenshot({path:`${out}/${name}-initial-two-hands.png`});
     if(mobile){
-      await page.locator('#box-next-kind').tap();await step(page);await page.locator('#box-rotate-candidate').tap();await step(page);await page.locator('[data-box-zone="2"]').tap();await step(page,30);
+      await page.locator('#box-next-kind').tap();await step(page);await page.locator('#box-rotate-candidate').tap();await step(page);await tapWorldZone(page,2);await step(page,30);
     }else{
       await page.mouse.move(viewport.width*.5,viewport.height*.5);await page.mouse.wheel(0,100);await step(page);
       for(const code of ['Digit2','Digit2','KeyR','Digit1']){await page.keyboard.press(code);await step(page,30);}
@@ -80,7 +102,7 @@ try{
     }
     await step(page,30);
     if(mobile)await page.locator('#box-place-assembly').tap();else await page.mouse.click(viewport.width*.5,viewport.height*.5,{button:'right'});await step(page,3);
-    const placed=await read(page),newlyPlaced=placed.visible.filter(point=>!initialVisibleIds.has(point.id));assert.equal(placed.visible.length,initial.visible.length+1,`${name}: right-click/touch PLACE adds one complete assembly`);assert.equal(newlyPlaced.length,1);assert.equal(newlyPlaced[0].layout.length,built.assembly.modules.length);assert(!placed.overflow);assert.equal(placed.error,'');
+    const placed=await read(page),newlyPlaced=placed.visible.filter(point=>!initialVisibleIds.has(point.id));assert.equal(placed.visible.length,initial.visible.length+1,`${name}: right-click/touch PLACE adds one complete assembly; ${JSON.stringify({fit:placed.fit,assembly:placed.assembly,visible:placed.visible.length,error:placed.error})}`);assert.equal(newlyPlaced.length,1);assert.equal(newlyPlaced[0].layout.length,built.assembly.modules.length);assert(!placed.overflow);assert.equal(placed.error,'');
     assert.equal(placed.assembly.modules.length,1,`${name}: successful placement starts a fresh one-box hand assembly`);
     await page.waitForTimeout(950);
     await page.evaluate(async()=>{const r=window.__wireTheHouse.renderer;await r.waitForFrame();r.render();await r.waitForFrame();});await page.screenshot({path:`${out}/${name}-placed.png`});

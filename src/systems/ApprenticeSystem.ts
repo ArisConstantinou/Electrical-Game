@@ -173,7 +173,7 @@ export class ApprenticeSystem {
     ].join('')}</div>`;
     this.status.className='apprentice-status';this.status.setAttribute('role','status');this.toolbar.prepend(this.status);game.hud.shell.append(this.toolbar);
     const returnButton=document.createElement('button');returnButton.id='apprentice-return';returnButton.type='button';returnButton.setAttribute('aria-label','Επιστροφή στον Apprentice');
-    returnButton.innerHTML=`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${NAV_ICONS.point}"/></svg><span>APPRENTICE</span>`;
+    returnButton.innerHTML=`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${NAV_ICONS.point}"/></svg><span>ΒΟΗΘΟΣ</span>`;
     returnButton.addEventListener('click',()=>this.command('point'));game.hud.shell.querySelector('#mobile-tool-slider')?.append(returnButton);
     this.groundMenu.id='apprentice-ground-menu';this.groundMenu.setAttribute('aria-label','Εντολή Apprentice στο έδαφος');
     this.groundMenu.innerHTML=[groundButton('go','ΠΗΓΑΙΝΕ','point','Πήγαινε στο σημείο'),groundButton('mix','ΠΗΛΟΣ','mix','Φτιάξε πηλό'),groundButton('break','ΣΠΑΣΕ','break-now','Σπάσε τοίχο'),groundButton('pipe','ΣΩΛΗΝΕΣ','pipe-socket','Κόψε σωλήνες'),groundButton('boxes','ΚΟΥΤΙΑ','layout','Βάλε κουτιά')].join('');
