@@ -9,7 +9,7 @@ import { matteMaterial, siteMaterial, siteProScreedMaterial } from './SiteMateri
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { ExteriorCourtyard } from './ExteriorCourtyard';
 
-const concreteBeam = (size: THREE.Vector3, material: THREE.Material): THREE.Mesh => {
+const concreteBeam = (size: THREE.Vector3, material: THREE.Material, center: THREE.Vector3): THREE.Mesh => {
   const geometry = new THREE.BoxGeometry(size.x, size.y, size.z);
   const positions = geometry.getAttribute('position'), normals = geometry.getAttribute('normal'), uvs = geometry.getAttribute('uv');
   for (let i = 0; i < positions.count; i++) {
@@ -17,8 +17,8 @@ const concreteBeam = (size: THREE.Vector3, material: THREE.Material): THREE.Mesh
     const nx = Math.abs(normals.getX(i)), ny = Math.abs(normals.getY(i));
     // Every face receives approximately 0.75 m of scanned concrete per tile.
     // A long, shallow beam must not stretch one square texture along its span.
-    if (ny > .5) uvs.setXY(i, x / .75, z / .75);
-    else uvs.setXY(i, .37 + y / .75, (nx > .5 ? z : x) / .75);
+    if (ny > .5) uvs.setXY(i, (x + center.x) / 2, (z + center.z) / 2);
+    else uvs.setXY(i, .37 + (y + center.y) / 2, (nx > .5 ? z + center.z : x + center.x) / 2);
   }
   return new THREE.Mesh(geometry, material);
 };
@@ -72,7 +72,17 @@ export class Room extends THREE.Group {
     floor.receiveShadow = true;
     this.add(floor);
 
-    const ceiling = new THREE.Mesh(new RoundedBoxGeometry(GAME_CONFIG.room.width, 0.16, GAME_CONFIG.room.depth, 2, .012), siteMaterial('concrete', 0xf0ede7, 1.9, 1.8));
+    const ceilingGeometry = new RoundedBoxGeometry(GAME_CONFIG.room.width, 0.16, GAME_CONFIG.room.depth, 2, .012);
+    const ceilingPositions = ceilingGeometry.getAttribute('position');
+    const ceilingNormals = ceilingGeometry.getAttribute('normal');
+    const ceilingUVs = ceilingGeometry.getAttribute('uv');
+    for (let i = 0; i < ceilingPositions.count; i++) {
+      const x = ceilingPositions.getX(i), y = ceilingPositions.getY(i), z = ceilingPositions.getZ(i);
+      const nx = Math.abs(ceilingNormals.getX(i)), ny = Math.abs(ceilingNormals.getY(i));
+      if (ny > .5) ceilingUVs.setXY(i, x / 2, z / 2);
+      else ceilingUVs.setXY(i, .37 + (y + GAME_CONFIG.room.height + .08) / 2, (nx > .5 ? z : x) / 2);
+    }
+    const ceiling = new THREE.Mesh(ceilingGeometry, siteMaterial('concrete', 0xe6e2dc));
     ceiling.position.y = GAME_CONFIG.room.height + 0.08;
     ceiling.name = 'Concrete slab ceiling';
     ceiling.userData.studioEntityId = 'world:ceiling';
@@ -308,17 +318,22 @@ export class Room extends THREE.Group {
     // The cast-in-place ring beam bears on the last clay courses and overlaps
     // the floor slab, so the wall head reads as a continuous structural joint.
     const width = GAME_CONFIG.room.width, depth = GAME_CONFIG.room.depth;
-    const material = siteMaterial('concrete', 0xd6d2cc);
+    const material = siteMaterial('concrete', 0xe6e2dc);
     const beams = new THREE.Group();
+    // Leave a shallow 6 cm bearing lip so the cast ring beam remains visible
+    // without the old 14 cm dark soffit that read as a void over the bricks.
+    const bearing = .16;
+    const lip = .06;
     const parts = [
-      { x: 0, z: GAME_CONFIG.room.wallFrontZ - .01, sx: width, sz: .27 },
-      { x: 0, z: depth / 2 - .035, sx: width, sz: .27 },
-      { x: -width / 2 + .035, z: 0, sx: .27, sz: depth },
-      { x: width / 2 - .035, z: 0, sx: .27, sz: depth },
+      { x: 0, z: GAME_CONFIG.room.wallFrontZ + lip - bearing / 2, sx: width, sz: bearing },
+      { x: 0, z: depth / 2 - .02 - lip + bearing / 2, sx: width, sz: bearing },
+      { x: -width / 2 + .02 + lip - bearing / 2, z: 0, sx: bearing, sz: depth },
+      { x: width / 2 - .02 - lip + bearing / 2, z: 0, sx: bearing, sz: depth },
     ];
     for (const part of parts) {
-      const beam = concreteBeam(new THREE.Vector3(part.sx, .22, part.sz), material);
-      beam.position.set(part.x, GAME_CONFIG.room.height - .09, part.z);
+      const center = new THREE.Vector3(part.x, GAME_CONFIG.room.height - .09, part.z);
+      const beam = concreteBeam(new THREE.Vector3(part.sx, .22, part.sz), material, center);
+      beam.position.copy(center);
       beam.castShadow = beam.receiveShadow = true;
       beam.raycast = () => undefined;
       beams.add(beam);

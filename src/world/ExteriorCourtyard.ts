@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { siteMaterial } from './SiteMaterials';
 import { brickFacePatch } from './BrickFacePatch';
 import { masonryFaceMaterial } from './BrickFaceMaterial';
@@ -30,8 +31,13 @@ export class ExteriorCourtyard extends THREE.Group {
     const paving = siteMaterial('floor', 0xe2ddd4, .4, .4);
     const recess = new THREE.MeshStandardMaterial({ color: 0x4b504a, roughness: 1 });
     const steel = new THREE.MeshStandardMaterial({ color: 0x444844, metalness: .45, roughness: .65 });
-    const bark = new THREE.MeshStandardMaterial({ color: 0x786a56, roughness: 1 });
-    const leaves = new THREE.MeshStandardMaterial({ color: 0x697a55, roughness: 1, side: THREE.DoubleSide });
+    const barkAlbedo = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}assets/site-materials/bark-willow-512.webp`);
+    barkAlbedo.colorSpace = THREE.SRGBColorSpace;
+    barkAlbedo.wrapS = barkAlbedo.wrapT = THREE.RepeatWrapping;
+    barkAlbedo.repeat.set(.35, .70);
+    barkAlbedo.anisotropy = 4;
+    const bark = new THREE.MeshStandardMaterial({ name: 'Weathered grey olive bark', map: barkAlbedo, color: 0xe8e2d7, roughness: 1 });
+    const leaves = new THREE.MeshStandardMaterial({ color: 0x899981, roughness: 1, side: THREE.DoubleSide });
 
     // A vertex-coloured atmosphere is spatial sky geometry, not a view image.
     // It remains behind every building and tree as the player changes angle.
@@ -192,17 +198,44 @@ export class ExteriorCourtyard extends THREE.Group {
 
     // A pruned olive tree contributes near/mid/far parallax and gentle motion.
     const tree = new THREE.Group(); tree.name = 'Olive tree outside unfinished opening'; tree.position.set(-6.35, 0, 2.80); this.add(tree);
-    const trunkPoints = [new THREE.Vector3(0,0,0), new THREE.Vector3(.09,.38,.01), new THREE.Vector3(-.06,.87,.07), new THREE.Vector3(.07,1.43,0)];
-    const trunk = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(trunkPoints), 22, .105, 9, false), bark);
+    const trunkProfile = [
+      [.205, 0], [.178, .12], [.151, .37], [.137, .73], [.123, 1.04], [.099, 1.32], [.073, 1.57],
+    ].map(([radius, height]) => new THREE.Vector2(radius, height));
+    const trunkGeometry = new THREE.LatheGeometry(trunkProfile, 14);
+    const trunkPositions = trunkGeometry.getAttribute('position');
+    for (let i = 0; i < trunkPositions.count; i++) {
+      const x = trunkPositions.getX(i), y = trunkPositions.getY(i), z = trunkPositions.getZ(i);
+      const angle = Math.atan2(z, x);
+      const furrow = 1 + .055 * Math.sin(angle * 5 + y * 5.1) + .028 * Math.sin(angle * 9 - y * 8.3);
+      trunkPositions.setXYZ(i, x * furrow + .045 * Math.sin(y * 3.3), y, z * furrow + .035 * Math.sin(y * 4.2 + .6));
+    }
+    trunkGeometry.computeVertexNormals();
+    const woodyParts: THREE.BufferGeometry[] = [trunkGeometry];
+    for (const [start, bend, tip, radius] of [
+      [[.03, 1.13, 0], [-.27, 1.52, -.12], [-.69, 1.88, -.24], .073],
+      [[.05, 1.23, 0], [.30, 1.56, -.08], [.72, 1.85, -.20], .068],
+      [[.02, 1.36, .02], [.12, 1.70, .22], [.52, 2.15, .36], .055],
+    ] as const) {
+      woodyParts.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
+        new THREE.Vector3(...start), new THREE.Vector3(...bend), new THREE.Vector3(...tip),
+      ]), 14, radius, 7, false));
+    }
+    const woodyGeometry = mergeGeometries(woodyParts);
+    woodyParts.forEach(geometry => geometry.dispose());
+    if (!woodyGeometry) throw new Error('Olive trunk geometry could not be merged');
+    const trunk = new THREE.Mesh(woodyGeometry, bark);
+    trunk.name = 'Tapered forked weathered olive trunk';
     trunk.castShadow = true; tree.add(trunk);
     this.canopy.position.set(.07, 1.43, 0); tree.add(this.canopy);
     const sprays = [[-.72,.44,-.25],[.70,.42,-.22],[-.47,.73,.35],[.50,.76,.36],[-.08,.87,-.43],[.06,.34,.53]] as const;
-    for (const [x, y, z] of sprays) {
-      const branch = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
+    const sprayBranches = sprays.map(([x, y, z]) => new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
         new THREE.Vector3(0,0,0), new THREE.Vector3(x*.42,y*.63,z*.34), new THREE.Vector3(x,y,z),
-      ]), 12, .034, 6, false), bark);
-      branch.castShadow = true; this.canopy.add(branch);
-    }
+      ]), 12, .034, 6, false));
+    const branchGeometry = mergeGeometries(sprayBranches);
+    sprayBranches.forEach(geometry => geometry.dispose());
+    if (!branchGeometry) throw new Error('Olive canopy branch geometry could not be merged');
+    const branches = new THREE.Mesh(branchGeometry, bark);
+    branches.name = 'Forked olive canopy limbs'; branches.castShadow = true; this.canopy.add(branches);
     // Kew describes narrow, leathery 2–9.5 cm blades with pale undersides.
     // Each low-poly blade is about 7 cm long and 1.2 cm wide, rather than a
     // quarter-metre triangular silhouette. Six instanced sprays keep draw cost
@@ -241,7 +274,7 @@ export class ExteriorCourtyard extends THREE.Group {
         quaternion.setFromEuler(new THREE.Euler(.38 * Math.sin(i * 2.11), angle + .42, .9 * Math.sin(i * 1.37)));
         scale.setScalar(.72 + i % 5 * .095);
         matrix.compose(position, quaternion, scale); foliage.setMatrixAt(i, matrix);
-        foliage.setColorAt(i, tint.setRGB(.72 + i % 5 * .022, .78 + i % 4 * .018, .69 + i % 3 * .025));
+        foliage.setColorAt(i, tint.setRGB(.80 + i % 5 * .026, .85 + i % 4 * .021, .78 + i % 3 * .031));
       }
       foliage.name = `Narrow silver-backed olive leaves ${sprayIndex + 1}`;
       foliage.castShadow = false; foliage.raycast = () => undefined;
