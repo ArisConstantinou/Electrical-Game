@@ -95,4 +95,17 @@ export function siteMaterial(surface: Surface, color: number, repeatX = 1, repea
   });
 }
 
+let siteProScreedTexture: THREE.Texture | null = null;
+export function siteProScreedMaterial(): THREE.MeshStandardMaterial {
+  if (!siteProScreedTexture) {
+    siteProScreedTexture = textureLoader.load(`${import.meta.env.BASE_URL}assets/site-materials/site-pro-screed-v1.webp`);
+    siteProScreedTexture.name = 'Site Pro unfinished cement screed albedo';
+    siteProScreedTexture.colorSpace = THREE.SRGBColorSpace;
+    siteProScreedTexture.wrapS = siteProScreedTexture.wrapT = THREE.RepeatWrapping;
+    siteProScreedTexture.repeat.set(2, 1.9);
+    siteProScreedTexture.anisotropy = 4;
+  }
+  return new THREE.MeshStandardMaterial({ name: 'Site Pro poured screed', map: siteProScreedTexture, roughness: .98, metalness: 0 });
+}
+
 export const matteMaterial = (color: number, roughness = .92): THREE.MeshStandardMaterial => new THREE.MeshStandardMaterial({ color, roughness, metalness: 0 });

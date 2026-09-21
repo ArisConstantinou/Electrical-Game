@@ -4,7 +4,7 @@ import { INSTALLATION_POINTS } from '../data/installationRules';
 import { BrickWall } from './BrickWall';
 import { brickFacePatch } from './BrickFacePatch';
 import { addLighting } from './Lighting';
-import { matteMaterial, siteMaterial } from './SiteMaterials';
+import { matteMaterial, siteMaterial, siteProScreedMaterial } from './SiteMaterials';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { ExteriorCourtyard } from './ExteriorCourtyard';
 import { attribute, texture as sampleTexture, uv } from 'three/tsl';
@@ -82,7 +82,7 @@ export class Room extends THREE.Group {
     this.referenceWalls.push(this.intactPracticeWall);
     this.add(this.intactPracticeWall);
 
-    const floor = new THREE.Mesh(new THREE.BoxGeometry(GAME_CONFIG.room.width, 0.12, GAME_CONFIG.room.depth), siteMaterial('floor', 0xffffff, 3.6, 3.4));
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(GAME_CONFIG.room.width, 0.12, GAME_CONFIG.room.depth), siteProScreedMaterial());
     floor.position.y = -0.06;
     floor.name = 'Rough unfinished concrete floor';
     floor.userData.studioEntityId = 'world:floor';
@@ -319,10 +319,10 @@ export class Room extends THREE.Group {
   }
 
   private addWallHeadBeams(): void {
-    // A shallow cast-concrete perimeter return hides the top clay course and
-    // meets the slab without a second, heavily patterned hanging beam.
+    // The cast-in-place ring beam bears on the last clay courses and overlaps
+    // the floor slab, so the wall head reads as a continuous structural joint.
     const width = GAME_CONFIG.room.width, depth = GAME_CONFIG.room.depth;
-    const material = siteMaterial('concrete', 0xf0ede7);
+    const material = siteMaterial('concrete', 0xd6d2cc);
     const beams = new THREE.Group();
     const parts = [
       { x: 0, z: GAME_CONFIG.room.wallFrontZ - .01, sx: width, sz: .27 },
@@ -331,8 +331,8 @@ export class Room extends THREE.Group {
       { x: width / 2 - .035, z: 0, sx: .27, sz: depth },
     ];
     for (const part of parts) {
-      const beam = concreteBeam(new THREE.Vector3(part.sx, .08, part.sz), material);
-      beam.position.set(part.x, GAME_CONFIG.room.height - .04, part.z);
+      const beam = concreteBeam(new THREE.Vector3(part.sx, .22, part.sz), material);
+      beam.position.set(part.x, GAME_CONFIG.room.height - .09, part.z);
       beam.castShadow = beam.receiveShadow = true;
       beam.raycast = () => undefined;
       beams.add(beam);

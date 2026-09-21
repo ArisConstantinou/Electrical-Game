@@ -8,9 +8,11 @@ and are licensed CC0: https://polyhaven.com/license
 - `rusty_metal_03-diff-1k.jpg`: https://polyhaven.com/a/rusty_metal_03
 - `gravelly_sand-albedo-512.webp`: https://polyhaven.com/a/gravelly_sand
 - `../masonry/red-brick-polyhaven-1k.jpg`: https://polyhaven.com/a/red_brick — 1K diffuse map by Rob Tuytel, CC0. Individual clay units sample deterministic, mortar-free portions of the photographed brick faces; physical game geometry supplies the joints.
+- `site-pro-screed-v1.webp`: generated for this game with the built-in imagegen tool, then encoded as WebP quality 88. Prompt and validation are in `artifacts/site-pro-04/screed-texture-prompt.md`. This is generated artwork, not a Poly Haven scan.
 
 They are reduced-resolution copies for the in-game construction surfaces.
-Floor UVs repeat at roughly 2.1 m; plaster and concrete are scaled to roughly
-4 m, following each source page's recorded real-world width.
+The older floor scan repeats at roughly 2.1 m; Site Pro screed repeats at roughly
+3.8 m. Plaster and concrete are scaled to roughly 4 m, following each source
+page's recorded real-world width.
 The painted-metal scan is mixed lightly into the existing wheelbarrow tray and
 concrete-mixer drum paint. It is not used as the shape of either object.
