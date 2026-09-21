@@ -1,10 +1,25 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { MeshStandardNodeMaterial } from 'three/webgpu';
+import { attribute, mix, texture as sampleTexture, uv, vec3 } from 'three/tsl';
 
 // Metres, Y up. The wheelbarrow wheel is +Z; the mixer mouth faces -Z.
 // Photo-led, editable assemblies: pressed shells, bent tubes and lathed parts.
 type V = readonly [number, number, number];
 const paint = (color:number,roughness=.38,metalness=.32) => new THREE.MeshStandardMaterial({color,roughness,metalness});
+const paintedSteelScan = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}assets/site-materials/rusty_metal_03-diff-1k.jpg`);
+paintedSteelScan.colorSpace = THREE.SRGBColorSpace;
+paintedSteelScan.wrapS = paintedSteelScan.wrapT = THREE.RepeatWrapping;
+paintedSteelScan.anisotropy = 4;
+function wornPowderCoat(color:number, withVertexColor=false):MeshStandardNodeMaterial {
+  const base = new THREE.Color(color);
+  const material = new MeshStandardNodeMaterial({roughness:.76,metalness:.18});
+  material.name = 'Powder-coated steel with photographed site wear';
+  const photographedWear = mix(vec3(1), sampleTexture(paintedSteelScan, uv()).rgb, .60);
+  const surface = vec3(base.r,base.g,base.b).mul(photographedWear);
+  material.colorNode = withVertexColor ? surface.mul(attribute<'vec3'>('color','vec3')) : surface;
+  return material;
+}
 function group(name:string):THREE.Group {
   const g=new THREE.Group();g.name=name;g.userData.studioEntityId=`equipment:${name}`;return g;
 }
@@ -78,8 +93,8 @@ export function setWheelbarrowFill(model:WheelbarrowModel,fraction:number):void 
   p.needsUpdate=true;geo.computeVertexNormals();geo.computeBoundingSphere();
 }
 export function createWheelbarrow():WheelbarrowModel {
-  const root=group('ready-mortar-wheelbarrow'),yellow=paint(0xf8b719,.34,.3),frame=paint(0x252c29,.46,.65),rubber=paint(0x171b19,.85,0),silver=paint(0xa8afab,.3,.8);
-  mesh(root,'pressed-yellow-tray',trayShell(),yellow);
+  const root=group('ready-mortar-wheelbarrow'),yellow=paint(0xe2b02e,.7,.18),frame=paint(0x252c29,.72,.25),rubber=paint(0x171b19,.9,0),silver=paint(0xa8afab,.48,.62);
+  mesh(root,'pressed-yellow-tray',trayShell(),wornPowderCoat(0xe2b02e));
   const rim:V[]=Array.from({length:80},(_,i)=>trayPoint(i/80*Math.PI*2,.361,.493,.705).toArray() as [number,number,number]);
   tube(root,'rolled-yellow-safety-rim',rim,.007,yellow,true);
   for(const s of [-1,1]){
@@ -106,7 +121,7 @@ export function createWheelbarrow():WheelbarrowModel {
 }
 
 export function createConcreteMixer():THREE.Group {
-  const root=group('orange-drum-concrete-mixer'),orange=paint(0xf34c12,.33,.38),dark=paint(0x252928,.58,.45),steel=paint(0x919792,.36,.78),interior=paint(0x8b2810,.67,.32);
+  const root=group('orange-drum-concrete-mixer'),orange=paint(0xd95622,.72,.18),dark=paint(0x252928,.74,.25),steel=paint(0x919792,.49,.62),interior=paint(0x8b2810,.78,.16);
   const frame=group('mixer-stand');root.add(frame);
   // Front telescopic foot, rear axle tripod, and bolted rectangular-tube frame.
   bar(frame,'front-upright',[-.41,.02,-.22],[-.41,1.075,-.22],.030,dark,true);
@@ -134,7 +149,7 @@ export function createConcreteMixer():THREE.Group {
   // Vertex tint keeps the whole drum in one draw, including its interior.
   for(let i=0;i<=64;i++)for(let j=0;j<profile.length;j++)colors.push(...new THREE.Color(j<=11?0xffffff:0x883f25).toArray());
   shell.geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
-  const drumPaint=orange.clone();drumPaint.vertexColors=true;shell.material=drumPaint;
+  shell.material=wornPowderCoat(0xd95622,true);
   torus(drum,'rolled-open-mouth',.247,.009,orange,[0,.367,0]);
   torus(drum,'welded-shell-seam',.348,.005,orange,[0,-.025,0]);
   lathe(drum,'cast-ring-gear-band',[[.341,-.105],[.358,-.105],[.358,-.063],[.344,-.063]],dark);

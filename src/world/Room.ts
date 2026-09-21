@@ -4,6 +4,7 @@ import { INSTALLATION_POINTS } from '../data/installationRules';
 import { BrickWall } from './BrickWall';
 import { addLighting } from './Lighting';
 import { matteMaterial, siteMaterial } from './SiteMaterials';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
 export class Room extends THREE.Group {
   readonly brickWall: BrickWall;
@@ -34,14 +35,17 @@ export class Room extends THREE.Group {
     floor.receiveShadow = true;
     this.add(floor);
 
-    const ceiling = new THREE.Mesh(new THREE.BoxGeometry(GAME_CONFIG.room.width, 0.16, GAME_CONFIG.room.depth), siteMaterial('concrete', 0xffffff, 1.9, 1.8));
+    const ceiling = new THREE.Mesh(new RoundedBoxGeometry(GAME_CONFIG.room.width, 0.16, GAME_CONFIG.room.depth, 2, .012), siteMaterial('concrete', 0xf0ede7, 1.9, 1.8));
     ceiling.position.y = GAME_CONFIG.room.height + 0.08;
     ceiling.name = 'Concrete slab ceiling';
     ceiling.userData.studioEntityId = 'world:ceiling';
     ceiling.receiveShadow = true;
     this.add(ceiling);
 
-    const sideMaterial = siteMaterial('plaster', 0xffffff, 1.8, .75);
+    // These are unfinished structural returns, cast with the slab and piers.
+    // Give them the same concrete aggregate and tint; the rear lift remains
+    // plaster because its exposed brick edge explains the different finish.
+    const sideMaterial = siteMaterial('concrete', 0xf0ede7, 1.8, .75);
     sideMaterial.userData.referenceLaserReceiver=true;
     const sideGeometry = new THREE.BoxGeometry(0.22, GAME_CONFIG.room.height, GAME_CONFIG.room.depth);
     for (const [name, x] of [['Left concrete wall', -GAME_CONFIG.room.width / 2 - 0.11], ['Right concrete wall', GAME_CONFIG.room.width / 2 + 0.11]] as const) {
@@ -54,10 +58,10 @@ export class Room extends THREE.Group {
       this.add(side);
     }
 
-    const columnMaterial = siteMaterial('concrete', 0xf0e9db, .4, .75);
+    const columnMaterial = siteMaterial('concrete', 0xf0ede7, .1, .75);
     columnMaterial.userData.referenceLaserReceiver=true;
     for (const x of [-2.72, 2.72]) {
-      const column = new THREE.Mesh(new THREE.BoxGeometry(0.36, GAME_CONFIG.room.height, 0.38), columnMaterial);
+      const column = new THREE.Mesh(new RoundedBoxGeometry(0.36, GAME_CONFIG.room.height, 0.38, 2, .009), columnMaterial);
       column.position.set(x, GAME_CONFIG.room.height / 2, -2.37);
       column.name = 'Structural concrete column';
       column.userData.studioEntityId = `world:column:${x}`;
@@ -70,6 +74,8 @@ export class Room extends THREE.Group {
     this.addFormworkMarks();
     this.addConstructionJoints();
     this.addRearWall();
+    this.addFloorReturns();
+    this.addContactPatina();
     this.addSiteSupplies();
 
     // Fired-clay shells leave thin angular plates, not round gravel. Share one
@@ -116,8 +122,10 @@ export class Room extends THREE.Group {
     );
     wall.name = 'Unfinished rear plaster wall';
     wall.userData.studioEntityId = 'world:rear-wall';
+    wall.userData.referenceLaserReceiver = true;
     wall.position.set(0, GAME_CONFIG.room.height / 2, rearZ + .08);
     wall.receiveShadow = true;
+    this.referenceWalls.push(wall);
     this.add(wall);
 
     // Staggered, individually three-dimensional clay courses behind a partly
@@ -166,7 +174,7 @@ export class Room extends THREE.Group {
     plaster.raycast = () => undefined;
     this.add(plaster);
 
-    const cornerMaterial = siteMaterial('concrete', 0xe2dcd2, .24, .8);
+    const cornerMaterial = siteMaterial('concrete', 0xf0ede7, .075, .75);
     const corners = new THREE.InstancedMesh(new THREE.BoxGeometry(.28, GAME_CONFIG.room.height, .30), cornerMaterial, 2);
     corners.name = 'Poured rear corner pilasters';
     for (const [index, x] of [-GAME_CONFIG.room.width / 2 + .14, GAME_CONFIG.room.width / 2 - .14].entries()) {
@@ -195,7 +203,7 @@ export class Room extends THREE.Group {
     cuts.computeBoundingSphere();
     this.add(cuts);
 
-    const beams = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), siteMaterial('concrete', 0xe6e0d6, 1, .15), 3);
+    const beams = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), siteMaterial('concrete', 0xf0ede7, 1, .15), 3);
     for (const [index, z] of [-2.65, .1, 2.65].entries()) {
       transform.compose(new THREE.Vector3(0, GAME_CONFIG.room.height - .085, z), new THREE.Quaternion(), new THREE.Vector3(width, .17, .24));
       beams.setMatrixAt(index, transform);
@@ -207,6 +215,82 @@ export class Room extends THREE.Group {
     this.add(beams);
   }
 
+  private addFloorReturns(): void {
+    // The screed is pressed into the rough wall base. A low, uneven cove
+    // connects the horizontal pour to the vertical substrate instead of
+    // leaving two photo-textured planes intersecting at a razor-sharp edge.
+    const material = siteMaterial('concrete', 0x817f79, 2.1, .25);
+    material.side = THREE.DoubleSide;
+    const strips: Array<{from: THREE.Vector3; to: THREE.Vector3; inward: THREE.Vector3}> = [
+      {from:new THREE.Vector3(-3.78,0,3.485),to:new THREE.Vector3(3.78,0,3.485),inward:new THREE.Vector3(0,0,-1)},
+      {from:new THREE.Vector3(-3.79,0,-3.58),to:new THREE.Vector3(3.79,0,-3.58),inward:new THREE.Vector3(0,0,1)},
+      {from:new THREE.Vector3(-3.785,0,-3.58),to:new THREE.Vector3(-3.785,0,3.48),inward:new THREE.Vector3(1,0,0)},
+      {from:new THREE.Vector3(3.785,0,-3.58),to:new THREE.Vector3(3.785,0,3.48),inward:new THREE.Vector3(-1,0,0)},
+    ];
+    for(const x of [-2.72,2.72])strips.push({from:new THREE.Vector3(x-.18,0,-2.18),to:new THREE.Vector3(x+.18,0,-2.18),inward:new THREE.Vector3(0,0,1)});
+    const positions:number[]=[],uvs:number[]=[],indices:number[]=[];
+    let vertex=0;
+    for(const [edge,strip] of strips.entries()){
+      const length=strip.from.distanceTo(strip.to),steps=Math.max(3,Math.ceil(length/.24));
+      for(let i=0;i<=steps;i++){
+        const t=i/steps,point=strip.from.clone().lerp(strip.to,t);
+        const variation=Math.sin(i*2.73+edge*4.1)*.012+Math.sin(i*6.71+edge)*.005;
+        const width=Math.max(.035,.085+variation),height=Math.max(.025,.054+variation*.35);
+        const foot=point.clone().addScaledVector(strip.inward,width);
+        positions.push(foot.x,.002,foot.z, point.x,height,point.z);
+        uvs.push(t*length/2.1,0,t*length/2.1,.25);
+        if(i<steps){const a=vertex+i*2;indices.push(a,a+2,a+1,a+1,a+2,a+3);}
+      }
+      vertex+=(steps+1)*2;
+    }
+    const geometry=new THREE.BufferGeometry();
+    geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+    geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));
+    geometry.setIndex(indices);geometry.computeVertexNormals();
+    const returns=new THREE.Mesh(geometry,material);
+    returns.name='Uneven screed returns against rough wall bases';
+    returns.userData.studioEntityId='world:screed-returns';
+    returns.castShadow=returns.receiveShadow=true;
+    returns.raycast=()=>undefined;
+    this.add(returns);
+  }
+
+  private addContactPatina(): void {
+    // Real site dust rides up the porous wall base and feathers out. A single
+    // small alpha texture covers the structural returns and unfinished plaster
+    // with an irregular, fading contact stain; it does not change work hits.
+    const canvas=document.createElement('canvas');canvas.width=128;canvas.height=128;
+    const context=canvas.getContext('2d');if(!context)return;
+    const data=context.createImageData(128,128);
+    for(let y=0;y<128;y++)for(let x=0;x<128;x++){
+      const fade=Math.pow(y/127,2.2);
+      const waviness=.75+.13*Math.sin(x*.29+y*.13)+.12*Math.sin(x*.77-y*.17);
+      const grain=(Math.sin(x*42.17+y*13.89)*43758.5453)%1;
+      const index=(y*128+x)*4;
+      data.data[index]=110;data.data[index+1]=103;data.data[index+2]=91;
+      data.data[index+3]=Math.round(THREE.MathUtils.clamp(fade*waviness*(.48+Math.abs(grain)*.16),0,.65)*255);
+    }
+    context.putImageData(data,0,0);
+    const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
+    texture.wrapS=THREE.RepeatWrapping;texture.repeat.x=5;
+    const material=new THREE.MeshBasicMaterial({map:texture,transparent:true,depthWrite:false,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-1});
+    const positions:number[]=[],uvs:number[]=[],indices:number[]=[];
+    const span=(a:THREE.Vector3,b:THREE.Vector3)=>{
+      const start=positions.length/3,h=.31;
+      positions.push(a.x,.005,a.z,b.x,.005,b.z,a.x,h,a.z,b.x,h,b.z);
+      uvs.push(0,0,1,0,0,1,1,1);
+      indices.push(start,start+1,start+2,start+1,start+3,start+2);
+    };
+    span(new THREE.Vector3(-3.797,0,-3.55),new THREE.Vector3(-3.797,0,3.47));
+    span(new THREE.Vector3(3.797,0,-3.55),new THREE.Vector3(3.797,0,3.47));
+    span(new THREE.Vector3(-3.6,0,3.48),new THREE.Vector3(3.6,0,3.48));
+    for(const x of [-2.72,2.72])span(new THREE.Vector3(x-.18,0,-2.174),new THREE.Vector3(x+.18,0,-2.174));
+    const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));geometry.setIndex(indices);geometry.computeVertexNormals();
+    const patina=new THREE.Mesh(geometry,material);patina.name='Feathered construction dust at wall contacts';
+    patina.userData.studioEntityId='world:contact-patina';patina.raycast=()=>undefined;
+    this.add(patina);
+  }
+
   private addFormworkMarks(): void {
     const marks = new THREE.Group();
     marks.name = 'Shallow concrete formwork imprints';
@@ -216,7 +300,14 @@ export class Room extends THREE.Group {
     for (let x = -2.4; x < 3; x += 1.2) segments.push({ position: new THREE.Vector3(x, GAME_CONFIG.room.height - .001, 0), size: new THREE.Vector3(.003, .001, 5) });
     for (let z = -1.9; z < 2.5; z += 1.2) segments.push({ position: new THREE.Vector3(0, GAME_CONFIG.room.height - .001, z), size: new THREE.Vector3(6, .001, .003) });
     for (const x of [-2.72, 2.72]) for (const y of [.73, 1.47, 2.21]) segments.push({ position: new THREE.Vector3(x, y, -2.179), size: new THREE.Vector3(.36, .0025, .001) });
-    const seams = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), matteMaterial(0x93938b), segments.length);
+    // Repeated shutter panel joints continue from the slab onto both cast
+    // side walls. They establish construction scale instead of leaving the
+    // large concrete surfaces as uninterrupted texture planes.
+    for(const x of [-3.795,3.795]){
+      for(const z of [-2.4,-1.2,0,1.2,2.4])segments.push({position:new THREE.Vector3(x,1.5,z),size:new THREE.Vector3(.0015,2.97,.0025)});
+      for(const y of [1.2,2.4])segments.push({position:new THREE.Vector3(x,y,0),size:new THREE.Vector3(.0015,.0025,7.05)});
+    }
+    const seams = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), matteMaterial(0x55554d), segments.length);
     seams.name = 'Board joints in poured concrete';
     const transform = new THREE.Matrix4();
     for (const [index, segment] of segments.entries()) seams.setMatrixAt(index, transform.compose(segment.position, new THREE.Quaternion(), segment.size));

@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { MeshStandardNodeMaterial } from 'three/webgpu';
+import { attribute, mix, texture as sampleTexture, uv, vec3 } from 'three/tsl';
 import { createConcreteMixer, createWheelbarrow, type WheelbarrowModel } from './SiteEquipmentModels';
 
 type Point = readonly [number, number, number];
@@ -160,20 +162,34 @@ export function createMixerModel(): THREE.Group {
 }
 
 function sandMound(): THREE.Mesh {
-  const vertices: number[] = [], colors: number[] = [], indices: number[] = [];
-  const rings = 18, sides = 64, base = new THREE.Color(0xb89a67);
+  const vertices: number[] = [], uvs: number[] = [], colors: number[] = [], indices: number[] = [];
+  const rings = 24, sides = 80, base = new THREE.Color(0xffffff);
   for (let ring = 0; ring <= rings; ring++) for (let side = 0; side <= sides; side++) {
     const t = ring / rings, angle = side / sides * Math.PI * 2;
-    const irregular = 1 + Math.sin(angle * 3 + .3) * .065 + Math.cos(angle * 7) * .025;
-    const x = Math.cos(angle) * t * 1.12 * irregular, z = Math.sin(angle) * t * .86 * irregular;
-    const height = .73 * Math.pow(1 - t, 1.15) + Math.sin(angle * 6 + t * 13) * .026 * t * (1 - t);
-    vertices.push(x + (1 - t) * .10, height + .008, z - (1 - t) * .09);
-    const shade = .94 + Math.sin(side * 13.47 + ring * 37.71) * .065 + Math.cos(angle - .5) * .025;
+    const irregular = 1 + Math.sin(angle * 3 + .3) * .068 + Math.cos(angle * 7) * .028;
+    const x = Math.cos(angle) * t * 1.12 * irregular + (1 - t) * .10;
+    const z = Math.sin(angle) * t * .91 * irregular - (1 - t) * .09;
+    const main = .55 * Math.pow(1 - t, 1.02);
+    const secondaryRadius = Math.hypot((x + .36) / .62, (z - .12) / .54);
+    const secondary = .22 * Math.pow(Math.max(0, 1 - secondaryRadius), 1.12);
+    const interruption = Math.sin(angle * 6 + t * 13) * .013 * t * (1 - t)
+      + Math.cos(angle * 11 - t * 18) * .008 * t * (1 - t);
+    const height = Math.max(main, secondary) + interruption;
+    vertices.push(x, height + .008, z);
+    uvs.push(.5 + x / 2.5, .5 + z / 2.5);
+    const shade = .96 + Math.sin(side * 13.47 + ring * 37.71) * .024;
     colors.push(base.r * shade, base.g * shade, base.b * shade);
     if (ring < rings && side < sides) { const a = ring * (sides + 1) + side, b = a + sides + 1; indices.push(a, a + 1, b, a + 1, b + 1, b); }
   }
-  const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3)); geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); geometry.setIndex(indices); geometry.computeVertexNormals();
-  const mat = material(0xffffff, 1); mat.vertexColors = true;
+  const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3)); geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2)); geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); geometry.setIndex(indices); geometry.computeVertexNormals();
+  const mat = new MeshStandardNodeMaterial({roughness:1,metalness:0});
+  mat.name = 'Scanned construction sand and warm fine aggregate';
+  const scan = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}assets/site-materials/gravelly_sand-albedo-512.webp`);
+  scan.colorSpace = THREE.SRGBColorSpace;
+  scan.wrapS = scan.wrapT = THREE.RepeatWrapping;
+  scan.anisotropy = 4;
+  const fineSand = new THREE.Color(0xe0c393);
+  mat.colorNode = mix(vec3(fineSand.r,fineSand.g,fineSand.b),sampleTexture(scan,uv()).rgb,.66).mul(attribute<'vec3'>('color','vec3'));
   const sand = new THREE.Mesh(geometry, mat); sand.name = 'mixing-large-sand-mound'; sand.userData.studioEntityId = 'mixing:sand'; sand.castShadow = true; sand.receiveShadow = true; return sand;
 }
 

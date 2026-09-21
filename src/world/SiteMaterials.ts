@@ -6,7 +6,7 @@ const textureSources = new Map<Surface, HTMLCanvasElement>();
 const textureLoader = new THREE.TextureLoader();
 const materialTextures = new Map<string, THREE.Texture>();
 const photographed: Partial<Record<Surface, string>> = new URLSearchParams(location.search).get('materials') === 'legacy' ? {} : {
-  floor: 'concrete_floor',
+  floor: 'concrete_screed',
   concrete: 'concrete',
   plaster: 'plastered_wall_03',
 };

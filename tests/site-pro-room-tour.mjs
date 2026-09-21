@@ -12,6 +12,7 @@ const devices = [
 ].filter(device => !only || device.name === only);
 const views = [
   { name: 'rear-room', x: 0, z: -.25, yaw: Math.PI, pitch: -.06 },
+  { name: 'floor-detail', x: 0, z: -.25, yaw: Math.PI, pitch: -.83 },
   { name: 'supplies', x: 0, z: -.35, yaw: -2.28, pitch: -.39 },
   { name: 'left-room', x: 0, z: -.35, yaw: 2.28, pitch: -.16 },
 ];
@@ -52,6 +53,31 @@ try {
       await page.screenshot({ path: `${output}/${device.name}-${view.name}.png` });
       report.cases.push({ device: device.name, view: view.name, state });
     }
+    const rearContact = await page.evaluate(() => {
+      const game = window.__wireTheHouse;
+      const camera = game.renderer.camera;
+      const rear = game.room.referenceWalls.find(wall => wall.userData.studioEntityId === 'world:rear-wall');
+      if (!rear) return { registered: false };
+      camera.position.set(0, 1.35, 3.0);
+      camera.rotation.set(0, Math.PI, 0, 'YXZ');
+      camera.updateMatrixWorld(true);
+      const walls = game.room.referenceWalls;
+      const index = walls.indexOf(rear);
+      walls.splice(index, 1);
+      game.heightMeasure.update(camera, true, () => true);
+      const withoutRear = game.heightMeasure.telemetry.mode;
+      walls.splice(index, 0, rear);
+      game.heightMeasure.update(camera, true, () => true);
+      const withRear = game.heightMeasure.telemetry;
+      game.heightMeasure.update(camera, false, () => true);
+      return { registered: true, withoutRear, withRear };
+    });
+    assert.equal(rearContact.registered, true, `${device.name}: rear work surface is registered`);
+    assert.equal(rearContact.withoutRear, 'no-wall', `${device.name}: rear surface is required for the hit`);
+    assert.equal(rearContact.withRear.mode, 'ready', `${device.name}: rear surface can be measured`);
+    assert.equal(rearContact.withRear.targetStable, true, `${device.name}: rear wall has stable backing`);
+    assert(Math.abs(rearContact.withRear.target[2] - 3.596) < .02, `${device.name}: tape contacts the visible rear elevation`);
+    report.cases.push({ device: device.name, view: 'rear-work-contact', state: rearContact });
     await context.close();
   }
   assert.deepEqual(report.errors, []);

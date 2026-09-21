@@ -24,7 +24,8 @@ const browser=await chromium.launch({channel:'chrome',headless:true}),report={ur
 try{
   const context=await browser.newContext({viewport:{width:1366,height:768}});await blockPointerLock(context);const page=await context.newPage();
   page.on('pageerror',error=>report.errors.push(error.message));page.on('console',message=>{if(message.type()==='error')report.errors.push(message.text());});
-  await page.goto(url);await page.waitForFunction(()=>window.__wireTheHouse?.mixing,undefined,{timeout:120000});await page.locator('#start-button').click();
+  await page.goto(url);await page.waitForFunction(()=>window.__wireTheHouse?.mixing,undefined,{timeout:120000});await page.locator('#apprentice-count').selectOption('0');await page.locator('#start-button').click();
+  await page.waitForFunction(()=>window.__wireTheHouse?.workerBody.telemetry.loaded,undefined,{timeout:120000});
   await page.evaluate(()=>{const g=window.__wireTheHouse;window.__collisionStep=g.step.bind(g);g.step=()=>{};});
   const step=(count=1)=>page.evaluate(n=>{for(let i=0;i<n;i++)window.__collisionStep(1/60);},count);await step(2);
   report.obstacles=await page.evaluate(()=>window.__wireTheHouse.mixing.collisionObstacles());
@@ -52,7 +53,7 @@ try{
   // anatomical body is posed by Game.step(). Advance both before visual capture
   // so a QA screenshot cannot show the spray at the new view with a stale hand.
   await step(2);
-  const capturePose=await page.evaluate(async()=>{const g=window.__wireTheHouse,t=g.workerBody.telemetry.fingerFit;g.renderer.render();await g.renderer.waitForFrame();return{indexError:t.indexR.error,forwardDot:t.sprayForward.dot,wristBendDegrees:t.sprayForward.wristBendDegrees};});
+  const capturePose=await page.evaluate(async()=>{const g=window.__wireTheHouse,t=g.workerBody.telemetry.fingerFit;g.renderer.render();await g.renderer.waitForFrame();return{started:g.started,inspector:g.modelInspector.active,inspectorLive:g.modelInspector.live,selectedTool:g.selectedTool,rigVisible:g.fpsRig.visible,stage:g.mission.activePoint?.stage,bodyLoaded:g.workerBody.loaded,bodyVisible:g.workerBody.visible,station:g.mixing.blocksWork,pvc:g.pvc.blocksWork,grips:g.fpsRig.anatomicalGrips().length,fitKeys:Object.keys(t),indexError:t.indexR?.error??null,forwardDot:t.sprayForward?.dot??null,wristBendDegrees:t.sprayForward?.wristBendDegrees??null};});
   assert(capturePose.indexError<.006,`Collision capture lost spray button contact: ${JSON.stringify(capturePose)}`);
   assert(capturePose.forwardDot>.98,`Collision capture points the index away from the spray actuator: ${JSON.stringify(capturePose)}`);
   await page.screenshot({path:`${out}/wheelbarrow-contact.png`});
