@@ -48,7 +48,7 @@ try{
         assert(!left.inserted&&!left.running&&left.held,'Walking away lifts the mixer into reachable hands and stops motor');
         const edge=await page.evaluate(()=>{const g=window.__wireTheHouse,m=g.mixing,c=g.renderer.camera,b=m.models.bucket.getWorldPosition(c.position.clone());g.player.crouched=true;c.position.set(b.x-.3,.95,b.z-.55);c.lookAt(b.x,.3,b.z);g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;c.updateMatrixWorld(true);const initiallyReachable=m.canReachMixer(m.models.bucket),accepted=m.action('insert'),pending=m.telemetry.approaching;for(let i=0;i<50;i++)m.update(1/60,false,false);m.present();return{initiallyReachable,accepted,pending,inserted:m.inserted,hands:m.arms.map(a=>({reach:a.shoulder.distanceTo(a.wrist),forearm:a.elbow.distanceTo(a.wrist)}))};});
         assert(!edge.initiallyReachable&&edge.accepted&&edge.pending&&edge.inserted,'Marginal crouched stance must first move into reach');
-        assert(edge.hands.every(hand=>hand.reach<.57&&Math.abs(hand.forearm-.27)<.001),'Automatic mixer stance keeps both forearms connected');cases.push({inserted,left,edge});continue;
+        assert(edge.hands.every(hand=>hand.reach<.57&&Math.abs(hand.forearm-.27)<.001),'Automatic mixer stance keeps both forearms connected');await shot('mixer-assisted');cases.push({inserted,left,edge});continue;
       }
       await page.evaluate(tool=>{const m=window.__wireTheHouse.mixing;m.beginActivity(tool==='trowel'?'tear':'sand',tool==='trowel'?m.models.sacks[0]:m.models.sand);},tool);
       const frames=[];

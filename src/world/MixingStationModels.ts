@@ -134,26 +134,46 @@ export function createShovelModel(): THREE.Group {
   return group;
 }
 
-/** Drill-form cordless mixer: offset pistol grip and battery opposite a straight auxiliary handle. */
+/** Compact cordless stirrer with a protected motor, two load-bearing handles and an axial paddle. */
 export function createMixerModel(): THREE.Group {
   const group = new THREE.Group(); group.name = 'mixing-cordless-mixer'; group.userData.studioEntityId = 'mixing:cordless-mixer';
-  const red = material(0xb91e2c, .45), black = material(0x202421, .88), metal = steel();
-  part(group, new THREE.CylinderGeometry(.058, .064, .18, 24), red, [0, .76, 0], 'mixer-red-motor-shell');
-  part(group, new THREE.CylinderGeometry(.049, .051, .071, 24), metal, [0, .643, 0], 'mixer-cast-gearbox');
-  part(group, new THREE.CylinderGeometry(.026, .023, .044, 16), black, [0, .588, 0], 'mixer-paddle-chuck');
-  part(group, new THREE.BoxGeometry(.066, .107, .108), red, [.045, .747, 0], 'mixer-pistol-grip-root');
-  rod(group, [.063, .765, 0], [.219, .791, 0], .033, black, 'mixer-pistol-rubber-grip');
-  rod(group, [.064, .745, -.019], [.215, .769, -.019], .018, red, 'mixer-pistol-red-spine');
-  part(group, new THREE.BoxGeometry(.033, .106, .107), red, [.232, .788, 0], 'mixer-battery-rail');
-  part(group, new THREE.BoxGeometry(.072, .133, .147), black, [.277, .771, 0], 'mixer-18V-removable-battery');
-  part(group, new THREE.BoxGeometry(.021, .049, .004), red, [.270, .771, .075], 'mixer-battery-release');
-  label(group, '18 V', 'BRUSHLESS', .065, .037, [.277, .805, .075], '#b31d29');
-  for (let i = 0; i < 5; i++) part(group, new THREE.BoxGeometry(.041, .004, .008), black, [0, .71 + i * .012, .058], `mixer-cooling-slot-${i}`);
-  part(group, new THREE.CylinderGeometry(.066, .066, .037, 24), black, [0, .677, 0], 'mixer-auxiliary-handle-clamp');
-  rod(group, [-.055, .682, 0], [-.114, .706, 0], .027, black, 'mixer-auxiliary-handle-neck');
-  rod(group, [-.114, .706, 0], [-.273, .706, 0], .028, black, 'mixer-straight-auxiliary-grip');
-  rod(group, [-.267, .706, 0], [-.285, .706, 0], .034, black, 'mixer-auxiliary-end-stop');
-  part(group, new THREE.BoxGeometry(.046, .013, .029), black, [.117, .730, .016], 'mixer-variable-speed-trigger');
+  const caseGreen = material(0x3f685c, .58, .08), rubber = material(0x303735, .92);
+  const frame = material(0x899494, .43, .63), darkMetal = material(0x434e4e, .43, .57), metal = steel();
+  const profile: [number, number][] = [
+    [0, .638], [.047, .638], [.054, .652], [.060, .688], [.065, .706],
+    [.067, .747], [.066, .790], [.061, .809], [.055, .822], [0, .822],
+  ];
+  part(group, new THREE.LatheGeometry(profile.map(([radius, height]) => new THREE.Vector2(radius, height)), 32), caseGreen, [0, 0, 0], 'mixer-sculpted-motor-housing');
+  part(group, new THREE.CylinderGeometry(.051, .058, .068, 24), darkMetal, [0, .650, 0], 'mixer-cast-aluminium-gearbox');
+  part(group, new THREE.CylinderGeometry(.026, .023, .043, 20), darkMetal, [0, .589, 0], 'mixer-keyed-shaft-coupling');
+  for (const y of [.664, .691, .814]) {
+    const ring = part(group, new THREE.TorusGeometry(y === .691 ? .065 : .062, .002, 6, 32), darkMetal, [0, y, 0], `mixer-case-seam-${y}`);
+    ring.rotation.x = Math.PI / 2;
+  }
+  for (let i = 0; i < 5; i++) {
+    part(group, new THREE.BoxGeometry(.044, .004, .003), rubber, [-.022, .722 + i * .011, -.074], `mixer-motor-vent-${i}`);
+  }
+  for (const side of [-1, 1] as const) {
+    const label = side < 0 ? 'left' : 'right';
+    const x = side < 0 ? -.20 : .156, y = side < 0 ? .706 : .780;
+    const outer = side < 0 ? -.282 : .266;
+    const upper = side < 0 ? .832 : .886, lower = side < 0 ? .650 : .718;
+    tube(group, [new THREE.Vector3(side * .063, upper, -.005), new THREE.Vector3(side * .12, upper + .018, -.005), new THREE.Vector3(outer, upper, -.005), new THREE.Vector3(outer + side * .01, y, -.005), new THREE.Vector3(outer, lower, -.005), new THREE.Vector3(side * .071, lower, -.005)], .011, frame, `mixer-${label}-protective-handle-frame`);
+    rod(group, [side * .095, y, 0], [outer, y, 0], .025, rubber, `mixer-${label}-rubber-grip`);
+    for (let ridge = 0; ridge < 4; ridge++) {
+      const gripX = x + side * (ridge - 1.5) * .017;
+      const band = part(group, new THREE.TorusGeometry(.0255, .0012, 5, 12), darkMetal, [gripX, y, 0], `mixer-${label}-grip-ridge-${ridge}`);
+      band.rotation.y = Math.PI / 2;
+    }
+  }
+  part(group, new THREE.BoxGeometry(.055, .014, .032), rubber, [.115, .751, -.019], 'mixer-variable-speed-trigger');
+  part(group, new THREE.CylinderGeometry(.013, .013, .012, 16), darkMetal, [-.074, .791, -.044], 'mixer-speed-dial');
+  const batteryRail = part(group, new THREE.BoxGeometry(.094, .022, .082), darkMetal, [0, .837, 0], 'mixer-top-battery-rail');
+  batteryRail.geometry.computeVertexNormals();
+  part(group, new THREE.BoxGeometry(.112, .059, .090), rubber, [0, .876, 0], 'mixer-protected-18V-battery');
+  part(group, new THREE.BoxGeometry(.056, .008, .044), caseGreen, [0, .910, 0], 'mixer-battery-release-slide');
+  const batteryLabel = label(group, '18 V', 'CORDLESS', .081, .028, [0, .877, -.046], '#25463e');
+  if (batteryLabel) batteryLabel.rotation.y = Math.PI;
   const paddle = new THREE.Group(); paddle.name = 'mixing-paddle'; paddle.userData.studioEntityId = 'mixing:paddle'; group.add(paddle);
   rod(paddle, [0, .064, 0], [0, .579, 0], .008, metal, 'mixer-steel-shaft');
   for (let helix = 0; helix < 2; helix++) {
@@ -173,7 +193,10 @@ export function createMixerModel(): THREE.Group {
     shell.userData.studioEntityId = `mixing:${shell.name}`; shell.scale.multiplyScalar(1.055); coating.add(shell);
   }
   rod(coating, [0, .063, 0], [0, .255, 0], .010, paste, 'mixer-shaft-mortar-coating'); paddle.add(coating);
-  group.userData.gripPoint = [.156, .780, 0]; group.userData.secondaryGripPoint = [-.20, .706, 0]; group.userData.tipPoint = [0, .08, 0];
+  // Keep the motor and hands below the worker's crouched eye line; the axial
+  // shaft still enters the gearbox rather than ending in open air.
+  for (const child of group.children) if (child !== paddle) child.position.y -= .07;
+  group.userData.gripPoint = [.156, .710, 0]; group.userData.secondaryGripPoint = [-.20, .636, 0]; group.userData.tipPoint = [0, .08, 0];
   group.userData.gripQuaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),new THREE.Vector3(-.156,-.026,0).normalize()).toArray();
   group.userData.secondaryGripQuaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),new THREE.Vector3(1,0,0)).toArray();
   return group;

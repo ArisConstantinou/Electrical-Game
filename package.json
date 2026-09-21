@@ -33,6 +33,7 @@
     "test:box-fit": "node tests/box-fit-preflight.mjs && node tests/fitting-held-preset.mjs && node tests/box-fit-preview-ui.mjs",
     "test:box-mixing-context": "node tests/box-mixing-context-ui.mjs",
     "test:mixing-collision": "node tests/mixing-equipment-collision.mjs",
+    "test:mixer-performance": "node tests/mixer-work-profile.mjs",
     "test:sand": "node tests/sand-pile-simulation.mjs && node tests/sand-shoveling-ui.mjs",
     "test:horizontal-bricks": "node tests/horizontal-masonry-profile.mjs",
     "test:multiple-boxes": "node tests/multiple-boxes-ui.mjs",
