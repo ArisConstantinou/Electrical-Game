@@ -16,10 +16,10 @@ export interface MasonryImpact {
   points: THREE.Vector3[]; kind: MasonryImpactKind; brickSize: THREE.Vector3; seed: number; destroyed: boolean;
   fragments: MasonryFragment[]; removedVolume: number;
 }
-// The supplied photograph is kept unedited. Geometry UVs select its clay-only
-// interior, so the white photographic background never reaches the wall.
+// The 220x76 texture is a crop of the game's existing site artwork. Sampling
+// only that face preserves detail without uploading the full cinematic image.
 const brickImageReady = uniform(0);
-const brickImage = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}assets/masonry/brick-side-reference.png`, () => { brickImageReady.value = 1; });
+const brickImage = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}assets/masonry/brick-face-site.webp`, () => { brickImageReady.value = 1; });
 brickImage.colorSpace = THREE.SRGBColorSpace;
 brickImage.anisotropy = 8;
 const wallMaterial = new MeshStandardNodeMaterial({ roughness: 1, metalness: 0, flatShading: true });
@@ -289,8 +289,8 @@ export class BrickWall extends THREE.Group {
       for (let j = 0; j < 3; j++) {
         const u = THREE.MathUtils.clamp((positions.getX(i + j) - brickX) / pitchX, 0, 1);
         const v = THREE.MathUtils.clamp((positions.getY(i + j) - row * pitchY) / pitchY, 0, 1);
-        coordinates[(i + j) * 2] = (58 + u * 621) / 735;
-        coordinates[(i + j) * 2 + 1] = (55 + v * 523) / 630;
+        coordinates[(i + j) * 2] = u;
+        coordinates[(i + j) * 2 + 1] = v;
         faces[i + j] = face;
       }
     }

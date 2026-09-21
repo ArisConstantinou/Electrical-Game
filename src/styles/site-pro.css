@@ -57,15 +57,16 @@ html, body { background: #151a1d; }
   #look-joystick.using-tool .look-joystick-ring { border-color: #ffdc32; background: #6a571b70; }
   #site-pro-use { position: absolute; z-index: 8; right: max(20px, env(safe-area-inset-right)); bottom: calc(254px + env(safe-area-inset-bottom)); width: 88px; min-height: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 5px; border: 2px solid #ffdc32; border-radius: 14px; color: #fff7cf; background: #192126ee; box-shadow: 0 5px 18px #0009; pointer-events: auto; touch-action: none; }
   #site-pro-use svg { width: 26px; height: 26px; fill: none; stroke: #ffdc32; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
-  #site-pro-use span { font: 900 16px/1 'Barlow Condensed', Arial, sans-serif; letter-spacing: .08em; }
+  #site-pro-use span { max-width: 100%; font: 900 14px/1 'Barlow Condensed', Arial, sans-serif; letter-spacing: .04em; white-space: nowrap; }
   #site-pro-use[aria-pressed="true"] { color: #192126; background: #ffdc32; }
   #site-pro-use[aria-pressed="true"] svg { stroke: #192126; }
   #mobile-interact:not([hidden]) { right: max(116px, calc(env(safe-area-inset-right) + 106px)); bottom: calc(268px + env(safe-area-inset-bottom)); }
   #mobile-use-status { position: static; width: 100%; max-width: none; min-height: 12px; transform: none; color: #f5f1dc; font: 800 12px/1.05 'Barlow Condensed', Arial, sans-serif; text-align: center; text-shadow: none; }
   #mobile-use-status[data-ready="false"] { color: #ffdc32; }
   #mobile-stance-controls { bottom: calc(240px + env(safe-area-inset-bottom)); }
-  #mobile-stance-controls button { border-color: #a0aeb1; background: #1b2529e8; }
-  #mobile-stance-controls span { font-size: 12px; line-height: 12px; }
+  #mobile-stance-controls { gap: 10px; }
+  #mobile-stance-controls button { width: 56px; height: 56px; border-color: #a0aeb1; background: #1b2529e8; }
+  #mobile-stance-controls span { font-size: 11px; line-height: 11px; letter-spacing: 0; white-space: nowrap; }
   #mobile-stance-controls button[aria-pressed="true"] { border-color: #ffdc32; background: #4a431d; }
   #site-pro-tools { position: absolute; z-index: 9; left: 50%; bottom: max(9px, env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(154px, 37vw); height: 56px; display: flex; align-items: center; justify-content: center; gap: 10px; border: 2px solid #ffdc32; border-radius: 14px; color: #fff9dd; background: #192126f2; box-shadow: 0 5px 20px #0009; font: 900 16px/1 'Barlow Condensed', Arial, sans-serif; letter-spacing: .08em; pointer-events: auto; touch-action: manipulation; }
   #site-pro-tools svg { width: 24px; height: 24px; fill: none; stroke: #ffdc32; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
@@ -81,6 +82,7 @@ html, body { background: #151a1d; }
   #tool-quick-controls .tool-quick-button svg { stroke: #ffdc32; }
   #aim-quick-controls { display: none; }
   #game-shell[data-tools-open="true"] #aim-quick-controls { display: grid; top: max(70px, calc(env(safe-area-inset-top) + 64px)); bottom: auto; }
+  #game-shell[data-tools-open="true"] #model-inspector-open { display: none; }
   #game-shell.settings-open #site-pro-tools, #game-shell.settings-open #site-pro-use, #game-shell.settings-open #mobile-tool-slider { visibility: hidden; }
   #game-shell[data-box-assembly="true"] #site-pro-tools { display: none; }
 }
@@ -97,7 +99,7 @@ html, body { background: #151a1d; }
   #site-pro-tools { height: 48px; bottom: max(6px, env(safe-area-inset-bottom)); }
   #site-pro-use { width: 74px; min-height: 66px; right: max(9px, env(safe-area-inset-right)); bottom: calc(170px + env(safe-area-inset-bottom)); }
   #site-pro-use svg { width: 20px; height: 20px; }
-  #site-pro-use span { font-size: 14px; }
+  #site-pro-use span { font-size: 12px; }
   #mobile-interact:not([hidden]) { top: 62px; bottom: auto; right: 100px; }
   #mobile-tool-slider { bottom: calc(60px + env(safe-area-inset-bottom)); }
   #game-shell[data-tools-open="true"] #tool-quick-controls { top: max(62px, env(safe-area-inset-top)); bottom: auto; left: 8px; right: 130px; }

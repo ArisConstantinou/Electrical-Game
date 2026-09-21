@@ -27,21 +27,21 @@ export class Room extends THREE.Group {
     this.referenceWalls.push(this.intactPracticeWall);
     this.add(this.intactPracticeWall);
 
-    const floor = new THREE.Mesh(new THREE.BoxGeometry(GAME_CONFIG.room.width, 0.12, GAME_CONFIG.room.depth), siteMaterial('floor', 0xa39d90, 4, 3.4));
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(GAME_CONFIG.room.width, 0.12, GAME_CONFIG.room.depth), siteMaterial('floor', 0xffffff, 3.6, 3.4));
     floor.position.y = -0.06;
     floor.name = 'Rough unfinished concrete floor';
     floor.userData.studioEntityId = 'world:floor';
     floor.receiveShadow = true;
     this.add(floor);
 
-    const ceiling = new THREE.Mesh(new THREE.BoxGeometry(GAME_CONFIG.room.width, 0.16, GAME_CONFIG.room.depth), siteMaterial('concrete', 0xafada5, 5, 4));
+    const ceiling = new THREE.Mesh(new THREE.BoxGeometry(GAME_CONFIG.room.width, 0.16, GAME_CONFIG.room.depth), siteMaterial('concrete', 0xffffff, 1.9, 1.8));
     ceiling.position.y = GAME_CONFIG.room.height + 0.08;
     ceiling.name = 'Concrete slab ceiling';
     ceiling.userData.studioEntityId = 'world:ceiling';
     ceiling.receiveShadow = true;
     this.add(ceiling);
 
-    const sideMaterial = siteMaterial('plaster', 0xaca89d, 2.2, 3.4);
+    const sideMaterial = siteMaterial('plaster', 0xffffff, 1.8, .75);
     sideMaterial.userData.referenceLaserReceiver=true;
     const sideGeometry = new THREE.BoxGeometry(0.22, GAME_CONFIG.room.height, GAME_CONFIG.room.depth);
     for (const [name, x] of [['Left concrete wall', -GAME_CONFIG.room.width / 2 - 0.11], ['Right concrete wall', GAME_CONFIG.room.width / 2 + 0.11]] as const) {
@@ -54,7 +54,7 @@ export class Room extends THREE.Group {
       this.add(side);
     }
 
-    const columnMaterial = siteMaterial('concrete', 0xa7a69d, .7, 5);
+    const columnMaterial = siteMaterial('concrete', 0xf0e9db, .4, .75);
     columnMaterial.userData.referenceLaserReceiver=true;
     for (const x of [-2.72, 2.72]) {
       const column = new THREE.Mesh(new THREE.BoxGeometry(0.36, GAME_CONFIG.room.height, 0.38), columnMaterial);
@@ -68,6 +68,8 @@ export class Room extends THREE.Group {
     }
 
     this.addFormworkMarks();
+    this.addConstructionJoints();
+    this.addRearWall();
     this.addSiteSupplies();
 
     // Fired-clay shells leave thin angular plates, not round gravel. Share one
@@ -102,6 +104,107 @@ export class Room extends THREE.Group {
     rubble.computeBoundingSphere();
     this.add(rubble);
     addLighting(scene);
+  }
+
+  private addRearWall(): void {
+    // The player already stops at this elevation. Keep the room enclosed until
+    // a real exterior scene can be built and tested behind any future opening.
+    const rearZ = GAME_CONFIG.room.depth / 2;
+    const wall = new THREE.Mesh(
+      new THREE.BoxGeometry(GAME_CONFIG.room.width, GAME_CONFIG.room.height, .16),
+      matteMaterial(0x827b70),
+    );
+    wall.name = 'Unfinished rear plaster wall';
+    wall.userData.studioEntityId = 'world:rear-wall';
+    wall.position.set(0, GAME_CONFIG.room.height / 2, rearZ + .08);
+    wall.receiveShadow = true;
+    this.add(wall);
+
+    // Staggered, individually three-dimensional clay courses behind a partly
+    // finished plaster lift. The masonry and the plaster do not share a flat
+    // photographic plane: their edges cast shadows at the actual transition.
+    const brickWidth = .235, course = .094, gap = .012;
+    const columns = 16, rows = 31;
+    const brickGeometry = new THREE.BoxGeometry(brickWidth - gap, course - gap, .085);
+    const brickMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff, map: new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}assets/masonry/brick-face-site.webp`), roughness: 1,
+    });
+    brickMaterial.map!.colorSpace = THREE.SRGBColorSpace;
+    const bricks = new THREE.InstancedMesh(brickGeometry, brickMaterial, columns * rows);
+    bricks.name = 'Exposed staggered rear clay courses';
+    bricks.userData.studioEntityId = 'world:rear-exposed-masonry';
+    const matrix = new THREE.Matrix4(), position = new THREE.Vector3(), rotation = new THREE.Quaternion(), scale = new THREE.Vector3(1, 1, 1);
+    const shade = new THREE.Color();
+    for (let row = 0; row < rows; row++) for (let column = 0; column < columns; column++) {
+      const index = row * columns + column;
+      position.set(-GAME_CONFIG.room.width / 2 + .12 + column * brickWidth + (row % 2) * brickWidth / 2, .055 + row * course, rearZ - .043);
+      matrix.compose(position, rotation, scale);
+      bricks.setMatrixAt(index, matrix);
+      bricks.setColorAt(index, shade.setRGB(.88 + (index * 7 % 5) * .026, .86 + (index * 11 % 4) * .025, .82 + (index * 13 % 5) * .018));
+    }
+    bricks.castShadow = bricks.receiveShadow = true;
+    bricks.computeBoundingSphere();
+    bricks.raycast = () => undefined;
+    this.add(bricks);
+
+    const plasterShape = new THREE.Shape();
+    plasterShape.moveTo(-.86, 0);
+    plasterShape.lineTo(3.8, 0);
+    plasterShape.lineTo(3.8, 3);
+    plasterShape.lineTo(-.84, 3);
+    for (let y = 2.88; y >= .12; y -= .12) {
+      const edge = -.89 + Math.sin(y * 11.7) * .035 + Math.sin(y * 24.1) * .014;
+      plasterShape.lineTo(edge, y);
+    }
+    plasterShape.closePath();
+    const plasterGeometry = new THREE.ExtrudeGeometry(plasterShape, {depth: .024, bevelEnabled: true, bevelSize: .006, bevelThickness: .004, bevelSegments: 1, curveSegments: 1});
+    const plaster = new THREE.Mesh(plasterGeometry, siteMaterial('plaster', 0xf5f1eb, .25, .25));
+    plaster.position.z = rearZ - .111;
+    plaster.name = 'Trowelled plaster lift with unfinished masonry edge';
+    plaster.userData.studioEntityId = 'world:rear-plaster-lift';
+    plaster.castShadow = plaster.receiveShadow = true;
+    plaster.raycast = () => undefined;
+    this.add(plaster);
+
+    const cornerMaterial = siteMaterial('concrete', 0xe2dcd2, .24, .8);
+    const corners = new THREE.InstancedMesh(new THREE.BoxGeometry(.28, GAME_CONFIG.room.height, .30), cornerMaterial, 2);
+    corners.name = 'Poured rear corner pilasters';
+    for (const [index, x] of [-GAME_CONFIG.room.width / 2 + .14, GAME_CONFIG.room.width / 2 - .14].entries()) {
+      corners.setMatrixAt(index, matrix.makeTranslation(x, GAME_CONFIG.room.height / 2, rearZ - .015));
+    }
+    corners.castShadow = corners.receiveShadow = true;
+    corners.raycast = () => undefined;
+    corners.computeBoundingSphere();
+    this.add(corners);
+  }
+
+  private addConstructionJoints(): void {
+    const width = GAME_CONFIG.room.width, depth = GAME_CONFIG.room.depth;
+    const sections: Array<{position: THREE.Vector3; size: THREE.Vector3}> = [];
+    // Drying-shrinkage cuts in the screed, and the darker margin at the wall
+    // make the floor read as a poured surface inside a built enclosure.
+    for (const x of [-1.27, 1.27]) sections.push({position: new THREE.Vector3(x, .0015, 0), size: new THREE.Vector3(.003, .002, depth - .06)});
+    for (const z of [-1.2, 1.2]) sections.push({position: new THREE.Vector3(0, .0015, z), size: new THREE.Vector3(width - .06, .002, .003)});
+    for (const x of [-width / 2 + .015, width / 2 - .015]) sections.push({position: new THREE.Vector3(x, .002, 0), size: new THREE.Vector3(.022, .004, depth)});
+    for (const z of [-depth / 2 + .015, depth / 2 - .015]) sections.push({position: new THREE.Vector3(0, .002, z), size: new THREE.Vector3(width, .004, .022)});
+    const cuts = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), matteMaterial(0x756d60), sections.length);
+    const transform = new THREE.Matrix4();
+    for (const [index, section] of sections.entries()) cuts.setMatrixAt(index, transform.compose(section.position, new THREE.Quaternion(), section.size));
+    cuts.name = 'Screed joints and wall perimeter gap';
+    cuts.raycast = () => undefined;
+    cuts.computeBoundingSphere();
+    this.add(cuts);
+
+    const beams = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), siteMaterial('concrete', 0xe6e0d6, 1, .15), 3);
+    for (const [index, z] of [-2.65, .1, 2.65].entries()) {
+      transform.compose(new THREE.Vector3(0, GAME_CONFIG.room.height - .085, z), new THREE.Quaternion(), new THREE.Vector3(width, .17, .24));
+      beams.setMatrixAt(index, transform);
+    }
+    beams.name = 'Downstand concrete ceiling beams';
+    beams.castShadow = beams.receiveShadow = true;
+    beams.raycast = () => undefined;
+    beams.computeBoundingSphere();
+    this.add(beams);
   }
 
   private addFormworkMarks(): void {

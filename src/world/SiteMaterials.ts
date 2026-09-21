@@ -3,6 +3,26 @@ import * as THREE from 'three';
 type Surface = 'floor' | 'concrete' | 'plaster' | 'clay';
 
 const textureSources = new Map<Surface, HTMLCanvasElement>();
+const textureLoader = new THREE.TextureLoader();
+const materialTextures = new Map<string, THREE.Texture>();
+const photographed: Partial<Record<Surface, string>> = new URLSearchParams(location.search).get('materials') === 'legacy' ? {} : {
+  floor: 'concrete_floor',
+  concrete: 'concrete',
+  plaster: 'plastered_wall_03',
+};
+function photographedTexture(surface: Surface, repeatX: number, repeatY: number): THREE.Texture {
+  const key = `${surface}:${repeatX}:${repeatY}`;
+  const cached = materialTextures.get(key);
+  if (cached) return cached;
+  const image = textureLoader.load(`${import.meta.env.BASE_URL}assets/site-materials/${photographed[surface]}-albedo-512.webp`);
+  image.name = `${surface} albedo 512 CC0`;
+  image.colorSpace = THREE.SRGBColorSpace;
+  image.wrapS = image.wrapT = THREE.RepeatWrapping;
+  image.repeat.set(repeatX, repeatY);
+  image.anisotropy = 4;
+  materialTextures.set(key, image);
+  return image;
+}
 const hash = (x: number, y: number, seed: number): number => {
   let value = Math.imul(x ^ seed, 374761393) ^ Math.imul(y, 668265263);
   value = Math.imul(value ^ value >>> 13, 1274126177);
@@ -31,9 +51,11 @@ function source(surface: Surface): HTMLCanvasElement {
     let shade = 228 + mottling + (grain - .5) * (surface === 'plaster' ? 35 : 20);
     if (surface === 'plaster') shade += (aggregate - .5) * 18;
     if (surface === 'floor') {
-      shade += Math.sin(u * 2 + v * 3) * 4;
-      if (grain < .013) shade -= 25;
-    } else if (surface === 'concrete' && aggregate < .035) shade -= 18;
+      const coarseAggregate = hash(Math.floor(x / 7), Math.floor(y / 7), seed + 73);
+      shade += Math.sin(u * 2 + v * 3) * 4 + (coarseAggregate - .5) * 21;
+      if (grain < .018) shade -= 36;
+      else if (grain > .986) shade += 16;
+    } else if (surface === 'concrete' && aggregate < .05) shade -= 23;
     else if (surface === 'clay' && grain < .06) shade -= 13;
     const index = (y * size + x) * 4;
     pixels.data[index] = THREE.MathUtils.clamp(shade + 2, 0, 255);
@@ -47,6 +69,15 @@ function source(surface: Surface): HTMLCanvasElement {
 }
 
 export function siteMaterial(surface: Surface, color: number, repeatX = 1, repeatY = 1): THREE.MeshStandardMaterial {
+  if (photographed[surface]) {
+    return new THREE.MeshStandardMaterial({
+      name: `Scanned ${surface} surface`,
+      color,
+      map: photographedTexture(surface, repeatX, repeatY),
+      roughness: surface === 'concrete' ? .92 : .97,
+      metalness: 0,
+    });
+  }
   const texture = new THREE.CanvasTexture(source(surface));
   texture.name = `Procedural ${surface} aggregate`;
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -58,7 +89,7 @@ export function siteMaterial(surface: Surface, color: number, repeatX = 1, repea
     color,
     map: texture,
     bumpMap: texture,
-    bumpScale: surface === 'plaster' ? .006 : surface === 'concrete' ? .0025 : .0015,
+    bumpScale: surface === 'plaster' ? .008 : surface === 'concrete' ? .004 : surface === 'floor' ? .005 : .0015,
     roughness: .98,
     metalness: 0,
   });

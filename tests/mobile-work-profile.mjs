@@ -35,7 +35,8 @@ try{
   g.renderer.gpu.render=(scene,camera)=>{const result=render(scene,camera);if(p.active&&scene===g.renderer.scene&&!g.renderer.gpu.getRenderTarget()){p.draws.push(g.renderer.webgl.info.render.calls);p.presentations.push(performance.now());}return result;};
  });
  const cdp=await context.newCDPSession(page);
- const stages=url.includes('bodyDiagnostic')?[['spray',false,true],['hose',true,true],['fitting',false,true]]:[['spray',false,true],['hammer',true,true],['trowel',false,true],['hose',true,true],['fitting',false,true],['level',false,true],['spring',false,true],['cutter',false,true]];
+ const only=process.argv.find(value=>value.startsWith('--only='))?.slice('--only='.length);
+ const stages=(url.includes('bodyDiagnostic')?[['spray',false,true],['hose',true,true],['fitting',false,true]]:[['spray',false,true],['hammer',true,true],['trowel',false,true],['hose',true,true],['fitting',false,true],['level',false,true],['spring',false,true],['cutter',false,true]]).filter(([tool])=>!only||tool===only);
  for(const [tool,held,rotate] of stages){
   await page.evaluate(tool=>window.dispatchEvent(new CustomEvent('wirehouse:select-tool',{detail:tool})),tool);
   await page.waitForFunction(tool=>window.__wireTheHouse.selectedTool===tool,tool);

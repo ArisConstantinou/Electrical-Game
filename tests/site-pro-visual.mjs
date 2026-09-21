@@ -6,6 +6,7 @@ import { blockPointerLock } from './browser-safety.mjs';
 const url = process.argv[2] ?? 'http://127.0.0.1:5365/Electrical-Game/';
 const output = process.argv[3] ?? 'output/site-pro-after';
 const checkSitePro = process.argv.includes('--site-pro');
+const only = process.argv.find(value => value.startsWith('--only='))?.slice('--only='.length);
 const sizes = [
   { name: 'compact-mobile-portrait', width: 320, height: 740, touch: true },
   { name: 'mobile-portrait', width: 390, height: 844, touch: true },
@@ -14,7 +15,7 @@ const sizes = [
   { name: 'tablet-portrait', width: 820, height: 1180, touch: true },
   { name: 'tablet-landscape', width: 1180, height: 820, touch: true },
   { name: 'desktop', width: 1366, height: 768, touch: false },
-];
+].filter(size => !only || size.name === only);
 
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch({ channel: 'chrome', headless: true });

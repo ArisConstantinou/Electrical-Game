@@ -256,10 +256,10 @@ export class MasonryVolume {
       for (const offset of [[2, 0, 0], [-2, 0, 0], [0, 2, 0], [0, -2, 0], [0, 0, 2], [0, 0, -2]]) if (this.nodeAirExposed(x + offset[0], y + offset[1], z + offset[2])) open++;
       variation *= .52 + open * .07;
     }
-    if (material === MaterialId.Mortar) return [.30 * variation, .28 * variation, .23 * variation];
+    if (material === MaterialId.Mortar) return [.235 * variation, .22 * variation, .195 * variation];
     if (material === MaterialId.Render) return [.46 * variation, .44 * variation, .37 * variation];
     if (material === MaterialId.Concrete) return [.33 * variation, .34 * variation, .33 * variation];
-    return [.49 * variation, .145 * variation, .065 * variation];
+    return [.44 * variation, .17 * variation, .105 * variation];
   }
   takeDirtyChunks(): string[] { const keys = [...this.dirty]; this.dirty.clear(); return keys; }
   chunkBounds(key: string): { min: Vec3; max: Vec3; x0: number; x1: number; y0: number; y1: number } {
