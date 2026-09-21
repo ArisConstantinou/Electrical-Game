@@ -24,6 +24,12 @@ try{
    for(const name of ['fitThumb','fitFinger','pinchBox','poseBoxGrasps','wrapGrip','limb','posePipeGrip','boxViewportCorrection','boxObstacleCorrection','clampBoxComposition'])wrap(g.workerBody,name,'body.'+name);
    wrap(g.workSurfaces,'frontForBounds','clearance.frontForBounds');
    for(const name of ['boxGraspScreenObstacles','boxGraspViewCorners','clampFittingZones'])wrap(g.fpsRig,name,'rig.'+name);
+   const finger=g.workerBody.fitFinger;
+   g.workerBody.fitFinger=function(digit,side,target,...rest){
+    if(p.active){const local=this.bone('hand.'+side).worldToLocal(target.clone()),key=digit+side,row=p.fingerTargets[key]??={min:[Infinity,Infinity,Infinity],max:[-Infinity,-Infinity,-Infinity],calls:0};
+     row.calls++;for(let i=0;i<3;i++){row.min[i]=Math.min(row.min[i],local.getComponent(i));row.max[i]=Math.max(row.max[i],local.getComponent(i));}}
+    return finger.call(this,digit,side,target,...rest);
+   };
   }
   const render=g.renderer.gpu.render.bind(g.renderer.gpu);
   g.renderer.gpu.render=(scene,camera)=>{const result=render(scene,camera);if(p.active&&scene===g.renderer.scene&&!g.renderer.gpu.getRenderTarget()){p.draws.push(g.renderer.webgl.info.render.calls);p.presentations.push(performance.now());}return result;};
@@ -36,9 +42,9 @@ try{
   await page.evaluate(rotate=>{window.__workProfile.rotate=rotate;},rotate);
   if(held){const use=page.locator('#site-pro-use');const b=await (await use.count()?use:page.locator('#look-joystick')).boundingBox();await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:b.x+b.width/2,y:b.y+b.height/2,id:1}]});}
   await page.waitForTimeout(1200);
-  await page.evaluate(()=>{const p=window.__workProfile;p.methods={};p.frames=[];p.presentations=[];p.draws=[];p.start=performance.now();p.active=true;});
+  await page.evaluate(()=>{const p=window.__workProfile;p.methods={};p.fingerTargets={};p.frames=[];p.presentations=[];p.draws=[];p.start=performance.now();p.active=true;});
   await page.waitForTimeout(3200);
-  const state=await page.evaluate(()=>{const p=window.__workProfile;p.active=false;const g=window.__wireTheHouse,duration=performance.now()-p.start,intervals=p.presentations.slice(1).map((t,i)=>t-p.presentations[i]).sort((a,b)=>a-b);return{selectedTool:g.selectedTool,fps:p.presentations.length*1000/duration,renderedFrames:p.presentations.length,p95Ms:intervals[Math.floor(intervals.length*.95)],frames:p.frames.length,drawCalls:p.draws.reduce((a,b)=>a+b,0)/p.draws.length,methods:Object.fromEntries(Object.entries(p.methods).map(([k,v])=>[k,{calls:v.calls,msPerFrame:v.total/p.frames.length,worst:v.worst}])),impacts:g.room.brickWall.impactCount,removedCm3:g.room.brickWall.volume.removedVolume*1e6,fragments:g.chasing.activeFragmentCount,pixelRatio:g.renderer.webgl.getPixelRatio(),waterLitres:g.roomWater.telemetry.receivedLitres,renderer:g.renderer.performanceTelemetry??null,renderError:g.renderError??g.renderer.renderError,pointerLock:!!document.pointerLockElement};});
+  const state=await page.evaluate(()=>{const p=window.__workProfile;p.active=false;const g=window.__wireTheHouse,duration=performance.now()-p.start,intervals=p.presentations.slice(1).map((t,i)=>t-p.presentations[i]).sort((a,b)=>a-b);return{selectedTool:g.selectedTool,fps:p.presentations.length*1000/duration,renderedFrames:p.presentations.length,p95Ms:intervals[Math.floor(intervals.length*.95)],frames:p.frames.length,drawCalls:p.draws.reduce((a,b)=>a+b,0)/p.draws.length,methods:Object.fromEntries(Object.entries(p.methods).map(([k,v])=>[k,{calls:v.calls,msPerFrame:v.total/p.frames.length,worst:v.worst}])),fingerTargets:p.fingerTargets,impacts:g.room.brickWall.impactCount,removedCm3:g.room.brickWall.volume.removedVolume*1e6,fragments:g.chasing.activeFragmentCount,pixelRatio:g.renderer.webgl.getPixelRatio(),waterLitres:g.roomWater.telemetry.receivedLitres,renderer:g.renderer.performanceTelemetry??null,renderError:g.renderError??g.renderer.renderError,pointerLock:!!document.pointerLockElement};});
   report.stages.push({tool,held,rotate,...state});console.log(JSON.stringify(report.stages.at(-1)));
   if(held)await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
   await page.screenshot({path:`${out}/${tool}.png`});await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));

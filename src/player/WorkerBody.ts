@@ -62,6 +62,7 @@ export class WorkerBody extends THREE.Group {
   private thumbOpposition=new Map<string,THREE.Vector3>();
   private thumbSurface=new Map<string,{mesh:THREE.SkinnedMesh;index:number}[]>();
   private thumbPoseCache=new Map<string,{key:string;angles:number[]}>();
+  private boxFingerPoseCache=new Map<string,{key:string;angles:number[]}>();
   private boxFingerAxes=new Map<string,THREE.Vector3>();
   private fingerAxes=new Map<string,THREE.Vector3>();
   private lengths=new Map<string,number>();
@@ -877,12 +878,25 @@ export class WorkerBody extends THREE.Group {
     const axes=[this.fingerSplay.get(digit+side)!,...names.map(n=>hinges.get(n)!)],indices=[0,0,1,2],limits=[[adduction-spread,adduction+spread],[actuator?-.45:0,1.35],[0,1.75],[0,1.25]];
     const pose=()=>{for(let j=0;j<3;j++){const b=this.bone(names[j]);b.quaternion.copy(this.rest.get(b)!.q);if(j===0)b.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(axes[0],angles[0]));b.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(axes[j+1],sign*angles[j+1]));b.updateWorldMatrix(false,true);}};
     const tip=()=>{const b=this.bone(names[2]);return this.point(names[2]).add(Y.clone().applyQuaternion(b.getWorldQuaternion(new THREE.Quaternion())).multiplyScalar(this.lengths.get(names[2])!));};
+    // Only the rigid casing pinch has a fixed target in hand space. The
+    // previously solved angles remain exact as the complete hand rotates or
+    // translates; flexible tool grips still solve their live targets.
+    const cacheKey=hinges===this.boxFingerAxes&&!actuator
+      ?this.bone('hand.'+side).worldToLocal(target.clone()).toArray().map(n=>Math.round(n*1e6)).join(',')
+      :null;
+    const cached=cacheKey===null?null:this.boxFingerPoseCache.get(digit+side);
+    if(cacheKey!==null&&cached?.key===cacheKey){
+      angles.splice(0,4,...cached.angles);pose();
+      this.fingerFit[digit+side]={error:tip().distanceTo(target),tip:tip().toArray(),target:target.toArray(),angles:angles.map(a=>a*180/Math.PI),solver:'cached-box-contact'};
+      return;
+    }
     pose();
     for(let pass=0;pass<10;pass++)for(let j=3;j>=0;j--){
       const b=this.bone(names[indices[j]]),origin=this.point(names[indices[j]]),q=j===0?b.parent!.getWorldQuaternion(new THREE.Quaternion()).multiply(this.rest.get(b)!.q):b.getWorldQuaternion(new THREE.Quaternion()),axis=axes[j].clone().applyQuaternion(q);
       const from=tip().sub(origin),to=target.clone().sub(origin);from.addScaledVector(axis,-from.dot(axis)).normalize();to.addScaledVector(axis,-to.dot(axis)).normalize();
       const delta=Math.atan2(axis.dot(from.clone().cross(to)),from.dot(to));angles[j]=THREE.MathUtils.clamp(angles[j]+(j===0?1:sign)*delta,limits[j][0],limits[j][1]);pose();
     }
+    if(cacheKey!==null)this.boxFingerPoseCache.set(digit+side,{key:cacheKey,angles:[...angles]});
     this.fingerFit[digit+side]={error:tip().distanceTo(target),tip:tip().toArray(),target:target.toArray(),angles:angles.map(a=>a*180/Math.PI)};
   }
   get telemetry(){return{loaded:this.loaded,visible:this.visible,bones:this.bones.size,phase:this.phase,crouch:this.bend,source:'Blender Human Base Meshes v1.4.1 CC0',scope:'shared body / all tool grips',locomotion:this.locomotionState,gripReachErrors:this.gripErrors,armTwist:this.armTwist,fingerFit:this.fingerFit};}
