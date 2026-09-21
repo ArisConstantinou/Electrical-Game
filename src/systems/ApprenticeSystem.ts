@@ -11,12 +11,16 @@ import type { BrickWall } from '../world/BrickWall';
 import { createMixerModel,createShovelModel } from '../world/MixingStationModels';
 import { buildToolModel } from '../player/ToolModels';
 import { MAX_WRIST_REACH_M,type WorkerGripTarget } from '../player/WorkerArm';
+import {ApprenticePipeBatch,APPRENTICE_PIPE_LENGTH_M,APPRENTICE_PIPE_TARGET,type ApprenticePipeKind} from './ApprenticePipeBatch';
+import {ApprenticePipeYard} from './ApprenticePipeYard';
+import {ApprenticeCrewMate} from './ApprenticeCrewMate';
 
-type Phase='idle'|'fetching'|'picking-up'|'lifting'|'walking'|'breaking'|'construction'|'done'|'blocked';
-type Mode='off'|'point'|'layout'|'plan';
+type Phase='idle'|'fetching'|'picking-up'|'lifting'|'walking'|'breaking'|'construction'|'pipe'|'done'|'blocked';
+type Mode='off'|'point'|'layout'|'pipe-choice'|'plan';
 type WorkStep='claim'|'return-hammer'|'water-source'|'water-drum'|'cement-source'|'cement-drum'|'sand-source'|'sand-drum'|'mixer-source'|'mixer-drum'|'mixing'|'bucket-source'|'bucket-cart'|'trowel-source'|'wall-mortar'|'box-source'|'wall-box'|'bonding';
-type WorkTool='water'|'trowel'|'shovel'|'mixer'|'bucket'|'box';
+type WorkTool='water'|'trowel'|'shovel'|'mixer'|'bucket'|'box'|'cutter';
 interface Job {anchor:THREE.Vector3;modules:BoxModuleLayout[];targets:THREE.Vector3[];cursor:number;refinements:number;fitRefinements:number}
+interface PipeJob {bundle:number;kind:ApprenticePipeKind;produced:number;target:number;step:'claim'|'approach'|'cut'|'store'|'wait-crew';elapsed:number}
 const FRONT=-2.41,DEPTH=.052;
 
 /** One independent apprentice. Job confirmation is the only demolition entry point. */
@@ -40,6 +44,7 @@ export class ApprenticeSystem {
   private readonly toolbar=document.createElement('section');
   private readonly status=document.createElement('div');
   private readonly paperCanvas=document.createElement('canvas');
+  private readonly mobilePlan=document.createElement('section');
   private readonly paper:THREE.Mesh<THREE.PlaneGeometry,THREE.MeshBasicMaterial>;
   private job:Job|null=null;
   private anchor:THREE.Vector3|null=null;
@@ -76,12 +81,20 @@ export class ApprenticeSystem {
   private stagedBoxes:BoxGroup|null=null;
   private readonly stagedBoxPosition=new THREE.Vector3();
   private workFailure='';
-  private blockedFrom:'breaking'|'construction'|null=null;
+  private blockedFrom:'breaking'|'construction'|'pipe'|null=null;
+  readonly pipeBatch=new ApprenticePipeBatch();
+  readonly pipeYard:ApprenticePipeYard;
+  private pipeSelection:number|null=null;
+  private pipeJob:PipeJob|null=null;
+  private readonly crew:ApprenticeCrewMate[]=[];
+  crewReady:Promise<void>=Promise.resolve();
+  private readonly pipeCutTarget=new THREE.Vector3();
   private message='Έτοιμος για οδηγίες';
   private readonly yellow=new THREE.MeshBasicMaterial({color:0xffdc35,transparent:true,opacity:.72,depthWrite:false});
 
   constructor(private readonly game:Game,debris:ChasingSystem){
     const scene=game.renderer.scene;
+    this.pipeYard=new ApprenticePipeYard(game.pvc.stock);scene.add(this.pipeYard);
     this.body=new WorkerBody(scene);this.body.name='Apprentice 1';this.body.overview=true;
     this.ready=this.body.ready;
     this.camera.position.set(.8,1.65,1.25);this.camera.add(this.rig);scene.add(this.camera);
@@ -100,18 +113,19 @@ export class ApprenticeSystem {
     this.highlight.name='Apprentice yellow directive';this.ghost.name='Apprentice box preview';scene.add(this.highlight,this.ghost,this.workWallMarker,this.hammerRestMarker);
     this.hammerRestMarker.position.set(.8,0,.5);
     this.paperCanvas.width=1024;this.paperCanvas.height=768;
-    this.paper=new THREE.Mesh(new THREE.PlaneGeometry(.42,.315),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(this.paperCanvas),side:THREE.DoubleSide}));
-    this.paper.name='Electrical instruction drawing';this.paper.position.set(0,-.20,-.51);this.paper.rotation.x=-.15;this.paper.visible=false;game.renderer.camera.add(this.paper);this.drawPlan();
-    const label=document.createElement('label');label.className='apprentice-count';label.innerHTML='Apprentices <select id="apprentice-count" aria-label="Apprentices"><option value="0">0</option><option value="1" selected>1</option></select>';
+    this.paper=new THREE.Mesh(new THREE.PlaneGeometry(.62,.465),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(this.paperCanvas),side:THREE.DoubleSide,toneMapped:false}));
+    this.paper.name='Electrical instruction drawing';this.paper.position.set(0,-.025,-.48);this.paper.rotation.x=-.08;this.paper.visible=false;game.renderer.camera.add(this.paper);this.drawPlan();
+    const label=document.createElement('label');label.className='apprentice-count';label.innerHTML='Apprentices <select id="apprentice-count" aria-label="Apprentices"><option value="0">0</option><option value="1" selected>1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select>';
     document.querySelector('#start-button')!.after(label);
-    label.querySelector('select')!.addEventListener('change',e=>{this.count=Number((e.target as HTMLSelectElement).value);});
+    label.querySelector('select')!.addEventListener('change',e=>{void this.prepareCrew(Number((e.target as HTMLSelectElement).value));});
     this.toolbar.id='apprentice-controls';this.toolbar.setAttribute('aria-label','Οδηγίες Apprentice');
-    this.toolbar.innerHTML='<div class="apprentice-actions"><button data-apprentice="point">T · ΔΕΙΞΕ</button><button data-apprentice="layout">E · ΚΟΥΤΙΑ</button><button data-apprentice="confirm">OK · ENTER</button><button data-apprentice="plan">V · ΣΧΕΔΙΟ</button><button data-apprentice="resume">ΣΥΝΕΧΕΙΑ</button><button data-apprentice="cancel">ΕΞΟΔΟΣ</button></div>';
+    this.toolbar.innerHTML='<div class="apprentice-actions"><button data-apprentice="point">T · ΔΕΙΞΕ</button><button data-apprentice="layout">E · ΚΟΥΤΙΑ</button><button data-apprentice="confirm">OK · ENTER</button><button data-apprentice="pipe-socket">ΠΡΙΖΑ · 20 × 50 cm</button><button data-apprentice="pipe-switch">SWITCH · 20 × 140 cm</button><button data-apprentice="plan">V · ΣΧΕΔΙΟ</button><button data-apprentice="resume">ΣΥΝΕΧΕΙΑ</button><button data-apprentice="cancel">ΕΞΟΔΟΣ</button></div>';
     this.status.className='apprentice-status';this.status.setAttribute('role','status');this.toolbar.prepend(this.status);game.hud.shell.append(this.toolbar);
+    this.mobilePlan.id='apprentice-mobile-plan';this.mobilePlan.setAttribute('aria-label','Ηλεκτρολογικό σχέδιο');this.mobilePlan.hidden=true;game.hud.shell.append(this.mobilePlan);
     this.toolbar.addEventListener('click',e=>{const action=(e.target as HTMLElement).closest<HTMLButtonElement>('[data-apprentice]')?.dataset.apprentice;if(action)this.command(action);});
     addEventListener('keydown',e=>{
       if(!game.started||e.repeat||e.target instanceof Element&&e.target.closest('input,textarea,select,[contenteditable="true"]')||game.hud.shell.classList.contains('settings-open')||game.modelInspector?.active)return;
-      const action=e.code==='KeyT'&&!e.shiftKey?'point':e.code==='KeyV'&&!e.shiftKey?'plan':e.code==='KeyE'&&this.mode==='point'?'layout':e.code==='Enter'&&this.mode==='layout'?'confirm':e.code==='Escape'&&this.mode!=='off'?'cancel':null;
+      const action=e.code==='KeyT'&&!e.shiftKey?'point':e.code==='KeyV'&&!e.shiftKey?'plan':e.code==='KeyE'&&this.mode==='point'?'layout':e.code==='Digit1'&&this.mode==='pipe-choice'?'pipe-socket':e.code==='Digit2'&&this.mode==='pipe-choice'?'pipe-switch':e.code==='Enter'&&this.mode==='layout'?'confirm':e.code==='Escape'&&this.mode!=='off'?'cancel':null;
       if(action){e.preventDefault();e.stopImmediatePropagation();game.input.resetTransientInput();this.command(action);}
     },{capture:true});
     addEventListener('wirehouse:select-tool',()=>{this.mode='off';this.paper.visible=false;this.ghost.visible=false;});
@@ -119,18 +133,42 @@ export class ApprenticeSystem {
     this.presentUI();
   }
   get ownsInput():boolean{return this.mode!=='off';}
-  collisionObstacles(){return this.game.started&&this.count===1?[{id:'apprentice-1',minX:this.camera.position.x-.18,maxX:this.camera.position.x+.18,minZ:this.camera.position.z-.08,maxZ:this.camera.position.z+.28}]:[];}
-  get bareHands():boolean{return this.mode==='point'||this.mode==='plan';}
-  get telemetry(){return{count:this.count,mode:this.mode,phase:this.phase,blockedFrom:this.blockedFrom,workStep:this.phase==='construction'?this.workStep:null,workCursor:this.workCursor,workTargets:this.workTargets.length,workContactReady:this.workContactReady,workGripReachM:this.workGripReachM,workTargetRangeM:this.workTargetRangeM,wallApproach:this.wallApproach,batchCycle:this.batchCycle,cementDone:this.cementDone,sandDone:this.sandDone,carriedKg:this.carriedKg,workFailure:this.workFailure,waiting:this.waiting,message:this.message,position:this.camera.position.toArray(),highlightSamples:this.lines.length,strikes:this.strikes,removedVolume:this.removedVolume,job:this.job?{anchor:this.job.anchor.toArray(),modules:this.job.modules,cursor:this.job.cursor,targets:this.job.targets.length,fitRefinements:this.job.fitRefinements}:null};}
+  private async prepareCrew(count:number):Promise<void>{
+    this.count=count;
+    const start=document.querySelector<HTMLButtonElement>('#start-button')!;
+    if(count>this.crew.length+1){
+      start.disabled=true;start.textContent='PREPARING APPRENTICES…';
+      for(let index=this.crew.length+2;index<=count;index++)this.crew.push(new ApprenticeCrewMate(this.game,index,this.pipeBatch,this.pipeYard));
+    }
+    this.crewReady=Promise.all(this.crew.slice(0,Math.max(0,count-1)).map(worker=>worker.ready)).then(()=>{});
+    await this.crewReady;
+    if(this.game.isReadyForStart){start.disabled=false;start.textContent='START';}
+  }
+  collisionObstacles(){return !this.game.started||this.count===0?[]:[{id:'apprentice-1',minX:this.camera.position.x-.18,maxX:this.camera.position.x+.18,minZ:this.camera.position.z-.08,maxZ:this.camera.position.z+.28},...this.crew.slice(0,this.count-1).map(worker=>worker.obstacle)];}
+  get bareHands():boolean{return this.mode==='point'||this.mode==='pipe-choice'||this.mode==='plan';}
+  get telemetry(){return{count:this.count,mode:this.mode,phase:this.phase,blockedFrom:this.blockedFrom,workStep:this.phase==='construction'?this.workStep:null,workCursor:this.workCursor,workTargets:this.workTargets.length,workContactReady:this.workContactReady,workGripReachM:this.workGripReachM,workTargetRangeM:this.workTargetRangeM,wallApproach:this.wallApproach,batchCycle:this.batchCycle,cementDone:this.cementDone,sandDone:this.sandDone,carriedKg:this.carriedKg,workFailure:this.workFailure,waiting:this.waiting,message:this.message,position:this.camera.position.toArray(),highlightSamples:this.lines.length,strikes:this.strikes,removedVolume:this.removedVolume,job:this.job?{anchor:this.job.anchor.toArray(),modules:this.job.modules,cursor:this.job.cursor,targets:this.job.targets.length,fitRefinements:this.job.fitRefinements}:null,pipeSelection:this.pipeSelection,pipeJob:this.pipeJob?{...this.pipeJob}:null,crew:this.crew.slice(0,this.count-1).map(worker=>({index:worker.index,active:worker.active,done:worker.done,position:worker.camera.position.toArray()})),pipeBatch:this.pipeBatch.telemetry,pipeYard:this.pipeYard.telemetry,bundles:[...this.game.pvc.stock.bundleRemaining]};}
 
   command(action:string):void {
     const g=this.game;if(!g.started)return;
-    if(action==='resume'&&this.phase==='blocked'&&this.job){
+    if(action==='resume'&&this.phase==='blocked'&&(this.job||this.pipeJob)){
       if(g.mixing.wheelbarrow.busy||g.pvc.blocksWork){this.message='Άφησε πρώτα τον εξοπλισμό για να συνεχίσω';return;}
-      this.phase=this.blockedFrom??'breaking';this.blockedFrom=null;this.workFailure='';this.stall=0;this.wallReachWait=0;this.path=[];this.workDestination=null;this.message='Συνεχίζω την επιβεβαιωμένη εργασία';return;
+      this.phase=this.blockedFrom??'breaking';if(this.phase==='pipe')for(const mate of this.crew)mate.resume();this.blockedFrom=null;this.workFailure='';this.stall=0;this.wallReachWait=0;this.path=[];this.workDestination=null;this.message='Συνεχίζω την επιβεβαιωμένη εργασία';return;
     }
     if(g.mixing.wheelbarrow.busy||g.mixing.blocksWork||g.pvc.blocksWork){g.hud.notify('Άφησε πρώτα τον εξοπλισμό που κρατάς.',false,1500);return;}
     if(action==='confirm'){this.confirm();return;}
+    if(action==='pipe-socket'||action==='pipe-switch'){
+      if(this.pipeSelection===null||!['idle','done'].includes(this.phase)){this.message='Δείξε πρώτα μία διαθέσιμη μάτσα με το T';return;}
+      if(this.count===0){this.message='Δεν έχει επιλεγεί Apprentice στην αρχική οθόνη';return;}
+      const kind:ApprenticePipeKind=action==='pipe-socket'?'socket':'switch';
+      const finished=this.pipeBatch.telemetry[kind==='socket'?'finishedSocket':'finishedSwitch'];
+      if(finished>=APPRENTICE_PIPE_TARGET){this.message=`Η παρτίδα ${kind==='socket'?'πρίζας':'switch'} είναι ήδη έτοιμη · 20 τεμάχια`;return;}
+      const remaining=APPRENTICE_PIPE_TARGET-finished,workerCount=Math.min(this.count,remaining),share=Math.ceil(remaining/workerCount);
+      let assigned=0;for(let index=0;index<workerCount-1;index++){
+        const target=Math.min(share,remaining-assigned-share);this.crew[index].assign((this.pipeSelection+index+1)%5,kind,target);assigned+=target;
+      }
+      this.pipeJob={bundle:this.pipeSelection,kind,produced:0,target:remaining-assigned,step:'claim',elapsed:0};this.phase='pipe';this.mode='point';this.path=[];this.pipeCutTarget.copy(this.pipeYard.cuttingPoint(this.pipeSelection,kind));
+      this.message=`Μάτσα ${this.pipeSelection+1} · κόβω ${APPRENTICE_PIPE_TARGET} σωλήνες ${Math.round(APPRENTICE_PIPE_LENGTH_M[kind]*100)} cm`;this.drawPlan();return;
+    }
     if(action==='layout'){
       if(!this.anchor){this.message='T · Δείξε πρώτα την περιοχή στον τοίχο';return;}
       if(!['idle','done'].includes(this.phase)){this.message='Η προηγούμενη εργασία παραμένει ενεργή · ΣΥΝΕΧΕΙΑ ή ΑΚΥΡΩΣΗ';return;}
@@ -139,6 +177,10 @@ export class ApprenticeSystem {
     }
     if(action==='cancel'){
       if(this.phase==='blocked'){
+        if(this.blockedFrom==='pipe'){
+          g.pvc.releaseApprentice();for(const mate of this.crew)mate.cancel();this.holdWorkTool(null);this.pipeJob=null;this.phase='idle';this.blockedFrom=null;this.message='Η κοπή σταμάτησε · τα έτοιμα τεμάχια και τα ρετάλια παραμένουν';
+          this.mode='off';this.paper.visible=false;return;
+        }
         if(this.carriedKg>0){const returned=g.mixing.wheelbarrow.receiveCarried(this.carriedKg);this.carriedKg-=returned;if(this.carriedKg>1e-6){this.message='Δεν χωρά η ποσότητα που κρατώ · άδειασε το αμαξάκι';return;}}
         g.mixing.drum.running=false;g.mixing.releaseApprentice();this.holdWorkTool(null);
         if(this.stagedBoxes){this.stagedBoxes.position.copy(this.stagedBoxPosition);this.stagedBoxes.visible=true;}
@@ -146,11 +188,13 @@ export class ApprenticeSystem {
         this.job=null;this.phase='idle';this.blockedFrom=null;this.workFailure='';this.message='Η εργασία ακυρώθηκε · τα υλικά παραμένουν στη σκηνή';
       }
       this.mode='off';this.ghost.visible=false;this.paper.visible=false;
+      if(this.phase!=='pipe')g.pvc.stock.highlightBundle(null);
       window.dispatchEvent(new CustomEvent('wirehouse:box-exit-assembly'));return;
     }
     if(action==='point'||action==='plan'){
       window.dispatchEvent(new CustomEvent('wirehouse:box-exit-assembly'));
       this.mode=action;this.ghost.visible=false;this.paper.visible=action==='plan';g.input.resetTransientInput();
+      if(action==='point'){this.pipeSelection=null;g.pvc.stock.highlightBundle(null);}
       if(action==='plan')this.drawPlan();
       this.message=action==='point'?'Κράτα το κλικ για κίτρινη γραμμή · E για κουτιά':'Ηλεκτρολογικό σχέδιο · T επιστροφή στις οδηγίες';
     }
@@ -158,6 +202,8 @@ export class ApprenticeSystem {
   handleInput(requested:boolean):boolean {
     if(!this.ownsInput)return false;
     if(this.mode==='point'&&(requested||this.game.input.actionHeld)&&['idle','done'].includes(this.phase)){
+      const bundle=this.game.pvc.stock.bundleAt(this.game.renderer.camera);
+      if(bundle){this.pipeSelection=bundle.index;this.game.pvc.stock.highlightBundle(bundle.index);this.mode='pipe-choice';this.message=`Μάτσα ${bundle.index+1} · διάλεξε ΠΡΙΖΑ (50 cm) ή SWITCH (140 cm)`;this.lines.length=0;this.clear(this.highlight);return true;}
       const hit=this.game.room.brickWall.aim(this.game.renderer.camera,4);
       if(hit&&Math.abs(hit.point.x)<2.48&&hit.point.y>.13&&hit.point.y<2.5){
         const p=hit.point.clone();p.z=FRONT+.025;
@@ -223,7 +269,7 @@ export class ApprenticeSystem {
   private moveTo(destination:FloorPoint,dt:number):boolean{
     const pos=this.camera.position;
     if(Math.hypot(destination.x-pos.x,destination.z-pos.z)<.045){this.velocity.set(0,0,0);this.path=[];return true;}
-    if(!this.path.length){const path=apprenticePath(pos,destination,this.game.mixing.collisionObstacles());if(!path){this.blockedFrom=this.phase==='construction'?'construction':'breaking';this.phase='blocked';this.message='Δεν υπάρχει ελεύθερη διαδρομή · μετακίνησε τον εξοπλισμό';return false;}this.path=path;}
+    if(!this.path.length){const path=apprenticePath(pos,destination,this.game.mixing.collisionObstacles());if(!path){this.blockedFrom=this.phase==='construction'?'construction':this.phase==='pipe'?'pipe':'breaking';this.phase='blocked';this.message='Δεν υπάρχει ελεύθερη διαδρομή · μετακίνησε τον εξοπλισμό';return false;}this.path=path;}
     const next=this.path[0],dx=next.x-pos.x,dz=next.z-pos.z,distance=Math.hypot(dx,dz),speed=Math.min(.9,distance/Math.max(.001,dt));
     if(this.game.mixing.collisionObstacles().some(o=>next.x>o.minX-.29&&next.x<o.maxX+.29&&next.z>o.minZ-.29&&next.z<o.maxZ+.29)){
       this.path=[];this.waiting=true;this.message='Η διαδρομή άλλαξε · ελέγχω τον εξοπλισμό';return false;
@@ -235,7 +281,8 @@ export class ApprenticeSystem {
   }
   update(dt:number):void {
     this.toolbar.hidden=!this.game.started;
-    this.body.visible=this.game.started&&this.count===1;this.hammer.visible=this.count===1;this.camera.visible=this.game.started&&this.count===1;
+    for(const mate of this.crew)if(this.phase!=='blocked'||this.blockedFrom!=='pipe')mate.update(dt,this.game.started&&mate.index<=this.count);
+    this.body.visible=this.game.started&&this.count>=1;this.hammer.visible=this.count>=1;this.camera.visible=this.game.started&&this.count>=1;
     if(!this.game.started||this.count===0||!this.body.loaded){this.presentUI();return;}
     dt=Math.min(dt,.05);this.elapsed+=dt;this.waiting=false;this.velocity.set(0,0,0);
     if(this.mode==='layout')this.preview();
@@ -249,6 +296,7 @@ export class ApprenticeSystem {
     this.rig.visible=this.hasHammer||this.phase==='picking-up';this.rig.beginFrame(dt,null,this.phase==='breaking');this.rig.update(dt,this.velocity.lengthSq()>.01);this.rig.show('hammer');
     if(this.phase==='breaking'&&this.job)this.breakWall(dt);
     if(this.phase==='construction')this.updateConstruction(dt);
+    if(this.phase==='pipe')this.updatePipe(dt);
     else if(this.phase!=='breaking'&&this.hasHammer){
       this.rig.restHammer(this.camera);
       const target=this.hammer.getWorldPosition(new THREE.Vector3()),rotation=this.hammer.getWorldQuaternion(new THREE.Quaternion()),alpha=1-Math.exp(-8*dt);
@@ -257,9 +305,50 @@ export class ApprenticeSystem {
       this.hammer.quaternion.copy(this.hammer.parent!.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(this.carriedRotation));this.hammer.updateWorldMatrix(false,true);this.rig.poseArms(this.camera);
     }
     this.camera.updateMatrixWorld(true);
-    const grips=this.phase==='construction'||this.phase==='blocked'&&this.workTool?this.poseWorkTool():[];
+    const grips=this.phase==='construction'||this.phase==='pipe'||this.phase==='blocked'&&this.workTool?this.poseWorkTool():[];
     this.body.update(dt,this.camera,{eyeHeight:this.camera.position.y,velocity:this.velocity,yaw:this.camera.rotation.y,pitch:this.camera.rotation.x},this.rig,'hammer',this.phase==='breaking',grips.length>0,grips);
     this.body.overview=true;this.presentUI();
+  }
+  private updatePipe(dt:number):void{
+    const job=this.pipeJob;if(!job)return;
+    if(this.crew.slice(0,this.count-1).some(mate=>mate.isBlocked)){
+      this.phase='blocked';this.blockedFrom='pipe';this.message='Μία μάτσα δεν έχει αρκετό PVC ή η διαδρομή κόπηκε · ΣΥΝΕΧΕΙΑ ή ΑΚΥΡΩΣΗ';return;
+    }
+    const pvc=this.game.pvc,centre=pvc.stock.bundleCenter(job.bundle);
+    if(job.step==='claim'){
+      if(!pvc.claimForApprentice()){this.waiting=true;this.message='Περιμένω να ελευθερωθεί η μάτσα PVC';return;}
+      job.step='approach';job.elapsed=0;this.path=[];
+    }
+    if(job.step==='approach'){
+      this.camera.position.y=THREE.MathUtils.damp(this.camera.position.y,job.kind==='socket'?.95:1.70,5,dt);
+      if(!this.moveTo({x:3.15,z:centre.z-.10},dt))return;
+      job.step='cut';job.elapsed=0;this.holdWorkTool('cutter');
+    }
+    if(job.step==='wait-crew'){
+      if(this.crew.slice(0,this.count-1).some(mate=>mate.active)){this.message='Περιμένω τους άλλους βοηθούς να τελειώσουν την παρτίδα';return;}
+      pvc.releaseApprentice();this.holdWorkTool(null);this.phase='done';this.pipeSelection=null;pvc.stock.highlightBundle(null);this.message=`Έτοιμα ${APPRENTICE_PIPE_TARGET} τεμάχια ${Math.round(APPRENTICE_PIPE_LENGTH_M[job.kind]*100)} cm`;this.pipeJob=null;this.drawPlan();return;
+    }
+    const needed=APPRENTICE_PIPE_LENGTH_M[job.kind]+.003;
+    const source=this.pipeBatch.remnants[job.bundle].findIndex(length=>length+1e-9>=needed);
+    this.pipeCutTarget.set(source<0?centre.x-.025:centre.x-.14,APPRENTICE_PIPE_LENGTH_M[job.kind],source<0?centre.z:centre.z-.085-source*.022);
+    this.camera.position.y=THREE.MathUtils.damp(this.camera.position.y,job.kind==='socket'?.95:1.70,7,dt);
+    this.camera.lookAt(this.pipeCutTarget);this.camera.updateMatrixWorld(true);
+    if(job.step==='cut'){
+      this.holdWorkTool('cutter');
+      if(!this.workContactReady){job.elapsed=Math.max(0,job.elapsed-dt*.3);this.waiting=true;this.message='Ρυθμίζω την επαφή του κόφτη στον σωλήνα';return;}
+      job.elapsed+=dt;
+      const moving=this.workTools.get('cutter')?.getObjectByName('cutter-moving-handle');if(moving)moving.rotation.z=.13+Math.sin(Math.min(1,job.elapsed/1.25)*Math.PI)*.48;
+      this.message=`Κόβω ${job.produced+1}/${job.target} · ${Math.round(APPRENTICE_PIPE_LENGTH_M[job.kind]*100)} cm`;
+      if(job.elapsed<1.25)return;
+      const receipt=this.pipeBatch.cut(job.bundle,job.kind,()=>pvc.consumeRawForApprentice(job.bundle));
+      if(!receipt){this.phase='blocked';this.blockedFrom='pipe';this.message='Η επιλεγμένη μάτσα δεν έχει αρκετό σωλήνα · διάλεξε άλλη ή συμπλήρωσε απόθεμα';return;}
+      this.pipeYard.addCut(receipt);job.produced++;job.step='store';job.elapsed=0;this.drawPlan();
+    }else if(job.step==='store'){
+      job.elapsed+=dt;
+      if(job.elapsed<.35)return;
+      if(job.produced>=job.target){job.step='wait-crew';this.holdWorkTool(null);return;}
+      job.step='cut';job.elapsed=0;
+    }
   }
   private breakWall(dt:number):void{
     const job=this.job!,wall=this.game.room.brickWall;
@@ -356,7 +445,7 @@ export class ApprenticeSystem {
     let tool=this.workTools.get(kind);
     if(!tool||kind==='box'&&tool!==this.stagedBoxes){
       const models=this.game.mixing.models;
-      tool=kind==='box'?this.stagedBoxes!:kind==='trowel'?buildToolModel('trowel'):kind==='shovel'?createShovelModel():kind==='mixer'?createMixerModel():kind==='water'?models.water.clone(true):models.bucket.clone(true);
+      tool=kind==='box'?this.stagedBoxes!:kind==='trowel'?buildToolModel('trowel'):kind==='cutter'?buildToolModel('cutter'):kind==='shovel'?createShovelModel():kind==='mixer'?createMixerModel():kind==='water'?models.water.clone(true):models.bucket.clone(true);
       tool.name=`Apprentice held ${kind}`;this.game.renderer.scene.add(tool);this.workTools.set(kind,tool);
     }
     tool.visible=true;
@@ -374,8 +463,8 @@ export class ApprenticeSystem {
     const hand=this.camera.localToWorld(new THREE.Vector3(.18,-.31,-.40));
     model.position.copy(hand).sub(primary.clone().applyQuaternion(model.quaternion));
     this.workContactReady=false;
-    if(kind==='trowel'&&this.workStep==='wall-mortar'){
-      const target=this.workTargets[this.workCursor],tipArray=model.userData.tipPoint as number[]|undefined;
+    if(kind==='trowel'&&this.workStep==='wall-mortar'||kind==='cutter'&&this.phase==='pipe'){
+      const target=kind==='cutter'?this.pipeCutTarget:this.workTargets[this.workCursor],tipArray=model.userData.tipPoint as number[]|undefined;
       if(target&&tipArray){
         const tipLocal=new THREE.Vector3().fromArray(tipArray);
         const shoulder=this.camera.localToWorld(new THREE.Vector3(.18,-.30,.08));
@@ -575,14 +664,15 @@ export class ApprenticeSystem {
   }
   private presentUI():void{
     this.toolbar.hidden=!this.game.started;
+    this.mobilePlan.hidden=!this.game.started||this.mode!=='plan';
     this.game.hud.shell.dataset.apprenticeMode=this.mode;
     const tool=this.game.hud.shell.querySelector<HTMLElement>('#tool-status')!;
-    tool.dataset.directive=this.mode==='point'?'ΔΑΧΤΥΛΟ · ΚΙΤΡΙΝΗ ΕΠΙΣΗΜΑΝΣΗ':this.mode==='plan'?'ΗΛΕΚΤΡΟΛΟΓΙΚΟ ΣΧΕΔΙΟ':'';
+    tool.dataset.directive=this.mode==='point'||this.mode==='pipe-choice'?'ΔΑΧΤΥΛΟ · ΚΙΤΡΙΝΗ ΕΠΙΣΗΜΑΝΣΗ':this.mode==='plan'?'ΗΛΕΚΤΡΟΛΟΓΙΚΟ ΣΧΕΔΙΟ':'';
     const touch=matchMedia('(pointer:coarse)').matches;
-    const instruction=touch&&this.mode==='layout'?'Σύνδεσε τα κουτιά · OK για ανάθεση':touch&&this.mode==='point'&&this.phase==='idle'?'Κράτα USE και σημάδεψε · μετά ΚΟΥΤΙΑ':this.message;
-    const text=this.count===0?'Apprentices: 0':`Apprentice 1 · ${instruction}`;if(this.status.textContent!==text)this.status.textContent=text;
+    const instruction=touch&&this.mode==='layout'?'Σύνδεσε τα κουτιά · OK για ανάθεση':touch&&this.mode==='point'&&this.phase==='idle'?'Κράτα USE και σημάδεψε τοίχο ή PVC':this.message;
+    const text=this.count===0?'Apprentices: 0':`${this.count===1?'Apprentice 1':`Apprentices ${this.count}`} · ${instruction}`;if(this.status.textContent!==text)this.status.textContent=text;
     for(const b of this.toolbar.querySelectorAll<HTMLButtonElement>('button')){
-      const action=b.dataset.apprentice;b.hidden=action==='layout'&&this.mode!=='point'||action==='confirm'&&this.mode!=='layout'||action==='cancel'&&this.mode==='off';
+      const action=b.dataset.apprentice;b.hidden=action==='layout'&&this.mode!=='point'||action==='confirm'&&this.mode!=='layout'||(action==='pipe-socket'||action==='pipe-switch')&&this.mode!=='pipe-choice'||action==='cancel'&&this.mode==='off';
       b.classList.toggle('selected',action===this.mode);
       if(action==='resume')b.hidden=this.phase!=='blocked';
       if(action==='cancel'&&this.phase==='blocked')b.hidden=false;
@@ -591,12 +681,41 @@ export class ApprenticeSystem {
     }
   }
   private drawPlan():void{
-    const ctx=this.paperCanvas.getContext('2d')!;ctx.fillStyle='#f4f1e5';ctx.fillRect(0,0,1024,768);ctx.strokeStyle='#d7dedc';ctx.lineWidth=1;
-    for(let x=32;x<1024;x+=32){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,768);ctx.stroke();}for(let y=32;y<768;y+=32){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(1024,y);ctx.stroke();}
-    ctx.fillStyle='#163b51';ctx.font='bold 42px sans-serif';ctx.fillText('ΗΛΕΚΤΡΟΛΟΓΙΚΟ ΣΧΕΔΙΟ',48,70);ctx.font='34px sans-serif';ctx.fillText('ΤΟΙΧΟΣ · ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ',48,116);
-    ctx.lineWidth=4;ctx.strokeStyle='#163b51';ctx.strokeRect(56,170,910,450);
-    if(this.job){const b=boxAssemblyBounds(this.job.modules),scale=Math.min(650/Math.max(.35,b.width),260/Math.max(.15,b.height));for(const m of this.job.modules){const s=boxModuleSize(m);ctx.strokeRect(512+(m.x-b.centerX-s.width/2)*scale,375-(m.y-b.centerY+s.height/2)*scale,s.width*scale,s.height*scale);ctx.font='bold 24px sans-serif';ctx.fillText(m.kind,500+(m.x-b.centerX)*scale,385-(m.y-b.centerY)*scale);}ctx.font='26px sans-serif';ctx.fillText(`Κέντρο κουτιών: ${Math.round(this.job.anchor.y*100)} cm από δάπεδο`,85,580);}else{ctx.font='28px sans-serif';ctx.fillText('T → περιοχή → κουτιά → OK',265,390);}
-    ctx.font='26px sans-serif';ctx.fillText('Πρίζα: 50 cm × 20     |     Switch: 140 cm × 20',48,692);
+    const ctx=this.paperCanvas.getContext('2d')!,w=1024,h=768;
+    ctx.fillStyle='#f4f1e5';ctx.fillRect(0,0,w,h);
+    ctx.strokeStyle='#dce3e0';ctx.lineWidth=1;
+    for(let x=32;x<w;x+=32){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke();}
+    for(let y=32;y<h;y+=32){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();}
+    ctx.fillStyle='#071c27';ctx.font='bold 43px sans-serif';ctx.fillText('ΗΛΕΚΤΡΟΛΟΓΙΚΟ ΣΧΕΔΙΟ',45,61);
+    ctx.font='26px sans-serif';ctx.fillText('ΜΠΡΟΣΤΙΝΟΣ ΤΟΙΧΟΣ · ΠΡΩΤΗ ΕΓΚΑΤΑΣΤΑΣΗ · PVC Ø20 mm',47,105);
+    const left=64,right=960,top=144,floor=546,mapX=(x:number)=>512+x*168,mapY=(y:number)=>floor-y*150;
+    ctx.fillStyle='#faf9f1';ctx.fillRect(left,top,right-left,floor-top);
+    ctx.strokeStyle='#456171';ctx.lineWidth=4;ctx.strokeRect(left,top,right-left,floor-top);
+    ctx.strokeStyle='#b3c4c8';ctx.lineWidth=2;
+    for(const height of [.3,1.2]){const y=mapY(height);ctx.setLineDash([7,9]);ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(right,y);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle='#456171';ctx.font='24px sans-serif';ctx.fillText(`${Math.round(height*100)} cm`,left+8,y-9);}
+    for(const point of this.game.mission.points){
+      if(point.definition.id.startsWith('extra-')&&!point.boxGroup.visible)continue;
+      const x=mapX(point.position.x),bottom=point.definition.bottom,boxWidth=Math.max(.074,point.boxGroup.groupWidth),boxHeight=point.boxGroup.groupHeight,y=mapY(bottom+boxHeight),installed=point.boxGroup.visible;
+      ctx.strokeStyle=installed?'#116995':'#6c8792';ctx.lineWidth=installed?4:3;ctx.setLineDash(installed?[]:[6,5]);ctx.strokeRect(x-boxWidth*75,y,boxWidth*150,boxHeight*150);ctx.setLineDash([]);
+      ctx.fillStyle='#173c4f';ctx.font='bold 25px sans-serif';ctx.textAlign='center';ctx.fillText(`${point.definition.id} · ${point.definition.kind==='switch'?'SW':'ΠΡ'}`,x,y-13);
+      ctx.font='22px sans-serif';ctx.fillText(`${Math.round(bottom*100)} cm`,x,y+boxHeight*150+27);
+      ctx.strokeStyle=point.conduit?'#116995':'#90aeb4';ctx.lineWidth=4;ctx.setLineDash(point.conduit?[]:[8,7]);ctx.beginPath();ctx.moveTo(x,mapY(bottom));ctx.lineTo(x,floor);ctx.stroke();ctx.setLineDash([]);
+    }
+    ctx.textAlign='left';
+    if(this.job){
+      const x=mapX(this.job.anchor.x),y=mapY(this.job.anchor.y);ctx.strokeStyle='#d19d12';ctx.lineWidth=5;ctx.strokeRect(x-29,y-29,58,58);ctx.fillStyle='#8b6412';ctx.font='bold 22px sans-serif';ctx.fillText(`ΕΝΤΟΛΗ: ${this.job.modules.map(m=>m.kind).join('+')}`,Math.min(x+35,695),Math.max(top+36,y-22));
+    }
+    ctx.fillStyle='#071c27';ctx.font='bold 29px sans-serif';ctx.fillText('ΚΟΠΕΣ ΓΙΑ ΤΟΝ ΒΟΗΘΟ',47,610);
+    ctx.font='26px sans-serif';ctx.fillText(`ΠΡΙΖΑ  ·  20 × 50 cm   |   έτοιμα ${this.pipeBatch.telemetry.finishedSocket}/20`,47,655);
+    ctx.fillText(`SWITCH · 20 × 140 cm  |   έτοιμα ${this.pipeBatch.telemetry.finishedSwitch}/20`,47,697);
+    ctx.fillStyle='#122f39';ctx.font='23px sans-serif';ctx.fillText('T: δείξε τοίχο ή μάτσα PVC   ·   E: διάταξη κουτιών   ·   OK: ανάθεση',47,739);
     this.paper.material.map!.needsUpdate=true;
+    const points=this.game.mission.points.filter(point=>!point.definition.id.startsWith('extra-')||point.boxGroup.visible);
+    const planPoints=points.map(point=>{
+      const x=250+point.position.x*82,y=215-point.definition.bottom*90;
+      const kind=point.definition.kind==='switch'?'SW':'ΠΡ';
+      return`<path d="M ${x} ${y+7} V 224" class="plan-route"/><rect x="${x-7}" y="${y-7}" width="14" height="14" class="plan-box"/><text x="${x}" y="${y-16}" text-anchor="middle">${point.definition.id} · ${kind}</text>`;
+    }).join('');
+    this.mobilePlan.innerHTML=`<h2>ΗΛΕΚΤΡΟΛΟΓΙΚΟ ΣΧΕΔΙΟ</h2><p>Μπροστινός τοίχος · PVC Ø20 mm</p><svg viewBox="0 0 500 245" role="img" aria-label="Θέσεις πριζών και διακόπτη στον μπροστινό τοίχο"><rect x="10" y="8" width="480" height="218" class="plan-wall"/><path d="M 10 107 H 490 M 10 188 H 490" class="plan-height"/>${planPoints}<text x="16" y="101">120 cm</text><text x="16" y="182">30 cm</text></svg><div class="mobile-plan-points">${points.map(point=>`<span><b>${point.definition.id}</b> ${point.definition.kind==='switch'?'switch':'πρίζα'} · ${Math.round(point.definition.bottom*100)} cm</span>`).join('')}</div><p class="mobile-plan-batch">Πρίζα: <b>${this.pipeBatch.telemetry.finishedSocket}/20 × 50 cm</b><br>Switch: <b>${this.pipeBatch.telemetry.finishedSwitch}/20 × 140 cm</b></p>${this.job?`<p class="mobile-plan-job">Τρέχουσα εντολή: ${this.job.modules.map(m=>m.kind).join(' + ')}</p>`:''}<p>T: δείξε τοίχο ή μάτσα PVC · E: διάταξη κουτιών · OK: ανάθεση</p>`;
   }
 }

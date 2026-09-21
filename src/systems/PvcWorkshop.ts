@@ -54,6 +54,7 @@ export class PvcWorkshop {
   phase:Phase='sealed';
   focused=false;
   rawCount:number=PVC.count;
+  apprenticeLease=false;
   installedCount=0;
   quantity=1;
   markingProgress=0;
@@ -93,6 +94,18 @@ export class PvcWorkshop {
 
   private get touch():boolean{return matchMedia('(pointer:coarse)').matches;}
   private instruction(desktop:string,touch:string):string{return this.touch?touch:desktop;}
+  claimForApprentice():boolean{
+    if(this.apprenticeLease)return true;
+    if(this.blocksWork||this.focused||!['sealed','loose','batch'].includes(this.phase))return false;
+    this.apprenticeLease=true;return true;
+  }
+  releaseApprentice():void{this.apprenticeLease=false;}
+  consumeRawForApprentice(bundle:number):boolean{
+    if(!this.apprenticeLease||bundle<0||bundle>=this.stock.bundleRemaining.length)return false;
+    const available=bundle===0?this.rawCount:this.stock.bundleRemaining[bundle];if(available<=0)return false;
+    if(bundle===0)this.rawCount--;
+    this.stock.setBundleRemaining(bundle,available-1);return true;
+  }
 
   constructor(private readonly game:Game){
     game.renderer.scene.add(this.stock,this.preparedRoot,this.previewRoot,this.targetGuide,this.securingRoot);
@@ -272,6 +285,7 @@ export class PvcWorkshop {
   }
   handleInput(dt:number,action:boolean,interaction:boolean):boolean{
     if(!this.game.started)return false;
+    if(this.apprenticeLease&&!this.focused)return false;
     for(const command of this.queue.splice(0))command();
     const wasBlocking=this.blocksWork;
     let startedFasteners=false;
@@ -426,7 +440,7 @@ export class PvcWorkshop {
       if(this.insertion===0){
         const count=Math.min(this.rawCount,Math.max(1,this.quantity));
         for(let i=0;i<count;i++){const mesh=new PvcTube();mesh.update(this.bend);this.prepared.push({recipe:this.bend.recipe(),mesh,cutFrom:0});this.preparedRoot.add(mesh);}
-        this.rawCount-=count;this.stock.pipes.forEach((p,i)=>p.visible=i<this.rawCount);
+        this.rawCount-=count;this.stock.setBundleRemaining(0,this.rawCount);
         // Production completes in the player's hand. One bent pipe continues
         // directly to installation; only the remainder is laid on the stack.
         this.carried=this.prepared.shift()??null;

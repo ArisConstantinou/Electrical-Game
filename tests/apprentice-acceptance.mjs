@@ -31,6 +31,7 @@ try{
   await page.keyboard.press('v');await step(2);
   assert.equal(await page.evaluate(()=>window.__wireTheHouse.player.crouched),before.crouched);
   assert.equal(await page.evaluate(()=>window.__wireTheHouse.apprentice.mode),'plan');
+  await page.screenshot({path:`${out}/${scenario}-plan.png`});
   if(scenario==='desktop'){
    await page.keyboard.press('Digit0');await step(2);await page.keyboard.press('t');await step(2);
    await page.mouse.down();await step(8);await page.mouse.up();await step(2);

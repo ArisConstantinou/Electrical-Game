@@ -10,6 +10,8 @@ const STOCK_BUNDLE_OFFSETS=[
   ...Array.from({length:6},(_,i)=>new THREE.Vector2(Math.cos(i*Math.PI/3)*.022,Math.sin(i*Math.PI/3)*.022)),
   ...Array.from({length:13},(_,i)=>{const angle=i*Math.PI*2/13+Math.PI/13;return new THREE.Vector2(Math.cos(angle)*.044,Math.sin(angle)*.044);}),
 ];
+export const PVC_BUNDLE_COUNT=5;
+const RESERVE_BUNDLE_Z=[.51,.82,1.47,1.78];
 export function part(parent:THREE.Object3D,g:THREE.BufferGeometry,m:THREE.Material,name:string,p=[0,0,0]):THREE.Mesh{
   const mesh=new THREE.Mesh(g,m);mesh.name=name;mesh.position.fromArray(p);mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);return mesh;
 }
@@ -50,6 +52,12 @@ export class PvcTube extends THREE.Mesh<THREE.BufferGeometry,THREE.MeshStandardM
 }
 export class PvcStock extends THREE.Group{
   readonly pipes:THREE.Group[]=[];readonly straps:THREE.Mesh[]=[];
+  readonly bundleRoots:THREE.Group[]=[];
+  readonly bundleRemaining=Array<number>(PVC_BUNDLE_COUNT).fill(PVC.count);
+  private readonly reserveMeshes:Array<{pipes:THREE.InstancedMesh;ends:THREE.InstancedMesh;straps:THREE.Mesh[]}>=[];
+  readonly bundleHighlight:THREE.Box3Helper;
+  private readonly bundleBox=new THREE.Box3();
+  private readonly bundleRay=new THREE.Raycaster();
   readonly straightedge=new THREE.Group();readonly marks:THREE.Mesh[]=[];
   readonly ruler=new THREE.Group();
   readonly liveMarks=new THREE.Group();
@@ -57,20 +65,36 @@ export class PvcStock extends THREE.Group{
   private spread=0;
   constructor(){
     super();this.name='PVC workshop · 20 × 3 m';this.userData.studioEntityId='pvc:workshop';
+    const original=new THREE.Group();original.name='PVC bundle 1 · 20 × 3 m';original.userData.pvcBundleIndex=0;this.bundleRoots.push(original);this.add(original);
     const pipeG=new THREE.CylinderGeometry(.01,.01,3,10,1,true),endG=new THREE.RingGeometry(.008,.01,10);
     for(let i=0;i<PVC.count;i++){
-      const group=new THREE.Group();group.userData.pvcStock=i;this.add(group);this.pipes.push(group);
+      const group=new THREE.Group();group.userData.pvcStock=i;original.add(group);this.pipes.push(group);
       part(group,pipeG,pvcMaterial,'3 m PVC length',[0,1.5,0]);
       for(const y of [0,3]){const end=part(group,endG,pvcMaterial,'Open pipe end',[0,y,0]);end.rotation.x=Math.PI/2;}
       const mark=part(group,new THREE.CylinderGeometry(.0103,.0103,.005,10,1,true),new THREE.MeshStandardMaterial({color:0x15191b,roughness:.85}),'Permanent marker ring');mark.visible=false;this.marks.push(mark);
     }
     const bandMaterial=new THREE.MeshStandardMaterial({color:0x1b7e78,roughness:.45});
     for(const y of [.4,1.5,2.6]){
-      const strap=part(this,new THREE.TorusGeometry(.055,.004,5,32),bandMaterial,'Rounded factory plastic strap');
+      const strap=part(original,new THREE.TorusGeometry(.055,.004,5,32),bandMaterial,'Rounded factory plastic strap');
       strap.position.copy(STOCK_CENTER).addScaledVector(STOCK_DIRECTION,y);
       strap.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),STOCK_DIRECTION);
       this.straps.push(strap);
     }
+    const dummy=new THREE.Object3D();
+    for(let bundle=1;bundle<PVC_BUNDLE_COUNT;bundle++){
+      const root=new THREE.Group();root.name=`PVC bundle ${bundle+1} · 20 × 3 m`;root.userData.pvcBundleIndex=bundle;root.position.set(STOCK_CENTER.x,STOCK_CENTER.y,RESERVE_BUNDLE_Z[bundle-1]);root.rotation.z=-STOCK_LEAN;this.add(root);this.bundleRoots.push(root);
+      const barrels=new THREE.InstancedMesh(pipeG,pvcMaterial,PVC.count);barrels.name='Individual 3 m hollow PVC tubes';barrels.castShadow=barrels.receiveShadow=true;root.add(barrels);
+      const ends=new THREE.InstancedMesh(endG,pvcMaterial,PVC.count*2);ends.name='Open PVC tube ends';root.add(ends);
+      for(let i=0;i<PVC.count;i++){
+        const offset=STOCK_BUNDLE_OFFSETS[i];dummy.position.set(offset.x,1.5,offset.y);dummy.rotation.set(0,0,0);dummy.updateMatrix();barrels.setMatrixAt(i,dummy.matrix);
+        for(let end=0;end<2;end++){dummy.position.set(offset.x,end*3,offset.y);dummy.rotation.set(Math.PI/2,0,0);dummy.updateMatrix();ends.setMatrixAt(i*2+end,dummy.matrix);}
+      }
+      barrels.instanceMatrix.needsUpdate=ends.instanceMatrix.needsUpdate=true;
+      const bands:THREE.Mesh[]=[];
+      for(const y of [.4,1.5,2.6]){const band=part(root,new THREE.TorusGeometry(.055,.004,5,32),bandMaterial,'Rounded factory plastic strap',[0,y,0]);band.rotation.x=Math.PI/2;bands.push(band);}
+      this.reserveMeshes.push({pipes:barrels,ends,straps:bands});
+    }
+    this.bundleHighlight=new THREE.Box3Helper(this.bundleBox,0xffda35);this.bundleHighlight.name='Selected PVC bundle highlight';this.bundleHighlight.visible=false;this.bundleHighlight.raycast=()=>{};this.add(this.bundleHighlight);
     const metal=new THREE.MeshStandardMaterial({color:0xa6b4b4,roughness:.4,metalness:.6});
     part(this.straightedge,new THREE.BoxGeometry(.66,.012,.04),metal,'Straightedge');
     part(this.straightedge,new THREE.BoxGeometry(.04,.025,.22),metal,'Carpenter square heel',[-.33,0,.09]);
@@ -82,6 +106,28 @@ export class PvcStock extends THREE.Group{
     part(this.ruler,new THREE.BoxGeometry(.026,.003,3),new THREE.MeshStandardMaterial({color:0xe7bc52,roughness:.65}),'3 m measuring tape');
     for(let i=0;i<=60;i++){const tick=part(this.ruler,new THREE.BoxGeometry(i%10===0?.025:.013,.001,.001),new THREE.MeshBasicMaterial({color:0x182020}),'5 cm tape graduation',[0,.002,-1.5+i*.05]);if(i%10===0){const t=label(`${i*5} cm`,.16,.026);t.rotation.x=-Math.PI/2;t.position.set(-.06,.006,tick.position.z);this.ruler.add(t);}}
     this.ruler.position.set(1.84,.028,1.15);this.ruler.visible=false;this.add(this.ruler);this.layout(0);
+  }
+  setBundleRemaining(index:number,count:number):void{
+    if(!Number.isInteger(index)||index<0||index>=PVC_BUNDLE_COUNT)throw new RangeError('Unknown PVC bundle');
+    const remaining=Math.max(0,Math.min(PVC.count,Math.floor(count)));this.bundleRemaining[index]=remaining;
+    if(index===0){this.pipes.forEach((pipe,i)=>pipe.visible=i<remaining);this.straps.forEach(strap=>strap.visible=remaining>0);}
+    else{const bundle=this.reserveMeshes[index-1];bundle.pipes.count=remaining;bundle.ends.count=remaining*2;bundle.straps.forEach(strap=>strap.visible=remaining>0);}
+  }
+  bundleCenter(index:number):THREE.Vector3{
+    if(!Number.isInteger(index)||index<0||index>=PVC_BUNDLE_COUNT)throw new RangeError('Unknown PVC bundle');
+    return new THREE.Vector3(STOCK_CENTER.x,STOCK_CENTER.y,index===0?STOCK_CENTER.z:RESERVE_BUNDLE_Z[index-1]);
+  }
+  bundleAt(camera:THREE.Camera,maxDistance=4.2):{index:number;point:THREE.Vector3}|null{
+    camera.updateMatrixWorld(true);this.updateMatrixWorld(true);this.bundleRay.setFromCamera(new THREE.Vector2(),camera);
+    const hit=this.bundleRay.intersectObjects(this.bundleRoots,true).find(hit=>hit.distance<=maxDistance);
+    if(!hit)return null;
+    let node:THREE.Object3D|null=hit.object;while(node&&!Number.isInteger(node.userData.pvcBundleIndex))node=node.parent;
+    return node?{index:node.userData.pvcBundleIndex as number,point:hit.point.clone()}:null;
+  }
+  highlightBundle(index:number|null):void{
+    this.bundleHighlight.visible=index!==null;
+    if(index===null)return;
+    this.bundleBox.setFromObject(this.bundleRoots[index]);this.bundleBox.expandByScalar(.015);this.bundleHighlight.updateMatrixWorld(true);
   }
   layout(progress:number):void{
     this.spread=progress;

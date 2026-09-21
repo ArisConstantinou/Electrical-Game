@@ -60,6 +60,7 @@ const SPRAY_COLORS = [
 ] as const;
 
 export class Game {
+  get isReadyForStart():boolean{return this.loopReady;}
   readonly hammerWorkStance = new HammerWorkStance();
   readonly renderer: Renderer;
   readonly input = new Input();
@@ -190,7 +191,7 @@ export class Game {
     addEventListener('wirehouse:graphics-lost',()=>{this.suspendLifecycle();if(!document.hidden)queueMicrotask(()=>void this.resumeLifecycle());});
     this.hud.onStart(() => {
       this.started = true;
-      if(this.apprentice.count===1){this.mixing.wheelbarrow.beginEmpty();this.apprentice.command('point');}
+      if(this.apprentice.count>=1){this.mixing.wheelbarrow.beginEmpty();this.apprentice.command('point');}
       else this.apprentice.command('cancel');
       if (matchMedia('(any-pointer: fine)').matches) this.desktopControls.requestLock(false);
     });
@@ -202,6 +203,7 @@ export class Game {
     this.ready = this.renderer.ready.then(async () => {
       await this.workerBody.ready;
       await this.apprentice.ready;
+      await this.apprentice.crewReady;
       await this.renderer.attachRoomWater(this.roomWater);
       this.renderer.setWarmupFactory(()=>this.mortar.createRenderWarmup());
       await this.renderer.prepareToolResources(this.mortar.createRenderWarmup());
