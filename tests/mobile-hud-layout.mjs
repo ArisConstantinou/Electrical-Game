@@ -12,22 +12,24 @@ try{for(const layout of layouts){
  await page.goto(url);await page.waitForFunction(()=>window.__wireTheHouse?.renderer.renderCamera,null,{timeout:120000});const click=async selector=>{await page.locator(selector).scrollIntoViewIfNeeded();await page.locator(selector)[layout.mobile?'tap':'click']();};await click('#start-button');await page.waitForTimeout(450);
  const tools={hammer:'Digit4',trowel:'Digit7',hose:'Digit8',spray:'Digit3'};
  for(const [tool,key] of Object.entries(tools)){
-  if(layout.mobile)await click(`[data-tool="${tool}"]`);else await page.keyboard.press(key);
+  if(layout.mobile){if(!await page.locator('#mobile-tool-slider').isVisible())await click('#site-pro-tools');await click(`#mobile-tool-slider [data-tool="${tool}"]`);}else await page.keyboard.press(key);
   await page.waitForFunction(tool=>window.__wireTheHouse.selectedTool===tool&&document.querySelector('#game-shell').dataset.activeTool===tool,tool);
+  if(layout.mobile)await click('#site-pro-tools');
   await page.waitForTimeout(150);
   const state=await page.evaluate(()=>{
    const bounds=e=>{const b=e.getBoundingClientRect();return{x:b.x,y:b.y,width:b.width,height:b.height,right:b.right,bottom:b.bottom};};
    const visible=e=>e.checkVisibility({checkOpacity:true,checkVisibilityCSS:true});
    return{tool:window.__wireTheHouse.selectedTool,settingsOpen:document.querySelector('#settings-toggle').getAttribute('aria-expanded'),pointerLock:document.pointerLockElement?.id??null,renderError:window.__wireTheHouse.renderer.renderError,overflow:document.documentElement.scrollWidth>innerWidth,
     buttons:[...document.querySelectorAll('#tool-quick-controls button,#aim-quick-controls button')].filter(visible).map(e=>({id:e.id,text:e.innerText,...bounds(e),font:Math.min(...[...e.querySelectorAll('span,b')].filter(visible).map(n=>parseFloat(getComputedStyle(n).fontSize)))})),
-    status:bounds(document.querySelector('#mobile-use-status')),rails:['#tool-quick-controls','#aim-quick-controls','#mobile-tool-slider'].map(id=>({id,...bounds(document.querySelector(id))})),look:bounds(document.querySelector('#look-joystick')),lookRadius:getComputedStyle(document.querySelector('#look-joystick')).borderRadius,actionText:document.querySelector('#mobile-action').textContent,oldAutoMenu:!!document.querySelector('#aim-control-mode'),aimMode:window.__wireTheHouse.aimInputMode,settings:bounds(document.querySelector('#settings-toggle')),
+    status:bounds(document.querySelector('#mobile-use-status')),rails:['#tool-quick-controls','#aim-quick-controls','#mobile-tool-slider'].map(id=>({id,...bounds(document.querySelector(id))})),look:bounds(document.querySelector('#look-joystick')),lookRadius:getComputedStyle(document.querySelector('#look-joystick')).borderRadius,use:bounds(document.querySelector('#site-pro-use')),actionText:document.querySelector('#mobile-action').textContent,oldAutoMenu:!!document.querySelector('#aim-control-mode'),aimMode:window.__wireTheHouse.aimInputMode,settings:bounds(document.querySelector('#settings-toggle')),
    };
   });
   report.cases.push({layout:layout.name,tool,state});
-  assert(!state.overflow);assert.equal(state.renderError,'');assert.equal(state.pointerLock,null);assert.equal(state.settingsOpen,'false');assert(!state.oldAutoMenu);assert.equal(state.actionText,'USE');
+  assert(!state.overflow);assert.equal(state.renderError,'');assert.equal(state.pointerLock,null);assert.equal(state.settingsOpen,'false');assert(!state.oldAutoMenu);assert.equal(state.actionText,'AIM');
   if(layout.mobile){
+   assert(state.use.width>=44&&state.use.height>=44,`${layout.name}: USE target too small`);
    for(const b of state.rails)assert(!(state.status.x<b.right&&state.status.right>b.x&&state.status.y<b.bottom&&state.status.bottom>b.y),`${layout.name}: use status overlaps ${b.id}`);
-   assert(Math.abs(state.look.width-state.look.height)<.5,'Use control is not circular');assert.equal(state.lookRadius,'50%');
+   assert(Math.abs(state.look.width-state.look.height)<.5,'AIM control is not circular');assert.equal(state.lookRadius,'50%');
    for(const b of state.buttons){assert(b.width>=44&&b.height>=44,`${b.id} touch target too small`);assert(b.font>=12,`${b.id} text too small`);}
    if(tool==='hammer')for(const id of ['quick-chisel-width','quick-chisel-tilt','quick-hammer-side','quick-hammer-speed']){const b=state.buttons.find(b=>b.id===id);assert(b&&b.x>=0&&b.right<=layout.width,`${layout.name}: essential ${id} not visible`);}
    const center={x:layout.width*.32,right:layout.width*.68,y:layout.height*.33,bottom:layout.height*.62};

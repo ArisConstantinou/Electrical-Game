@@ -36,7 +36,7 @@ try{
     const page=await context.newPage();page.on('pageerror',e=>report.errors.push(e.message));
     try{
       await page.goto(url);await page.waitForFunction(()=>window.__wireTheHouse?.renderer.renderCamera,{timeout:120000});
-      await page.locator('#start-button').tap();await page.waitForTimeout(1200);await page.locator('[data-tool="hammer"]').tap();await page.waitForFunction(()=>window.__wireTheHouse.selectedTool==='hammer');
+      await page.locator('#start-button').tap();await page.waitForTimeout(1200);await page.locator('#site-pro-tools').tap();await page.locator('#mobile-tool-slider [data-tool="hammer"]').tap();await page.waitForFunction(()=>window.__wireTheHouse.selectedTool==='hammer');
       await page.evaluate(({distance,yaw})=>{
         const g=window.__wireTheHouse,c=g.renderer.camera;
         window.__contactStep=g.step.bind(g);g.step=()=>{};
@@ -79,7 +79,7 @@ try{
         await step(page,30);
       }
       const initial=await state(page);
-      const b=await page.locator('#look-joystick').boundingBox(),action={x:b.x+b.width/2,y:b.y+b.height/2,id:2};
+      const b=await page.locator('#site-pro-use').boundingBox(),action={x:b.x+b.width/2,y:b.y+b.height/2,id:2};
       if(diagnostic)await page.evaluate(()=>{window.__wireTheHouse.input.actionHeld=true;});
       else await touch('touchStart',[action]);
       await step(page,240);
