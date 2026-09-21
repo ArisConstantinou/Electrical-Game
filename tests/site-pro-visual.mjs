@@ -7,9 +7,12 @@ const url = process.argv[2] ?? 'http://127.0.0.1:5365/Electrical-Game/';
 const output = process.argv[3] ?? 'output/site-pro-after';
 const checkSitePro = process.argv.includes('--site-pro');
 const sizes = [
+  { name: 'compact-mobile-portrait', width: 320, height: 740, touch: true },
   { name: 'mobile-portrait', width: 390, height: 844, touch: true },
+  { name: 'compact-mobile-landscape', width: 667, height: 375, touch: true },
   { name: 'mobile-landscape', width: 844, height: 390, touch: true },
   { name: 'tablet-portrait', width: 820, height: 1180, touch: true },
+  { name: 'tablet-landscape', width: 1180, height: 820, touch: true },
   { name: 'desktop', width: 1366, height: 768, touch: false },
 ];
 
@@ -50,11 +53,15 @@ try {
       await page.waitForFunction(() => window.__wireTheHouse.selectedTool === 'hammer');
       assert.equal(await button.getAttribute('aria-expanded'), 'false');
       assert.equal(await page.locator('#mobile-tool-slider').isVisible(), false);
+      await page.evaluate(() => window.__wireTheHouse.renderer.waitForFrame());
+      await page.screenshot({ path: `${output}/${size.name}-hammer.png` });
     } else if (checkSitePro) {
       assert.ok(state.controls['#site-pro-desktop-tools']?.visible, 'desktop hotbar unavailable');
       await page.locator('#site-pro-desktop-tools [data-tool="hammer"]').click();
       await page.waitForFunction(() => window.__wireTheHouse.selectedTool === 'hammer');
       assert.equal(await page.locator('#site-pro-desktop-tools [data-tool="hammer"]').getAttribute('class'), 'selected');
+      await page.evaluate(() => window.__wireTheHouse.renderer.waitForFrame());
+      await page.screenshot({ path: `${output}/${size.name}-hammer.png` });
     }
     report.cases.push({ name: size.name, state });
     await context.close();
