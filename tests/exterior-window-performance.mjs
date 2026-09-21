@@ -21,12 +21,13 @@ try {
   await page.evaluate(() => {
     const game = window.__wireTheHouse;
     const original = game.renderer.gpu.render.bind(game.renderer.gpu);
-    window.__windowProfile = { active: false, times: [], draws: [] };
+    window.__windowProfile = { active: false, times: [], draws: [], triangles: [] };
     game.renderer.gpu.render = (scene, camera) => {
       const result = original(scene, camera), profile = window.__windowProfile;
       if (profile.active && scene === game.renderer.scene && !game.renderer.gpu.getRenderTarget()) {
         profile.times.push(performance.now());
         profile.draws.push(game.renderer.webgl.info.render.calls);
+        profile.triangles.push(game.renderer.webgl.info.render.triangles);
       }
       return result;
     };
@@ -41,7 +42,7 @@ try {
       camera.rotation.set(pitch, yaw, 0, 'YXZ');
       game.player.yaw = yaw; game.player.pitch = pitch;
       window.__windowProfile.active = false;
-      window.__windowProfile.times = []; window.__windowProfile.draws = [];
+      window.__windowProfile.times = []; window.__windowProfile.draws = []; window.__windowProfile.triangles = [];
     }, pose);
     await page.waitForTimeout(300);
     await page.evaluate(() => { window.__windowProfile.active = true; });
@@ -52,6 +53,7 @@ try {
       const intervals = profile.times.slice(1).map((time, index) => time - profile.times[index]).sort((a, b) => a - b);
       return { frames: profile.times.length, p95Ms: intervals[Math.floor(intervals.length * .95)] ?? null,
         drawCalls: profile.draws.reduce((sum, value) => sum + value, 0) / profile.draws.length,
+        triangles: profile.triangles.reduce((sum, value) => sum + value, 0) / profile.triangles.length,
         renderError: game.renderer.renderError };
     });
     assert(sample.frames > 35 && sample.p95Ms < 40 && sample.drawCalls < 700 && !sample.renderError, `${pose.name}: ${JSON.stringify(sample)}`);

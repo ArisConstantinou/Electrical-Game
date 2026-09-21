@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { siteMaterial } from './SiteMaterials';
+import { brickFacePatch } from './BrickFacePatch';
+import { masonryFaceMaterial } from './BrickFaceMaterial';
 
 /** Real geometry beyond the unglazed left opening, with a small wind-driven canopy. */
 export class ExteriorCourtyard extends THREE.Group {
@@ -11,9 +13,21 @@ export class ExteriorCourtyard extends THREE.Group {
     super();
     this.name = 'Open-air residential construction courtyard';
     this.userData.studioEntityId = 'world:exterior-courtyard';
-    const earth = siteMaterial('floor', 0xc4b59c, 4.8, 3.2);
+    // Poly Haven gravelly sand is a 2.5 m-wide photographed outdoor surface.
+    // The same scan covers the courtyard and the smaller planted verge at its
+    // recorded physical scale, rather than tinting an interior cement floor.
+    const groundAlbedo = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}assets/site-materials/gravelly_sand-albedo-512.webp`);
+    groundAlbedo.colorSpace = THREE.SRGBColorSpace;
+    groundAlbedo.wrapS = groundAlbedo.wrapT = THREE.RepeatWrapping;
+    groundAlbedo.repeat.set(15.7 / 2.5, 17 / 2.5);
+    groundAlbedo.anisotropy = 4;
+    const earth = new THREE.MeshStandardMaterial({ name: 'Photographed compacted courtyard gravel', map: groundAlbedo, roughness: 1 });
+    const vergeAlbedo = groundAlbedo.clone();
+    vergeAlbedo.repeat.set(3.12 / 2.5, .53 / 2.5);
+    const vergeSoil = new THREE.MeshStandardMaterial({ name: 'Photographed dry planting soil', map: vergeAlbedo, roughness: 1 });
     const plaster = siteMaterial('plaster', 0xf2e8d5, 2.6, 1.4);
     const concrete = siteMaterial('concrete', 0xdbd6c9, 1.8, 1.4);
+    const paving = siteMaterial('floor', 0xe2ddd4, .4, .4);
     const recess = new THREE.MeshStandardMaterial({ color: 0x4b504a, roughness: 1 });
     const steel = new THREE.MeshStandardMaterial({ color: 0x444844, metalness: .45, roughness: .65 });
     const bark = new THREE.MeshStandardMaterial({ color: 0x786a56, roughness: 1 });
@@ -43,37 +57,65 @@ export class ExteriorCourtyard extends THREE.Group {
       parent.add(mesh); return mesh;
     };
 
-    block('Compacted courtyard ground', earth, -11.7, -.105, 0, 15.7, .21, 17, false);
+    const groundGeometry = new THREE.PlaneGeometry(15.7, 17, 32, 34);
+    groundGeometry.rotateX(-Math.PI / 2);
+    const groundPositions = groundGeometry.getAttribute('position');
+    for (let i = 0; i < groundPositions.count; i++) {
+      const x = groundPositions.getX(i), z = groundPositions.getZ(i);
+      const height = .010 * Math.sin(x * .83 + z * .27) + .007 * Math.sin(z * 1.37 - x * .41)
+        + .003 * Math.sin(x * 4.7 + z * 3.1);
+      groundPositions.setY(i, height);
+    }
+    groundGeometry.computeVertexNormals();
+    const ground = new THREE.Mesh(groundGeometry, earth);
+    ground.name = 'Compacted courtyard ground';
+    ground.position.x = -11.7;
+    ground.receiveShadow = true;
+    ground.raycast = () => undefined;
+    this.add(ground);
     // Separate concrete pads and a low curb establish measurable distances
     // between the nearby opening, planting strip and neighbouring building.
     const padGeometry = new THREE.BoxGeometry(.78, .055, .82);
-    const pads = new THREE.InstancedMesh(padGeometry, concrete, 15);
+    const pads = new THREE.InstancedMesh(padGeometry, paving, 15);
     const matrix = new THREE.Matrix4();
+    const padTint = new THREE.Color();
     for (let i = 0; i < 15; i++) {
       matrix.makeTranslation(-4.7 - Math.floor(i / 3) * .88, -.006, -1.18 + (i % 3) * .92);
       pads.setMatrixAt(i, matrix);
+      const shade = .90 + ((i * .61803398875) % 1) * .10;
+      pads.setColorAt(i, padTint.setRGB(shade, shade * .99, shade * .97));
     }
     pads.name = 'Separate walkable courtyard paving slabs';
     pads.receiveShadow = true; pads.raycast = () => undefined; pads.computeBoundingSphere(); this.add(pads);
     block('Raised planted verge', concrete, -6.6, .11, 2.80, 3.25, .22, .62);
-    block('Dry soil in planted verge', earth, -6.6, .23, 2.80, 3.12, .025, .53, false);
+    block('Dry soil in planted verge', vergeSoil, -6.6, .23, 2.80, 3.12, .025, .53, false);
     block('Courtyard boundary wall', new THREE.MeshStandardMaterial({color:0x898176,roughness:1}), -11.6, .63, 2.72, .36, 1.26, 3.8);
     block('Cast coping on boundary wall', concrete, -11.6, 1.31, 2.72, .49, .09, 3.95);
-    const boundaryBricks = new THREE.InstancedMesh(new THREE.BoxGeometry(.045, .091, .235), siteMaterial('clay', 0xc59676), 168);
+    const boundaryGeometry = new THREE.BoxGeometry(.045, .091, .235);
+    const boundaryPatches = new Float32Array(168 * 4);
+    boundaryGeometry.setAttribute('brickPatch', new THREE.InstancedBufferAttribute(boundaryPatches, 4));
+    const boundaryBricks = new THREE.InstancedMesh(boundaryGeometry, masonryFaceMaterial, 168);
     for (let i = 0; i < 168; i++) {
       const row = Math.floor(i / 14), column = i % 14;
       matrix.makeTranslation(-11.385, .075 + row * .101, .91 + column * .263 + (row % 2) * .09);
       boundaryBricks.setMatrixAt(i, matrix);
+      boundaryPatches.set(brickFacePatch(row, column, 4), i * 4);
     }
     boundaryBricks.name = 'Individual clay courses on courtyard boundary';
     boundaryBricks.castShadow = boundaryBricks.receiveShadow = true;
     boundaryBricks.raycast = () => undefined; boundaryBricks.computeBoundingSphere(); this.add(boundaryBricks);
     const grass = new THREE.InstancedMesh(new THREE.ConeGeometry(.024, .30, 4), new THREE.MeshStandardMaterial({color:0x788363,roughness:1,side:THREE.DoubleSide}), 55);
     const grassTint = new THREE.Color();
+    const grassPosition = new THREE.Vector3(), grassRotation = new THREE.Quaternion(), grassScale = new THREE.Vector3();
     for (let i = 0; i < 55; i++) {
-      const x = -8.02 + i * .053, z = 2.8 + Math.sin(i * 2.17) * .15;
-      matrix.makeTranslation(x, .25 + (i % 6) * .018, z); grass.setMatrixAt(i, matrix);
-      grass.setColorAt(i, grassTint.setRGB(.79+i%4*.025, .82+i%5*.025, .65+i%3*.04));
+      const x = -8.05 + ((i * .61803398875) % 1) * 2.90;
+      const z = 2.8 + Math.sin(i * 2.17) * .20;
+      const height = .10 + ((i * .41421356237) % 1) * .15;
+      grassPosition.set(x, .24 + height / 2, z);
+      grassRotation.setFromEuler(new THREE.Euler(Math.sin(i * 1.37) * .24, i * 2.40, Math.cos(i * 1.91) * .20));
+      grassScale.set(.65 + i % 3 * .11, height / .30, .65 + i % 4 * .08);
+      grass.setMatrixAt(i, matrix.compose(grassPosition, grassRotation, grassScale));
+      grass.setColorAt(i, grassTint.setRGB(.72+i%4*.025, .78+i%5*.025, .62+i%3*.04));
     }
     grass.name = 'Sparse plants in soil around olive trunk'; grass.raycast = () => undefined;
     grass.computeBoundingSphere(); this.add(grass);
@@ -88,9 +130,9 @@ export class ExteriorCourtyard extends THREE.Group {
       block('Neighbour facade below open bays', plaster, facadeX, base + .43, 0, wallThickness, .86, facadeWidth);
       block('Neighbour facade lintel band', plaster, facadeX, base + 2.40, 0, wallThickness, .48, facadeWidth);
       for (const [z, width] of [[-4.415, 1.57], [-.25, 2.44], [4.165, 2.07]] as const)
-        block('Solid masonry between neighbouring openings', plaster, facadeX, base + 1.52, z, wallThickness, 1.10, width);
+        block('Solid masonry between neighbouring openings', plaster, facadeX, base + 1.51, z, wallThickness, 1.30, width);
       for (const z of [-2.55, 2.05]) {
-        block('Deep unglazed room behind exterior opening', recess, facadeX - .30, base + 1.52, z, .035, 1.10, 2.16, false);
+        block('Deep unglazed room behind exterior opening', recess, facadeX - .30, base + 1.51, z, .035, 1.30, 2.16, false);
         block('Cast sill under exterior opening', concrete, facadeX + .04, base + .86, z, .46, .09, 2.28);
         block('Cast lintel over exterior opening', concrete, facadeX + .04, base + 2.11, z, .46, .12, 2.28);
       }

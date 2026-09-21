@@ -3,28 +3,11 @@ import { GAME_CONFIG } from '../data/gameConfig';
 import { INSTALLATION_POINTS } from '../data/installationRules';
 import { BrickWall } from './BrickWall';
 import { brickFacePatch } from './BrickFacePatch';
+import { masonryFaceMaterial } from './BrickFaceMaterial';
 import { addLighting } from './Lighting';
 import { matteMaterial, siteMaterial, siteProScreedMaterial } from './SiteMaterials';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { ExteriorCourtyard } from './ExteriorCourtyard';
-import { attribute, texture as sampleTexture, uv } from 'three/tsl';
-import { MeshStandardNodeMaterial } from 'three/webgpu';
-
-// Poly Haven "Red Brick" by Rob Tuytel, CC0: https://polyhaven.com/a/red_brick
-// Individual photographed clay faces are assigned to physical bricks; the
-// source image's baked mortar is never laid over the game's real joints.
-const brickFace = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}assets/masonry/red-brick-polyhaven-1k.jpg`);
-brickFace.colorSpace = THREE.SRGBColorSpace;
-brickFace.anisotropy = 8;
-brickFace.wrapS = brickFace.wrapT = THREE.RepeatWrapping;
-const brickMaterial = (): MeshStandardNodeMaterial => {
-  const material = new MeshStandardNodeMaterial({ roughness: 1 });
-  material.name = 'Varied photographed fired-clay units';
-  const patch = attribute<'vec4'>('brickPatch', 'vec4');
-  material.colorNode = sampleTexture(brickFace, uv().mul(patch.zw).add(patch.xy)).rgb;
-  return material;
-};
-const masonryFaceMaterial = brickMaterial();
 
 const concreteBeam = (size: THREE.Vector3, material: THREE.Material): THREE.Mesh => {
   const geometry = new THREE.BoxGeometry(size.x, size.y, size.z);
