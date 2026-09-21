@@ -23,6 +23,23 @@ html, body { background: #151a1d; }
 .screen-panel h1 span { color: #ffda28; }
 #site-pro-tools { display: none; }
 #site-pro-use { display: none; }
+#site-pro-desktop-tools { display: none; }
+
+@media (hover:hover) and (pointer:fine) and (min-width:761px) {
+  #top-hud { width: min(370px, calc(100% - 44px)); }
+  #desktop-key-guide { border-left: 3px solid #ffda28; }
+  #desktop-key-guide kbd { border-color: #79898b; background: #303a3d; }
+  #tool-status b.selected { border-color: #ffda28; color: #fff4b0; background: #51491f; }
+  #site-pro-desktop-tools { position: absolute; z-index: 5; right: max(18px, env(safe-area-inset-right)); bottom: max(18px, env(safe-area-inset-bottom)); display: flex; gap: 5px; padding: 5px; border: 1px solid #9aa8aa99; border-radius: 9px; background: #192126eb; box-shadow: 0 8px 24px #0009; backdrop-filter: blur(5px); pointer-events: auto; }
+  #site-pro-desktop-tools button { position: relative; width: 72px; height: 66px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 7px 3px 4px; border: 1px solid #82909299; border-radius: 5px; color: #e8efed; background: #263036; cursor: pointer; }
+  #site-pro-desktop-tools button.selected { border-color: #ffda28; color: #fff7c6; background: #48421e; box-shadow: inset 0 0 0 1px #ffda28; }
+  #site-pro-desktop-tools button:hover { border-color: #ffda28; }
+  #site-pro-desktop-tools button:focus-visible { outline: 3px solid #ffda28; outline-offset: 2px; }
+  #site-pro-desktop-tools kbd { position: absolute; top: 3px; left: 4px; color: #fff; font: 800 12px/1 'Barlow Condensed', Arial, sans-serif; }
+  #site-pro-desktop-tools svg { width: 26px; height: 26px; fill: none; stroke: #ffda28; stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
+  #site-pro-desktop-tools span { font: 800 12px/1 'Barlow Condensed', Arial, sans-serif; letter-spacing: .04em; }
+  #game-shell:is(.settings-open,.leveling-active,.mixing-active,[data-box-assembly="true"]) #site-pro-desktop-tools { display: none; }
+}
 
 @media (pointer:coarse), (max-width:760px) {
   #top-hud { top: max(10px, env(safe-area-inset-top)); left: max(10px, env(safe-area-inset-left)); width: min(322px, calc(100% - 78px)); min-height: 54px; padding: 9px 12px; border-left-width: 3px; }

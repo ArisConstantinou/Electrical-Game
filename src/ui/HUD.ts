@@ -108,6 +108,13 @@ export class HUD {
             <div><kbd>0</kbd><span>DRILL</span><kbd>B</kbd><span>DRIVER</span><kbd>L</kbd><span>LASER</span></div>
             <div><kbd>T</kbd><span>POINT</span><kbd>V</kbd><span>PLAN</span><kbd>SHIFT T / R</kbd><span>CHISEL / ANGLE</span><kbd>F</kbd><span>FULLSCREEN</span></div>
           </aside>
+          <nav id="site-pro-desktop-tools" aria-label="Common tools and their existing keyboard shortcuts">
+            <button type="button" data-tool="spray" aria-label="Spray, keyboard 3"><kbd>3</kbd><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M10 9h11l3 5v14H7V14zM12 4h8v5h-8zM24 11h5M26 7l4-2M26 15l4 2"/></svg><span>SPRAY</span></button>
+            <button type="button" data-tool="hammer" aria-label="Hammer, keyboard 4"><kbd>4</kbd><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 8h17l5 5-5 5H5zM16 18v11"/></svg><span>HAMMER</span></button>
+            <button type="button" data-tool="fitting" aria-label="Box fitting, keyboard 5"><kbd>5</kbd><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="5" y="6" width="22" height="21" rx="2"/><circle cx="16" cy="16.5" r="5"/><path d="M8 10h3M21 10h3"/></svg><span>BOX</span></button>
+            <button type="button" data-tool="trowel" aria-label="Trowel, keyboard 7"><kbd>7</kbd><svg viewBox="0 0 32 32" aria-hidden="true"><path d="m3 27 5-17 14 9zM15 15l5-7 8-4"/></svg><span>TROWEL</span></button>
+            <button type="button" data-tool="measure" aria-label="Tape measure, keyboard 9"><kbd>9</kbd><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 5h17a5 5 0 0 1 5 5v10H5zM8 20v8h11M12 6v7M17 6v4M22 6v7M8 24h4"/><circle cx="17" cy="14" r="3"/></svg><span>MEASURE</span></button>
+          </nav>
           <div id="mortar-panel" class="hud-card" hidden>
             <strong id="mortar-readout"></strong><div id="water-gun-readout" hidden></div>
             <div id="mortar-flow" data-quality="ready" data-holding="false">

@@ -30,7 +30,7 @@ try {
     await page.waitForTimeout(500);
     const state = await page.evaluate(() => {
       const bounds = selector => { const element = document.querySelector(selector); if (!element) return null; const r = element.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height, right: r.right, bottom: r.bottom, visible: element.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) }; };
-      return { viewport: { width: innerWidth, height: innerHeight }, scrollWidth: document.documentElement.scrollWidth, objective: document.querySelector('#objective-compact')?.textContent, tool: window.__wireTheHouse.selectedTool, renderError: window.__wireTheHouse.renderer.renderError, controls: Object.fromEntries(['#top-hud', '#settings-toggle', '#joystick', '#look-joystick', '#site-pro-use', '#site-pro-tools', '#mobile-tool-slider'].map(id => [id, bounds(id)])) };
+      return { viewport: { width: innerWidth, height: innerHeight }, scrollWidth: document.documentElement.scrollWidth, objective: document.querySelector('#objective-compact')?.textContent, tool: window.__wireTheHouse.selectedTool, renderError: window.__wireTheHouse.renderer.renderError, controls: Object.fromEntries(['#top-hud', '#settings-toggle', '#joystick', '#look-joystick', '#site-pro-use', '#site-pro-tools', '#mobile-tool-slider', '#site-pro-desktop-tools'].map(id => [id, bounds(id)])) };
     });
     assert.ok(!state.renderError, `${size.name}: renderer error`);
     assert.ok(state.scrollWidth <= state.viewport.width + 1, `${size.name}: horizontal overflow`);
@@ -50,6 +50,11 @@ try {
       await page.waitForFunction(() => window.__wireTheHouse.selectedTool === 'hammer');
       assert.equal(await button.getAttribute('aria-expanded'), 'false');
       assert.equal(await page.locator('#mobile-tool-slider').isVisible(), false);
+    } else if (checkSitePro) {
+      assert.ok(state.controls['#site-pro-desktop-tools']?.visible, 'desktop hotbar unavailable');
+      await page.locator('#site-pro-desktop-tools [data-tool="hammer"]').click();
+      await page.waitForFunction(() => window.__wireTheHouse.selectedTool === 'hammer');
+      assert.equal(await page.locator('#site-pro-desktop-tools [data-tool="hammer"]').getAttribute('class'), 'selected');
     }
     report.cases.push({ name: size.name, state });
     await context.close();
