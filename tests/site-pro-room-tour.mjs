@@ -22,6 +22,7 @@ const views = [
   { name: 'open-left-window', x: -1.45, z: 2.0, yaw: Math.PI / 2, pitch: -.04 },
   { name: 'near-open-window', x: -2.90, z: 2.0, yaw: Math.PI / 2, pitch: -.04 },
   { name: 'neighbour-through-opening', x: -2.90, z: 2.0, yaw: 1.1, pitch: -.04 },
+  { name: 'far-house-through-opening', x: -2.90, z: 1.2, yaw: 1.68, pitch: -.04 },
 ];
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch({ channel: 'chrome', headless: true });

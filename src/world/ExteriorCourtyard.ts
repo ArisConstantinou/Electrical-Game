@@ -213,7 +213,7 @@ export class ExteriorCourtyard extends THREE.Group {
     const farHouse = new THREE.Group(); farHouse.name = 'Residence beyond courtyard boundary';
     farHouse.position.set(-13.3, 0, 2.1); this.add(farHouse); parent = farHouse;
     const warmPlaster = siteMaterial('plaster', 0xe0bb98, 1.9, 1.2);
-    const darkInside = new THREE.MeshStandardMaterial({ color: 0x464137, roughness: 1 });
+    const roomPlaster = siteMaterial('plaster', 0xc2b8aa, 1.4, 1.1);
     const terracotta = siteMaterial('clay', 0xb97255, 1.3, 1);
     const farShapes = new Map<THREE.Material, Array<{ position: THREE.Vector3; scale: THREE.Vector3 }>>();
     const farBlock = (material: THREE.Material, x: number, y: number, z: number, sx: number, sy: number, sz: number): void => {
@@ -225,13 +225,22 @@ export class ExteriorCourtyard extends THREE.Group {
     farBlock(warmPlaster, 0, 2.27, 0, .32, .42, 6.3);
     for (const [z, width] of [[-2.68, .94], [-.87, .83], [.94, .83], [2.68, .94]] as const)
       farBlock(warmPlaster, 0, 1.51, z, .32, 1.24, width);
+    // The one-storey house has a three-metre shell behind the front masonry,
+    // with separate unfinished rooms visible through its unglazed openings.
+    farBlock(roomPlaster, -2.75, 1.30, 0, .22, 2.60, 6.3);
+    for (const z of [-3.10, -.895, .895, 3.10])
+      farBlock(roomPlaster, -1.37, 1.30, z, 2.75, 2.60, .16);
+    farBlock(concrete, -1.37, .085, 0, 2.95, .17, 6.45);
     for (const z of [-1.79, 0, 1.79]) {
-      farBlock(darkInside, -.24, 1.51, z, .025, 1.24, .97);
       farBlock(concrete, .09, .91, z, .50, .075, 1.06);
       farBlock(concrete, -.035, 1.51, z - .52, .26, 1.24, .055);
       farBlock(concrete, -.035, 1.51, z + .52, .26, 1.24, .055);
+      farBlock(roomPlaster, -.84, 1.51, z - .50, 1.55, 1.24, .09);
+      farBlock(roomPlaster, -.84, 1.51, z + .50, 1.55, 1.24, .09);
+      farBlock(concrete, -.84, .875, z, 1.55, .09, .98);
+      farBlock(concrete, -.84, 2.145, z, 1.55, .09, .98);
     }
-    farBlock(concrete, .12, 2.52, 0, .66, .17, 6.55);
+    farBlock(concrete, -1.20, 2.52, 0, 3.50, .17, 6.55);
     farBlock(terracotta, .10, 2.65, 0, .68, .12, 6.72);
     for (const [material, shapes] of farShapes) {
       const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), material, shapes.length);
@@ -240,7 +249,7 @@ export class ExteriorCourtyard extends THREE.Group {
         const shape = shapes[i];
         mesh.setMatrixAt(i, matrix.compose(shape.position, new THREE.Quaternion(), shape.scale));
       }
-      mesh.castShadow = material !== darkInside; mesh.receiveShadow = true;
+      mesh.castShadow = true; mesh.receiveShadow = true;
       mesh.raycast = () => undefined; mesh.computeBoundingSphere(); farHouse.add(mesh);
     }
     const drain = new THREE.Mesh(new THREE.CylinderGeometry(.037, .037, 2.65, 8), steel);
