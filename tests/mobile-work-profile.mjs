@@ -19,12 +19,14 @@ try{
    if(label==='game.step'){if(p.rotate){g.player.yaw=Math.sin(performance.now()*.0016)*.3;}if(p.active)p.frames.push(performance.now());}
    const start=performance.now();try{return original.apply(this,args);}finally{if(p.active){const a=p.methods[label]??={calls:0,total:0,worst:0};const d=performance.now()-start;a.calls++;a.total+=d;a.worst=Math.max(a.worst,d);}}
   };};
-  for(const [object,prefix,names] of [[g,'game',['step','performAction']],[g.fpsRig,'rig',['update','contact','poseArms','poseTrowel','aimWaterGun']],[g.chasing,'debris',['update','spawnDebris','overlapsWall','hasWallSupport','supportContact']],[g.room.brickWall,'wall',['aim','removeAtAim','processPendingSupport','flushPendingMeshes']],[g.mortar,'mortar',['update','preview','coverage','swing']],[g.roomWater,'water',['update']],[g.renderer,'render',['render']]])for(const name of names)wrap(object,name,prefix+'.'+name);
+  for(const [object,prefix,names] of [[g,'game',['step','performAction']],[g.player,'player',['update']],[g.fpsRig,'rig',['update','contact','poseArms','poseTrowel','aimWaterGun','constrainWorkSurfaces']],[g.workerBody,'body',['update']],[g.chasing,'debris',['update','spawnDebris','overlapsWall','hasWallSupport','supportContact']],[g.room.brickWall,'wall',['aim','removeAtAim','processPendingSupport','flushPendingMeshes']],[g.mortar,'mortar',['update','preview','coverage','swing','flushWetGeometry']],[g.roomWater,'water',['update']],[g.boxPlacement,'box',['update','target']],[g.boxFitPreview,'fit',['update']],[g.mixing,'mixing',['update','present']],[g.pvc,'pvc',['present','handleInput']],[g.apprentice,'apprentice',['update','presentPlayer']],[g.hud,'hud',['update','updateMobileUseStatus','updateMortar','updateWaterGun','updateWorkReticle']],[g.renderer,'render',['render']]])for(const name of names)wrap(object,name,prefix+'.'+name);
+  if(location.search.includes('bodyDiagnostic'))for(const name of ['fitThumb','fitFinger','pinchBox','poseBoxGrasps','wrapGrip','limb','posePipeGrip'])wrap(g.workerBody,name,'body.'+name);
   const render=g.renderer.gpu.render.bind(g.renderer.gpu);
   g.renderer.gpu.render=(scene,camera)=>{const result=render(scene,camera);if(p.active&&scene===g.renderer.scene&&!g.renderer.gpu.getRenderTarget()){p.draws.push(g.renderer.webgl.info.render.calls);p.presentations.push(performance.now());}return result;};
  });
  const cdp=await context.newCDPSession(page);
- for(const [tool,held,rotate] of [['spray',false,true],['hammer',true,true],['trowel',false,true],['hose',true,true],['fitting',false,true],['level',false,true],['spring',false,true],['cutter',false,true]]){
+ const stages=url.includes('bodyDiagnostic')?[['spray',false,true],['hose',true,true],['fitting',false,true]]:[['spray',false,true],['hammer',true,true],['trowel',false,true],['hose',true,true],['fitting',false,true],['level',false,true],['spring',false,true],['cutter',false,true]];
+ for(const [tool,held,rotate] of stages){
   await page.evaluate(tool=>window.dispatchEvent(new CustomEvent('wirehouse:select-tool',{detail:tool})),tool);
   await page.waitForFunction(tool=>window.__wireTheHouse.selectedTool===tool,tool);
   await page.evaluate(rotate=>{window.__workProfile.rotate=rotate;},rotate);
