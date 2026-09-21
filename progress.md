@@ -1,5 +1,13 @@
 Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web game named WIRE THE HOUSE, based on real Cyprus residential first-fix practices, editable in Web Game Studio, playable on desktop/mobile, deployed to arisconstantinou/Electrical-Game via GitHub Pages, and ending at FIRST FIX COMPLETE without cable pulling.
 
+## 2026-09-21 · Apprentice construction continuation
+
+- User authorized this phase by saying Continue and confirmed GPT-5.6 Sol / High. The isolated `codex/apprentice-demo` branch adds physical mixing, initially empty cart filling, wall mortar contact and installed/bonded confirmed boxes.
+- The worker uses finite water/cement/sand sources and the existing 60 L drum; ready mortar moves by visible bucket trips to a 114 kg capacity cart. Wall deposits consume only accepted cart mass. A station lease prevents concurrent player use of owned material; blocked work can resume or cancel without erasing carried mortar.
+- Final compiled-browser fast full-chain test passes with 46 real wall strikes, 114 kg cart fill, 3.977948 kg applied to wall and conserved, zero trowel-tip error, installed bonded boxes and no page errors. Intermediate recipe doses were accelerated only in this diagnostic; an earlier full unaccelerated run completed all 18 cement and 36 sand trips before the final fit refinement. A focused actual contact/box test passes on the final refinement.
+- Apprentice zero/one desktop and portrait/landscape emulation, player mixing/tool switching on three layouts, batch supply, fit preflight, navigation, typecheck, production build and the bundled web-game client pass. The stock full box-placement UI test still fails its early cleared-slot fixture at the physical wall stop; the focused apprentice placement and fit-preflight checks pass. Idle Apprentice 1 adds about 236 draw calls and 644k triangles in headless desktop comparison; mobile hardware performance remains unmeasured.
+- The compiled candidate is served on the existing 5365 listener. Its earlier validated sample remains in ignored `output/apprentice/baseline-dist`. The protected integration checkout was not changed. Later pipe bundles/batches, full plan and multiple workers remain in the original request, outside this phase.
+
 ## 2026-09-21 · Apprentice sample in isolated checkout
 
 - Approved scope: one Apprentice; T points and draws a yellow highlight; existing live hand-built box assembly; OK authorizes the worker to fetch a hammer, walk, and physically demolish the selected route/recess. V displays the current instruction drawing. Later mixing, wheelbarrow filling, box installation, pipe batches and multiple helpers are explicitly NOT implemented in this sample.

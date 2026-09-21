@@ -103,6 +103,23 @@ export class Wheelbarrow {
     this.velocity.set(0,0,0);this.driving=true;this.state='driving';return true;
   }
   release():void{this.mobileFast=false;this.panel.querySelector('#cart-fast')?.setAttribute('aria-pressed','false');this.driving=false;this.velocity.set(0,0,0);if(this.state==='driving')this.state='parked';this.game.player.crouched=this.savedCrouch;}
+  /** Select the genuinely empty vessel before the first Apprentice job starts. */
+  beginEmpty():boolean{
+    if(this.driving||this.state!=='parked'||this.handAction||this.parcels.length||this.shovelKg>0||this.consumedKg>0)return false;
+    this.massKg=0;this.mortarSlump.reset(0xa770ce);return true;
+  }
+  /** Accept only mortar actually removed from a ready source batch. */
+  receiveFromBatch(batch:import('./MortarBatch').MortarBatch,requested:number):number{
+    if(this.state!=='parked'||this.handAction||!batch.ready)return 0;
+    const amount=Math.min(Math.max(0,requested),this.capacityKg-this.massKg);
+    if(amount<=0)return 0;
+    const transferred=batch.consumeKg(amount);this.massKg+=transferred;return transferred;
+  }
+  receiveCarried(available:number):number{
+    if(this.state!=='parked'||this.handAction||!Number.isFinite(available)||available<=0)return 0;
+    const received=Math.min(available,this.capacityKg-this.massKg);
+    this.massKg+=received;return received;
+  }
   consume(amount:number):number{if(this.state!=='parked')return 0;const take=Math.min(Math.max(0,amount),this.massKg);this.massKg-=take;this.consumedKg+=take;return take;}
   scoop(point:THREE.Vector3):boolean{
     if(this.shovelKg>0||this.handAction||!this.parcels.some(p=>p.settled&&p.mass>0&&p.position.distanceTo(point)<.6))return false;

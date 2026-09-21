@@ -26,6 +26,14 @@ export class MixingStation {
   readonly models = createMixingStationModels();
   readonly drum=new DrumMixer(this.models.concreteMixer);
   private destination:'bucket'|'drum'='bucket';
+  apprenticeLease=false;
+  private apprenticeDrumOwned=false;
+  claimForApprentice():boolean{
+    if(this.apprenticeLease)return true;
+    if(this.active||this.carrying||this.activity||this.mixingNow||this.batch.massKg>0||(this.drum.batch.massKg>0&&!this.apprenticeDrumOwned)||this.wheelbarrow.busy)return false;
+    this.apprenticeLease=true;this.apprenticeDrumOwned=true;return true;
+  }
+  releaseApprentice():void{this.apprenticeLease=false;}
   private activityDestination:'bucket'|'drum'='bucket';
   private get workingBatch():MortarBatch{return this.destination==='drum'?this.drum.batch:this.batch;}
   private get activityBatch():MortarBatch{return this.activityDestination==='drum'?this.drum.batch:this.batch;}
@@ -68,7 +76,7 @@ export class MixingStation {
   private automaticCrouch=false;
   private readonly activationDistance=2.8;
   private readonly mobileInteract:HTMLButtonElement|null;
-  private readonly stationTrowel:THREE.Group;
+  readonly stationTrowel:THREE.Group;
   private activity:Activity=null;
   private activityTime=0;
   private activityStep=0;
@@ -173,6 +181,8 @@ export class MixingStation {
   }
   get interactionTargeted():boolean{return this.game.hud.shell.dataset.mixingInteract==='true';}
   setActive(value:boolean):void{
+    if(value&&this.apprenticeLease)return;
+    if(value)this.apprenticeDrumOwned=false;
     if(!this.game.started)return;
     if(value&&this.game.boxAssemblyActive)window.dispatchEvent(new CustomEvent('wirehouse:box-exit-assembly'));
     if(!value&&this.automaticCrouch){this.game.player.crouched=false;this.automaticCrouch=false;}
@@ -191,6 +201,7 @@ export class MixingStation {
     this.game.input.resetTransientInput();
   }
   chooseTool(tool:MixingTool):void{
+    if(this.apprenticeLease)return;
     if(this.wheelbarrow.busy||this.wheelbarrow.recovering)return;
     if(this.carrying&&tool!=='hands'){this.message='Άφησε πρώτα τη σύκλα στο δάπεδο.';return;}
     // World pickups and toolbar actions both finish the current finite deposit,
@@ -273,6 +284,7 @@ export class MixingStation {
     return Boolean(this.aimedObject());
   }
   handleInteractionRequest(requested:boolean,explicitInteract=true):boolean{
+    if(this.apprenticeLease)return Boolean(requested&&this.aimedObject());
     if(this.wheelbarrow.driving){if(requested&&explicitInteract)this.wheelbarrow.release();return true;}
     if(this.wheelbarrow.busy||this.wheelbarrow.recovering)return true;
     if(!requested)return false;
@@ -447,7 +459,7 @@ export class MixingStation {
   /** Called only when the wrist actually releases; failed or cancelled throws use no mortar. */
   get canSupplyScoop():boolean{return Boolean(this.supplyBatch||this.wheelbarrow.massKg>0&&this.wheelbarrow.state==='parked')&&!this.blocksWork&&!this.inserted;}
   reserveScoop(requested:number):number{
-    if(!Number.isFinite(requested)||requested<=0||this.blocksWork||this.inserted)return 0;
+    if(!Number.isFinite(requested)||requested<=0||this.blocksWork||this.inserted||this.apprenticeLease)return 0;
     const batch=this.supplyBatch;
     if(batch){this.finished=true;this.customSupply=true;this.uiKey='';return batch.consumeKg(requested);}
     const amount=this.wheelbarrow.consume(requested);
@@ -497,7 +509,7 @@ export class MixingStation {
     if(this.active&&this.tool!=='shovel'&&distance>this.activationDistance+1.2)this.setActive(false);
     this.receipt.update(this.workingBatch,this.game.started&&this.active,dt,this.destination==='drum'?this.drum.running?`Μπετονιέρα σε λειτουργία · ${Math.round(this.drum.batch.mixProgress*100)}%`:this.drum.batch.ready?'Έτοιμο · FINISH για χρήση':'20 L νερό · 18 μιστριές τσιμέντο · 36 φτυαριές άμμο':this.recipeHint(),this.destination==='drum'?'ΣΤΗ ΜΠΕΤΟΝΙΕΡΑ':'ΣΤΗ ΣΥΚΛΑ');
     const aimed=this.aimedObject();this.updateToolHighlights(aimed);const prompt=this.promptFor(aimed),interactAvailable=Boolean(prompt);this.prompt.hidden=!prompt;this.prompt.textContent=prompt;
-    const mixingUiAvailable=!this.wheelbarrow.busy&&stageNearby&&(!this.game.boxAssemblyActive||interactAvailable);
+    const mixingUiAvailable=!this.apprenticeLease&&!this.wheelbarrow.busy&&stageNearby&&(!this.game.boxAssemblyActive||interactAvailable);
     this.toolbelt.hidden=!mixingUiAvailable;
     this.game.hud.shell.classList.toggle('mixing-stage',mixingUiAvailable);
     this.game.hud.shell.classList.toggle('mixing-target',interactAvailable);
