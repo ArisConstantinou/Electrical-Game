@@ -31,7 +31,11 @@ try{for(const layout of layouts){
    for(const b of state.rails)assert(!(state.status.x<b.right&&state.status.right>b.x&&state.status.y<b.bottom&&state.status.bottom>b.y),`${layout.name}: use status overlaps ${b.id}`);
    assert(Math.abs(state.look.width-state.look.height)<.5,'AIM control is not circular');assert.equal(state.lookRadius,'50%');
    for(const b of state.buttons){assert(b.width>=44&&b.height>=44,`${b.id} touch target too small`);assert(b.font>=12,`${b.id} text too small`);}
-   if(tool==='hammer')for(const id of ['quick-chisel-width','quick-chisel-tilt','quick-hammer-side','quick-hammer-speed']){const b=state.buttons.find(b=>b.id===id);assert(b&&b.x>=0&&b.right<=layout.width,`${layout.name}: essential ${id} not visible`);}
+   if(tool==='hammer')for(const id of ['quick-chisel-width','quick-chisel-tilt','quick-hammer-side','quick-hammer-speed']){
+    const button=page.locator(`#${id}`);await button.scrollIntoViewIfNeeded();const b=await button.boundingBox();
+    assert(b&&b.width>=44&&b.height>=44&&b.x>=0&&b.x+b.width<=layout.width,`${layout.name}: essential ${id} cannot be reached`);
+    assert(await button.evaluate(el=>{const r=el.getBoundingClientRect();return document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)?.closest(`#${el.id}`)===el;}),`${layout.name}: essential ${id} is covered`);
+   }
    const center={x:layout.width*.32,right:layout.width*.68,y:layout.height*.33,bottom:layout.height*.62};
    for(const b of state.buttons.filter(b=>b.x>=0&&b.right<=layout.width))assert(!(b.x<center.right&&b.right>center.x&&b.y<center.bottom&&b.bottom>center.y),`${layout.name}: ${b.id} covers central wall`);
    const expected={hammer:['quick-chisel-width','quick-chisel-tilt','quick-hammer-side','quick-hammer-speed'],spray:['quick-tool-mode','quick-spray-color'],hose:['quick-water-flow'],trowel:['quick-loft-down','quick-loft-up','quick-work-height']};
