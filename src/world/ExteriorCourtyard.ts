@@ -107,8 +107,9 @@ export class ExteriorCourtyard extends THREE.Group {
     rail.name = 'Individual balcony railing uprights'; rail.castShadow = true; rail.raycast = () => undefined;
     rail.computeBoundingSphere(); neighbour.add(rail);
     block('Balcony top rail', steel, facadeX + 1.07, 3.66, 0, .033, .032, 7.35);
-    // Beyond the low brick boundary, a second residence has its own depth,
-    // punched apertures and roof profile. No broad background wall is used.
+    // Beyond the low brick boundary, a single-storey residence has its own
+    // depth and punched apertures. Its lower roof leaves actual sky visible
+    // through the room's open window instead of filling it with a facade.
     const farHouse = new THREE.Group(); farHouse.name = 'Residence beyond courtyard boundary';
     farHouse.position.set(-13.3, 0, 2.1); this.add(farHouse); parent = farHouse;
     const warmPlaster = siteMaterial('plaster', 0xe0bb98, 1.9, 1.2);
@@ -131,9 +132,7 @@ export class ExteriorCourtyard extends THREE.Group {
       farBlock(concrete, -.035, 1.51, z + .52, .26, 1.24, .055);
     }
     farBlock(concrete, .12, 2.52, 0, .66, .17, 6.55);
-    farBlock(warmPlaster, 0, 3.32, 0, .32, 1.40, 6.3);
-    farBlock(terracotta, .10, 4.18, 0, .68, .18, 6.72);
-    farBlock(warmPlaster, -.10, 4.47, 0, .29, .43, 6.3);
+    farBlock(terracotta, .10, 2.65, 0, .68, .12, 6.72);
     for (const [material, shapes] of farShapes) {
       const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), material, shapes.length);
       mesh.name = `Batched far-residence ${material.name || material.type} structure`;
@@ -144,8 +143,8 @@ export class ExteriorCourtyard extends THREE.Group {
       mesh.castShadow = material !== darkInside; mesh.receiveShadow = true;
       mesh.raycast = () => undefined; mesh.computeBoundingSphere(); farHouse.add(mesh);
     }
-    const drain = new THREE.Mesh(new THREE.CylinderGeometry(.037, .037, 4.1, 8), steel);
-    drain.name = 'Rainwater downpipe with wall offset'; drain.position.set(.23, 2.05, 2.88);
+    const drain = new THREE.Mesh(new THREE.CylinderGeometry(.037, .037, 2.65, 8), steel);
+    drain.name = 'Rainwater downpipe with wall offset'; drain.position.set(.23, 1.325, 2.88);
     drain.castShadow = true; drain.raycast = () => undefined; farHouse.add(drain);
     parent = this;
 
