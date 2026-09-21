@@ -182,6 +182,31 @@ export class ExteriorCourtyard extends THREE.Group {
     rail.name = 'Individual balcony railing uprights'; rail.castShadow = true; rail.raycast = () => undefined;
     rail.computeBoundingSphere(); neighbour.add(rail);
     block('Balcony top rail', steel, facadeX + 1.07, 3.66, 0, .033, .032, 7.35);
+    // Each cast/plastered piece must sample the scan at one world-space scale.
+    // Repeating the full photograph on a 9 cm sill and a 10 m facade made the
+    // formwork grain change size abruptly at every structural connection.
+    const continuousPlaster = siteMaterial('plaster', 0xf2e8d5);
+    const continuousConcrete = siteMaterial('concrete', 0xf0ece5);
+    if (continuousConcrete.map) {
+      continuousConcrete.map = continuousConcrete.map.clone();
+      continuousConcrete.map.offset.x = .18;
+    }
+    neighbour.traverse(object => {
+      if (!(object instanceof THREE.Mesh) || object instanceof THREE.InstancedMesh) return;
+      if (object.material !== plaster && object.material !== concrete) return;
+      const positions = object.geometry.getAttribute('position');
+      const normals = object.geometry.getAttribute('normal');
+      const uvs = object.geometry.getAttribute('uv');
+      for (let i = 0; i < positions.count; i++) {
+        const x = positions.getX(i) + object.position.x;
+        const y = positions.getY(i) + object.position.y;
+        const z = positions.getZ(i) + object.position.z;
+        const nx = Math.abs(normals.getX(i)), ny = Math.abs(normals.getY(i));
+        if (ny > .5) uvs.setXY(i, x / 4, z / 4);
+        else uvs.setXY(i, (nx > .5 ? z : x) / 4, y / 4);
+      }
+      object.material = object.material === plaster ? continuousPlaster : continuousConcrete;
+    });
     // Beyond the low brick boundary, a single-storey residence has its own
     // depth and punched apertures. Its lower roof leaves actual sky visible
     // through the room's open window instead of filling it with a facade.
