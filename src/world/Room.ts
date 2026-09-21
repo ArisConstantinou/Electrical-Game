@@ -299,9 +299,8 @@ export class Room extends THREE.Group {
   }
 
   private addWallHeadBeams(): void {
-    // The brick infill terminates below a continuous cast-concrete ring beam.
-    // Its upper half enters the slab; the lower edge is a visible construction
-    // joint, so clay no longer intersects the ceiling as two unrelated skins.
+    // A shallow cast-concrete perimeter return hides the top clay course and
+    // meets the slab without a second, heavily patterned hanging beam.
     const width = GAME_CONFIG.room.width, depth = GAME_CONFIG.room.depth;
     const material = siteMaterial('concrete', 0xf0ede7);
     const beams = new THREE.Group();
@@ -312,13 +311,13 @@ export class Room extends THREE.Group {
       { x: width / 2 - .035, z: 0, sx: .27, sz: depth },
     ];
     for (const part of parts) {
-      const beam = concreteBeam(new THREE.Vector3(part.sx, .22, part.sz), material);
-      beam.position.set(part.x, 2.89, part.z);
+      const beam = concreteBeam(new THREE.Vector3(part.sx, .08, part.sz), material);
+      beam.position.set(part.x, GAME_CONFIG.room.height - .04, part.z);
       beam.castShadow = beam.receiveShadow = true;
       beam.raycast = () => undefined;
       beams.add(beam);
     }
-    beams.name = 'Cast concrete ring beam joining brick walls to ceiling slab';
+    beams.name = 'Concrete slab perimeter bearing on brick walls';
     this.add(beams);
   }
 
@@ -339,17 +338,6 @@ export class Room extends THREE.Group {
     cuts.computeBoundingSphere();
     this.add(cuts);
 
-    const beams = new THREE.Group();
-    const beamMaterial = siteMaterial('concrete', 0xf0ede7);
-    for (const z of [-2.65, .1, 2.65]) {
-      const beam = concreteBeam(new THREE.Vector3(width, .17, .24), beamMaterial);
-      beam.position.set(0, GAME_CONFIG.room.height - .085, z);
-      beam.castShadow = beam.receiveShadow = true;
-      beam.raycast = () => undefined;
-      beams.add(beam);
-    }
-    beams.name = 'Downstand concrete ceiling beams';
-    this.add(beams);
   }
 
   private addFloorReturns(): void {
