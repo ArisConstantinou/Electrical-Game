@@ -195,14 +195,18 @@ export class BrickWall extends THREE.Group {
     return this.strike(camera);
   }
   private strike(camera: THREE.Camera): MasonryImpact | null {
-    const start = performance.now();
     let contact = this.contactProvider?.(camera) ?? null;
     if (!this.contactProvider) {
       const hit = this.aim(camera);
       if (hit) contact = {point: hit.point, direction: camera.getWorldDirection(new THREE.Vector3()), edge: new THREE.Vector3(Math.cos(this.chiselEdgeAngle), Math.sin(this.chiselEdgeAngle), 0), energyJ: this.chiselEnergyJ, chisel: this.chiselType};
     }
     if (!contact) return null;
-    const result = this.volume.impact({ ...contact, widthM: this.chiselWidthM, trim: this.chiselTiltDegrees < 0 });
+    return this.strikeContact(contact);
+  }
+  /** Independent workers submit physical contact without replacing the player's provider. */
+  strikeContact(contact: ChiselContact): MasonryImpact | null {
+    const start = performance.now();
+    const result = this.volume.impact({ ...contact, widthM: contact.widthM ?? this.chiselWidthM, trim: this.chiselTiltDegrees < 0 });
     if (!result.contact) return null;
     this.lastResult = result;
     this.impactCount++;

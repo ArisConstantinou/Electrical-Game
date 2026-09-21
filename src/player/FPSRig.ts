@@ -871,7 +871,7 @@ export class FPSRig extends THREE.Group {
     }
     return retracted;
   }
-  private restHammer(camera:THREE.Camera):void {
+  restHammer(camera:THREE.Camera):void {
     this.reachable=false;this.chiselInAir=true;
     this.presentedFeedOffset=null;
     this.feedOffset.set(0,0,0);

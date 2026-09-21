@@ -1,0 +1,21 @@
+.start-actions {width:min(620px,100%);grid-template-columns:minmax(0,1fr) auto;}
+.start-utilities {grid-column:1/-1;}
+.apprentice-count {display:flex;align-items:center;gap:12px;padding:12px 20px;background:#24352ee8;border:1px solid #728879;border-radius:10px;font-size:18px;font-weight:700;color:#fff;}
+.apprentice-count select {font:inherit;color:#fff;background:#172b22;border:1px solid #91a997;border-radius:6px;padding:10px;min-width:65px;}
+#apprentice-controls {position:absolute;left:50%;top:110px;transform:translateX(-50%);z-index:15;width:max-content;max-width:calc(100% - 32px);padding:10px 14px;border:1px solid #e2be54;border-radius:10px;background:#17231eed;color:#fff;pointer-events:auto;font-size:16px;}
+#apprentice-controls[hidden] {display:none;}
+.apprentice-status {text-align:center;max-width:600px;margin-bottom:8px;line-height:1.4;}
+[data-apprentice-mode="layout"] #apprentice-controls {left:auto;right:24px;transform:none;max-width:calc(100% - 480px);}
+[data-apprentice-mode="point"] #tool-status > *, [data-apprentice-mode="plan"] #tool-status > * {display:none;}
+[data-apprentice-mode="point"] #tool-status::after, [data-apprentice-mode="plan"] #tool-status::after {content:attr(data-directive);font-size:16px;}
+[data-apprentice-mode="point"] #box-supply, [data-apprentice-mode="plan"] #box-supply,
+[data-apprentice-mode="point"] #tool-quick-controls, [data-apprentice-mode="plan"] #tool-quick-controls,
+[data-apprentice-mode="layout"] #box-fit-size, [data-apprentice-mode="layout"] #box-fit-status, [data-apprentice-mode="layout"] #box-fit-legend {display:none;}
+[data-apprentice-mode="layout"] #interaction-prompt, [data-apprentice-mode="point"] #interaction-prompt, [data-apprentice-mode="plan"] #interaction-prompt {display:none;}
+.apprentice-actions {display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
+.apprentice-actions button {padding:8px 12px;font-size:14px;min-height:38px;border:1px solid #768b7d;border-radius:6px;background:#283d31;color:#fff;cursor:pointer;}
+.apprentice-actions button.selected {background:#f0cb4a;color:#19291e;border-color:#ffdf70;}
+.apprentice-actions button[hidden] {display:none;}
+@media(max-width:600px){.start-actions {grid-template-columns:1fr;}.apprentice-count {justify-content:center;font-size:16px;}#apprentice-controls {top:100px;padding:8px;width:calc(100% - 32px);font-size:14px;}.apprentice-actions {gap:4px;}.apprentice-actions button {font-size:12px;padding:7px 9px;}}
+@media(max-width:900px){[data-apprentice-mode="layout"] #apprentice-controls {left:16px;right:16px;top:96px;max-width:calc(100% - 32px);width:auto;}}
+@media(pointer:coarse) and (orientation:landscape){#apprentice-controls,[data-apprentice-mode="layout"] #apprentice-controls {top:65px;left:128px;right:98px;max-width:none;width:auto;transform:none;padding:5px 8px;font-size:14px;}.apprentice-status {margin-bottom:3px;}.apprentice-actions button {min-height:30px;padding:5px 10px;font-size:12px;}}

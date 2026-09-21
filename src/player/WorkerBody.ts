@@ -12,6 +12,33 @@ export class WorkerBody extends THREE.Group {
   readonly ready:Promise<void>;
   loaded=false;
   overview=false;
+  /** Applied after the normal free-arm solve; no held tool is needed. */
+  poseDirective(camera:THREE.PerspectiveCamera, paper=false):void {
+    if(!this.loaded)return;
+    const direction=new THREE.Vector3(-.55,.25,-1).normalize().applyQuaternion(camera.quaternion);
+    for(const side of (paper?['R','L']:['R'])){
+      const sign=side==='R'?1:-1;
+      const wrist=camera.localToWorld(new THREE.Vector3(sign*(paper?.245:.17),paper?-.32:-.19,paper?-.47:-.43));
+      this.limb('upper_arm.'+side,'forearm.'+side,'hand.'+side,wrist,new THREE.Vector3(sign,-1,0));
+      const frame=this.handFrames.get(side)!;
+      const along=paper?new THREE.Vector3(-sign*.45,.89,0).normalize().applyQuaternion(camera.quaternion):direction;
+      const radial=paper?new THREE.Vector3(.89,sign*.45,0).normalize().applyQuaternion(camera.quaternion):new THREE.Vector3(-sign,0,0).applyQuaternion(camera.quaternion);
+      radial.addScaledVector(along,-radial.dot(along)).normalize();
+      const basis=new THREE.Matrix4().makeBasis(radial,along,radial.clone().cross(along).normalize());
+      this.worldRotation(this.bone('hand.'+side),new THREE.Quaternion().setFromRotationMatrix(basis).multiply(frame.basis));
+      for(const digit of ['index','middle','ring','little'])for(let j=1;j<=3;j++){
+        const bone=this.bone(`${digit}.0${j}.${side}`);
+        bone.quaternion.copy(this.rest.get(bone)!.q);
+        if(paper||digit!=='index')bone.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(this.fingerAxes.get(`${digit}.0${j}.${side}`)!,[.8,1.15,.7][j-1]));
+      }
+      if(paper){
+        const p=(x:number,y:number,z:number)=>camera.localToWorld(new THREE.Vector3(sign*x,y,z));
+        for(const [digit,y]of [['index',-.235],['middle',-.255],['ring',-.275],['little',-.293]] as const)this.fitFinger(digit,side,p(.207,y,-.528),false);
+        this.fitThumb(side,p(.192,-.28,-.486));
+      }
+    }
+    this.updateMatrixWorld(true);for(const skeleton of this.skeletons)skeleton.update();
+  }
   private bones=new Map<string,THREE.Bone>();
   private skeletons=new Set<THREE.Skeleton>();
   private graspHistory:GraspHistory|undefined;

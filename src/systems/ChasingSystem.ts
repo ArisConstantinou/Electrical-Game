@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GAME_CONFIG } from '../data/gameConfig';
 import type { InstallationPoint } from '../electrical/InstallationPoint';
-import type { BrickWall, MasonryImpact } from '../world/BrickWall';
+import type { BrickWall, MasonryImpact, ChiselContact } from '../world/BrickWall';
 import { splitDebrisGeometry } from './splitDebrisGeometry';
 
 interface Particle {
@@ -98,6 +98,12 @@ export class ChasingSystem {
   }
 
   canFitBoxes(point: InstallationPoint): boolean { return this.wall.canFitBoxes(point); }
+
+  hitContact(contact: ChiselContact): MasonryImpact | null {
+    const impact = this.wall.strikeContact(contact);
+    if (impact) this.spawnDebris(impact);
+    return impact;
+  }
 
   positionBoxAtAim(point: InstallationPoint, camera: THREE.Camera): boolean {
     const origin = camera.getWorldPosition(new THREE.Vector3());
@@ -459,14 +465,17 @@ export class ChasingSystem {
           if (processed % 32 === 0 && performance.now() - start >= budgetMs) return processed;
         }
         if (job.cursor === triangleCount) {
-          const geometry = particle.mesh.geometry, canonical = new THREE.BufferGeometry();
-          // Attributes remain shared and untouched; the canonical geometry never
-          // enters the renderer and therefore owns no duplicate GPU buffers.
-          for (const name of Object.keys(geometry.attributes)) canonical.setAttribute(name, geometry.getAttribute(name));
-          canonical.boundingBox = geometry.boundingBox?.clone() ?? null;
-          canonical.boundingSphere = geometry.boundingSphere?.clone() ?? null;
+          const canonical = particle.mesh.geometry, indexed = new THREE.BufferGeometry();
+          // Changing an already rendered geometry from non-indexed to indexed
+          // leaves WebGPU's cached render object without an index GPUBuffer.
+          // A new geometry identity rebuilds that binding; physics retains the
+          // original solid and both views share the untouched attributes.
+          for (const name of Object.keys(canonical.attributes)) indexed.setAttribute(name, canonical.getAttribute(name));
+          indexed.boundingBox = canonical.boundingBox?.clone() ?? null;
+          indexed.boundingSphere = canonical.boundingSphere?.clone() ?? null;
+          indexed.setIndex(new THREE.BufferAttribute(job.indices, 1));
           particle.canonicalGeometry = canonical;
-          geometry.setIndex(new THREE.BufferAttribute(job.indices, 1));
+          particle.mesh.geometry = indexed;
           this.boundaryJobs.delete(particle);
         }
       } else {
