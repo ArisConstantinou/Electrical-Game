@@ -330,7 +330,7 @@ export class Game {
     this.laserLevel.update(this.renderer.camera,this.selectedTool,this.started&&!blockingWork&&this.input.actionHeld,dt,(point,normal)=>this.fpsRig.canReachPoint(this.renderer.camera,point,.10,normal));
     this.audio.setContinuous('spray',this.started&&!blockingWork&&this.selectedTool==='spray'&&this.input.actionHeld);
     this.audio.setContinuous('hose',waterHeld);
-    this.audio.setContinuous('drill',this.selectedTool==='drill'&&this.laserLevel.working);
+    this.audio.setContinuous('drill',this.pvc.phase==='fastener-drilling'||this.selectedTool==='drill'&&this.laserLevel.working);
     this.audio.setContinuous('driver',this.selectedTool==='driver'&&this.laserLevel.working);
     this.audio.setContinuous('trowel',mortarTool&&this.selectedTool==='trowel'&&this.input.actionHeld&&!this.mortar.throwFeedback.overheld,.7+this.mortar.charge*.3);
     this.audio.setContinuous('mixer',this.mixing.mixerRunning);
@@ -397,7 +397,7 @@ export class Game {
     this.pvc.present();
     this.workerBody.overview=this.frontBodyView||this.modelInspector.live;
     const bodyPlayer=this.mixing.wheelbarrow.driving?{eyeHeight:1.65,velocity:this.player.velocity,yaw:this.mixing.wheelbarrow.telemetry.yaw+Math.PI,pitch:-.60}:this.pvc.focused?{eyeHeight:this.renderer.camera.position.y,velocity:this.player.velocity,yaw:this.player.yaw,pitch:this.player.pitch}:this.player;
-    const clearPipeLayout=this.pvc.focused&&['spreading','marking'].includes(this.pvc.phase)&&!this.workerBody.overview;
+    const clearPipeLayout=this.pvc.focused&&['spreading','marking','fastener-marking'].includes(this.pvc.phase)&&!this.workerBody.overview;
     if(!clearPipeLayout&&(this.selectedTool!=='hose'||mixingOwnedInput||pvcOwnedInput))this.workerBody.update(dt,this.renderer.camera,bodyPlayer,this.fpsRig,this.selectedTool,this.input.actionHeld,mixingOwnedInput||this.pvc.blocksWork,this.pvc.blocksWork?this.pvc.anatomicalGrips():this.mixing.anatomicalGrips(),this.workSurfaces.frontForBounds);
     this.mixing.useAnatomicalBody(this.workerBody.loaded);
     this.pvc.useAnatomicalBody();

@@ -8,13 +8,16 @@ import { PvcBend,PVC,type PipeRecipe } from './PvcBend';
 import { PvcStock,PvcTube,part,pvcMaterial } from './PvcModels';
 import { springLeadPoint } from './PvcLead';
 import {DEFAULT_PVC_PRESETS,PVC_PRESET_KEY,readPvcPresets,type PvcPreset} from './PvcPresets';
+import {buildHeldRebar,buildPvcDrill12,buildRebarHug,buildRebarPliers} from './PvcSecuringModels';
 import '../ui/PvcWorkshop.css';
 
-type Phase='sealed'|'opening'|'loose'|'spreading'|'marking'|'spring'|'inserting'|'bending'|'review'|'extracting'|'batch'|'carrying'|'fitting'|'cutting'|'cut'|'installing';
+type Phase='sealed'|'opening'|'loose'|'spreading'|'marking'|'spring'|'inserting'|'bending'|'review'|'extracting'|'batch'|'carrying'|'fitting'|'cutting'|'cut'|'installing'|'fastener-marking'|'fastener-drilling'|'fastener-insert-ready'|'fastener-inserting'|'fastener-tighten-ready'|'fastener-tightening';
 interface StockPipe{recipe:PipeRecipe;mesh:PvcTube;cutFrom:number}
+interface FastenerHole{side:-1|1;y:number;marker:THREE.Group;drilled:boolean}
+interface FastenerPair{left:FastenerHole;right:FastenerHole;rebar:THREE.Mesh}
 const v=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z);
-const workPhases:Phase[]=['opening','spreading','marking','spring','inserting','bending','review','extracting','fitting','cutting','cut','installing'];
-const animated:Phase[]=['opening','spreading','inserting','extracting','cutting','installing'];
+const workPhases:Phase[]=['opening','spreading','marking','spring','inserting','bending','review','extracting','fitting','cutting','cut','installing','fastener-marking','fastener-drilling','fastener-insert-ready','fastener-inserting','fastener-tighten-ready','fastener-tightening'];
+const animated:Phase[]=['opening','spreading','inserting','extracting','cutting','installing','fastener-drilling','fastener-inserting','fastener-tightening'];
 export class PvcWorkshop {
   readonly stock=new PvcStock();
   readonly work=new THREE.Group();
@@ -32,6 +35,12 @@ export class PvcWorkshop {
   readonly controls:HTMLElement;
   readonly markConfirm:HTMLButtonElement;
   readonly zoomControl:HTMLButtonElement;
+  readonly drillControl:HTMLButtonElement;
+  readonly securingRoot=new THREE.Group();
+  readonly securingCursor=new THREE.Group();
+  readonly drill=buildPvcDrill12();
+  readonly heldRebar=buildHeldRebar();
+  readonly rebarPliers=buildRebarPliers();
   customPresets:PvcPreset[]=[];
   transparent=false;
   readonly prompt:HTMLButtonElement;
@@ -56,6 +65,11 @@ export class PvcWorkshop {
   private canvasHold=false;
   private markingActive=false;
   private fitZoomed=false;
+  private fastenerAim={x:-.72,y:.72};
+  private fastenerHoles:FastenerHole[]=[];
+  private fastenerPairs:FastenerPair[]=[];
+  private fastenerIndex=0;
+  private fastenerProgress=0;
   private shapeKey='';
   private message='';
   private readonly cameraDestination=v();
@@ -74,12 +88,14 @@ export class PvcWorkshop {
   private instruction(desktop:string,touch:string):string{return this.touch?touch:desktop;}
 
   constructor(private readonly game:Game){
-    game.renderer.scene.add(this.stock,this.preparedRoot,this.previewRoot,this.targetGuide);
+    game.renderer.scene.add(this.stock,this.preparedRoot,this.previewRoot,this.targetGuide,this.securingRoot);
     this.targetGuide.name='PVC eligible box guide';this.targetGuide.visible=false;this.targetGuide.renderOrder=30;this.targetGuide.raycast=()=>{};
     const guideMaterial=this.targetGuide.material as THREE.LineBasicMaterial;guideMaterial.depthTest=false;guideMaterial.transparent=true;guideMaterial.opacity=.95;
     game.room.traverse(o=>{if(o.userData.studioEntityId==='world:site-spare-pvc')o.visible=false;});
     this.work.name='PVC physical working piece';this.work.userData.studioEntityId='pvc:held-work';
-    game.renderer.scene.add(this.work);this.work.add(this.pipe,this.spring,this.cutter,this.marker);
+    game.renderer.scene.add(this.work);this.work.add(this.pipe,this.spring,this.cutter,this.marker,this.drill,this.heldRebar,this.rebarPliers);
+    this.securingRoot.name='PVC drilled rebar fasteners';this.securingCursor.name='Fastener hole aiming cursor';this.securingRoot.add(this.securingCursor);
+    for(const side of [-1,1]){const ring=new THREE.Mesh(new THREE.TorusGeometry(.011,.0018,5,24),new THREE.MeshBasicMaterial({color:0xff453a,depthTest:false}));ring.name='Valid 12 mm hole cursor';ring.rotation.y=Math.PI/2;ring.position.x=side*.002;ring.renderOrder=40;this.securingCursor.add(ring);}
     this.spring.name='135 galvanized spring turns · 400 mm';this.spring.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.cable=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([v(),v(-.12,-.12),v(-.3,-.22),v(-.45,-.24)]),32,.003,6,false),new THREE.MeshStandardMaterial({color:0x252c30,roughness:.66}));
     this.cable.name='Spring retrieval cable · 2 m · 6 mm';this.work.add(this.cable);
@@ -94,12 +110,14 @@ export class PvcWorkshop {
     this.liveMeasure=document.createElement('output');this.liveMeasure.id='pvc-live-measure';this.liveMeasure.hidden=true;this.liveMeasure.setAttribute('aria-label','Ζωντανή μέτρηση σωλήνας');
     this.markConfirm=document.createElement('button');this.markConfirm.id='pvc-mark-confirm';this.markConfirm.setAttribute('aria-label','Σημάδεψε τις σωλήνες με τον μαρκαδόρο');this.markConfirm.innerHTML='<svg viewBox="0 0 32 32" aria-hidden="true"><path d="m8 24 3-8L23 4l5 5-12 12-8 3zM19 8l5 5M8 24l6-2-4-4-2 6z"/></svg>';this.markConfirm.hidden=true;
     this.zoomControl=document.createElement('button');this.zoomControl.id='pvc-fit-zoom';this.zoomControl.setAttribute('aria-label','Μεγέθυνση κάμερας κοπής');this.zoomControl.innerHTML='<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="14" cy="14" r="8"/><path d="m20 20 8 8M10 14h8"/><path class="zoom-plus" d="M14 10v8"/></svg>';this.zoomControl.hidden=true;
-    game.hud.shell.append(this.prompt,this.liveMeasure,this.markConfirm,this.zoomControl,this.controls);
+    this.drillControl=document.createElement('button');this.drillControl.id='pvc-drill-holes';this.drillControl.setAttribute('aria-label','Τρύπησε διαδοχικά τις σημειωμένες οπές με τρυπάνι 12 χιλιοστών');this.drillControl.innerHTML='<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 7h15v10H3zM18 10h7M25 9v4M6 17v10h9v-4l-3-6M5 27"/><path d="M25 11h5"/></svg>';this.drillControl.hidden=true;
+    game.hud.shell.append(this.prompt,this.liveMeasure,this.markConfirm,this.zoomControl,this.drillControl,this.controls);
     try{this.customPresets=readPvcPresets(localStorage);}catch{/* Storage can be unavailable in private/embedded contexts. */}
     this.stock.setPresets(this.presets);
     this.prompt.addEventListener('click',()=>this.queue.push(()=>this.interact()));
     this.markConfirm.addEventListener('click',()=>this.queue.push(()=>this.interact()));
     this.zoomControl.addEventListener('click',()=>this.queue.push(()=>{if(!this.target||!['fitting','cut'].includes(this.phase))return;this.fitZoomed=!this.fitZoomed;this.setFitCamera();}));
+    this.drillControl.addEventListener('click',()=>this.queue.push(()=>this.startFastenerDrilling()));
     this.controls.querySelectorAll<HTMLButtonElement>('[data-pvc]').forEach(button=>{
       let touchHandled=false;
       button.addEventListener('pointerdown',e=>{touchHandled=e.pointerType!=='mouse';});
@@ -135,10 +153,14 @@ export class PvcWorkshop {
       if(this.phase==='review'&&['Equal','NumpadAdd','Minus','NumpadSubtract'].includes(e.code)){e.preventDefault();this.queue.push(()=>this.changeQuantity(['Equal','NumpadAdd'].includes(e.code)?1:-1));}
     },{capture:true});
     game.hud.shell.addEventListener('contextmenu',()=>{if(this.focused)this.queue.push(()=>this.pause());});
-    game.player.lookHandler=(_dx,dy)=>{
+    game.player.lookHandler=(dx,dy)=>{
       if(!this.focused)return false;
       if(this.phase==='marking')this.setMark(this.bend.mark+dy*.0015);
       if(this.phase==='fitting')this.setCut(this.cutS+dy*.0006);
+      if(this.phase==='fastener-marking'){
+        this.fastenerAim.x=THREE.MathUtils.clamp(this.fastenerAim.x+dx*.0045,-1,1);
+        this.fastenerAim.y=THREE.MathUtils.clamp(this.fastenerAim.y-dy*.0045,0,1);
+      }
       return true;
     };
     // Mouse adjustment while unlocked uses the same surface and never requests
@@ -178,7 +200,7 @@ export class PvcWorkshop {
     this.focused=true;this.game.mixing.setActive(false);this.game.mixing.releaseAutomaticStance();if(!preserveInput)this.game.input.resetTransientInput();
     const c=this.game.renderer.camera;
     if(this.target){
-      this.setFitCamera();
+      if(this.phase.startsWith('fastener-'))this.setFastenerCamera();else this.setFitCamera();
     }else if(['marking','spreading'].includes(this.phase)){
       this.cameraDestination.set(2.20,.95,this.bend.mark-.35+.31);this.cameraFocus.set(2.20,.025,this.bend.mark-.35+(innerWidth<700?.20:0));
     }else{
@@ -191,6 +213,11 @@ export class PvcWorkshop {
     if(!this.target)return;const p=this.target.boxGroup.getWorldPosition(v());
     // Both zoom levels remain perfectly square and level to the wall.
     this.cameraDestination.set(p.x,p.y,p.z+(this.fitZoomed?.50:.68));this.cameraFocus.set(p.x,p.y,p.z+.02);
+    const camera=new THREE.PerspectiveCamera();camera.position.copy(this.cameraDestination);camera.lookAt(this.cameraFocus);this.targetRotation.copy(camera.quaternion);
+  }
+  private setFastenerCamera():void{
+    if(!this.target)return;const p=this.target.boxGroup.getWorldPosition(v()),bottom=p.y-this.target.boxGroup.groupHeight/2;
+    const y=Math.max(.34,(bottom+.08)/2);this.cameraDestination.set(p.x,y,p.z+.72);this.cameraFocus.set(p.x,y,p.z+.015);
     const camera=new THREE.PerspectiveCamera();camera.position.copy(this.cameraDestination);camera.lookAt(this.cameraFocus);this.targetRotation.copy(camera.quaternion);
   }
   pause():void{
@@ -266,6 +293,9 @@ export class PvcWorkshop {
   }
   private use():void{
     if(!this.focused)return;
+    if(this.phase==='fastener-marking'){this.markFastenerHole();return;}
+    if(this.phase==='fastener-insert-ready'){this.fastenerIndex=0;this.fastenerProgress=0;this.transition('fastener-inserting');return;}
+    if(this.phase==='fastener-tighten-ready'){this.fastenerIndex=0;this.fastenerProgress=0;this.transition('fastener-tightening');return;}
     if(this.touch&&['review','cut'].includes(this.phase)){this.interact();return;}
     if(this.phase==='spring')this.transition('inserting');
     if(this.touch&&this.phase==='bending'&&this.bend.ready){this.transition('review');return;}
@@ -280,6 +310,8 @@ export class PvcWorkshop {
       if(!this.stockAimed()&&!(this.target&&this.game.boxPlacement.target(this.game.renderer.camera)===this.target))return;
       this.setFocus();return;
     }
+    if(this.phase==='fastener-marking'){this.markFastenerHole();return;}
+    if(this.phase==='fastener-insert-ready'||this.phase==='fastener-tighten-ready'){this.use();return;}
     if(this.phase==='sealed'&&this.stockAimed()){this.transition('opening');this.setFocus();return;}
     if(this.phase==='loose'&&this.stockAimed()){this.transition('spreading');this.setFocus();return;}
     if(this.phase==='marking'){
@@ -348,8 +380,27 @@ export class PvcWorkshop {
       if(!this.installClear()){this.transition('cut');this.message='Η θέση άλλαξε. Έλεγξε ξανά τη στήριξη και το κανάλι.';return;}
       const installed=new THREE.Group(),mesh=new PvcTube();mesh.update(this.bend,this.cutFrom);installed.add(mesh);this.orientAtBox(installed,0);
       installed.name=`Hand-formed PVC · ${this.target!.definition.id}`;installed.userData.studioEntityId=`point-${this.target!.definition.id}:rigid-pvc`;installed.userData.pvcRecipe={...this.bend.recipe(),cutFrom:this.cutFrom};
-      this.game.renderer.scene.add(installed);this.target!.conduit=installed;this.target!.pipeStep='done';this.target!.setStage('complete');this.installedCount++;
-      this.carried?.mesh.geometry.dispose();this.carried=null;this.target=null;this.focused=false;this.transition('batch');this.game.audio.play('box');
+      this.game.renderer.scene.add(installed);this.target!.conduit=installed;this.target!.pipeStep='install';this.target!.setStage('conduit');
+      this.fastenerHoles=[];this.fastenerPairs=[];this.fastenerIndex=0;this.fastenerProgress=0;this.fastenerAim={x:-.72,y:.72};
+      this.transition('fastener-marking');this.setFastenerCamera();this.game.audio.play('box');
+    }else if(this.phase==='fastener-drilling'){
+      const duration=.85,completed=Math.min(this.fastenerHoles.length,Math.floor(this.elapsed/duration)),index=Math.min(this.fastenerHoles.length-1,completed);this.fastenerIndex=index;this.fastenerProgress=THREE.MathUtils.clamp((this.elapsed-completed*duration)/duration,0,1);
+      this.drill.getObjectByName('reference-motor')!.rotation.z=this.elapsed*26;
+      for(let drilled=0;drilled<completed;drilled++)if(!this.fastenerHoles[drilled].drilled){
+        const hole=this.fastenerHoles[drilled];hole.drilled=true;const point=hole.marker.position,depthEnd=point.x+hole.side*.045;
+        this.game.room.brickWall.volume.carveBox({x:Math.min(point.x,depthEnd),y:point.y-.006,z:point.z-.006},{x:Math.max(point.x,depthEnd),y:point.y+.006,z:point.z+.006});
+        const centre=hole.marker.getObjectByName('Undrilled red hole mark') as THREE.Mesh;centre.material=new THREE.MeshStandardMaterial({color:0x171819,roughness:1});centre.name='Drilled 12 mm masonry hole';
+      }
+      if(this.elapsed>=this.fastenerHoles.length*duration){this.fastenerIndex=0;this.fastenerProgress=0;this.transition('fastener-insert-ready');this.message='Και οι οπές ανοίχτηκαν. USE: πέρασε τα rebar ένα-ένα.';}
+    }else if(this.phase==='fastener-inserting'){
+      const duration=1.05,index=Math.min(this.fastenerPairs.length-1,Math.floor(this.elapsed/duration));this.fastenerIndex=index;this.fastenerProgress=THREE.MathUtils.clamp((this.elapsed-index*duration)/duration,0,1);
+      const pair=this.fastenerPairs[index];pair.rebar.visible=true;pair.rebar.scale.x=THREE.MathUtils.smoothstep(this.fastenerProgress,0,1);
+      if(this.elapsed>=this.fastenerPairs.length*duration){this.fastenerPairs.forEach(p=>p.rebar.scale.x=1);this.fastenerIndex=0;this.fastenerProgress=0;this.transition('fastener-tighten-ready');this.message='Τα rebar αγκάλιασαν ελαφρά τη σωλήνα. USE: σφίξε τα ένα-ένα.';}
+    }else if(this.phase==='fastener-tightening'){
+      const duration=1.15,index=Math.min(this.fastenerPairs.length-1,Math.floor(this.elapsed/duration));this.fastenerIndex=index;this.fastenerProgress=THREE.MathUtils.clamp((this.elapsed-index*duration)/duration,0,1);
+      const jaw=this.rebarPliers.getObjectByName('rebar-plier-moving-jaw');if(jaw)jaw.rotation.z=-this.fastenerProgress*.30;
+      const pair=this.fastenerPairs[index];pair.rebar.scale.z=1-THREE.MathUtils.smoothstep(this.fastenerProgress,0,1)*.16;
+      if(this.elapsed>=this.fastenerPairs.length*duration)this.finishFasteners();
     }
   }
   private arrangePrepared():void{
@@ -357,6 +408,47 @@ export class PvcWorkshop {
   }
   private fitError():number{
     if(!this.target)return 0;const p=this.target.boxGroup.getWorldPosition(v());return(this.bend.topHeight-this.cutFrom-(p.y-this.target.boxGroup.groupHeight/2+.015))*1000;
+  }
+  private fastenerArea():{centreX:number;leftX:number;rightX:number;minY:number;maxY:number;z:number}|null{
+    if(!this.target)return null;const p=this.target.boxGroup.getWorldPosition(v()),bottom=p.y-this.target.boxGroup.groupHeight/2;
+    // The prepared chase is 200 mm wide plus an 8 mm working margin.  These
+    // are its two opposing inner brick faces, 30 mm behind the facade.
+    return{centreX:p.x,leftX:p.x-.108,rightX:p.x+.108,minY:.09,maxY:Math.max(.13,bottom-.065),z:p.z-.030};
+  }
+  private fastenerCursorPoint():{side:-1|1;point:THREE.Vector3}|null{
+    const area=this.fastenerArea();if(!area)return null;const side: -1|1=this.fastenerAim.x<0?-1:1;
+    const rawY=THREE.MathUtils.lerp(area.minY,area.maxY,this.fastenerAim.y),pitch=this.game.room.brickWall.volume.height/23,row=Math.floor(rawY/pitch);
+    // Preserve free aiming, nudging only marks that would land in a horizontal
+    // mortar joint back onto the clay face of that same brick course.
+    const y=THREE.MathUtils.clamp(row*pitch+THREE.MathUtils.clamp(rawY-row*pitch,.018,pitch-.018),area.minY,area.maxY);
+    return{side,point:v(side<0?area.leftX:area.rightX,y,area.z)};
+  }
+  private markerAt(point:THREE.Vector3,side:-1|1):THREE.Group{
+    const marker=new THREE.Group();marker.position.copy(point);marker.name=`Marked ${side<0?'left':'right'} 12 mm rebar hole`;
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(.009,.0018,5,24),new THREE.MeshStandardMaterial({color:0xd3322d,roughness:.7,emissive:0x390000}));ring.rotation.y=Math.PI/2;marker.add(ring);
+    const centre=new THREE.Mesh(new THREE.CircleGeometry(.006,16),new THREE.MeshBasicMaterial({color:0x5c1714,side:THREE.DoubleSide}));centre.name='Undrilled red hole mark';centre.rotation.y=Math.PI/2;marker.add(centre);this.securingRoot.add(marker);return marker;
+  }
+  private markFastenerHole():void{
+    const cursor=this.fastenerCursorPoint();if(!cursor)return;
+    const sameSide=this.fastenerHoles.filter(h=>h.side===cursor.side),otherSide=this.fastenerHoles.filter(h=>h.side!==cursor.side);
+    if(sameSide.some(h=>Math.abs(h.y-cursor.point.y)<.035)){this.message='Μετακίνησε το σημάδι σε άλλη οριζόντια σειρά τούβλου.';return;}
+    // The second hole of every pair stays level with the first so the rebar
+    // enters the two opposing inner faces without twisting the conduit.
+    if(sameSide.length>otherSide.length){this.message='Σημάδεψε τώρα την απέναντι πλευρά.';return;}
+    const unmatched=otherSide.find(h=>!this.fastenerHoles.some(candidate=>candidate.side===cursor.side&&Math.abs(candidate.y-h.y)<.001));
+    const y=unmatched?.y??cursor.point.y,area=this.fastenerArea()!,point=v(cursor.side<0?area.leftX:area.rightX,y,area.z);
+    this.fastenerHoles.push({side:cursor.side,y,marker:this.markerAt(point,cursor.side),drilled:false});
+    const left=this.fastenerHoles.find(h=>h.side<0&&Math.abs(h.y-y)<.001),right=this.fastenerHoles.find(h=>h.side>0&&Math.abs(h.y-y)<.001);
+    if(left&&right){const rebar=buildRebarHug(left.marker.position,right.marker.position,area.z+.010);rebar.visible=false;this.securingRoot.add(rebar);this.fastenerPairs.push({left,right,rebar});this.fastenerAim.y=THREE.MathUtils.clamp(this.fastenerAim.y-.34,0,1);}
+    this.fastenerAim.x=cursor.side<0?.72:-.72;this.message=`${this.fastenerHoles.length} οπές σημειωμένες${this.fastenerPairs.length?' · πάτησε το εικονίδιο τρυπανιού όταν τελειώσεις':''}.`;
+  }
+  private startFastenerDrilling():void{
+    if(this.phase!=='fastener-marking'||this.fastenerPairs.length<1||this.fastenerPairs.length*2!==this.fastenerHoles.length)return;
+    this.fastenerIndex=0;this.fastenerProgress=0;this.transition('fastener-drilling');this.message='Τρύπημα 12 mm · μία οπή τη φορά.';
+  }
+  private finishFasteners():void{
+    if(!this.target)return;this.target.pipeStep='done';this.target.setStage('complete');this.target.userData.pvcFasteners={holeCount:this.fastenerHoles.length,pairCount:this.fastenerPairs.length,drillBitMm:12,sequence:'marked-drilled-inserted-lightly-tightened'};
+    this.installedCount++;this.carried?.mesh.geometry.dispose();this.carried=null;this.target=null;this.focused=false;this.transition('batch');this.game.audio.play('box');
   }
   private boxBottomHeight():number|null{
     if(!this.target)return null;const p=this.target.boxGroup.getWorldPosition(v());return Math.max(0,p.y-this.target.boxGroup.groupHeight/2);
@@ -386,6 +478,8 @@ export class PvcWorkshop {
     this.stock.straightedge.visible=this.focused&&this.phase==='marking';
     this.stock.liveMarks.visible=this.stock.straightedge.visible&&this.markingProgress<1;
     this.previewRoot.visible=this.focused&&Boolean(this.target);
+    const cursor=this.fastenerCursorPoint();this.securingCursor.visible=this.focused&&this.phase==='fastener-marking'&&Boolean(cursor);
+    if(cursor)this.securingCursor.position.copy(cursor.point);
     if(active){this.game.fpsRig.visible=false;this.pose();}
     this.updateTargetGuide();
     this.renderUI();
@@ -405,8 +499,8 @@ export class PvcWorkshop {
     this.targetGuideBounds.setFromObject(this.guideTarget.boxGroup).expandByScalar(.018);this.targetGuide.visible=true;this.targetGuide.updateMatrixWorld(true);
   }
   anatomicalGrips():WorkerGripTarget[]{
-    const clearFirstPerson=['carrying','fitting','cutting','cut','installing'].includes(this.phase);
-    return this.arms.map(arm=>({...workerGripTarget(arm,this.work.visible&&(this.phase!=='carrying'||arm.side>0)),section:[.01,.01] as [number,number],shape:'round' as const,contactLocked:true,surfaceContact:true,firstPersonClearance:clearFirstPerson?.30:undefined}));
+    const clearFirstPerson=['carrying','fitting','cutting','cut','installing'].includes(this.phase)||this.phase.startsWith('fastener-');
+    return this.arms.map(arm=>({...workerGripTarget(arm,this.work.visible&&this.phase!=='fastener-marking'&&(this.phase!=='carrying'||arm.side>0)),section:(this.phase.startsWith('fastener-')?(arm.side<0?[.005,.005]:[.011,.011]):[.01,.01]) as [number,number],shape:'round' as const,contactLocked:true,surfaceContact:true,firstPersonClearance:clearFirstPerson?.42:undefined}));
   }
   useAnatomicalBody():void{
     // Legacy arm geometry is only a transform driver, never a visible fallback.
@@ -417,6 +511,7 @@ export class PvcWorkshop {
     const c=this.game.renderer.camera;c.updateMatrixWorld(true);
     this.work.position.copy(c.position);this.work.quaternion.copy(c.quaternion);
     const fit=Boolean(this.target)&&['fitting','cutting','cut','installing'].includes(this.phase);
+    const securing=Boolean(this.target)&&this.phase.startsWith('fastener-');
     const bending=['spring','inserting','bending','review','extracting'].includes(this.phase);
     this.pipe.visible=bending||this.phase==='carrying'||fit;
     const mark=this.bend.at(this.bend.mark),key=[this.bend.revision,this.bend.mark,this.cutFrom,this.phase].join(':');
@@ -459,6 +554,9 @@ export class PvcWorkshop {
     }
     this.marker.visible=this.phase==='marking';
     this.cutter.visible=['opening','fitting','cutting','cut','installing'].includes(this.phase);
+    this.drill.visible=this.phase==='fastener-drilling';
+    this.heldRebar.visible=['fastener-insert-ready','fastener-inserting','fastener-tighten-ready','fastener-tightening'].includes(this.phase);
+    this.rebarPliers.visible=this.heldRebar.visible;
     const left=v(-.21,-.20,-.43),right=v(.20,-.21,-.43),leftQ=new THREE.Quaternion(),rightQ=new THREE.Quaternion();
     if(bending){
       // Both hands bracket the active spring section while feeding the pipe.
@@ -490,6 +588,19 @@ export class PvcWorkshop {
       this.cutter.position.set(.02,-.15+Math.sin(this.elapsed*6)*.04,-.41);this.cutter.quaternion.identity();
       right.copy(v().fromArray(this.cutter.userData.gripPoint).add(this.cutter.position));rightQ.fromArray(this.cutter.userData.gripQuaternion);
       this.cutter.getObjectByName('cutter-moving-handle')!.rotation.z=.13-Math.max(0,Math.sin(this.elapsed*9))*.5;
+    }else if(securing){
+      const holes=this.fastenerHoles,pairs=this.fastenerPairs;
+      if(this.phase==='fastener-drilling'&&holes.length){
+        const hole=holes[Math.min(this.fastenerIndex,holes.length-1)],tip=c.worldToLocal(hole.marker.position.clone()),direction=v(hole.side,0,0),q=new THREE.Quaternion().setFromUnitVectors(v(0,0,-1),direction);
+        const pulse=Math.sin(Math.min(1,this.fastenerProgress)*Math.PI)*.015;this.drill.quaternion.copy(q);this.drill.position.copy(tip).sub(v().fromArray(this.drill.userData.tipPoint).applyQuaternion(q)).addScaledVector(direction,-.05+pulse);
+        right.copy(v().fromArray(this.drill.userData.gripPoint).applyQuaternion(q).add(this.drill.position));rightQ.copy(q);left.copy(tip).add(v(-hole.side*.09,-.04,.04));leftQ.copy(q);
+      }else{
+        const pair=pairs[Math.min(this.fastenerIndex,Math.max(0,pairs.length-1))],world=pair?pair.left.marker.position.clone().add(pair.right.marker.position).multiplyScalar(.5):this.target!.boxGroup.getWorldPosition(v()).add(v(0,-.16,.12)),centre=c.worldToLocal(world);
+        this.heldRebar.position.copy(centre).add(v(-.16,-.03,.10));this.heldRebar.rotation.set(0,0,.08);left.copy(this.heldRebar.position).add(v(0,-.02,0));leftQ.identity();
+        this.rebarPliers.position.copy(centre).add(v(.10,-.01,.08));this.rebarPliers.rotation.set(0,0,-.18);right.copy(v().fromArray(this.rebarPliers.userData.gripPoint).applyQuaternion(this.rebarPliers.quaternion).add(this.rebarPliers.position));rightQ.copy(this.rebarPliers.quaternion);
+        if(this.phase==='fastener-inserting'){const approach=1-THREE.MathUtils.smoothstep(this.fastenerProgress,0,1);this.heldRebar.position.z+=approach*.13;left.z+=approach*.13;}
+        if(this.phase==='fastener-tightening'){const approach=1-THREE.MathUtils.smoothstep(this.fastenerProgress,0,.35);this.rebarPliers.position.z+=approach*.10;right.z+=approach*.10;}
+      }
     }
     this.work.updateMatrixWorld(true);
     const bodyRight=v(1,0,0).applyQuaternion(c.quaternion);
@@ -518,6 +629,12 @@ export class PvcWorkshop {
       opening:'Κοπή πλαστικών δεσιμάτων',spreading:'Ευθυγράμμιση σωλήνων',
       inserting:'Εισαγωγή spring στο σημάδι',extracting:'Τράβηγμα spring από το καλώδιο',
       cutting:'Κοπή PVC',installing:'Εισαγωγή στο κουτί',
+      'fastener-marking':'Μετακίνησε τον στόχο στις εσωτερικές παρειές · USE: σημάδεψε οπή · ελάχιστο ένα αντικριστό ζεύγος',
+      'fastener-drilling':'Τρύπημα 12 mm · οι σημειωμένες οπές ανοίγουν μία-μία',
+      'fastener-insert-ready':'USE: πέρασε τα rebar ένα-ένα και άφησέ τα να αγκαλιάσουν ελαφρά τη σωλήνα',
+      'fastener-inserting':'Εισαγωγή rebar · ένα ζεύγος τη φορά',
+      'fastener-tighten-ready':'USE: ξεκίνα το τελικό σφίξιμο με την πένσα',
+      'fastener-tightening':'Σύσφιξη rebar · ένα ζεύγος τη φορά',
     };
     if(this.touch)Object.assign(tips,{
       marking:'Σύρε πάνω/κάτω για μήκος · ΣΗΜΑΔΕΨΕ για μαρκάρισμα',
@@ -525,6 +642,8 @@ export class PvcWorkshop {
       bending:'8 ΘΕΣΕΙΣ ΧΕΡΙΩΝ · Κράτα ΛΥΓΙΣΕ · ΕΛΕΓΧΟΣ στις 90°',
       review:'Διάλεξε 1, 5 ή ΟΛΕΣ · μετά ΕΤΟΙΜΑΣΕ ΚΑΙ ΚΡΑΤΑ',
       fitting:'Σύρε πάνω/κάτω το cutter · Κράτα ΚΟΨΕ',cut:'ΕΦΑΡΜΟΣΕ στο κουτί ή ΠΙΣΩ',
+      'fastener-marking':'Σύρε το στόχο · USE για κάθε οπή · μετά πάτησε το εικονίδιο τρυπανιού',
+      'fastener-drilling':'Τρύπημα 12 mm · μία οπή τη φορά','fastener-insert-ready':'USE · ΠΕΡΑΣΕ REBAR','fastener-inserting':'Πέρασμα rebar ένα-ένα','fastener-tighten-ready':'USE · ΣΦΙΞΕ ΜΕ ΠΕΝΣΑ','fastener-tightening':'Σύσφιξη ένα-ένα',
     });
     const key=this.touch?'ΑΓΓΙΞΕ':'E';
     const hint=show?(this.message||tips[this.phase]||`${key}: συνέχεια`):
@@ -538,6 +657,7 @@ export class PvcWorkshop {
     if(this.prompt.textContent!==hint)this.prompt.textContent=hint;
     this.markConfirm.hidden=!show||this.phase!=='marking'||this.markingActive;
     this.zoomControl.hidden=!this.touch||!show||!['fitting','cut'].includes(this.phase);
+    this.drillControl.hidden=!show||this.phase!=='fastener-marking'||this.fastenerPairs.length<1||this.fastenerPairs.length*2!==this.fastenerHoles.length;
     this.zoomControl.setAttribute('aria-pressed',String(this.fitZoomed));this.zoomControl.dataset.zoom=String(this.fitZoomed);
     this.liveMeasure.hidden=!show||!['marking','bending','review','fitting','cut'].includes(this.phase);
     if(!this.liveMeasure.hidden){
@@ -567,11 +687,11 @@ export class PvcWorkshop {
     use.textContent=this.phase==='fitting'?'ΚΟΨΕ':this.phase==='bending'?'ΛΥΓΙΣΕ':'SPRING';
     if(this.touch){
       const action=this.focused
-        ? this.phase==='marking'?'AIM':this.phase==='spring'?'SPRING':this.phase==='bending'?(this.bend.ready?'ΕΛΕΓΧΟΣ':'ΛΥΓΙΣΕ'):this.phase==='review'?'ΕΤΟΙΜΑΣΕ':this.phase==='fitting'?'ΚΟΨΕ':this.phase==='cut'?'ΕΦΑΡΜΟΣΕ':'USE'
+        ? this.phase==='marking'?'AIM':this.phase==='fastener-marking'?'ΣΗΜΑΔΙ':this.phase==='fastener-insert-ready'?'REBAR':this.phase==='fastener-tighten-ready'?'ΣΦΙΞΕ':this.phase==='spring'?'SPRING':this.phase==='bending'?(this.bend.ready?'ΕΛΕΓΧΟΣ':'ΛΥΓΙΣΕ'):this.phase==='review'?'ΕΤΟΙΜΑΣΕ':this.phase==='fitting'?'ΚΟΨΕ':this.phase==='cut'?'ΕΦΑΡΜΟΣΕ':'USE'
         : this.phase==='sealed'&&near?'ΚΟΨΕ':this.phase==='loose'&&near?'ΑΠΛΩΣΕ':this.phase==='batch'&&near?(this.prepared.length?'ΠΑΡΕ':'ΝΕΑ'):this.phase==='carrying'&&near?'ΕΠΙΣΤΡΕΨΕ':this.phase==='carrying'&&nearBox?'ΕΦΑΡΜΟΣΕ':'USE';
       const mobileAction=this.game.hud.shell.querySelector<HTMLElement>('#mobile-action')!,mobileDetail=this.game.hud.shell.querySelector<HTMLElement>('#look-joystick-thumb small')!,joystick=this.game.hud.shell.querySelector<HTMLElement>('#look-joystick')!;
-      mobileAction.textContent=action;mobileDetail.textContent=action==='AIM'?'DRAG':action==='USE'?'+ AIM':'USE';joystick.setAttribute('aria-label',action==='AIM'?'Σύρε για να ρυθμίσεις το σημάδι':action==='USE'?'Hold to use selected tool; drag to aim':`${action} με το USE joystick`);
+      mobileAction.textContent=action;mobileDetail.textContent=['AIM','ΣΗΜΑΔΙ'].includes(action)?'DRAG':action==='USE'?'+ AIM':'USE';joystick.setAttribute('aria-label',action==='AIM'?'Σύρε για να ρυθμίσεις το σημάδι σωλήνας':action==='ΣΗΜΑΔΙ'?'Σύρε για επιλογή οπής και πάτησε για σημάδεμα':action==='USE'?'Hold to use selected tool; drag to aim':`${action} με το USE joystick`);
     }
   }
-  get telemetry(){return{phase:this.phase,focused:this.focused,raw:this.rawCount,prepared:this.prepared.length,carrying:Boolean(this.carried),installed:this.installedCount,total:this.rawCount+this.prepared.length+Number(Boolean(this.carried))+this.installedCount,markCm:this.bend.mark*100,markingProgress:this.markingProgress,markingActive:this.markingActive,springInsertion:this.insertion,springCentreM:this.bend.mark,springLengthM:PVC.springLength,retrievalCableM:PVC.cableLength,grip:this.bend.grip,angle:this.bend.angle,radiusMm:this.bend.radius?this.bend.radius*1000:null,ready:this.bend.ready,angles:[...this.bend.angles],quantity:this.quantity,target:this.target?.definition.id??null,guideTarget:this.guideTarget?.definition.id??null,boxBottomCm:this.boxBottomHeight()===null?null:this.boxBottomHeight()!*100,cutCm:this.cutS*100,cutFromCm:this.cutFrom*100,fitErrorMm:this.fitError(),offcuts:this.offcuts.length,message:this.message,preview:this.pipe.visible,arms:this.arms.map(a=>({side:a.side,reach:a.shoulder.distanceTo(a.wrist)}))};}
+  get telemetry(){return{phase:this.phase,focused:this.focused,raw:this.rawCount,prepared:this.prepared.length,carrying:Boolean(this.carried),installed:this.installedCount,total:this.rawCount+this.prepared.length+Number(Boolean(this.carried))+this.installedCount,markCm:this.bend.mark*100,markingProgress:this.markingProgress,markingActive:this.markingActive,springInsertion:this.insertion,springCentreM:this.bend.mark,springLengthM:PVC.springLength,retrievalCableM:PVC.cableLength,grip:this.bend.grip,angle:this.bend.angle,radiusMm:this.bend.radius?this.bend.radius*1000:null,ready:this.bend.ready,angles:[...this.bend.angles],quantity:this.quantity,target:this.target?.definition.id??null,guideTarget:this.guideTarget?.definition.id??null,boxBottomCm:this.boxBottomHeight()===null?null:this.boxBottomHeight()!*100,cutCm:this.cutS*100,cutFromCm:this.cutFrom*100,fitErrorMm:this.fitError(),offcuts:this.offcuts.length,message:this.message,preview:this.pipe.visible,fasteners:{holes:this.fastenerHoles.length,pairs:this.fastenerPairs.length,drilled:this.fastenerHoles.filter(h=>h.drilled).length,index:this.fastenerIndex,progress:this.fastenerProgress,bitDiameterMm:12,aim:{...this.fastenerAim},positions:this.fastenerHoles.map(h=>({side:h.side,x:h.marker.position.x,y:h.y,z:h.marker.position.z}))},arms:this.arms.map(a=>({side:a.side,reach:a.shoulder.distanceTo(a.wrist)}))};}
 }

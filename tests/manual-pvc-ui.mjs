@@ -84,11 +84,15 @@ try{
   await page.evaluate(()=>{const v=window.__wireTheHouse.room.brickWall.volume;window.pvcCavity=v.cavityBox.bind(v);v.cavityBox=()=>({clear:false});});
   await key('KeyE');assert.equal((await state()).phase,'cut','Blocked channel must reject installation');assert.match((await state()).message,/τούβλο|δάπεδο/);
   await page.evaluate(()=>{window.__wireTheHouse.room.brickWall.volume.cavityBox=window.pvcCavity;});
-  await key('KeyE');await step(40);assert.equal((await state()).phase,'batch',JSON.stringify(await state()));assert.equal((await state()).installed,1);assert.equal((await state()).total,20);await snap('16-installed');
+  await key('KeyE');await step(40);assert.equal((await state()).phase,'fastener-marking',JSON.stringify(await state()));
+  for(let i=0;i<4;i++)await key('KeyE');assert.equal((await state()).fasteners.pairs,2);assert.equal(await page.locator('#pvc-drill-holes').isVisible(),true);await snap('16-fastener-marks');
+  await page.locator('#pvc-drill-holes').click();await step(230);assert.equal((await state()).phase,'fastener-insert-ready');assert.equal((await state()).fasteners.drilled,4);await snap('17-drilled');
+  await key('KeyE');await step(140);assert.equal((await state()).phase,'fastener-tighten-ready');await snap('18-light-hug');
+  await key('KeyE');await step(160);assert.equal((await state()).phase,'batch',JSON.stringify(await state()));assert.equal((await state()).installed,1);assert.equal((await state()).total,20);await snap('19-installed');
   const installed=await page.evaluate(()=>{const p=window.__wireTheHouse.mission.points[0];return{stage:p.stage,recipe:p.conduit?.userData.pvcRecipe};});assert.equal(installed.stage,'complete');assert.equal(installed.recipe.angles.reduce((a,b)=>a+b,0),90);
   await key('KeyR');assert.equal(await page.evaluate(()=>window.__wireTheHouse.mission.points[0].conduit.children[0].material.opacity),1);
   await key('KeyR');assert.equal(await page.evaluate(()=>window.__wireTheHouse.mission.points[0].conduit.children[0].material.opacity),.4);
-  report.checks.push('prepared bonded box -> fit -> long cut -> re-cut -> blocked-lane rejection -> actual formed pipe installed; R toggles held and installed PVC');report.pvc=await state();
+  report.checks.push('prepared bonded box -> fit -> long cut -> re-cut -> blocked-lane rejection -> formed pipe -> four physical 12 mm holes -> two sequential rebar hugs -> sequential plier tightening; R toggles held and installed PVC');report.pvc=await state();
  }
  report.errors=report.errors.filter(message=>message!=='Pointer Lock disabled for automated verification');
  assert.equal(report.errors.length,0,report.errors.join('\n'));

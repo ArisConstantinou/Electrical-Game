@@ -265,8 +265,12 @@ function cutter(): THREE.Group {
   rod(assembly, fixedA, fixedB, .0125, metal, 'Fixed handle metal core');
   rod(assembly, [.060, -.044, .001], [.165, -.143, .001], .014, red, 'Fixed red moulded handle', .0108);
   const moving = new THREE.Group(); moving.name = 'cutter-moving-handle'; moving.position.set(.019, .016, .010); moving.rotation.z = .13; assembly.add(moving);
-  const blade = outline([[-.086, .028], [-.037, .022], [-.023, -.022], [-.051, -.010], [-.066, .005], [-.086, -.006]]);
-  part(moving, extrude(blade, .0022), mat(0xd5dbd7, .18, .87), [0, 0, 0], 'Replaceable double ground V-shaped cutter blade');
+  // The blade starts inside the open support jaw and sweeps through its pipe
+  // cradle.  Its former long rear point protruded above the C-frame in close-up.
+  const blade = outline([[-.052, .024], [-.037, .022], [-.023, -.022], [-.046, -.010], [-.054, .004], [-.055, .014]]);
+  // Seat the thin blade between the two 12 mm support cheeks; only its cutting
+  // edge remains visible through the jaw opening.
+  part(moving, extrude(blade, .0022), mat(0xd5dbd7, .18, .87), [0, 0, -.006], 'Replaceable double ground V-shaped cutter blade');
   rod(moving, [0, 0, -.004], [.179, -.089, -.004], .011, metal, 'Moving handle continuous metal core');
   rod(moving, [.038, -.022, -.003], [.183, -.094, -.003], .014, red, 'Moving red moulded handle', .0105);
   torus(moving, .0085, .0028, red, [.180, -.093, -.003], 'Handle transport lock eye');
