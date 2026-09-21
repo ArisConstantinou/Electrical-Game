@@ -58,6 +58,7 @@ export class Wheelbarrow {
   speed=0;
   blocked=false;
   private mobileFast=false;
+  private mobileTip=false;
   constructor(readonly model:WheelbarrowModel,private readonly game:Game){
     game.renderer.scene.attach(model.group);
     this.yaw=model.group.rotation.y;
@@ -79,10 +80,13 @@ export class Wheelbarrow {
     this.panel=document.createElement('aside');this.panel.id='wheelbarrow-guide';this.panel.hidden=true;
     this.panel.innerHTML='<b>ΚΑΡΟΤΣΙ · ΙΣΟΡΡΟΠΙΑ</b><div class="cart-guide-row"><div class="cart-level" aria-label="Κλίση καροτσιού"><span class="cart-safe"></span><i></i></div><div class="cart-readout"></div></div><small>WASD · ΚΙΝΗΣΗ &nbsp; MOUSE · ΣΤΡΟΦΗ<br>SHIFT · ΓΡΗΓΟΡΑ &nbsp; E · ΑΦΗΣΕ</small>';
     this.dot=this.panel.querySelector('i')!;this.text=this.panel.querySelector('.cart-readout')!;game.hud.shell.append(this.panel);
-    this.panel.insertAdjacentHTML('beforeend','<div class="cart-touch-actions"><button id="cart-fast" type="button" aria-pressed="false">ΚΡΑΤΑ · ΓΡΗΓΟΡΑ</button><button id="cart-release" type="button">ΑΦΗΣΕ</button></div>');
+    this.panel.insertAdjacentHTML('beforeend','<div class="cart-touch-actions"><button id="cart-fast" type="button" aria-pressed="false">ΓΡΗΓΟΡΑ</button><button id="cart-tip" type="button" aria-pressed="false">ΚΡΑΤΑ · ΑΝΑΤΡΟΠΗ</button><button id="cart-release" type="button">ΑΦΗΣΕ</button></div>');
     const fast=this.panel.querySelector<HTMLButtonElement>('#cart-fast')!;
     fast.addEventListener('pointerdown',event=>{event.preventDefault();event.stopPropagation();fast.setPointerCapture(event.pointerId);this.mobileFast=true;fast.setAttribute('aria-pressed','true');});
     for(const type of ['pointerup','pointercancel','lostpointercapture'])fast.addEventListener(type,()=>{this.mobileFast=false;fast.setAttribute('aria-pressed','false');});
+    const tip=this.panel.querySelector<HTMLButtonElement>('#cart-tip')!;
+    tip.addEventListener('pointerdown',event=>{event.preventDefault();event.stopPropagation();tip.setPointerCapture(event.pointerId);this.mobileTip=true;tip.setAttribute('aria-pressed','true');});
+    for(const type of ['pointerup','pointercancel','lostpointercapture'])tip.addEventListener(type,()=>{this.mobileTip=false;tip.setAttribute('aria-pressed','false');});
     this.panel.querySelector('#cart-release')!.addEventListener('click',()=>this.release());
     if(matchMedia('(pointer:coarse)').matches)this.panel.querySelector('small')!.textContent='ΑΡΙΣΤΕΡΟ · ΚΙΝΗΣΗ  |  ΔΕΞΙΟ · ΣΤΡΟΦΗ';
     addEventListener('blur',()=>{if(this.driving)this.release();});
@@ -102,7 +106,7 @@ export class Wheelbarrow {
     this.game.renderer.camera.position.copy(back).setY(1.65);this.game.renderer.camera.rotation.set(-.60,this.game.player.yaw,0);
     this.velocity.set(0,0,0);this.driving=true;this.state='driving';return true;
   }
-  release():void{this.mobileFast=false;this.panel.querySelector('#cart-fast')?.setAttribute('aria-pressed','false');this.driving=false;this.velocity.set(0,0,0);if(this.state==='driving')this.state='parked';this.game.player.crouched=this.savedCrouch;}
+  release():void{this.mobileFast=this.mobileTip=false;for(const id of ['#cart-fast','#cart-tip'])this.panel.querySelector(id)?.setAttribute('aria-pressed','false');this.driving=false;this.velocity.set(0,0,0);if(this.state==='driving')this.state='parked';this.game.player.crouched=this.savedCrouch;}
   consume(amount:number):number{if(this.state!=='parked')return 0;const take=Math.min(Math.max(0,amount),this.massKg);this.massKg-=take;this.consumedKg+=take;return take;}
   scoop(point:THREE.Vector3):boolean{
     if(this.shovelKg>0||this.handAction||!this.parcels.some(p=>p.settled&&p.mass>0&&p.position.distanceTo(point)<.6))return false;
@@ -149,7 +153,9 @@ export class Wheelbarrow {
       // Retained mortar shifts the combined centre of mass. Downhill weight
       // reinforces the lean; spilling reduces that torque immediately.
       this.rollSpeed+=(ax*.08*load-displacedLoad.x*2*loadFraction-this.roll)*22*dt-this.rollSpeed*7*dt;
-      this.pitchSpeed+=((this.driving?.12:0)-az*.08*load+displacedLoad.y*.7*loadFraction-this.pitch)*22*dt-this.pitchSpeed*7*dt;
+      // Raising the handles continuously tips the tray forward. The normal
+      // balance spring, inertia and mortar slump still decide when it spills.
+      this.pitchSpeed+=((this.driving?.12:0)+(this.driving&&this.mobileTip?1.05:0)-az*.08*load+displacedLoad.y*.7*loadFraction-this.pitch)*22*dt-this.pitchSpeed*7*dt;
       this.roll+=this.rollSpeed*dt;this.pitch+=this.pitchSpeed*dt;
       this.stability=Math.hypot(this.roll/.55,(this.pitch-.12)/.65);
       this.tipExposure=this.stability>1?this.tipExposure+dt:Math.max(0,this.tipExposure-dt*2);

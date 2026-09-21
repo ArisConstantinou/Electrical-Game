@@ -293,6 +293,9 @@ export class PvcWorkshop {
     // USE joystick and is the canonical spring / bend hold.
     this.pressHeld=this.focused&&(this.toolbarHold||this.canvasHold||this.touch&&this.game.input.actionHeld);
     if(this.focused){
+      // PlayerController.update is paused in this close work view. Route its
+      // continuous mobile aim stick to the square and hole cursor here.
+      if(this.touch){const look=this.game.input.mobileLook;if(look.x||look.y)this.game.player.lookHandler?.(look.x*dt*120,look.y*dt*120);}
       const c=this.game.renderer.camera,t=1-Math.exp(-8*dt);c.position.lerp(this.cameraDestination,t);c.quaternion.slerp(this.targetRotation,t);
       this.game.player.yaw=c.rotation.y;this.game.player.pitch=c.rotation.x;this.game.player.velocity.set(0,0,0);
       const direction=Number(this.game.input.pressed('KeyD'))-Number(this.game.input.pressed('KeyA'));
@@ -404,10 +407,9 @@ export class PvcWorkshop {
       if(!this.installClear()){this.message=this.instruction('Η σωλήνα ακουμπά τούβλο ή δεν κάθεται στο δάπεδο. ESC για διόρθωση του καναλιού.','Η σωλήνα ακουμπά τούβλο ή δεν κάθεται στο δάπεδο. ΠΙΣΩ για διόρθωση του καναλιού.');return;}
       const staged=this.stagedFasteners.get(this.target!);
       if(staged){this.fastenerHoles=staged.holes;this.fastenerPairs=staged.pairs;this.fastenerIndex=0;this.fastenerProgress=0;this.transition('pipe-install-ready');this.setFastenerCamera();this.message='Τα ανοικτά σύρματα είναι έτοιμα. USE: εφάρμοσε τη σωλήνα.';return;}
-      // Prepare the wall first. The cut conduit stays in the player's stock
-      // until the holes are drilled and open tying wires are anchored.
+      // Seat the measured conduit first, then mark its retaining wire holes.
       this.fastenerHoles=[];this.fastenerPairs=[];this.fastenerIndex=0;this.fastenerProgress=0;this.fastenerAim={x:-.72,y:.72};
-      this.transition('fastener-marking');this.setFastenerCamera();return;
+      this.transition('pipe-install-ready');this.setFitCamera();this.message='USE: εφάρμοσε πρώτα τη σωλήνα στο κουτί.';return;
     }
   }
   private animate(dt:number):void{
@@ -443,7 +445,9 @@ export class PvcWorkshop {
       const installed=new THREE.Group(),mesh=new PvcTube();mesh.update(this.bend,this.cutFrom);installed.add(mesh);this.orientAtBox(installed,0);
       installed.name=`Hand-formed PVC · ${this.target!.definition.id}`;installed.userData.studioEntityId=`point-${this.target!.definition.id}:rigid-pvc`;installed.userData.pvcRecipe={...this.bend.recipe(),cutFrom:this.cutFrom};
       this.game.renderer.scene.add(installed);this.target!.conduit=installed;this.target!.pipeStep='install';this.target!.setStage('conduit');
-      this.transition('fastener-tighten-ready');this.setFastenerCamera();this.message='Η σωλήνα μπήκε μέσα στα ανοικτά σύρματα. USE: σφίξε τα ένα-ένα.';this.game.audio.play('box');
+      if(this.fastenerPairs.length){this.transition('fastener-tighten-ready');this.setFastenerCamera();this.message='Η σωλήνα μπήκε στο κουτί. USE: σφίξε τα σύρματα ένα-ένα.';}
+      else{this.fastenerHoles=[];this.fastenerAim={x:-.72,y:.72};this.transition('fastener-marking');this.setFastenerCamera();this.message='Η σωλήνα μπήκε στο κουτί. Σημάδεψε τώρα τις οπές στήριξης.';}
+      this.game.audio.play('box');
     }else if(this.phase==='fastener-drilling'){
       const duration=.85,completed=Math.min(this.fastenerHoles.length,Math.floor(this.elapsed/duration)),index=Math.min(this.fastenerHoles.length-1,completed);this.fastenerIndex=index;this.fastenerProgress=THREE.MathUtils.clamp((this.elapsed-completed*duration)/duration,0,1);
       this.drill.getObjectByName('reference-motor')!.rotation.z=this.elapsed*26;
@@ -459,7 +463,8 @@ export class PvcWorkshop {
       if(this.elapsed>=this.fastenerPairs.length*duration){
         this.fastenerPairs.forEach(p=>p.rebar.scale.x=1);this.fastenerIndex=0;this.fastenerProgress=0;
         if(!this.carried){const point=this.target!;this.stagedFasteners.set(point,{holes:this.fastenerHoles,pairs:this.fastenerPairs});point.userData.pvcFasteners={holeCount:this.fastenerHoles.length,pairCount:this.fastenerPairs.length,drillBitMm:12,sequence:'marked-drilled-open-wire'};this.target=null;this.focused=false;this.transition(this.fastenerReturnPhase);this.game.hud.notify('Τα ανοικτά σύρματα έμειναν στο chase. Ετοίμασε και φέρε τη σωλήνα.',true,2200);}
-        else{this.transition('pipe-install-ready');this.message='Τα σύρματα μπήκαν στις οπές και μένουν ανοικτά. USE: εφάρμοσε τώρα τη σωλήνα.';}
+        else if(this.target?.conduit){this.transition('fastener-tighten-ready');this.message='Τα σύρματα μπήκαν στις οπές. USE: σφίξε τα γύρω από τη σωλήνα.';}
+        else{this.transition('pipe-install-ready');this.message='Τα σύρματα μπήκαν στις οπές. USE: εφάρμοσε τώρα τη σωλήνα.';}
       }
     }else if(this.phase==='fastener-tightening'){
       const duration=1.15,index=Math.min(this.fastenerPairs.length-1,Math.floor(this.elapsed/duration));this.fastenerIndex=index;this.fastenerProgress=THREE.MathUtils.clamp((this.elapsed-index*duration)/duration,0,1);
@@ -515,7 +520,7 @@ export class PvcWorkshop {
     this.fastenerIndex=0;this.fastenerProgress=0;this.transition('fastener-drilling');this.message='Τρύπημα 12 mm · μία οπή τη φορά.';
   }
   private finishFasteners():void{
-    if(!this.target)return;this.fastenerPairs.forEach(pair=>setConduitTieTightness(pair.rebar,1));this.target.pipeStep='done';this.target.setStage('complete');this.target.userData.pvcFasteners={holeCount:this.fastenerHoles.length,pairCount:this.fastenerPairs.length,drillBitMm:12,sequence:'marked-drilled-open-wire-pipe-inserted-twisted'};
+    if(!this.target)return;this.fastenerPairs.forEach(pair=>setConduitTieTightness(pair.rebar,1));this.target.pipeStep='done';this.target.setStage('complete');this.target.userData.pvcFasteners={holeCount:this.fastenerHoles.length,pairCount:this.fastenerPairs.length,drillBitMm:12,sequence:this.stagedFasteners.has(this.target)?'marked-drilled-open-wire-pipe-inserted-twisted':'pipe-inserted-marked-drilled-open-wire-twisted'};
     this.stagedFasteners.delete(this.target);this.installedCount++;this.carried?.mesh.geometry.dispose();this.carried=null;this.target=null;this.focused=false;this.transition('batch');this.game.audio.play('box');
   }
   private boxBottomHeight():number|null{
@@ -700,7 +705,7 @@ export class PvcWorkshop {
       review:'1 / 5 / 0 · ΠΟΣΟΤΗΤΑ   |   E · ΕΤΟΙΜΑΣΕ ΚΑΙ ΚΡΑΤΑ 1',
       fitting:'MOUSE ↑ / ↓ · ΘΕΣΗ CUTTER   |   LMB · ΚΟΨΕ   |   ESC · ΕΞΟΔΟΣ',
       cut:'E · ΣΥΝΕΧΕΙΑ   |   ESC · ΕΞΟΔΟΣ',
-      'pipe-install-ready':'USE: πέρασε τη σωλήνα μέσα από τα ανοικτά σύρματα και εφάρμοσέ τη στο κουτί',
+      'pipe-install-ready':'USE: εφάρμοσε τη σωλήνα στο κουτί',
       opening:'Κοπή πλαστικών δεσιμάτων',spreading:'Ευθυγράμμιση σωλήνων',
       inserting:'Εισαγωγή spring στο σημάδι',extracting:'Τράβηγμα spring από το καλώδιο',
       cutting:'Κοπή PVC',installing:'Εισαγωγή στο κουτί',
@@ -716,7 +721,7 @@ export class PvcWorkshop {
       spring:'Κράτα SPRING για εισαγωγή',
       bending:'8 ΘΕΣΕΙΣ ΧΕΡΙΩΝ · Κράτα ΛΥΓΙΣΕ · ΕΛΕΓΧΟΣ στις 90°',
       review:'Διάλεξε 1, 5 ή ΟΛΕΣ · μετά ΕΤΟΙΜΑΣΕ ΚΑΙ ΚΡΑΤΑ',
-      fitting:'Σύρε πάνω/κάτω το cutter · Κράτα ΚΟΨΕ',cut:'ΠΡΟΕΤΟΙΜΑΣΕ ΟΠΕΣ ή ΠΙΣΩ','pipe-install-ready':'USE · ΕΦΑΡΜΟΣΕ ΣΩΛΗΝΑ',
+      fitting:'Σύρε πάνω/κάτω το cutter · Κράτα ΚΟΨΕ',cut:'ΕΦΑΡΜΟΣΕ ΣΩΛΗΝΑ ή ΠΙΣΩ','pipe-install-ready':'USE · ΕΦΑΡΜΟΣΕ ΣΩΛΗΝΑ',
       'fastener-marking':'Σύρε το στόχο · USE για κάθε οπή · μετά πάτησε το εικονίδιο τρυπανιού',
       'fastener-drilling':'Τρύπημα 12 mm · μία οπή τη φορά','fastener-insert-ready':'USE · ΠΕΡΑΣΕ ΣΥΡΜΑ','fastener-inserting':'Πέρασμα ανοικτού σύρματος','fastener-tighten-ready':'USE · ΣΤΡΙΨΕ ΜΕ ΠΕΝΣΑ','fastener-tightening':'Σφίξιμο σύρματος γύρω από το PVC',
     });
@@ -763,7 +768,7 @@ export class PvcWorkshop {
     use.textContent=this.phase==='fitting'?'ΚΟΨΕ':this.phase==='bending'?'ΛΥΓΙΣΕ':'SPRING';
     if(this.touch){
       const action=this.focused
-        ? this.phase==='marking'?'AIM':this.phase==='fastener-marking'?'ΣΗΜΑΔΙ':this.phase==='fastener-insert-ready'?'ΣΥΡΜΑ':this.phase==='pipe-install-ready'?'ΣΩΛΗΝΑ':this.phase==='fastener-tighten-ready'?'ΣΤΡΙΨΕ':this.phase==='spring'?'SPRING':this.phase==='bending'?(this.bend.ready?'ΕΛΕΓΧΟΣ':'ΛΥΓΙΣΕ'):this.phase==='review'?'ΕΤΟΙΜΑΣΕ':this.phase==='fitting'?'ΚΟΨΕ':this.phase==='cut'?'ΟΠΕΣ':'USE'
+        ? this.phase==='marking'?'AIM':this.phase==='fastener-marking'?'ΣΗΜΑΔΙ':this.phase==='fastener-insert-ready'?'ΣΥΡΜΑ':this.phase==='pipe-install-ready'?'ΣΩΛΗΝΑ':this.phase==='fastener-tighten-ready'?'ΣΤΡΙΨΕ':this.phase==='spring'?'SPRING':this.phase==='bending'?(this.bend.ready?'ΕΛΕΓΧΟΣ':'ΛΥΓΙΣΕ'):this.phase==='review'?'ΕΤΟΙΜΑΣΕ':this.phase==='fitting'?'ΚΟΨΕ':this.phase==='cut'?'ΣΩΛΗΝΑ':'USE'
         : this.fastenerPrepAvailable?'ΟΠΕΣ':this.phase==='sealed'&&near?'ΚΟΨΕ':this.phase==='loose'&&near?'ΑΠΛΩΣΕ':this.phase==='batch'&&near?(this.prepared.length?'ΠΑΡΕ':'ΝΕΑ'):this.phase==='carrying'&&near?'ΕΠΙΣΤΡΕΨΕ':this.phase==='carrying'&&nearBox?'ΕΦΑΡΜΟΣΕ':'USE';
       const mobileAction=this.game.hud.shell.querySelector<HTMLElement>('#mobile-action')!,mobileDetail=this.game.hud.shell.querySelector<HTMLElement>('#look-joystick-thumb small')!,joystick=this.game.hud.shell.querySelector<HTMLElement>('#look-joystick')!;
       mobileAction.textContent=action;mobileDetail.textContent=['AIM','ΣΗΜΑΔΙ'].includes(action)?'DRAG':action==='USE'?'+ AIM':'USE';joystick.setAttribute('aria-label',action==='AIM'?'Σύρε για να ρυθμίσεις το σημάδι σωλήνας':action==='ΣΗΜΑΔΙ'?'Σύρε για επιλογή οπής και πάτησε για σημάδεμα':action==='USE'?'Hold to use selected tool; drag to aim':`${action} με το USE joystick`);

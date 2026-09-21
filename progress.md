@@ -1015,3 +1015,11 @@ Original prompt for this task: Selecting BOX should show an initial box in the l
 - After the player bends, carries and cuts a pipe for that box, the workshop reconnects to the staged holes/wires, skips duplicate drilling, allows pipe insertion and then twists each wire sequentially with the pliers. Tightening no longer moves or deletes the wall anchors.
 - While the PVC view owns input, the unrelated generic drill panel is suppressed. During final twisting, the spare loose wire is removed from the hand so only the pliers and installed tie are shown.
 - Portrait 390x680 and landscape 844x390 end-to-end tests pass independent entry, four freely placed chase-only holes, staged open-wire persistence, later pipe insertion and anchored final twists. Desktop PVC logic/UI, production build, diff check and the bundled develop-web-game client also pass. Physical iPhone/Safari remains unverified.
+
+## 2026-09-21 · Mobile PVC seating and wheelbarrow spill
+
+- Reported iPhone flow: cut conduit advanced to fastening before seating; the focused PVC camera ignored continuous mobile stick input, so the measuring square stayed still.
+- In the wheelbarrow worktree, cut now offers pipe seating before marking/drilling/tying when no wires were staged. The previously supported pre-staged wire path still passes the full portrait and landscape PVC flow.
+- Focused mobile emulation moved the PVC square from 50 to 60 cm, then verified pipe-installed-before-holes and the complete new fastening sequence. The native route used this checkout's built assets at the fixed 5365 URL through browser request interception, leaving the apprentice-demo listener untouched.
+- Holding the new mobile ΑΝΑΤΡΟΠΗ control physically tips a full wheelbarrow in place; the focused test verified a complete 114 kg spill and mass conservation. Screenshots are under output/reported-mobile-workflows and output/mobile-wheelbarrow-spill.
+- Build, focused controls and full staged PVC emulation pass. Physical iPhone Safari, public Pages, and replacement of the active 5365 listener remain unverified. The listener currently serves apprentice-demo; do not replace it while that task is active.
