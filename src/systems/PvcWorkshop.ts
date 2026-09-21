@@ -143,6 +143,14 @@ export class PvcWorkshop {
     game.renderer.webgl.domElement.addEventListener('pointermove',e=>{if(e.pointerType!=='touch'||touchY===null)return;e.stopPropagation();game.player.lookHandler?.(0,e.clientY-touchY);touchY=e.clientY;});
     for(const event of ['pointerup','pointercancel'])addEventListener(event,e=>{if((e as PointerEvent).pointerType==='mouse')this.canvasHold=false;touchY=null;});
     addEventListener('blur',()=>this.pause());document.addEventListener('visibilitychange',()=>{if(document.hidden)this.pause();});
+    let wasPointerLocked=document.pointerLockElement===game.renderer.webgl.domElement;
+    document.addEventListener('pointerlockchange',()=>{
+      const locked=document.pointerLockElement===game.renderer.webgl.domElement,released=wasPointerLocked&&!locked;wasPointerLocked=locked;
+      // Browsers normally consume Escape to release Pointer Lock, so a
+      // keydown is not guaranteed. Treat that real lock transition as the
+      // desktop exit gesture for the isolated PVC work view.
+      if(released&&this.focused&&!game.hud.shell.classList.contains('settings-open')&&!document.querySelector('#model-inspector:not([hidden])'))this.queue.push(()=>this.pause());
+    });
     addEventListener('keydown',e=>{
       if(e.target instanceof Element&&e.target.closest('input,textarea,select,[contenteditable="true"]')||!this.game.started)return;
       if(e.code==='KeyR'&&(this.blocksWork||['spring','cutter'].includes(this.game.selectedTool)||this.aimsInstalledPipe())){
@@ -154,6 +162,9 @@ export class PvcWorkshop {
       if(e.code==='KeyZ')this.queue.push(()=>this.command('undo'));
       if(e.code==='KeyP'){e.preventDefault();this.queue.push(()=>this.savePreset(e.shiftKey));}
       if(e.code==='Tab'&&this.phase==='marking'){e.preventDefault();this.queue.push(()=>{const next=this.presets.find(p=>p.cm>this.bend.mark*100+.05)??this.presets[0];this.setMark(next.cm/100);});}
+      if(this.phase==='review'&&['Digit1','Digit5','Digit0'].includes(e.code)){
+        e.preventDefault();this.queue.push(()=>this.quantity=e.code==='Digit0'?this.rawCount:Math.min(this.rawCount,Number(e.code.at(-1))));return;
+      }
       if(this.phase==='review'&&['Equal','NumpadAdd','Minus','NumpadSubtract'].includes(e.code)){e.preventDefault();this.queue.push(()=>this.changeQuantity(['Equal','NumpadAdd'].includes(e.code)?1:-1));}
     },{capture:true});
     game.hud.shell.addEventListener('contextmenu',()=>{if(this.focused)this.queue.push(()=>this.pause());});
@@ -286,6 +297,7 @@ export class PvcWorkshop {
       if(this.phase==='bending'&&direction&&this.feedTime<=0){this.bend.move(direction);this.feedTime=.16;}
       if(!direction)this.feedTime=0;
       if(this.phase==='bending'&&this.pressHeld)this.bend.press(dt);
+      if(this.phase==='bending'&&this.bend.ready&&this.message.startsWith('Χρειάζεται ομαλή γωνία'))this.message='';
       if(this.phase==='marking'&&this.markingActive){
         this.markingProgress=Math.min(1,this.markingProgress+dt/.85);
         if(this.markingProgress===1){this.transition('spring');this.setFocus(true);this.message=this.instruction('Οι σωλήνες σημαδεύτηκαν. Βάλε τώρα το spring με LMB.','Οι σωλήνες σημαδεύτηκαν. Κράτα το SPRING για εισαγωγή.');}
@@ -377,7 +389,14 @@ export class PvcWorkshop {
       // A conduit does not need a laboratory-perfect flush cut: up to 30 mm
       // of extra length seats safely inside the 37 mm deep box entry. Only a
       // genuinely excessive or short cut must be corrected/replaced.
-      if(error>BOX_ENTRY_ALLOWANCE_MM){this.transition('fitting');this.message=`Περισσεύουν ${Math.round(error)} mm. Κόψε λίγο ακόμη· έως ${BOX_ENTRY_ALLOWANCE_MM} mm μπαίνουν μέσα στο κουτί.`;return;}
+      if(error>BOX_ENTRY_ALLOWANCE_MM){
+        this.transition('fitting');
+        // Put the cutter on a useful second-cut line instead of leaving it on
+        // the already removed end, where another click can only report that it
+        // has not moved. Retain 15 mm for safe seating inside the box.
+        this.cutS=THREE.MathUtils.clamp(this.cutFrom+Math.max(.002,(error-15)/1000),this.cutFrom,Math.max(this.cutFrom,this.bend.mark-.22));
+        this.message=`Περισσεύουν ${Math.round(error)} mm. Ο cutter μετακινήθηκε για ασφαλή επανακοπή · LMB: κόψε · ESC: έξοδος.`;return;
+      }
       if(error< -SHORT_PIPE_TOLERANCE_MM){this.message=this.instruction('Κόπηκε κοντή και δεν φτάνει στο κουτί. ESC, μετά επιστροφή στη μάτσα με E.','Κόπηκε κοντή και δεν φτάνει στο κουτί. ΠΙΣΩ, μετά στόχευσε τη μάτσα για επιστροφή.');return;}
       if(!this.installClear()){this.message=this.instruction('Η σωλήνα ακουμπά τούβλο ή δεν κάθεται στο δάπεδο. ESC για διόρθωση του καναλιού.','Η σωλήνα ακουμπά τούβλο ή δεν κάθεται στο δάπεδο. ΠΙΣΩ για διόρθωση του καναλιού.');return;}
       const staged=this.stagedFasteners.get(this.target!);
@@ -612,6 +631,12 @@ export class PvcWorkshop {
       leftQ.setFromUnitVectors(v(0,1,0),v(Math.cos(p.angle),-Math.sin(p.angle),0));rightQ.setFromUnitVectors(v(0,1,0),v(-Math.cos(q.angle),Math.sin(q.angle),0));
       if(this.phase==='spring'||this.phase==='inserting'){left.set(-.16,this.pipe.position.y,this.pipe.position.z);right.set(.16,this.pipe.position.y,this.pipe.position.z);}
     }
+    if(this.phase==='carrying'){
+      const grip=this.bend.at(Math.min(this.bend.mark,.6));
+      right.copy(v(grip.x,grip.y,0).applyQuaternion(this.pipe.quaternion).add(this.pipe.position));
+      const tangent=v(Math.cos(grip.angle),Math.sin(grip.angle),0).applyQuaternion(this.pipe.quaternion).normalize();
+      rightQ.setFromUnitVectors(v(0,1,0),tangent);
+    }
     if(this.marker.visible){
       const point=v(1.94+Math.min(1,this.markingProgress)*.532,.043,-.35+this.bend.mark);this.marker.position.copy(c.worldToLocal(point));this.marker.rotation.z=-.25;right.copy(this.marker.position).add(v(0,.055,0));
       this.marker.quaternion.copy(c.quaternion).invert().multiply(new THREE.Quaternion().setFromAxisAngle(v(0,0,1),-.25));
@@ -668,10 +693,10 @@ export class PvcWorkshop {
     const tips:Partial<Record<Phase,string>>={
       marking:'Mouse: γωνία · E: σημάδεψε όλες τις σωλήνες · P: preset · Tab: επόμενο',
       spring:'LMB: βάλε το spring · R: διαφάνεια · ESC: πίσω',
-      bending:'A / D: χέρι · LMB: λύγισε εδώ · 8 θέσεις για 90° · Z: διόρθωση · E: έλεγχος · R: διαφάνεια',
-      review:'Ροδέλα ή − / +: ποσότητα · E: παραγωγή · R: διαφάνεια',
-      fitting:'Mouse πάνω/κάτω: cutter · LMB: κόψε · E: προετοιμασία στερέωσης · R: διαφάνεια',
-      cut:'E: εφάρμοσε · R: διαφάνεια · ESC: πίσω',
+      bending:'A / D · ΘΕΣΗ ΧΕΡΙΩΝ   |   LMB · ΛΥΓΙΣΕ   |   Z · ΔΙΟΡΘΩΣΗ',
+      review:'1 / 5 / 0 · ΠΟΣΟΤΗΤΑ   |   E · ΕΤΟΙΜΑΣΕ ΚΑΙ ΚΡΑΤΑ 1',
+      fitting:'MOUSE ↑ / ↓ · ΘΕΣΗ CUTTER   |   LMB · ΚΟΨΕ   |   ESC · ΕΞΟΔΟΣ',
+      cut:'E · ΣΥΝΕΧΕΙΑ   |   ESC · ΕΞΟΔΟΣ',
       'pipe-install-ready':'USE: πέρασε τη σωλήνα μέσα από τα ανοικτά rebar και εφάρμοσέ τη στο κουτί',
       opening:'Κοπή πλαστικών δεσιμάτων',spreading:'Ευθυγράμμιση σωλήνων',
       inserting:'Εισαγωγή spring στο σημάδι',extracting:'Τράβηγμα spring από το καλώδιο',
@@ -693,7 +718,8 @@ export class PvcWorkshop {
       'fastener-drilling':'Τρύπημα 12 mm · μία οπή τη φορά','fastener-insert-ready':'USE · ΠΕΡΑΣΕ ΣΥΡΜΑ','fastener-inserting':'Πέρασμα ανοικτού σύρματος','fastener-tighten-ready':'USE · ΣΤΡΙΨΕ ΜΕ ΠΕΝΣΑ','fastener-tightening':'Στρίψιμο ένα-ένα',
     });
     const key=this.touch?'ΑΓΓΙΞΕ':'E';
-    const hint=show?(this.message||tips[this.phase]||`${key}: συνέχεια`):
+    const readyToReview=!this.touch&&show&&this.phase==='bending'&&this.bend.ready;
+    const hint=show?(readyToReview?'E · ΣΥΝΕΧΕΙΑ ΣΤΗΝ ΠΟΣΟΤΗΤΑ':this.message||tips[this.phase]||`${key}: συνέχεια`):
       this.phase==='sealed'?`${key} · ΚΟΨΕ ΤΑ ΔΕΣΙΜΑΤΑ · 20 × 3 m`:this.phase==='loose'?`${key} · ΑΠΛΩΣΕ ΤΙΣ ΣΩΛΗΝΕΣ`:
       this.phase==='batch'?`${key} · ${this.prepared.length?'ΠΑΡΕ ΣΩΛΗΝΑ':'ΝΕΑ ΠΡΟΕΤΟΙΜΑΣΙΑ'} · ${this.prepared.length} έτοιμες / ${this.rawCount} άκοπες`:
       this.phase==='carrying'?(this.message||(near?`${key} · ΕΠΙΣΤΡΟΦΗ ΣΤΗ ΜΑΤΣΑ`:nearBox?`${key} · ΕΦΑΡΜΟΣΕ ΣΤΟ ΚΟΥΤΙ`:'')):`${key} · ΣΥΝΕΧΙΣΕ`;

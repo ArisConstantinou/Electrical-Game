@@ -56,14 +56,13 @@ try{
     assert.equal(await page.evaluate(()=>window.__wireTheHouse.workerBody.visible),true,`Hands must remain visible at bend cell ${cell}`);
     if(cell===4)await snap('08-progressive-bend');
   }
-  assert(Math.abs((await state()).angle-90)<1e-6);await snap('09-bent-90');
-  await key('Escape');assert.equal((await state()).focused,false);const saved=(await state()).angle;
-  await aim([1.2,1.65,.6],[2.2,.02,.15]);await key('KeyE');assert.equal((await state()).focused,true);assert.equal((await state()).angle,saved);
-  await key('KeyE');assert.equal((await state()).phase,'review');await snap('10-review');
-  for(let i=0;i<19;i++)await key('Equal',1);assert.equal((await state()).quantity,20);
+  assert(Math.abs((await state()).angle-90)<1e-6);assert.equal((await state()).ready,true);assert.match(await page.locator('#pvc-prompt').textContent(),/E.*ΠΟΣΟΤΗΤΑ/);assert.doesNotMatch(await page.locator('#pvc-prompt').textContent(),/Χρειάζεται/);await snap('09-bent-90');
+  await key('KeyE');assert.equal((await state()).phase,'review','E at a completed bend must open quantity without pausing/re-entering');await snap('10-review');
+  await key('Digit5');assert.equal((await state()).quantity,5);await key('Digit1');assert.equal((await state()).quantity,1);await key('Digit0');assert.equal((await state()).quantity,20);
   await key('KeyE');await step(100);assert.equal((await state()).phase,'carrying','Finishing a batch must continue with one bent pipe in hand');assert.equal((await state()).prepared,19);assert.equal((await state()).raw,0);assert.equal((await state()).total,20);
   const carryPresentation=await page.evaluate(()=>{const g=window.__wireTheHouse,delta=g.workerBody.position.clone().sub(g.renderer.camera.position);return{bodyOffset:Math.hypot(delta.x,delta.z),activeGrips:g.pvc.anatomicalGrips().filter(x=>x.active).length};});
-  assert(carryPresentation.bodyOffset>.26,'The torso must stay behind the first-person camera while carrying PVC');assert.equal(carryPresentation.activeGrips,1,'Carrying uses one visible hand instead of solving two hidden contacts');await snap('12-carry');
+  assert(carryPresentation.bodyOffset>.26,'The torso must stay behind the first-person camera while carrying PVC');assert.equal(carryPresentation.activeGrips,1,'Carrying uses one visible hand instead of solving two hidden contacts');
+  const carryContact=await page.evaluate(()=>{const g=window.__wireTheHouse,p=g.pvc,s=Math.min(p.bend.mark,.6),a=p.bend.at(s),centre=p.pipe.localToWorld(g.renderer.camera.position.clone().set(a.x,a.y,0)),grip=p.anatomicalGrips().find(x=>x.active);return{gapMm:centre.distanceTo(grip.center)*1000};});assert(carryContact.gapMm<1,`The carrying hand must close on the pipe centreline (${carryContact.gapMm.toFixed(1)} mm gap)`);await snap('12-carry');
  report.checks.push('stock -> marking -> spring -> eight local bends -> exact 90 degrees -> batch 20 -> automatically carry one');
   // This checkout already supplies real bonded boxes and physically carved lanes.
   const targetPose=await page.evaluate(()=>{
@@ -75,10 +74,12 @@ try{
   const assisted=await page.evaluate(()=>{const g=window.__wireTheHouse;return{exact:g.boxPlacement.target(g.renderer.camera)?.definition.id??null,near:g.boxPlacement.targetNear(g.renderer.camera)?.definition.id??null};});
   assert.equal(assisted.exact,null,'Fixture must miss the hollow casing exactly');assert.equal(assisted.near,'A','A nearby visible casing must remain an eligible PVC target');
   await key('KeyE');await step(70);assert.equal((await state()).phase,'fitting',JSON.stringify(await state()));assert.equal((await state()).fitReady,true,'The cutter must open at the measured box-entry position');assert((await state()).cutCm>(await state()).cutFromCm);await snap('13-fitting');
+  await page.evaluate(()=>{window.__qaPvcLock=null;Object.defineProperty(document,'pointerLockElement',{configurable:true,get:()=>window.__qaPvcLock});window.__setPvcLock=active=>{window.__qaPvcLock=active?document.querySelector('#game-canvas'):null;document.dispatchEvent(new Event('pointerlockchange'));};window.__setPvcLock(true);});await step(2);await page.evaluate(()=>window.__setPvcLock(false));await step(2);assert.equal((await state()).focused,false,'Pointer-lock Escape must leave the cutter view without a keydown');assert.equal((await state()).phase,'carrying');
+  await aim(targetPose.camera,[targetPose.target[0]+.12,targetPose.target[1],targetPose.target[2]]);await key('KeyE');await step(70);assert.equal((await state()).phase,'fitting','PVC fitting must resume after leaving the cutter view');
   // A realistic 15 mm insertion is accepted inside the box instead of forcing
   // an impractical zero-millimetre touchscreen cut.
   let desired=await page.evaluate(()=>{const g=window.__wireTheHouse,p=g.pvc.target;return g.pvc.bend.topHeight-(p.boxGroup.getWorldPosition(g.renderer.camera.position.clone()).y-p.boxGroup.groupHeight/2+.015);});
-  await cutAt((desired-.015)*100);await use();await step(32);assert.equal((await state()).phase,'cut');assert((await state()).fitErrorMm>10);assert.equal((await state()).fitReady,true);await snap('14-box-entry-cut');
+  await cutAt((desired-.032)*100);await use();await step(32);assert.equal((await state()).phase,'cut');assert((await state()).fitErrorMm>30);await key('KeyE');assert.equal((await state()).phase,'fitting');assert((await state()).cutCm>(await state()).cutFromCm,'An excessive first cut must advance the cutter to a valid recut line');assert.match((await state()).message,/μετακινήθηκε/);await use();await step(32);assert.equal((await state()).phase,'cut');assert.equal((await state()).fitReady,true,'The automatic second-cut line must seat safely');await snap('14-box-entry-cut');
   // Reject a blocked lane, then restore the same real collision implementation.
   await page.evaluate(()=>{const v=window.__wireTheHouse.room.brickWall.volume;window.pvcCavity=v.cavityBox.bind(v);v.cavityBox=()=>({clear:false});});
   await key('KeyE');assert.equal((await state()).phase,'cut','Blocked channel must reject installation');assert.match((await state()).message,/τούβλο|δάπεδο/);

@@ -1,5 +1,13 @@
 Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web game named WIRE THE HOUSE, based on real Cyprus residential first-fix practices, editable in Web Game Studio, playable on desktop/mobile, deployed to arisconstantinou/Electrical-Game via GitHub Pages, and ending at FIRST FIX COMPLETE without cable pulling.
 
+## 2026-09-21 · PC PVC directions, carry contact, recut and cutter exit
+
+- Reproduced the user's exact stale 90-degree warning: an early E stored the failure message and the message survived after the bend became valid. At 90 degrees desktop now replaces it with `E · ΣΥΝΕΧΕΙΑ ΣΤΗΝ ΠΟΣΟΤΗΤΑ`; review uses direct 1/5/0 quantity keys and concise PC-only mouse/keyboard directions.
+- The one active carrying grip is now derived from the same material-space pipe point and tangent used to position the pipe. The focused browser regression measures under 1 mm centreline error and the reviewed screenshot shows the hand closing around the pipe instead of floating beside it.
+- An excessive first cut now advances the cutter from the removed end to a safe 15 mm seating recut line. A second LMB cut succeeds without the previous impossible `Μετακίνησε το cutter` loop.
+- Pointer-lock release now exits the focused PVC/cutter view even when the browser consumes Escape and emits no keydown. The same regression proves exit to carrying, re-entry, recut, full hole/rebar workflow and final installation.
+- `test:pvc`, TypeScript, production build, mobile PVC hands, mobile carry CPU sample and the bundled develop-web-game client pass without page errors. Final desktop screenshots are under `output/manual-pvc/after`; the skill smoke is under `output/pvc-pc-fix-skill`. The build retains the existing unresolved start-image and large-chunk warnings. Headless mobile carry mean was 1.924 ms and p95 3.2 ms versus legacy 2.133/3.0 ms; this is short host CPU sampling, not physical-phone FPS/GPU proof.
+
 ## 2026-09-21 · PVC mobile carry, targeting, stance and quantity follow-up
 
 - Physical iPhone screenshots showed non-action text styled like controls, the full torso covering carried/fitted PVC, exact hollow-casing raycasts missing boxes, no nearby crouch/stand controls, one-by-one quantity selection and a second pickup after production.
