@@ -91,11 +91,15 @@ export class ApprenticeSystem {
   private readonly pipeCutTarget=new THREE.Vector3();
   private message='Έτοιμος για οδηγίες';
   private readonly yellow=new THREE.MeshBasicMaterial({color:0xffdc35,transparent:true,opacity:.72,depthWrite:false});
+  private readonly mobileView=matchMedia('(pointer:coarse)').matches;
+  private readonly viewFrustum=new THREE.Frustum();
+  private readonly viewMatrix=new THREE.Matrix4();
+  private readonly workerBounds=new THREE.Sphere(new THREE.Vector3(),1.4);
 
   constructor(private readonly game:Game,debris:ChasingSystem){
     const scene=game.renderer.scene;
     this.pipeYard=new ApprenticePipeYard(game.pvc.stock);scene.add(this.pipeYard);
-    this.body=new WorkerBody(scene);this.body.name='Apprentice 1';this.body.overview=true;
+    this.body=new WorkerBody(scene,{detail:this.mobileView?'apprentice':'full',castShadow:!this.mobileView});this.body.name='Apprentice 1';this.body.overview=true;
     this.ready=this.body.ready;
     this.camera.position.set(.8,1.65,1.25);this.camera.add(this.rig);scene.add(this.camera);
     this.rig.show('hammer');this.rig.workStanceTiltDegrees=0;this.rig.workStanceSide=0;
@@ -307,7 +311,19 @@ export class ApprenticeSystem {
     this.camera.updateMatrixWorld(true);
     const grips=this.phase==='construction'||this.phase==='pipe'||this.phase==='blocked'&&this.workTool?this.poseWorkTool():[];
     this.body.update(dt,this.camera,{eyeHeight:this.camera.position.y,velocity:this.velocity,yaw:this.camera.rotation.y,pitch:this.camera.rotation.x},this.rig,'hammer',this.phase==='breaking',grips.length>0,grips);
-    this.body.overview=true;this.presentUI();
+    this.body.overview=true;this.cullMobileBodies();this.presentUI();
+  }
+  private cullMobileBodies():void {
+    if(!this.mobileView)return;
+    const camera=this.game.renderer.camera;
+    camera.updateMatrixWorld();
+    this.viewFrustum.setFromProjectionMatrix(this.viewMatrix.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse));
+    for(const mate of this.crew.slice(0,this.count-1))mate.body.visible=this.game.started&&mate.body.loaded;
+    for(const body of [this.body,...this.crew.slice(0,this.count-1).map(mate=>mate.body)]){
+      if(!body.visible)continue;
+      this.workerBounds.center.set(body.position.x,body.position.y+1,body.position.z);
+      body.visible=this.viewFrustum.intersectsSphere(this.workerBounds);
+    }
   }
   private updatePipe(dt:number):void{
     const job=this.pipeJob;if(!job)return;

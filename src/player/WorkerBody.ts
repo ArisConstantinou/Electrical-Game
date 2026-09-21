@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
 import type { PlayerController } from './PlayerController';
 import type { FPSRig, RigTool } from './FPSRig';
 import type { WorkerGripTarget } from './WorkerArm';
@@ -9,6 +10,7 @@ import {solveRigidGrasp,type GraspHistory} from './RigidGrasp';
 const Y=new THREE.Vector3(0,1,0);
 /** Full anatomical sample. World-space skeleton owns the pose; camera aim remains independent. */
 export class WorkerBody extends THREE.Group {
+  private static readonly templates=new Map<string,Promise<{scene:THREE.Group;metadata:Record<string,{head:number[];tail:number[]}>}>>();
   readonly ready:Promise<void>;
   loaded=false;
   overview=false;
@@ -68,16 +70,28 @@ export class WorkerBody extends THREE.Group {
   private armTwist:Record<string,{upperDegrees:number;foreDegrees:number}>={};
   private footRest=new Map<string,THREE.Quaternion>();
   private locomotionState={speed:0,forward:0,sideways:0,pelvisBobM:0,pelvisSwayM:0,pelvisYawDegrees:0,spineCounterDegrees:0,headCounterDegrees:0};
-  constructor(scene:THREE.Scene){
+  constructor(scene:THREE.Scene,options:{detail?:'full'|'apprentice';castShadow?:boolean}={}){
     super();this.name='Anatomical full body worker';this.userData.studioEntityId='worker:full-body';scene.add(this);
-    this.ready=Promise.all([new GLTFLoader().loadAsync(`${import.meta.env.BASE_URL}assets/worker/worker.glb`),fetch(`${import.meta.env.BASE_URL}assets/worker/skeleton.json`).then(r=>r.json())]).then(([g,metadata])=>{
-      for(const [name,entry]of Object.entries(metadata) as [string,{head:number[];tail:number[]}][])this.lengths.set(name,new THREE.Vector3().fromArray(entry.head).distanceTo(new THREE.Vector3().fromArray(entry.tail)));
-      this.add(g.scene);g.scene.traverse(o=>{
+    const detail=options.detail??'full',asset=detail==='apprentice'?'worker-apprentice-lod.glb':'worker.glb';
+    let template=WorkerBody.templates.get(asset);
+    if(!template){template=Promise.all([new GLTFLoader().loadAsync(`${import.meta.env.BASE_URL}assets/worker/${asset}`),fetch(`${import.meta.env.BASE_URL}assets/worker/skeleton.json`).then(r=>r.json() as Promise<Record<string,{head:number[];tail:number[]}>>)]).then(([g,metadata])=>({scene:g.scene,metadata}));WorkerBody.templates.set(asset,template);}
+    this.ready=template.then(({scene:source,metadata})=>{
+      for(const [name,entry]of Object.entries(metadata))this.lengths.set(name,new THREE.Vector3().fromArray(entry.head).distanceTo(new THREE.Vector3().fromArray(entry.tail)));
+      const model=cloneSkeleton(source),skins:THREE.SkinnedMesh[]=[];this.add(model);model.traverse(o=>{
+        if(o instanceof THREE.SkinnedMesh)skins.push(o);
         if(o instanceof THREE.SkinnedMesh)this.skeletons.add(o.skeleton);
         if(o instanceof THREE.Bone){this.bones.set(o.name,o);this.rest.set(o,{q:o.quaternion.clone(),p:o.position.clone()});}
-        if(o instanceof THREE.Mesh){o.castShadow=true;o.receiveShadow=true;o.frustumCulled=false;}
+        if(o instanceof THREE.Mesh){o.castShadow=options.castShadow??true;o.receiveShadow=true;o.frustumCulled=false;}
         if(o.name.startsWith('WorkerHead')||o.name.includes('eye'))this.headParts.push(o);
       });
+      // SkeletonUtils clones each primitive with an equivalent Skeleton. The
+      // source GLB binds them to one rig, so restore that sharing to avoid 21
+      // redundant bone-matrix updates and GPU skin palettes per worker.
+      const shared=skins[0]?.skeleton;
+      if(shared&&skins.every(mesh=>mesh.skeleton.bones.every((bone,i)=>bone===shared.bones[i]))){
+        for(const mesh of skins)mesh.skeleton=shared;
+        this.skeletons.clear();this.skeletons.add(shared);
+      }
       // Keep the head in the shadow pass. A hidden Object3D is omitted from
       // every pass, producing a headless first-person shadow.
       const headMeshes=new Set<THREE.Mesh>();
@@ -92,7 +106,7 @@ export class WorkerBody extends THREE.Group {
       for(const side of ['L','R'])this.footRest.set(side,this.bone('foot.'+side).getWorldQuaternion(new THREE.Quaternion()));
       for(const side of ['L','R']){
         const samples:{mesh:THREE.SkinnedMesh;index:number}[]=[];
-        g.scene.traverse(o=>{
+        model.traverse(o=>{
           if(!(o instanceof THREE.SkinnedMesh))return;
           const indices=o.geometry.attributes.skinIndex,weights=o.geometry.attributes.skinWeight;
           const thumbIndices=new Set(o.skeleton.bones.map((b,i)=>b.name.replaceAll('.','').startsWith('thumb')&&b.name.endsWith(side)?i:-1));thumbIndices.delete(-1);

@@ -24,7 +24,7 @@ export class ApprenticeCrewMate {
 
   constructor(private readonly game:Game,readonly index:number,private readonly batch:ApprenticePipeBatch,private readonly yard:ApprenticePipeYard){
     const scene=game.renderer.scene;
-    this.body=new WorkerBody(scene);this.body.name=`Apprentice ${index}`;this.body.overview=true;this.ready=this.body.ready;
+    this.body=new WorkerBody(scene,{detail:'apprentice',castShadow:!matchMedia('(pointer:coarse)').matches});this.body.name=`Apprentice ${index}`;this.body.overview=true;this.ready=this.body.ready;
     this.camera.position.set(2.65,1.65,.25+index*.39);this.camera.add(this.rig);scene.add(this.camera);
     this.rig.show('hammer');this.rig.visible=false;this.camera.visible=false;
     this.cutter.name=`Apprentice ${index} cutter`;this.cutter.visible=false;scene.add(this.cutter);
