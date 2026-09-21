@@ -12,11 +12,16 @@ try{
   await page.goto('http://127.0.0.1:5365/Electrical-Game/');await page.waitForFunction(()=>window.__wireTheHouse,{},{timeout:120000});
   await page.selectOption('#apprentice-count',scenario==='zero'?'0':'1');await page.screenshot({path:`${out}/${scenario}-start.png`});
   await page.locator('#start-button').click();await page.waitForTimeout(650);
+  if(scenario==='zero'){
+   assert.equal(await page.locator('#apprentice-controls').isVisible(),false,'no Apprentice should leave the game controls unobstructed');
+   assert.equal(await page.evaluate(()=>window.__wireTheHouse.apprentice.body.visible),false);
+   report.checks.push('zero: no helper or Apprentice navigation obscures the game');
+   await context.close();continue;
+  }
   await page.evaluate(()=>{const g=window.__wireTheHouse;window.testStep=g.step.bind(g);g.step=()=>{};const c=g.renderer.camera;c.position.set(-.8,1.65,-.75);c.lookAt(-.8,1.2,-2.41);g.player.pitch=c.rotation.x;g.player.yaw=c.rotation.y;});
   const step=async n=>page.evaluate(n=>{for(let i=0;i<n;i++)window.testStep(1/60);},n);
   await step(3);
   const before=await page.evaluate(()=>({paint:window.__wireTheHouse.room.brickWall.freeMarkCount,removed:window.__wireTheHouse.room.brickWall.telemetry.removedVolume,crouched:window.__wireTheHouse.player.crouched}));
-  if(scenario==='zero')await page.locator('[data-apprentice="point"]').click();
   if(mobile){await page.locator('[data-apprentice="point"]').tap();await page.locator('#look-joystick').tap();}else{await page.mouse.click(680,380);}
   await step(4);
   // Short touch is edge-triggered; hold is covered by the desktop gameplay test.
@@ -37,11 +42,6 @@ try{
    await page.mouse.down();await step(8);await page.mouse.up();await step(2);
    assert.equal(await page.evaluate(()=>window.__wireTheHouse.laserLevel.working),false,'pointing cannot operate the previous drill');
    assert.equal(await page.evaluate(()=>window.__wireTheHouse.fpsRig.visible),false,'pointing hides the previous tool');
-  }
-  if(scenario==='zero'){
-   await page.locator('[data-apprentice="point"]').click();await step(2);await page.locator('[data-apprentice="layout"]').click();await step(2);await page.locator('[data-apprentice="confirm"]').click();await step(2);
-   assert.equal(await page.evaluate(()=>window.__wireTheHouse.apprentice.phase),'idle');
-   assert.equal(await page.evaluate(()=>window.__wireTheHouse.apprentice.body.visible),false);
   }
   if(scenario==='desktop'){
    report.performance=await page.evaluate(async()=>{
