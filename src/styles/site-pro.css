@@ -61,7 +61,7 @@ html, body { background: #151a1d; }
   #site-pro-use[aria-pressed="true"] { color: #192126; background: #ffdc32; }
   #site-pro-use[aria-pressed="true"] svg { stroke: #192126; }
   #mobile-interact:not([hidden]) { right: max(116px, calc(env(safe-area-inset-right) + 106px)); bottom: calc(268px + env(safe-area-inset-bottom)); }
-  #mobile-use-status { position: static; width: 100%; max-width: none; min-height: 12px; transform: none; color: #f5f1dc; font: 800 12px/1.05 'Barlow Condensed', Arial, sans-serif; text-align: center; text-shadow: none; }
+  #mobile-use-status { position: static; width: 100%; max-width: none; min-width: 0; min-height: 12px; transform: none; color: #f5f1dc; font: 800 12px/1.05 'Barlow Condensed', Arial, sans-serif; text-align: center; text-shadow: none; overflow-wrap: anywhere; }
   #mobile-use-status[data-ready="false"] { color: #ffdc32; }
   #mobile-stance-controls { bottom: calc(240px + env(safe-area-inset-bottom)); }
   #mobile-stance-controls { gap: 10px; }

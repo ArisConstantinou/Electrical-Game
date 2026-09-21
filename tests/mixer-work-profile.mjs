@@ -50,11 +50,18 @@ try {
     const p = window.__mixerProfile, g = window.__wireTheHouse;
     p.active = false;
     const intervals = p.times.slice(1).map((time, index) => time - p.times[index]).sort((a, b) => a - b);
-    return { samples: p.times.length, mixingFrames: p.mixingFrames, p95Ms: intervals[Math.floor(intervals.length * .95)], drawCalls: p.draws.reduce((sum, value) => sum + value, 0) / p.draws.length, renderError: g.renderer.renderError, inserted: g.mixing.inserted };
+    const receipt = document.querySelector('#mixing-receipt');
+    const use = document.querySelector('#site-pro-use').getBoundingClientRect();
+    const status = document.querySelector('#mobile-use-status');
+    const statusRect = status.getBoundingClientRect();
+    return { samples: p.times.length, mixingFrames: p.mixingFrames, p95Ms: intervals[Math.floor(intervals.length * .95)], drawCalls: p.draws.reduce((sum, value) => sum + value, 0) / p.draws.length, renderError: g.renderer.renderError, inserted: g.mixing.inserted, compact: g.hud.shell.classList.contains('mixing-motor-active'), receiptHeight: receipt.getBoundingClientRect().height, receiptLabelPx: parseFloat(getComputedStyle(receipt.querySelector('dt')).fontSize), useStatus: status.textContent, useStatusFits: statusRect.left >= use.left && statusRect.right <= use.right && status.scrollWidth <= status.clientWidth };
   }));
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await page.screenshot({ path: `${out}/mobile-portrait-mixer-work.png` });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await page.waitForFunction(() => !window.__wireTheHouse.hud.shell.classList.contains('mixing-motor-active'));
   assert(report.inserted && report.samples > 30 && report.mixingFrames > 30 && report.p95Ms < 40 && report.drawCalls < 600 && report.renderError === '');
+  assert(report.compact && report.receiptHeight < 65 && report.receiptLabelPx >= 12, 'Held mixing keeps the ingredient receipt compact and readable');
+  assert(report.useStatus === 'ΜΙΞΗ' && report.useStatusFits, 'Held mixing status remains within its mobile button');
   assert.deepEqual(report.errors, []);
   await context.close();
 } finally {

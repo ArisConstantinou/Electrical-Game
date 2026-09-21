@@ -10,6 +10,14 @@
 #mixing-receipt.has-deposit{border-left-color:#9bc89c}
 #mixing-receipt.has-deposit p{color:#c8eec5}
 @media(max-width:700px),(pointer:coarse){#mixing-receipt{left:10px;top:max(68px,calc(env(safe-area-inset-top) + 62px));width:300px;max-width:calc(100% - 20px);padding:8px 10px}#mixing-receipt dl{margin:5px 0;gap:7px}}
+@media(max-width:700px),(pointer:coarse){
+  .mixing-motor-active #mixing-receipt{width:236px;padding:4px 7px;background:rgba(26,29,25,.84)}
+  .mixing-motor-active #mixing-receipt .mix-receipt-title{display:none}
+  .mixing-motor-active #mixing-receipt dl{margin:0;gap:5px;grid-template-columns:.8fr 1.15fr 1.15fr}
+  .mixing-motor-active #mixing-receipt dt{font-size:12px}
+  .mixing-motor-active #mixing-receipt dd{margin:0;font-size:14px}
+  .mixing-motor-active #mixing-receipt p{position:absolute;width:1px;height:1px;min-height:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+}
 @media(max-height:540px){#mixing-receipt{left:10px;top:64px;width:285px;padding:7px 10px}#mixing-receipt p{min-height:0}#mixing-receipt dl{margin:4px 0}}
 #mixing-panel{display:none!important}
 #mixing-panel[hidden],#mixing-world-prompt[hidden],#mixing-finish[hidden]{display:none!important}

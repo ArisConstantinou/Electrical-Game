@@ -543,6 +543,7 @@ export class MixingStation {
     const direction=this.game.renderer.camera.getWorldDirection(new THREE.Vector3());
     const bucketAim=direction.dot(this.bucketPosition().add(new THREE.Vector3(0,.3,0)).sub(this.game.renderer.camera.position).normalize())>.88||direction.dot(this.bucketPosition().add(new THREE.Vector3(0,.75,0)).sub(this.game.renderer.camera.position).normalize())>.96;
     this.mixingNow=held&&this.tool==='mixer'&&this.inserted&&this.near(this.models.bucket,1.35)&&bucketAim&&!document.hidden;
+    this.game.hud.shell.classList.toggle('mixing-motor-active',this.mixingNow);
     if(this.mixingNow){const before=this.batch.mixProgress;this.batch.mix(dt);if(this.batch.mixProgress>before||this.batch.ready)this.mixerDirty=true;this.message=qualityNames[this.batch.quality];}
     if(held&&this.tool==='mixer'&&this.inserted&&!this.near(this.models.bucket,1.35))this.message='Πλησίασε τη σύκλα για να ανακατέψεις.';
     if(this.wasHeldInteraction&&!heldInteraction&&this.batch.ready&&this.inserted){this.inserted=false;this.stop();this.message='Ο πηλός είναι έτοιμος. Πάτησε FINISH.';}
@@ -602,7 +603,7 @@ export class MixingStation {
     else{m.mixer.position.copy(this.mixerHome);m.mixer.rotation.copy(this.mixerRotation);}
     m.mixer.visible=this.inserted||this.cleanSeconds>0||this.tool!=='mixer'||!this.active;m.shovel.visible=this.tool!=='shovel'||!this.active;
     this.game.fpsRig.visible=!this.blocksWork&&!(this.interactionTargeted&&this.game.selectedTool==='fitting');
-    if(this.blocksWork)this.game.hud.updateMobileUseStatus(this.carrying?'ΑΦΗΣΕ ΤΗ ΣΥΚΛΑ':this.tool==='hands'?'ΠΙΑΣΕ ΕΡΓΑΛΕΙΟ':this.tool==='mixer'?this.mixerControlHint:'ΧΡΗΣΗ',this.tool!=='hands',this.mixingNow);
+    if(this.blocksWork)this.game.hud.updateMobileUseStatus(this.carrying?'ΑΦΗΣΕ ΤΗ ΣΥΚΛΑ':this.tool==='hands'?'ΠΙΑΣΕ ΕΡΓΑΛΕΙΟ':this.tool==='mixer'?(this.mixingNow?'ΜΙΞΗ':this.mixerControlHint):'ΧΡΗΣΗ',this.tool!=='hands',this.mixingNow);
     this.stationTrowel.visible=this.tool!=='trowel'||!this.active;this.stationTrowel.getObjectByName('trowel-load')!.visible=Boolean(state.heldTrowel);
     m.water.visible=this.tool!=='water'||!this.active;
     this.held.visible=this.active&&!this.carrying&&!this.wheelbarrow.busy;

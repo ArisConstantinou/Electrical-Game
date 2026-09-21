@@ -21,6 +21,7 @@ try {
     await page.waitForFunction(() => window.__wireTheHouse?.mixing?.models.sand?.telemetry, null, { timeout: 120000 });
     await page.locator('#apprentice-count').selectOption('0');
     if (layout.touch) await page.locator('#start-button').tap(); else await page.locator('#start-button').click();
+    await page.locator('#start-screen').waitFor({ state: 'hidden' });
     await page.evaluate(() => { const game = window.__wireTheHouse; window.__sandStep = game.step.bind(game); game.step = () => {}; });
     const step = count => page.evaluate(n => { for (let i = 0; i < n; i++) window.__sandStep(1 / 60); }, count);
     const before = await page.evaluate(() => {
