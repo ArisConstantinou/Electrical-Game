@@ -55,7 +55,8 @@ export class BoxPlacementSystem {
     const ray=new THREE.Raycaster(camera.getWorldPosition(new THREE.Vector3()),camera.getWorldDirection(new THREE.Vector3()),0,GAME_CONFIG.interaction.maxDistance);
     let target:InstallationPoint|null=null,distance=Infinity;
     for(const point of this.points){if(!point.boxGroup.visible)continue;point.updateWorldMatrix(true,true);
-      const hit=ray.intersectObjects(point.boxGroup.boxes,true)[0];if(hit&&hit.distance<distance){distance=hit.distance;target=point;}}
+      const hit=ray.intersectObjects(point.boxGroup.boxes,true)[0];
+      if(hit&&hit.distance<distance&&!this.wall.volume.raycast(ray.ray.origin,ray.ray.direction,Math.max(0,hit.distance-.003))){distance=hit.distance;target=point;}}
     return target;
   }
 
@@ -64,13 +65,21 @@ export class BoxPlacementSystem {
   targetNear(camera:THREE.Camera,maxDistance=1.6,maxNdcX=.32,maxNdcY=.20):InstallationPoint|null{
     const exact=this.target(camera);if(exact)return exact;
     camera.updateMatrixWorld(true);
+    const origin=camera.getWorldPosition(new THREE.Vector3());
     let target:InstallationPoint|null=null,score=Infinity;
     for(const point of this.points){
       if(!point.boxGroup.visible)continue;
-      const world=point.boxGroup.getWorldPosition(new THREE.Vector3()),distance=world.distanceTo(camera.getWorldPosition(new THREE.Vector3()));
+      const world=point.boxGroup.getWorldPosition(new THREE.Vector3()),distance=world.distanceTo(origin);
       if(distance>maxDistance)continue;
       const projected=world.clone().project(camera);
       if(projected.z< -1||projected.z>1||Math.abs(projected.x)>maxNdcX||Math.abs(projected.y)>maxNdcY)continue;
+      // A projected centre is only a forgiving aim aid. Check the nearest
+      // physical casing surface so hidden boxes cannot be selected through an
+      // intact section of masonry.
+      point.updateWorldMatrix(true,true);
+      const surface=new THREE.Box3().setFromObject(point.boxGroup).clampPoint(origin,new THREE.Vector3());
+      const toSurface=surface.sub(origin),surfaceDistance=toSurface.length();
+      if(surfaceDistance>.003&&this.wall.volume.raycast(origin,toSurface.normalize(),surfaceDistance-.003))continue;
       const candidate=Math.hypot(projected.x/maxNdcX,projected.y/maxNdcY)+distance*.04;
       if(candidate<score){score=candidate;target=point;}
     }
