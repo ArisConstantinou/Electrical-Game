@@ -11,6 +11,8 @@ const devices = [
   { name: 'desktop', width: 1366, height: 768, touch: false },
 ].filter(device => !only || device.name === only);
 const views = [
+  { name: 'front-brick-wall', x: 0, z: 0, yaw: 0, pitch: -.05 },
+  { name: 'right-brick-wall', x: 0, z: 0, yaw: -Math.PI / 2, pitch: -.05 },
   { name: 'rear-room', x: 0, z: -.25, yaw: Math.PI, pitch: -.06 },
   { name: 'floor-detail', x: 0, z: -.25, yaw: Math.PI, pitch: -.83 },
   { name: 'supplies', x: 0, z: -.35, yaw: -2.28, pitch: -.39 },
@@ -79,6 +81,38 @@ try {
     assert.equal(rearContact.withRear.targetStable, true, `${device.name}: rear wall has stable backing`);
     assert(Math.abs(rearContact.withRear.target[2] - 3.596) < .02, `${device.name}: tape contacts the visible rear elevation`);
     report.cases.push({ device: device.name, view: 'rear-work-contact', state: rearContact });
+    const masonry = await page.evaluate(() => {
+      const room = window.__wireTheHouse.room;
+      const left = room.referenceWalls.find(wall => wall.name === 'Left concrete wall');
+      const right = room.referenceWalls.find(wall => wall.name === 'Right concrete wall');
+      const rear = room.getObjectByName('Full staggered rear clay courses');
+      const front = room.brickWall.getObjectByName('Batched untouched masonry');
+      const practice = room.intactPracticeWall.getObjectByName('Batched untouched masonry');
+      const leftBricks = left?.getObjectByName('Left fired-clay courses cut around unglazed opening');
+      const rightBricks = right?.getObjectByName('Right fired-clay courses');
+      const leftWindowBlocked = (() => {
+        if (!leftBricks?.isInstancedMesh) return true;
+        const matrix = new leftBricks.matrixWorld.constructor();
+        leftBricks.updateMatrixWorld(true);
+        for (let i = 0; i < leftBricks.count; i++) {
+          leftBricks.getMatrixAt(i, matrix);
+          const z = matrix.elements[14], y = matrix.elements[13];
+          const halfZ = Math.abs(matrix.elements[10]) / 2, halfY = Math.abs(matrix.elements[5]) / 2;
+          if (z + halfZ > 1.0501 && z - halfZ < 2.9499 && y + halfY > 1.0501 && y - halfY < 2.3499) return true;
+        }
+        return false;
+      })();
+      return {
+        front: Boolean(front), rightPractice: Boolean(practice), rear: rear?.count ?? 0,
+        left: leftBricks?.count ?? 0, right: rightBricks?.count ?? 0,
+        source: rear?.userData.textureSource ?? '',
+        rearPlaster: Boolean(room.getObjectByName('Trowelled plaster lift with unfinished masonry edge')),
+        leftWindowBlocked,
+      };
+    });
+    assert(masonry.front && masonry.rightPractice && masonry.left > 300 && masonry.right > 400 && masonry.rear >= 480, `${device.name}: missing fired-clay wall: ${JSON.stringify(masonry)}`);
+    assert(masonry.source.includes('red-brick-polyhaven-1k.jpg') && !masonry.rearPlaster && !masonry.leftWindowBlocked, `${device.name}: wrong material or window obstruction: ${JSON.stringify(masonry)}`);
+    report.cases.push({ device: device.name, view: 'four-masonry-walls', state: masonry });
     await context.close();
   }
   assert.deepEqual(report.errors, []);

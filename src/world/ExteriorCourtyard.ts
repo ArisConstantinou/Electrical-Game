@@ -4,6 +4,7 @@ import { siteMaterial } from './SiteMaterials';
 /** Real geometry beyond the unglazed left opening, with a small wind-driven canopy. */
 export class ExteriorCourtyard extends THREE.Group {
   private readonly canopy = new THREE.Group();
+  private readonly branchCrowns: THREE.Group[] = [];
   private windTime = 0;
 
   constructor() {
@@ -23,7 +24,7 @@ export class ExteriorCourtyard extends THREE.Group {
     const skyGeometry = new THREE.SphereGeometry(60, 32, 12);
     const skyPositions = skyGeometry.getAttribute('position');
     const skyColors: number[] = [];
-    const horizon = new THREE.Color(0xe2e4dd), blue = new THREE.Color(0x82b5d3), skyColor = new THREE.Color();
+    const horizon = new THREE.Color(0xb9cdd4), blue = new THREE.Color(0x78a8ca), skyColor = new THREE.Color();
     for (let i = 0; i < skyPositions.count; i++) {
       const height = THREE.MathUtils.clamp((skyPositions.getY(i) / 60 + .02) * 2.1, 0, 1);
       skyColor.copy(horizon).lerp(blue, height);
@@ -106,46 +107,115 @@ export class ExteriorCourtyard extends THREE.Group {
     rail.name = 'Individual balcony railing uprights'; rail.castShadow = true; rail.raycast = () => undefined;
     rail.computeBoundingSphere(); neighbour.add(rail);
     block('Balcony top rail', steel, facadeX + 1.07, 3.66, 0, .033, .032, 7.35);
-    block('Distant warm wall past courtyard', plaster, -16.8, 2.0, 0, .35, 4, 18);
+    // Beyond the low brick boundary, a second residence has its own depth,
+    // punched apertures and roof profile. No broad background wall is used.
+    const farHouse = new THREE.Group(); farHouse.name = 'Residence beyond courtyard boundary';
+    farHouse.position.set(-13.3, 0, 2.1); this.add(farHouse); parent = farHouse;
+    const warmPlaster = siteMaterial('plaster', 0xe0bb98, 1.9, 1.2);
+    const darkInside = new THREE.MeshStandardMaterial({ color: 0x464137, roughness: 1 });
+    const terracotta = siteMaterial('clay', 0xb97255, 1.3, 1);
+    const farShapes = new Map<THREE.Material, Array<{ position: THREE.Vector3; scale: THREE.Vector3 }>>();
+    const farBlock = (material: THREE.Material, x: number, y: number, z: number, sx: number, sy: number, sz: number): void => {
+      const shapes = farShapes.get(material) ?? [];
+      shapes.push({ position: new THREE.Vector3(x, y, z), scale: new THREE.Vector3(sx, sy, sz) });
+      farShapes.set(material, shapes);
+    };
+    farBlock(warmPlaster, 0, .55, 0, .32, 1.1, 6.3);
+    farBlock(warmPlaster, 0, 2.27, 0, .32, .42, 6.3);
+    for (const [z, width] of [[-2.68, .94], [-.87, .83], [.94, .83], [2.68, .94]] as const)
+      farBlock(warmPlaster, 0, 1.51, z, .32, 1.24, width);
+    for (const z of [-1.79, 0, 1.79]) {
+      farBlock(darkInside, -.24, 1.51, z, .025, 1.24, .97);
+      farBlock(concrete, .09, .91, z, .50, .075, 1.06);
+      farBlock(concrete, -.035, 1.51, z - .52, .26, 1.24, .055);
+      farBlock(concrete, -.035, 1.51, z + .52, .26, 1.24, .055);
+    }
+    farBlock(concrete, .12, 2.52, 0, .66, .17, 6.55);
+    farBlock(warmPlaster, 0, 3.32, 0, .32, 1.40, 6.3);
+    farBlock(terracotta, .10, 4.18, 0, .68, .18, 6.72);
+    farBlock(warmPlaster, -.10, 4.47, 0, .29, .43, 6.3);
+    for (const [material, shapes] of farShapes) {
+      const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), material, shapes.length);
+      mesh.name = `Batched far-residence ${material.name || material.type} structure`;
+      for (let i = 0; i < shapes.length; i++) {
+        const shape = shapes[i];
+        mesh.setMatrixAt(i, matrix.compose(shape.position, new THREE.Quaternion(), shape.scale));
+      }
+      mesh.castShadow = material !== darkInside; mesh.receiveShadow = true;
+      mesh.raycast = () => undefined; mesh.computeBoundingSphere(); farHouse.add(mesh);
+    }
+    const drain = new THREE.Mesh(new THREE.CylinderGeometry(.037, .037, 4.1, 8), steel);
+    drain.name = 'Rainwater downpipe with wall offset'; drain.position.set(.23, 2.05, 2.88);
+    drain.castShadow = true; drain.raycast = () => undefined; farHouse.add(drain);
     parent = this;
 
     // A pruned olive tree contributes near/mid/far parallax and gentle motion.
     const tree = new THREE.Group(); tree.name = 'Olive tree outside unfinished opening'; tree.position.set(-6.35, 0, 2.80); this.add(tree);
-    const trunkPoints = [new THREE.Vector3(0,0,0), new THREE.Vector3(.03,.48,0), new THREE.Vector3(-.08,1.05,.03), new THREE.Vector3(.04,1.64,0)];
-    const trunk = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(trunkPoints), 18, .09, 7, false), bark);
+    const trunkPoints = [new THREE.Vector3(0,0,0), new THREE.Vector3(.09,.38,.01), new THREE.Vector3(-.06,.87,.07), new THREE.Vector3(.07,1.43,0)];
+    const trunk = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(trunkPoints), 22, .105, 9, false), bark);
     trunk.castShadow = true; tree.add(trunk);
-    this.canopy.position.set(.04, 1.59, 0); tree.add(this.canopy);
-    for (const [x, y, z] of [[-.65,.48,-.23],[.66,.40,-.17],[-.35,.79,.35],[.41,.83,.41]] as const) {
+    this.canopy.position.set(.07, 1.43, 0); tree.add(this.canopy);
+    const sprays = [[-.72,.44,-.25],[.70,.42,-.22],[-.47,.73,.35],[.50,.76,.36],[-.08,.87,-.43],[.06,.34,.53]] as const;
+    for (const [x, y, z] of sprays) {
       const branch = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
-        new THREE.Vector3(0,0,0), new THREE.Vector3(x*.45,y*.45,z*.45), new THREE.Vector3(x,y,z),
-      ]), 10, .028, 5, false), bark);
+        new THREE.Vector3(0,0,0), new THREE.Vector3(x*.42,y*.63,z*.34), new THREE.Vector3(x,y,z),
+      ]), 12, .034, 6, false), bark);
       branch.castShadow = true; this.canopy.add(branch);
     }
+    // Kew describes narrow, leathery 2–9.5 cm blades with pale undersides.
+    // Each low-poly blade is about 7 cm long and 1.2 cm wide, rather than a
+    // quarter-metre triangular silhouette. Six instanced sprays keep draw cost
+    // bounded while each crown responds independently to wind.
     const leafGeometry = new THREE.BufferGeometry();
-    leafGeometry.setAttribute('position', new THREE.Float32BufferAttribute([
-      0,-.105,0, -.042,0,.018, 0,.145,0,
-      0,-.105,0, 0,.145,0, .042,0,.018,
-    ], 3));
-    leafGeometry.computeVertexNormals();
-    const foliage = new THREE.InstancedMesh(leafGeometry, leaves, 188);
-    const position = new THREE.Vector3(), quaternion = new THREE.Quaternion(), scale = new THREE.Vector3(), tint = new THREE.Color();
-    const sprays = [[-.65,.48,-.23],[.66,.40,-.17],[-.35,.79,.35],[.41,.83,.41]] as const;
-    for (let i = 0; i < 188; i++) {
-      const [sx, sy, sz] = sprays[i % sprays.length];
-      const angle = i * 2.39996, radius = .08 + .37 * Math.sqrt((i % 47) / 47);
-      position.set(sx + Math.cos(angle)*radius, sy + .21*Math.sin(i*1.71), sz + Math.sin(angle)*radius*.80);
-      quaternion.setFromEuler(new THREE.Euler(.36*Math.sin(i*2.11), angle + .42, .65*Math.sin(i*1.37)));
-      scale.setScalar(.72 + i%5*.095);
-      matrix.compose(position, quaternion, scale); foliage.setMatrixAt(i, matrix);
-      foliage.setColorAt(i, tint.setRGB(.73+i%5*.026, .79+i%4*.026, .67+i%3*.027));
+    const leafVertices: number[] = [];
+    for (let leaf = 0; leaf < 7; leaf++) {
+      const centerX = (leaf - 3) * .022, centerY = (leaf % 2 ? .015 : -.015), centerZ = (leaf % 3 - 1) * .018;
+      const direction = leaf % 2 ? .61 : -.61;
+      const point = (x: number, y: number): [number, number, number] => [
+        centerX + x * Math.cos(direction) - y * Math.sin(direction),
+        centerY + x * Math.sin(direction) + y * Math.cos(direction),
+        centerZ + x * .17,
+      ];
+      const stem = point(0, -.035), leftLow = point(-.004, -.018), leftWide = point(-.006, .003);
+      const tip = point(0, .036), rightWide = point(.006, .003), rightLow = point(.004, -.018);
+      for (const vertex of [stem,leftLow,leftWide, stem,leftWide,tip, stem,tip,rightWide, stem,rightWide,rightLow])
+        leafVertices.push(...vertex);
     }
-    foliage.name = 'Individual silver-green olive foliage clusters'; foliage.castShadow = true;
-    foliage.raycast = () => undefined; foliage.computeBoundingSphere(); this.canopy.add(foliage);
+    leafGeometry.setAttribute('position', new THREE.Float32BufferAttribute(leafVertices, 3));
+    leafGeometry.computeVertexNormals();
+    const position = new THREE.Vector3(), quaternion = new THREE.Quaternion(), scale = new THREE.Vector3(), tint = new THREE.Color();
+    for (let sprayIndex = 0; sprayIndex < sprays.length; sprayIndex++) {
+      const [sx, sy, sz] = sprays[sprayIndex];
+      const crown = new THREE.Group(); crown.position.set(sx, sy, sz);
+      crown.name = `Wind-responsive olive branch ${sprayIndex + 1}`;
+      this.canopy.add(crown); this.branchCrowns.push(crown);
+      const twig = new THREE.Mesh(new THREE.CylinderGeometry(.003, .012, .69, 5), bark);
+      twig.position.y = -.20; twig.rotation.z = (sprayIndex % 2 ? -1 : 1) * .35;
+      crown.add(twig);
+      const foliage = new THREE.InstancedMesh(leafGeometry, leaves, 270);
+      for (let i = 0; i < 270; i++) {
+        const angle = i * 2.39996 + sprayIndex * 1.37;
+        const radial = Math.sqrt((i + .5) / 270);
+        position.set(Math.cos(angle) * radial * .37, Math.sin(i * 1.71 + sprayIndex) * .27, Math.sin(angle) * radial * .28);
+        quaternion.setFromEuler(new THREE.Euler(.38 * Math.sin(i * 2.11), angle + .42, .9 * Math.sin(i * 1.37)));
+        scale.setScalar(.72 + i % 5 * .095);
+        matrix.compose(position, quaternion, scale); foliage.setMatrixAt(i, matrix);
+        foliage.setColorAt(i, tint.setRGB(.72 + i % 5 * .022, .78 + i % 4 * .018, .69 + i % 3 * .025));
+      }
+      foliage.name = `Narrow silver-backed olive leaves ${sprayIndex + 1}`;
+      foliage.castShadow = false; foliage.raycast = () => undefined;
+      foliage.computeBoundingSphere(); crown.add(foliage);
+    }
   }
 
   update(dt: number): void {
     this.windTime += Math.min(.05, Math.max(0, dt));
     this.canopy.rotation.z = .016 * Math.sin(this.windTime * 1.25) + .006 * Math.sin(this.windTime * 2.7);
     this.canopy.rotation.x = .011 * Math.sin(this.windTime * .91 + .7);
+    for (let i = 0; i < this.branchCrowns.length; i++) {
+      const crown = this.branchCrowns[i];
+      crown.rotation.z = .026 * Math.sin(this.windTime * (1.31 + i * .09) + i * 1.2);
+      crown.rotation.x = .019 * Math.sin(this.windTime * (.83 + i * .07) + i * .8);
+    }
   }
 }

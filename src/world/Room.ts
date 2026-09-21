@@ -6,6 +6,37 @@ import { addLighting } from './Lighting';
 import { matteMaterial, siteMaterial } from './SiteMaterials';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { ExteriorCourtyard } from './ExteriorCourtyard';
+import { positionWorld, texture as sampleTexture, vec2 } from 'three/tsl';
+import { MeshStandardNodeMaterial } from 'three/webgpu';
+
+// Poly Haven "Red Brick" by Rob Tuytel, CC0: https://polyhaven.com/a/red_brick
+// A continuous world-space projection keeps the photographed bonds, changing
+// brick faces, and mortar aligned across individually modelled wall courses.
+const brickFace = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}assets/masonry/red-brick-polyhaven-1k.jpg`);
+brickFace.colorSpace = THREE.SRGBColorSpace;
+brickFace.anisotropy = 8;
+brickFace.wrapS = brickFace.wrapT = THREE.RepeatWrapping;
+const brickMaterial = (axis: 'x' | 'z'): MeshStandardNodeMaterial => {
+  const material = new MeshStandardNodeMaterial({ roughness: 1 });
+  material.name = `Continuous photographed fired-clay face (${axis})`;
+  material.colorNode = sampleTexture(brickFace, vec2(positionWorld[axis].div(2.34), positionWorld.y.div(2.535))).rgb;
+  return material;
+};
+const sideBrickMaterial = brickMaterial('z');
+const rearBrickMaterial = brickMaterial('x');
+
+const concreteBeam = (size: THREE.Vector3, material: THREE.Material): THREE.Mesh => {
+  const geometry = new THREE.BoxGeometry(size.x, size.y, size.z);
+  const positions = geometry.getAttribute('position'), normals = geometry.getAttribute('normal'), uvs = geometry.getAttribute('uv');
+  for (let i = 0; i < positions.count; i++) {
+    const x = positions.getX(i), y = positions.getY(i), z = positions.getZ(i);
+    const nx = Math.abs(normals.getX(i)), ny = Math.abs(normals.getY(i));
+    // Every face receives approximately 0.75 m of scanned concrete per tile.
+    // A long, shallow beam must not stretch one square texture along its span.
+    uvs.setXY(i, (nx > .5 ? z : x) / .75, (ny > .5 ? z : y) / .75);
+  }
+  return new THREE.Mesh(geometry, material);
+};
 
 export class Room extends THREE.Group {
   readonly brickWall: BrickWall;
@@ -44,10 +75,9 @@ export class Room extends THREE.Group {
     ceiling.receiveShadow = true;
     this.add(ceiling);
 
-    // These are unfinished structural returns, cast with the slab and piers.
-    // Give them the same concrete aggregate and tint; the rear lift remains
-    // plaster because its exposed brick edge explains the different finish.
-    const sideMaterial = siteMaterial('concrete', 0xf0ede7, 1.8, .75);
+    // Mortar backing stays solid for contact and measurement. Individually
+    // raised clay courses on all side-wall segments match the primary wall.
+    const sideMaterial = matteMaterial(0x625b51);
     sideMaterial.userData.referenceLaserReceiver=true;
     const sideGeometry = new THREE.BoxGeometry(0.22, GAME_CONFIG.room.height, GAME_CONFIG.room.depth);
     for (const [name, x] of [['Left concrete wall', -GAME_CONFIG.room.width / 2 - 0.11], ['Right concrete wall', GAME_CONFIG.room.width / 2 + 0.11]] as const) {
@@ -82,6 +112,7 @@ export class Room extends THREE.Group {
       side.name = name;
       side.userData.studioEntityId = `world:${name.toLowerCase().replaceAll(' ', '-')}`;
       side.receiveShadow = true;
+      this.addSideBrickCourses(side, x, x < 0);
       this.referenceWalls.push(side);
       this.add(side);
     }
@@ -104,6 +135,7 @@ export class Room extends THREE.Group {
     this.addFormworkMarks();
     this.addConstructionJoints();
     this.addRearWall();
+    this.addWallHeadBeams();
     this.addFloorReturns();
     this.addContactPatina();
     this.addSiteSupplies();
@@ -144,15 +176,51 @@ export class Room extends THREE.Group {
 
   update(dt: number): void { this.exterior.update(dt); }
 
+  private addSideBrickCourses(side: THREE.Group, wallX: number, hasOpening: boolean): void {
+    const pitch = GAME_CONFIG.room.depth / 20, course = GAME_CONFIG.room.height / 23, gap = .002;
+    const zMin = -GAME_CONFIG.room.depth / 2, zMax = GAME_CONFIG.room.depth / 2;
+    const pieces: Array<{ y: number; z: number; height: number; length: number }> = [];
+    const add = (y0: number, y1: number, z0: number, z1: number): void => {
+      if (y1 - y0 > .016 && z1 - z0 > .016)
+        pieces.push({ y: (y0 + y1) / 2, z: (z0 + z1) / 2, height: y1 - y0, length: z1 - z0 });
+    };
+    for (let row = 0; row < 23; row++) for (let column = -1; column <= 20; column++) {
+      const offset = (row % 2) * pitch / 2;
+      const y0 = row * course + gap / 2, y1 = (row + 1) * course - gap / 2;
+      const z0 = Math.max(zMin, zMin + column * pitch + offset + gap / 2);
+      const z1 = Math.min(zMax, zMin + (column + 1) * pitch + offset - gap / 2);
+      if (z1 <= z0) continue;
+      if (!hasOpening || y1 <= 1.05 || y0 >= 2.35 || z1 <= 1.05 || z0 >= 2.95) { add(y0, y1, z0, z1); continue; }
+      add(y0, Math.min(y1, 1.05), z0, z1);
+      add(Math.max(y0, 2.35), y1, z0, z1);
+      const middleBottom = Math.max(y0, 1.05), middleTop = Math.min(y1, 2.35);
+      add(middleBottom, middleTop, z0, Math.min(z1, 1.05));
+      add(middleBottom, middleTop, Math.max(z0, 2.95), z1);
+    }
+    const bricks = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), sideBrickMaterial, pieces.length);
+    bricks.name = hasOpening ? 'Left fired-clay courses cut around unglazed opening' : 'Right fired-clay courses';
+    const matrix = new THREE.Matrix4(), rotation = new THREE.Quaternion(), position = new THREE.Vector3(), scale = new THREE.Vector3();
+    for (const [index, piece] of pieces.entries()) {
+      position.set(wallX + (wallX < 0 ? .120 : -.120), piece.y, piece.z);
+      scale.set(.020, piece.height, piece.length);
+      bricks.setMatrixAt(index, matrix.compose(position, rotation, scale));
+    }
+    bricks.castShadow = bricks.receiveShadow = true;
+    // Measurement hits the continuous masonry backing, including mortar
+    // joints, while the photographed faces project only about 2 cm inward.
+    bricks.raycast = () => undefined;
+    bricks.computeBoundingSphere(); side.add(bricks);
+  }
+
   private addRearWall(): void {
-    // The player already stops at this elevation. Keep the room enclosed until
-    // a real exterior scene can be built and tested behind any future opening.
+    // The fourth perimeter wall uses the same clay photograph and course
+    // dimensions as the primary wall. A solid mortar backing retains contact.
     const rearZ = GAME_CONFIG.room.depth / 2;
     const wall = new THREE.Mesh(
       new THREE.BoxGeometry(GAME_CONFIG.room.width, GAME_CONFIG.room.height, .16),
-      matteMaterial(0x827b70),
+      matteMaterial(0x625b51),
     );
-    wall.name = 'Unfinished rear plaster wall';
+    wall.name = 'Solid rear masonry backing';
     wall.userData.studioEntityId = 'world:rear-wall';
     wall.userData.referenceLaserReceiver = true;
     wall.position.set(0, GAME_CONFIG.room.height / 2, rearZ + .08);
@@ -160,51 +228,27 @@ export class Room extends THREE.Group {
     this.referenceWalls.push(wall);
     this.add(wall);
 
-    // Staggered, individually three-dimensional clay courses behind a partly
-    // finished plaster lift. The masonry and the plaster do not share a flat
-    // photographic plane: their edges cast shadows at the actual transition.
-    const brickWidth = .235, course = .094, gap = .012;
-    const columns = 16, rows = 31;
-    const brickGeometry = new THREE.BoxGeometry(brickWidth - gap, course - gap, .085);
-    const brickMaterial = new THREE.MeshStandardMaterial({
-      color: 0xffffff, map: new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}assets/masonry/brick-face-site.webp`), roughness: 1,
-    });
-    brickMaterial.map!.colorSpace = THREE.SRGBColorSpace;
-    const bricks = new THREE.InstancedMesh(brickGeometry, brickMaterial, columns * rows);
-    bricks.name = 'Exposed staggered rear clay courses';
+    const brickWidth = GAME_CONFIG.room.width / 21, course = GAME_CONFIG.room.height / 23, gap = .002;
+    const columns = 22, rows = 23;
+    const bricks = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), rearBrickMaterial, columns * rows);
+    bricks.name = 'Full staggered rear clay courses';
+    bricks.userData.textureSource = 'red-brick-polyhaven-1k.jpg';
     bricks.userData.studioEntityId = 'world:rear-exposed-masonry';
-    const matrix = new THREE.Matrix4(), position = new THREE.Vector3(), rotation = new THREE.Quaternion(), scale = new THREE.Vector3(1, 1, 1);
-    const shade = new THREE.Color();
+    const matrix = new THREE.Matrix4(), position = new THREE.Vector3(), rotation = new THREE.Quaternion(), scale = new THREE.Vector3();
     for (let row = 0; row < rows; row++) for (let column = 0; column < columns; column++) {
       const index = row * columns + column;
-      position.set(-GAME_CONFIG.room.width / 2 + .12 + column * brickWidth + (row % 2) * brickWidth / 2, .055 + row * course, rearZ - .043);
+      const left = -GAME_CONFIG.room.width / 2 + column * brickWidth + (row % 2) * brickWidth / 2;
+      const right = Math.min(GAME_CONFIG.room.width / 2, left + brickWidth - gap);
+      const clippedLeft = Math.max(-GAME_CONFIG.room.width / 2, left + gap / 2);
+      position.set((clippedLeft + right) / 2, (row + .5) * course, rearZ - .010);
+      scale.set(Math.max(0, right - clippedLeft), course - gap, .020);
       matrix.compose(position, rotation, scale);
       bricks.setMatrixAt(index, matrix);
-      bricks.setColorAt(index, shade.setRGB(.88 + (index * 7 % 5) * .026, .86 + (index * 11 % 4) * .025, .82 + (index * 13 % 5) * .018));
     }
     bricks.castShadow = bricks.receiveShadow = true;
     bricks.computeBoundingSphere();
     bricks.raycast = () => undefined;
     this.add(bricks);
-
-    const plasterShape = new THREE.Shape();
-    plasterShape.moveTo(-.86, 0);
-    plasterShape.lineTo(3.8, 0);
-    plasterShape.lineTo(3.8, 3);
-    plasterShape.lineTo(-.84, 3);
-    for (let y = 2.88; y >= .12; y -= .12) {
-      const edge = -.89 + Math.sin(y * 11.7) * .035 + Math.sin(y * 24.1) * .014;
-      plasterShape.lineTo(edge, y);
-    }
-    plasterShape.closePath();
-    const plasterGeometry = new THREE.ExtrudeGeometry(plasterShape, {depth: .024, bevelEnabled: true, bevelSize: .006, bevelThickness: .004, bevelSegments: 1, curveSegments: 1});
-    const plaster = new THREE.Mesh(plasterGeometry, siteMaterial('plaster', 0xf5f1eb, .25, .25));
-    plaster.position.z = rearZ - .111;
-    plaster.name = 'Trowelled plaster lift with unfinished masonry edge';
-    plaster.userData.studioEntityId = 'world:rear-plaster-lift';
-    plaster.castShadow = plaster.receiveShadow = true;
-    plaster.raycast = () => undefined;
-    this.add(plaster);
 
     const cornerMaterial = siteMaterial('concrete', 0xf0ede7, .075, .75);
     const corners = new THREE.InstancedMesh(new THREE.BoxGeometry(.28, GAME_CONFIG.room.height, .30), cornerMaterial, 2);
@@ -216,6 +260,30 @@ export class Room extends THREE.Group {
     corners.raycast = () => undefined;
     corners.computeBoundingSphere();
     this.add(corners);
+  }
+
+  private addWallHeadBeams(): void {
+    // The brick infill terminates below a continuous cast-concrete ring beam.
+    // Its upper half enters the slab; the lower edge is a visible construction
+    // joint, so clay no longer intersects the ceiling as two unrelated skins.
+    const width = GAME_CONFIG.room.width, depth = GAME_CONFIG.room.depth;
+    const material = siteMaterial('floor', 0xbdb7ad);
+    const beams = new THREE.Group();
+    const parts = [
+      { x: 0, z: GAME_CONFIG.room.wallFrontZ - .01, sx: width, sz: .27 },
+      { x: 0, z: depth / 2 - .035, sx: width, sz: .27 },
+      { x: -width / 2 + .035, z: 0, sx: .27, sz: depth },
+      { x: width / 2 - .035, z: 0, sx: .27, sz: depth },
+    ];
+    for (const part of parts) {
+      const beam = concreteBeam(new THREE.Vector3(part.sx, .22, part.sz), material);
+      beam.position.set(part.x, 2.89, part.z);
+      beam.castShadow = beam.receiveShadow = true;
+      beam.raycast = () => undefined;
+      beams.add(beam);
+    }
+    beams.name = 'Cast concrete ring beam joining brick walls to ceiling slab';
+    this.add(beams);
   }
 
   private addConstructionJoints(): void {
@@ -235,15 +303,16 @@ export class Room extends THREE.Group {
     cuts.computeBoundingSphere();
     this.add(cuts);
 
-    const beams = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), siteMaterial('concrete', 0xf0ede7, 1, .15), 3);
-    for (const [index, z] of [-2.65, .1, 2.65].entries()) {
-      transform.compose(new THREE.Vector3(0, GAME_CONFIG.room.height - .085, z), new THREE.Quaternion(), new THREE.Vector3(width, .17, .24));
-      beams.setMatrixAt(index, transform);
+    const beams = new THREE.Group();
+    const beamMaterial = siteMaterial('floor', 0xbdb7ad);
+    for (const z of [-2.65, .1, 2.65]) {
+      const beam = concreteBeam(new THREE.Vector3(width, .17, .24), beamMaterial);
+      beam.position.set(0, GAME_CONFIG.room.height - .085, z);
+      beam.castShadow = beam.receiveShadow = true;
+      beam.raycast = () => undefined;
+      beams.add(beam);
     }
     beams.name = 'Downstand concrete ceiling beams';
-    beams.castShadow = beams.receiveShadow = true;
-    beams.raycast = () => undefined;
-    beams.computeBoundingSphere();
     this.add(beams);
   }
 
@@ -332,21 +401,8 @@ export class Room extends THREE.Group {
     for (let x = -2.4; x < 3; x += 1.2) segments.push({ position: new THREE.Vector3(x, GAME_CONFIG.room.height - .001, 0), size: new THREE.Vector3(.003, .001, 5) });
     for (let z = -1.9; z < 2.5; z += 1.2) segments.push({ position: new THREE.Vector3(0, GAME_CONFIG.room.height - .001, z), size: new THREE.Vector3(6, .001, .003) });
     for (const x of [-2.72, 2.72]) for (const y of [.73, 1.47, 2.21]) segments.push({ position: new THREE.Vector3(x, y, -2.179), size: new THREE.Vector3(.36, .0025, .001) });
-    // Repeated shutter panel joints continue from the slab onto both cast
-    // side walls. They establish construction scale instead of leaving the
-    // large concrete surfaces as uninterrupted texture planes.
-    for(const x of [-3.795,3.795]){
-      for(const z of [-2.4,-1.2,0,1.2,2.4]){
-        if(x<0&&z>1.05&&z<2.95)continue;
-        segments.push({position:new THREE.Vector3(x,1.5,z),size:new THREE.Vector3(.0015,2.97,.0025)});
-      }
-      for(const y of [1.2,2.4]){
-        if(x<0&&y<2.35){
-          segments.push({position:new THREE.Vector3(x,y,-1.2375),size:new THREE.Vector3(.0015,.0025,4.575)});
-          segments.push({position:new THREE.Vector3(x,y,3.2375),size:new THREE.Vector3(.0015,.0025,.575)});
-        }else segments.push({position:new THREE.Vector3(x,y,0),size:new THREE.Vector3(.0015,.0025,7.05)});
-      }
-    }
+    // Shutter marks belong to the slab and concrete columns, not the new
+    // exposed fired-clay side walls.
     const seams = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), matteMaterial(0x55554d), segments.length);
     seams.name = 'Board joints in poured concrete';
     const transform = new THREE.Matrix4();

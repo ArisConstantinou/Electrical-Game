@@ -7,6 +7,7 @@ and are licensed CC0: https://polyhaven.com/license
 - `plastered_wall_03-albedo-512.webp`: https://polyhaven.com/a/plastered_wall_03
 - `rusty_metal_03-diff-1k.jpg`: https://polyhaven.com/a/rusty_metal_03
 - `gravelly_sand-albedo-512.webp`: https://polyhaven.com/a/gravelly_sand
+- `../masonry/red-brick-polyhaven-1k.jpg`: https://polyhaven.com/a/red_brick — 1K diffuse map by Rob Tuytel, CC0. The original running-bond photograph is projected continuously across the in-game clay elevations.
 
 They are reduced-resolution copies for the in-game construction surfaces.
 Floor UVs repeat at roughly 2.1 m; plaster and concrete are scaled to roughly

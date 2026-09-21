@@ -16,12 +16,13 @@ export interface MasonryImpact {
   points: THREE.Vector3[]; kind: MasonryImpactKind; brickSize: THREE.Vector3; seed: number; destroyed: boolean;
   fragments: MasonryFragment[]; removedVolume: number;
 }
-// The 220x76 texture is a crop of the game's existing site artwork. Sampling
-// only that face preserves detail without uploading the full cinematic image.
+// Poly Haven "Red Brick" by Rob Tuytel, CC0: https://polyhaven.com/a/red_brick
+// UVs pick different photographed brick faces for each physical clay unit.
 const brickImageReady = uniform(0);
-const brickImage = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}assets/masonry/brick-face-site.webp`, () => { brickImageReady.value = 1; });
+const brickImage = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}assets/masonry/red-brick-polyhaven-1k.jpg`, () => { brickImageReady.value = 1; });
 brickImage.colorSpace = THREE.SRGBColorSpace;
 brickImage.anisotropy = 8;
+brickImage.wrapS = brickImage.wrapT = THREE.RepeatWrapping;
 const wallMaterial = new MeshStandardNodeMaterial({ roughness: 1, metalness: 0, flatShading: true });
 wallMaterial.name = 'Reference clay face with independent fractured masonry';
 const masonryColor = attribute<'vec3'>('color', 'vec3');
@@ -271,15 +272,7 @@ export class BrickWall extends THREE.Group {
   private addBrickSurfaceAttributes(geometry: THREE.BufferGeometry): void {
     const positions = geometry.getAttribute('position'), normals = geometry.getAttribute('normal'), colors = geometry.getAttribute('color');
     const coordinates = new Float32Array(positions.count * 2), faces = new Float32Array(positions.count);
-    const pitchX = this.volume.width / 21, pitchY = this.volume.height / 23;
     for (let i = 0; i < positions.count; i += 3) {
-      const centerX = (positions.getX(i) + positions.getX(i + 1) + positions.getX(i + 2)) / 3;
-      const centerY = (positions.getY(i) + positions.getY(i + 1) + positions.getY(i + 2)) / 3;
-      // Choose one brick for the complete triangle. Boundary vertices must not
-      // wrap back to the opposite UV edge and stretch the photo across a seam.
-      const row = Math.floor(centerY / pitchY), offset = row % 2 ? pitchX * .5 : 0;
-      const column = Math.floor((centerX + this.volume.width / 2 - offset) / pitchX);
-      const brickX = column * pitchX + offset - this.volume.width / 2;
       const originalPlane = [0, 1, 2].every(j => {
         const z = positions.getZ(i + j);
         return Math.abs(z - this.volume.frontZ) < 1e-5 || Math.abs(z - (this.volume.frontZ - this.volume.depth)) < 1e-5;
@@ -287,10 +280,8 @@ export class BrickWall extends THREE.Group {
       const clay = colors.getX(i) > colors.getY(i) * 2;
       const face = Number(clay && originalPlane && Math.abs(normals.getZ(i)) > .999);
       for (let j = 0; j < 3; j++) {
-        const u = THREE.MathUtils.clamp((positions.getX(i + j) - brickX) / pitchX, 0, 1);
-        const v = THREE.MathUtils.clamp((positions.getY(i + j) - row * pitchY) / pitchY, 0, 1);
-        coordinates[(i + j) * 2] = u;
-        coordinates[(i + j) * 2 + 1] = v;
+        coordinates[(i + j) * 2] = (positions.getX(i + j) + this.volume.width / 2) / 2.34;
+        coordinates[(i + j) * 2 + 1] = positions.getY(i + j) / 2.535;
         faces[i + j] = face;
       }
     }
