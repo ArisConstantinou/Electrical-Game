@@ -1,5 +1,11 @@
 Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web game named WIRE THE HOUSE, based on real Cyprus residential first-fix practices, editable in Web Game Studio, playable on desktop/mobile, deployed to arisconstantinou/Electrical-Game via GitHub Pages, and ending at FIRST FIX COMPLETE without cable pulling.
 
+## 2026-09-21 · Accept physically seated PVC at -4 mm preferred-depth error
+
+- User screenshot showed a cut at `-4 mm` rejected as unable to reach the box. The value is relative to the preferred 15 mm insertion, so the pipe still has about 11 mm of real seating; the old 3 mm negative tolerance incorrectly classified it as short.
+- The lower acceptance bound now retains at least 5 mm inside the box (`-10 mm` from preferred depth). Truly short cuts remain rejected, while the exact `-4 mm` native cutter case proceeds through channel clearance, rebar preparation and installation.
+- TypeScript, production build and the complete native PVC browser flow pass without page errors. The bundled client made two bounded attempts but its fixed five-second click window expired while START was still disabled for Water/Site preparation; its later start-screen captures were inspected, all owned browser processes closed, and it is not counted as gameplay proof.
+
 ## 2026-09-21 · PC PVC directions, carry contact, recut and cutter exit
 
 - Reproduced the user's exact stale 90-degree warning: an early E stored the failure message and the message survived after the bend became valid. At 90 degrees desktop now replaces it with `E · ΣΥΝΕΧΕΙΑ ΣΤΗΝ ΠΟΣΟΤΗΤΑ`; review uses direct 1/5/0 quantity keys and concise PC-only mouse/keyboard directions.

@@ -17,7 +17,10 @@ interface FastenerHole{side:-1|1;y:number;marker:THREE.Group;drilled:boolean;pai
 interface FastenerPair{left:FastenerHole;right:FastenerHole;rebar:THREE.Group}
 const v=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z);
 const BOX_ENTRY_ALLOWANCE_MM=30;
-const SHORT_PIPE_TOLERANCE_MM=3;
+// fitError is measured from the preferred 15 mm seating depth, not from the
+// box face. A -10 mm error therefore still leaves 5 mm of real PVC inside the
+// entry; only a shorter result genuinely fails to reach the box.
+const SHORT_PIPE_TOLERANCE_MM=10;
 const workPhases:Phase[]=['opening','spreading','marking','spring','inserting','bending','review','extracting','fitting','cutting','cut','pipe-install-ready','installing','fastener-marking','fastener-drilling','fastener-insert-ready','fastener-inserting','fastener-tighten-ready','fastener-tightening'];
 const animated:Phase[]=['opening','spreading','inserting','extracting','cutting','installing','fastener-drilling','fastener-inserting','fastener-tightening'];
 export class PvcWorkshop {
