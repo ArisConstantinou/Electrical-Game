@@ -9,20 +9,6 @@ import { matteMaterial, siteMaterial, siteProScreedMaterial } from './SiteMateri
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { ExteriorCourtyard } from './ExteriorCourtyard';
 
-const concreteBeam = (size: THREE.Vector3, material: THREE.Material, center: THREE.Vector3): THREE.Mesh => {
-  const geometry = new THREE.BoxGeometry(size.x, size.y, size.z);
-  const positions = geometry.getAttribute('position'), normals = geometry.getAttribute('normal'), uvs = geometry.getAttribute('uv');
-  for (let i = 0; i < positions.count; i++) {
-    const x = positions.getX(i), y = positions.getY(i), z = positions.getZ(i);
-    const nx = Math.abs(normals.getX(i)), ny = Math.abs(normals.getY(i));
-    // Every face receives approximately 0.75 m of scanned concrete per tile.
-    // A long, shallow beam must not stretch one square texture along its span.
-    if (ny > .5) uvs.setXY(i, (x + center.x) / 2, (z + center.z) / 2);
-    else uvs.setXY(i, .37 + (y + center.y) / 2, (nx > .5 ? z + center.z : x + center.x) / 2);
-  }
-  return new THREE.Mesh(geometry, material);
-};
-
 /** Constant-time hit on a raised clay face; backing remains hittable in joints. */
 const setBrickFaceRaycast = (
   mesh: THREE.InstancedMesh, normal: THREE.Vector3, facePoint: THREE.Vector3,
@@ -152,7 +138,8 @@ export class Room extends THREE.Group {
     this.addFormworkMarks();
     this.addConstructionJoints();
     this.addRearWall();
-    this.addWallHeadBeams();
+    // The slab bears over the wall heads and columns. Exposed brick meets its
+    // soffit directly, with no decorative inner downstand or shadow band.
     this.addFloorReturns();
     this.addContactPatina();
     this.addSiteSupplies();
@@ -312,34 +299,6 @@ export class Room extends THREE.Group {
     corners.raycast = () => undefined;
     corners.computeBoundingSphere();
     this.add(corners);
-  }
-
-  private addWallHeadBeams(): void {
-    // The cast-in-place ring beam bears on the last clay courses and overlaps
-    // the floor slab, so the wall head reads as a continuous structural joint.
-    const width = GAME_CONFIG.room.width, depth = GAME_CONFIG.room.depth;
-    const material = siteMaterial('concrete', 0xe6e2dc);
-    const beams = new THREE.Group();
-    // Leave a shallow 6 cm bearing lip so the cast ring beam remains visible
-    // without the old 14 cm dark soffit that read as a void over the bricks.
-    const bearing = .16;
-    const lip = .06;
-    const parts = [
-      { x: 0, z: GAME_CONFIG.room.wallFrontZ + lip - bearing / 2, sx: width, sz: bearing },
-      { x: 0, z: depth / 2 - .02 - lip + bearing / 2, sx: width, sz: bearing },
-      { x: -width / 2 + .02 + lip - bearing / 2, z: 0, sx: bearing, sz: depth },
-      { x: width / 2 - .02 - lip + bearing / 2, z: 0, sx: bearing, sz: depth },
-    ];
-    for (const part of parts) {
-      const center = new THREE.Vector3(part.x, GAME_CONFIG.room.height - .09, part.z);
-      const beam = concreteBeam(new THREE.Vector3(part.sx, .22, part.sz), material, center);
-      beam.position.copy(center);
-      beam.castShadow = beam.receiveShadow = true;
-      beam.raycast = () => undefined;
-      beams.add(beam);
-    }
-    beams.name = 'Concrete slab perimeter bearing on brick walls';
-    this.add(beams);
   }
 
   private addConstructionJoints(): void {
