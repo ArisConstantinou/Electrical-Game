@@ -984,3 +984,12 @@ Original prompt for this task: Selecting BOX should show an initial box in the l
 - Reordered the physical sequence to mark/drill without an installed pipe, insert each rebar strap open, apply the cut pipe through those open straps, and only then tighten each strap with the pliers.
 - Rebuilt strap geometry around a local centre so tightening deforms its bow without scaling absolute wall coordinates. Automated assertions keep every rebar world position unchanged through tightening and require both straps to remain visible after closure.
 - Focused desktop and portrait/landscape mobile PVC workflows pass. Inspected frames show chase-only marks, forward drilling, open straps without pipe, pipe insertion and both fully tied straps. Production/publication checks pending.
+
+## 2026-09-21 · Independent PVC tie-wire preparation
+
+- Corrected the fastening material from rigid 8 mm rebar to thin galvanized tying wire matching the supplied construction reference. Each wall-anchored open loop now remains in the chased brick area and gains a visible two-strand twist only during the final plier pass.
+- Added direct entry before carrying a pipe: select DRILL, aim inside an eligible chased wall area and press USE / ΟΠΕΣ. This opens the square fastener view without a pipe, while targets outside the chase remain invalid.
+- The independent sequence supports any valid number of manual marks with a minimum opposing pair, drills every 12 mm hole over time, then inserts every wire loop open. It returns to normal movement with the open wires preserved and no conduit installed.
+- After the player bends, carries and cuts a pipe for that box, the workshop reconnects to the staged holes/wires, skips duplicate drilling, allows pipe insertion and then twists each wire sequentially with the pliers. Tightening no longer moves or deletes the wall anchors.
+- While the PVC view owns input, the unrelated generic drill panel is suppressed. During final twisting, the spare loose wire is removed from the hand so only the pliers and installed tie are shown.
+- Portrait 390x680 and landscape 844x390 end-to-end tests pass independent entry, four freely placed chase-only holes, staged open-wire persistence, later pipe insertion and anchored final twists. Desktop PVC logic/UI, production build, diff check and the bundled develop-web-game client also pass. Physical iPhone/Safari remains unverified.

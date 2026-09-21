@@ -41,20 +41,25 @@ export function buildRebarPliers():THREE.Group{
   group.userData.gripPoint=[.064,-.125,.004];group.userData.tipPoint=[0,.092,0];return group;
 }
 
-/** Ribbed 8 mm steel held in the left hand before it is bent around the conduit. */
+/** Thin galvanized tying wire held in the left hand before anchoring. */
 export function buildHeldRebar():THREE.Group{
-  const group=new THREE.Group(),material=steel(0x626866,.52);group.name='8 mm ribbed reinforcing bar';
-  rod(group,new THREE.Vector3(0,-.18,0),new THREE.Vector3(0,.18,0),.004,material,'8 mm rebar core');
-  for(let i=0;i<20;i++){const y=-.17+i*.018,ring=new THREE.Mesh(new THREE.TorusGeometry(.00435,.00055,4,10),material);ring.name='Rebar deformation rib';ring.position.y=y;ring.rotation.x=Math.PI/2;group.add(ring);}
+  const group=new THREE.Group(),material=steel(0x717776,.58);group.name='Galvanized conduit tying wire';
+  const loop=new THREE.Mesh(new THREE.TorusGeometry(.052,.00115,6,40,Math.PI*1.72),material);loop.name='Open tying-wire loop';loop.rotation.x=Math.PI/2;loop.position.y=.04;group.add(loop);
+  rod(group,new THREE.Vector3(-.050,.030,0),new THREE.Vector3(-.018,-.17,0),.00115,material,'Left wire tail');
+  rod(group,new THREE.Vector3(.050,.030,0),new THREE.Vector3(.018,-.17,0),.00115,material,'Right wire tail');
   group.userData.gripPoint=[0,-.02,0];return group;
 }
 
-export function buildRebarHug(left:THREE.Vector3,right:THREE.Vector3,frontZ:number):THREE.Mesh{
+export function buildRebarHug(left:THREE.Vector3,right:THREE.Vector3,frontZ:number):THREE.Group{
   // Store vertices around the strap centre. Scaling during tightening must
   // deform the bow without scaling its absolute wall coordinates toward 0.
   const middle=left.clone().add(right).multiplyScalar(.5),local=(point:THREE.Vector3)=>point.clone().sub(middle),curve=new THREE.CatmullRomCurve3([
     local(left),local(new THREE.Vector3(left.x+.025,left.y,frontZ)),local(new THREE.Vector3(middle.x-.021,middle.y,frontZ+.030)),
     local(new THREE.Vector3(middle.x,middle.y,frontZ+.038)),local(new THREE.Vector3(middle.x+.021,middle.y,frontZ+.030)),local(new THREE.Vector3(right.x-.025,right.y,frontZ)),local(right),
   ]);
-  const mesh=new THREE.Mesh(new THREE.TubeGeometry(curve,36,.004,8,false),steel(0x676d6b,.52));mesh.name='8 mm rebar conduit wall strap';mesh.position.copy(middle);mesh.userData.leftHole=left.toArray();mesh.userData.rightHole=right.toArray();return mesh;
+  const group=new THREE.Group();group.name='Galvanized conduit tying wire';group.position.copy(middle);group.userData.leftHole=left.toArray();group.userData.rightHole=right.toArray();
+  const wire=new THREE.Mesh(new THREE.TubeGeometry(curve,48,.00115,6,false),steel(0x777d7b,.58));wire.name='Open wall-anchored tying wire';group.add(wire);
+  const twist=new THREE.Group();twist.name='tie-wire-twist';twist.visible=false;twist.position.set(0,0,frontZ-middle.z);group.add(twist);
+  for(const phase of [0,Math.PI]){const points=Array.from({length:25},(_,i)=>{const t=i/24,a=phase+t*Math.PI*5;return new THREE.Vector3(Math.cos(a)*.0022,-t*.018,Math.sin(a)*.0022);});const strand=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points),24,.00065,5,false),steel(0x6c7270,.5));strand.name='Twisted tying-wire strand';twist.add(strand);}
+  return group;
 }

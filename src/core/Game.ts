@@ -351,7 +351,7 @@ export class Game {
     const aimed = this.selectedTool==='measure'?Boolean(this.heightMeasure.target):this.selectedTool === 'hammer' ? this.fpsRig.reachable && !this.fpsRig.chiselInAir : this.selectedTool === 'spray' ? wallAim : pointAim;
     this.hud.update(this.mission.activePoint, aimed, this.mission.progress, this.selectedTool);
     this.hud.updateHeightMeasure(this.selectedTool==='measure',this.heightMeasure.heightM,Boolean(this.heightMeasure.target));
-    this.hud.updateLaser(this.selectedTool,this.laserLevel.telemetry);
+    this.hud.updateLaser(this.pvc.blocksWork?'spray':this.selectedTool,this.laserLevel.telemetry);
     this.hud.updateWorkHeight(this.player.crouched||this.input.pressed('ControlLeft')||this.input.pressed('ControlRight'));
     const useHeld=this.started&&this.input.actionHeld;
     const hammerReady=this.fpsRig.contactStatus==='ready'&&this.hammerSpeed>0;
@@ -360,7 +360,7 @@ export class Game {
       'no-solid':'AIM AT BRICK','too-close':'STEP BACK SLIGHTLY','out-of-reach':'MOVE INTO REACH',
     };
     const useStatus=this.selectedTool==='measure'?'AIM TO MEASURE'
-      :this.selectedTool==='drill'?(this.laserLevel.working?'DRILLING':'HOLD TO DRILL')
+      :this.selectedTool==='drill'?(this.pvc.fastenerPrepAvailable?'USE · PVC FIXINGS':this.laserLevel.working?'DRILLING':'HOLD TO DRILL')
       :this.selectedTool==='driver'?(this.laserLevel.working?'FASTENING':'HOLD TO FASTEN')
       :this.selectedTool==='laser'?(this.laserLevel.telemetry.mounted?'TAP TO PICK UP':'TAP TO MOUNT')
       :this.selectedTool==='hammer'?(this.hammerSpeed===0?'SPEED 0 · PAUSED':hammerStatus[this.fpsRig.contactStatus])
