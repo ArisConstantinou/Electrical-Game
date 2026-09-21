@@ -7,6 +7,7 @@ import { laserBand, laserTint, laserEmission } from '../systems/LaserProjection'
 import type { InstallationDefinition } from '../data/installationRules';
 import type { InstallationPoint } from '../electrical/InstallationPoint';
 import { MasonryVolume, type MasonryFragment, type MasonryVolumeOptions } from './MasonryVolume';
+import { brickFacePatch } from './BrickFacePatch';
 
 export type SprayMode = 'dots' | 'live';
 export type MasonryImpactKind = 'chase-chip' | 'demolish-chip' | 'demolish-crack' | 'demolish-spall' | 'demolish-split' | 'demolish-break';
@@ -17,7 +18,7 @@ export interface MasonryImpact {
   fragments: MasonryFragment[]; removedVolume: number;
 }
 // Poly Haven "Red Brick" by Rob Tuytel, CC0: https://polyhaven.com/a/red_brick
-// UVs pick different photographed brick faces for each physical clay unit.
+// Each exposed physical clay unit samples one mortar-free photographed face.
 const brickImageReady = uniform(0);
 const brickImage = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}assets/masonry/red-brick-polyhaven-1k.jpg`, () => { brickImageReady.value = 1; });
 brickImage.colorSpace = THREE.SRGBColorSpace;
@@ -272,6 +273,7 @@ export class BrickWall extends THREE.Group {
   private addBrickSurfaceAttributes(geometry: THREE.BufferGeometry): void {
     const positions = geometry.getAttribute('position'), normals = geometry.getAttribute('normal'), colors = geometry.getAttribute('color');
     const coordinates = new Float32Array(positions.count * 2), faces = new Float32Array(positions.count);
+    const pitchX = this.volume.width / 21, course = this.volume.height / 23;
     for (let i = 0; i < positions.count; i += 3) {
       const originalPlane = [0, 1, 2].every(j => {
         const z = positions.getZ(i + j);
@@ -279,9 +281,16 @@ export class BrickWall extends THREE.Group {
       });
       const clay = colors.getX(i) > colors.getY(i) * 2;
       const face = Number(clay && originalPlane && Math.abs(normals.getZ(i)) > .999);
+      const centreX = (positions.getX(i) + positions.getX(i + 1) + positions.getX(i + 2)) / 3;
+      const centreY = (positions.getY(i) + positions.getY(i + 1) + positions.getY(i + 2)) / 3;
+      const row = Math.floor(centreY / course);
+      const stagger = (row % 2) * pitchX / 2;
+      const column = Math.floor((centreX + this.volume.width / 2 - stagger) / pitchX);
+      const left = -this.volume.width / 2 + column * pitchX + stagger;
+      const patch = brickFacePatch(row, column);
       for (let j = 0; j < 3; j++) {
-        coordinates[(i + j) * 2] = (positions.getX(i + j) + this.volume.width / 2) / 2.34;
-        coordinates[(i + j) * 2 + 1] = positions.getY(i + j) / 2.535;
+        coordinates[(i + j) * 2] = patch[0] + patch[2] * (positions.getX(i + j) - left) / pitchX;
+        coordinates[(i + j) * 2 + 1] = patch[1] + patch[3] * (positions.getY(i + j) - row * course) / course;
         faces[i + j] = face;
       }
     }

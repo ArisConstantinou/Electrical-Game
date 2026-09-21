@@ -2,28 +2,29 @@ import * as THREE from 'three';
 import { GAME_CONFIG } from '../data/gameConfig';
 import { INSTALLATION_POINTS } from '../data/installationRules';
 import { BrickWall } from './BrickWall';
+import { brickFacePatch } from './BrickFacePatch';
 import { addLighting } from './Lighting';
 import { matteMaterial, siteMaterial } from './SiteMaterials';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { ExteriorCourtyard } from './ExteriorCourtyard';
-import { positionWorld, texture as sampleTexture, vec2 } from 'three/tsl';
+import { attribute, texture as sampleTexture, uv } from 'three/tsl';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 
 // Poly Haven "Red Brick" by Rob Tuytel, CC0: https://polyhaven.com/a/red_brick
-// A continuous world-space projection keeps the photographed bonds, changing
-// brick faces, and mortar aligned across individually modelled wall courses.
+// Individual photographed clay faces are assigned to physical bricks; the
+// source image's baked mortar is never laid over the game's real joints.
 const brickFace = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}assets/masonry/red-brick-polyhaven-1k.jpg`);
 brickFace.colorSpace = THREE.SRGBColorSpace;
 brickFace.anisotropy = 8;
 brickFace.wrapS = brickFace.wrapT = THREE.RepeatWrapping;
-const brickMaterial = (axis: 'x' | 'z'): MeshStandardNodeMaterial => {
+const brickMaterial = (): MeshStandardNodeMaterial => {
   const material = new MeshStandardNodeMaterial({ roughness: 1 });
-  material.name = `Continuous photographed fired-clay face (${axis})`;
-  material.colorNode = sampleTexture(brickFace, vec2(positionWorld[axis].div(2.34), positionWorld.y.div(2.535))).rgb;
+  material.name = 'Varied photographed fired-clay units';
+  const patch = attribute<'vec4'>('brickPatch', 'vec4');
+  material.colorNode = sampleTexture(brickFace, uv().mul(patch.zw).add(patch.xy)).rgb;
   return material;
 };
-const sideBrickMaterial = brickMaterial('z');
-const rearBrickMaterial = brickMaterial('x');
+const masonryFaceMaterial = brickMaterial();
 
 const concreteBeam = (size: THREE.Vector3, material: THREE.Material): THREE.Mesh => {
   const geometry = new THREE.BoxGeometry(size.x, size.y, size.z);
@@ -97,7 +98,7 @@ export class Room extends THREE.Group {
 
     // Mortar backing stays solid for contact and measurement. Individually
     // raised clay courses on all side-wall segments match the primary wall.
-    const sideMaterial = matteMaterial(0x625b51);
+    const sideMaterial = matteMaterial(0x918a81);
     sideMaterial.userData.referenceLaserReceiver=true;
     const sideGeometry = new THREE.BoxGeometry(0.22, GAME_CONFIG.room.height, GAME_CONFIG.room.depth);
     for (const [name, x] of [['Left concrete wall', -GAME_CONFIG.room.width / 2 - 0.11], ['Right concrete wall', GAME_CONFIG.room.width / 2 + 0.11]] as const) {
@@ -197,7 +198,7 @@ export class Room extends THREE.Group {
   update(dt: number): void { this.exterior.update(dt); }
 
   private addSideBrickCourses(side: THREE.Group, wallX: number, hasOpening: boolean): void {
-    const pitch = GAME_CONFIG.room.depth / 20, course = GAME_CONFIG.room.height / 23, gap = .002;
+    const pitch = GAME_CONFIG.room.depth / 20, course = GAME_CONFIG.room.height / 23, gap = .006;
     const zMin = -GAME_CONFIG.room.depth / 2, zMax = GAME_CONFIG.room.depth / 2;
     const pieces: Array<{ y: number; z: number; height: number; length: number }> = [];
     const add = (y0: number, y1: number, z0: number, z1: number): void => {
@@ -217,10 +218,22 @@ export class Room extends THREE.Group {
       add(middleBottom, middleTop, z0, Math.min(z1, 1.05));
       add(middleBottom, middleTop, Math.max(z0, 2.95), z1);
     }
-    const bricks = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), sideBrickMaterial, pieces.length);
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const patchRects = new Float32Array(pieces.length * 4);
+    geometry.setAttribute('brickPatch', new THREE.InstancedBufferAttribute(patchRects, 4));
+    const bricks = new THREE.InstancedMesh(geometry, masonryFaceMaterial, pieces.length);
     bricks.name = hasOpening ? 'Left fired-clay courses cut around unglazed opening' : 'Right fired-clay courses';
     const matrix = new THREE.Matrix4(), rotation = new THREE.Quaternion(), position = new THREE.Vector3(), scale = new THREE.Vector3();
     for (const [index, piece] of pieces.entries()) {
+      const row = Math.floor(piece.y / course), offset = (row % 2) * pitch / 2;
+      const column = Math.floor((piece.z - zMin - offset) / pitch);
+      const base = brickFacePatch(row, column, wallX < 0 ? 1 : 2);
+      const startZ = zMin + column * pitch + offset + gap / 2;
+      const startY = row * course + gap / 2;
+      const u = (piece.z - piece.length / 2 - startZ) / (pitch - gap);
+      const v = (piece.y - piece.height / 2 - startY) / (course - gap);
+      patchRects.set([base[0] + base[2] * u, base[1] + base[3] * v,
+        base[2] * piece.length / (pitch - gap), base[3] * piece.height / (course - gap)], index * 4);
       position.set(wallX + (wallX < 0 ? .120 : -.120), piece.y, piece.z);
       scale.set(.020, piece.height, piece.length);
       bricks.setMatrixAt(index, matrix.compose(position, rotation, scale));
@@ -247,7 +260,7 @@ export class Room extends THREE.Group {
     rearGroup.userData.studioEntityId = 'world:rear-wall';
     const wall = new THREE.Mesh(
       new THREE.BoxGeometry(GAME_CONFIG.room.width, GAME_CONFIG.room.height, .16),
-      matteMaterial(0x625b51),
+      matteMaterial(0x918a81),
     );
     wall.name = 'Solid rear masonry backing';
     wall.userData.referenceLaserReceiver = true;
@@ -255,9 +268,12 @@ export class Room extends THREE.Group {
     wall.receiveShadow = true;
     rearGroup.add(wall);
 
-    const brickWidth = GAME_CONFIG.room.width / 21, course = GAME_CONFIG.room.height / 23, gap = .002;
+    const brickWidth = GAME_CONFIG.room.width / 21, course = GAME_CONFIG.room.height / 23, gap = .006;
     const columns = 22, rows = 23;
-    const bricks = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), rearBrickMaterial, columns * rows);
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const patchRects = new Float32Array(columns * rows * 4);
+    geometry.setAttribute('brickPatch', new THREE.InstancedBufferAttribute(patchRects, 4));
+    const bricks = new THREE.InstancedMesh(geometry, masonryFaceMaterial, columns * rows);
     bricks.name = 'Full staggered rear clay courses';
     bricks.userData.textureSource = 'red-brick-polyhaven-1k.jpg';
     bricks.userData.studioEntityId = 'world:rear-exposed-masonry';
@@ -267,6 +283,10 @@ export class Room extends THREE.Group {
       const left = -GAME_CONFIG.room.width / 2 + column * brickWidth + (row % 2) * brickWidth / 2;
       const right = Math.min(GAME_CONFIG.room.width / 2, left + brickWidth - gap);
       const clippedLeft = Math.max(-GAME_CONFIG.room.width / 2, left + gap / 2);
+      const base = brickFacePatch(row, column, 3);
+      const fullLeft = left + gap / 2;
+      patchRects.set(right > clippedLeft ? [base[0] + base[2] * (clippedLeft - fullLeft) / (brickWidth - gap), base[1],
+        base[2] * (right - clippedLeft) / (brickWidth - gap), base[3]] : [base[0], base[1], 0, base[3]], index * 4);
       position.set((clippedLeft + right) / 2, (row + .5) * course, rearZ - .010);
       scale.set(Math.max(0, right - clippedLeft), course - gap, .020);
       matrix.compose(position, rotation, scale);
