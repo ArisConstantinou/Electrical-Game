@@ -1,0 +1,338 @@
+[
+  {
+    "name": "portrait",
+    "state": "closed",
+    "open": "false",
+    "panel": [
+      {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "visible": false
+      },
+      {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "visible": false
+      },
+      {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "visible": false
+      }
+    ],
+    "centerTag": "SPAN",
+    "centerId": "",
+    "centerBlockedByMenu": false,
+    "hintVisible": true,
+    "viewport": [
+      390,
+      844
+    ],
+    "overflow": false,
+    "renderError": "",
+    "frameProfile": {
+      "p95Ms": 16.800000000000182,
+      "worstMs": 16.899999999999636
+    }
+  },
+  {
+    "name": "portrait",
+    "state": "open",
+    "open": "true",
+    "panel": [
+      {
+        "x": 8,
+        "y": 70,
+        "width": 374,
+        "height": 69,
+        "visible": true
+      },
+      {
+        "x": 8,
+        "y": 145,
+        "width": 312,
+        "height": 56,
+        "visible": true
+      },
+      {
+        "x": 326,
+        "y": 145,
+        "width": 54,
+        "height": 109,
+        "visible": true
+      }
+    ],
+    "centerTag": "SPAN",
+    "centerId": "",
+    "centerBlockedByMenu": false,
+    "hintVisible": false,
+    "viewport": [
+      390,
+      844
+    ],
+    "overflow": false,
+    "renderError": "",
+    "frameProfile": {
+      "p95Ms": 16.800000000000182,
+      "worstMs": 16.800000000000182
+    }
+  },
+  {
+    "name": "landscape",
+    "state": "closed",
+    "open": "false",
+    "panel": [
+      {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "visible": false
+      },
+      {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "visible": false
+      },
+      {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "visible": false
+      }
+    ],
+    "centerTag": "SPAN",
+    "centerId": "",
+    "centerBlockedByMenu": false,
+    "hintVisible": true,
+    "viewport": [
+      844,
+      390
+    ],
+    "overflow": false,
+    "renderError": "",
+    "frameProfile": {
+      "p95Ms": 16.800000000000182,
+      "worstMs": 16.900000000000546
+    }
+  },
+  {
+    "name": "landscape",
+    "state": "open",
+    "open": "true",
+    "panel": [
+      {
+        "x": 8,
+        "y": 70,
+        "width": 828,
+        "height": 69,
+        "visible": true
+      },
+      {
+        "x": 162,
+        "y": 326,
+        "width": 520,
+        "height": 56,
+        "visible": true
+      },
+      {
+        "x": 721,
+        "y": 145,
+        "width": 113,
+        "height": 52,
+        "visible": true
+      }
+    ],
+    "centerTag": "SPAN",
+    "centerId": "",
+    "centerBlockedByMenu": false,
+    "hintVisible": false,
+    "viewport": [
+      844,
+      390
+    ],
+    "overflow": false,
+    "renderError": "",
+    "frameProfile": {
+      "p95Ms": 17.199999999999818,
+      "worstMs": 33.20000000000073
+    }
+  },
+  {
+    "name": "compact-landscape",
+    "state": "closed",
+    "open": "false",
+    "panel": [
+      {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "visible": false
+      },
+      {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "visible": false
+      },
+      {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "visible": false
+      }
+    ],
+    "centerTag": "SPAN",
+    "centerId": "",
+    "centerBlockedByMenu": false,
+    "hintVisible": true,
+    "viewport": [
+      667,
+      375
+    ],
+    "overflow": false,
+    "renderError": "",
+    "frameProfile": {
+      "p95Ms": 16.800000000000182,
+      "worstMs": 16.899999999999636
+    }
+  },
+  {
+    "name": "compact-landscape",
+    "state": "open",
+    "open": "true",
+    "panel": [
+      {
+        "x": 8,
+        "y": 70,
+        "width": 651,
+        "height": 69,
+        "visible": true
+      },
+      {
+        "x": 162,
+        "y": 311,
+        "width": 343,
+        "height": 56,
+        "visible": true
+      },
+      {
+        "x": 544,
+        "y": 145,
+        "width": 113,
+        "height": 52,
+        "visible": true
+      }
+    ],
+    "centerTag": "SPAN",
+    "centerId": "",
+    "centerBlockedByMenu": false,
+    "hintVisible": false,
+    "viewport": [
+      667,
+      375
+    ],
+    "overflow": false,
+    "renderError": "",
+    "frameProfile": {
+      "p95Ms": 16.800000000000182,
+      "worstMs": 16.800000000000182
+    }
+  },
+  {
+    "name": "tablet",
+    "state": "closed",
+    "open": "false",
+    "panel": [
+      {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "visible": false
+      },
+      {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "visible": false
+      },
+      {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "visible": false
+      }
+    ],
+    "centerTag": "SPAN",
+    "centerId": "",
+    "centerBlockedByMenu": false,
+    "hintVisible": true,
+    "viewport": [
+      820,
+      1180
+    ],
+    "overflow": false,
+    "renderError": "",
+    "frameProfile": {
+      "p95Ms": 16.800000000000182,
+      "worstMs": 16.899999999999636
+    }
+  },
+  {
+    "name": "tablet",
+    "state": "open",
+    "open": "true",
+    "panel": [
+      {
+        "x": 8,
+        "y": 70,
+        "width": 804,
+        "height": 69,
+        "visible": true
+      },
+      {
+        "x": 8,
+        "y": 145,
+        "width": 742,
+        "height": 56,
+        "visible": true
+      },
+      {
+        "x": 756,
+        "y": 145,
+        "width": 54,
+        "height": 109,
+        "visible": true
+      }
+    ],
+    "centerTag": "SPAN",
+    "centerId": "",
+    "centerBlockedByMenu": false,
+    "hintVisible": false,
+    "viewport": [
+      820,
+      1180
+    ],
+    "overflow": false,
+    "renderError": "",
+    "frameProfile": {
+      "p95Ms": 16.800000000000182,
+      "worstMs": 16.800000000000182
+    }
+  }
+]

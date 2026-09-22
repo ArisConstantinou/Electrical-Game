@@ -293,3 +293,22 @@ html, body { background: #151a1d; }
   #site-pro-use[aria-pressed="true"]::before,
   #mobile-interact[aria-pressed="true"]::before { filter: none; }
 }
+
+/* The selected-tool hint is already shown when the picker closes. While it
+   is open, the hint otherwise sits directly over the tool icons. */
+@media (pointer:coarse), (max-width:760px) {
+  #game-shell[data-tools-open="true"] #interaction-prompt { display: none; }
+}
+
+/* In a short landscape viewport, the temporary tool settings sit between the
+   two thumb-control clusters instead of crossing the centre of the work wall. */
+@media (pointer:coarse) and (orientation:landscape) and (max-height:520px) {
+  #game-shell[data-tools-open="true"] #tool-quick-controls {
+    top: auto;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    left: calc(max(14px, env(safe-area-inset-left)) + var(--orbit-stick-size) + var(--orbit-action-size) + 10px);
+    right: calc(max(14px, env(safe-area-inset-right)) + var(--orbit-stick-size) + var(--orbit-action-size) + 10px);
+    height: 56px;
+    border-radius: 12px;
+  }
+}
