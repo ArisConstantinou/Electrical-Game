@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {mkdir, writeFile} from 'node:fs/promises';
 import {blockPointerLock} from './browser-safety.mjs';
+import {installDistOverlay} from './dist-overlay.mjs';
 const url=process.argv.find(x=>x.startsWith('http'))??'http://127.0.0.1:5365/Electrical-Game/';
 const baseline=process.argv.includes('--baseline');
 const out=`output/manual-pvc/${baseline?'before':'after'}`;await mkdir(out,{recursive:true});
@@ -11,25 +12,28 @@ try{
  const context=await browser.newContext({viewport:{width:1366,height:768}});await blockPointerLock(context);
  const page=await context.newPage();page.on('pageerror',e=>report.errors.push(e.message));
  page.on('console',m=>{if(m.type()==='error')report.errors.push(m.text());});
- await page.goto(url);await page.locator('#start-button').click({timeout:120000});await page.waitForTimeout(600);
+ if(process.argv.includes('--dist-overlay'))await installDistOverlay(page);
+ await page.goto(url);if(process.argv.includes('--socket-join'))await page.locator('#apprentice-count').selectOption('0');await page.locator('#start-button').click({timeout:120000});await page.waitForTimeout(600);
  await page.evaluate(()=>{const g=window.__wireTheHouse;window.pvcStep=g.step.bind(g);g.step=()=>{};});
  const step=n=>page.evaluate(n=>{for(let i=0;i<n;i++)window.pvcStep(1/60);},n);
  const aim=async(position,target)=>{await page.evaluate(({position,target})=>{const g=window.__wireTheHouse,c=g.renderer.camera;c.position.fromArray(position);c.lookAt(...target);g.player.pitch=c.rotation.x;g.player.yaw=c.rotation.y;c.updateMatrixWorld(true);},{position,target});await step(2);};
+ const aimStock=async()=>{const target=await page.evaluate(()=>{const pipe=window.__wireTheHouse.pvc.stock.pipes[0];pipe.updateWorldMatrix(true,true);return pipe.children[0].getWorldPosition(pipe.position.clone()).toArray();});await aim([.9,1.65,.75],target);};
  const snap=async name=>{await page.evaluate(async()=>{const r=window.__wireTheHouse.renderer;await r.waitForFrame();r.render();await r.waitForFrame();});await page.screenshot({path:`${out}/${name}.png`});report.poses??={};report.poses[name]=await page.evaluate(()=>({pvc:window.__wireTheHouse.pvc?.telemetry,body:window.__wireTheHouse.workerBody.telemetry}));};
+ const snapAt=async(name,position,target)=>{await page.evaluate(({position,target})=>{const g=window.__wireTheHouse,c=g.renderer.camera;c.position.fromArray(position);c.lookAt(...target);c.updateMatrixWorld(true);g.pvc.present();},{position,target});await snap(name);};
  const state=()=>page.evaluate(()=>window.__wireTheHouse.pvc.telemetry);
  const bendFocusSpan=()=>page.evaluate(()=>{const g=window.__wireTheHouse,pvc=g.pvc,mark=pvc.bend.mark,a=pvc.bend.at(Math.max(0,mark-.2)),b=pvc.bend.at(Math.min(3,mark+.2)),camera=g.renderer.renderCamera,pa=pvc.pipe.localToWorld(g.renderer.camera.position.clone().set(a.x,a.y,0)).project(camera),pb=pvc.pipe.localToWorld(g.renderer.camera.position.clone().set(b.x,b.y,0)).project(camera);return pa.distanceTo(pb);});
  const key=async(code,n=2)=>{await page.keyboard.down(code);await step(n);await page.keyboard.up(code);await step(2);};
  const use=async(n=2)=>{await page.mouse.down();await step(n);await page.mouse.up();await step(2);};
  let cutMouseY=400;
  const cutAt=async cm=>{const current=(await state()).cutCm;cutMouseY+=(cm-current)/.06;await page.mouse.move(1000,cutMouseY);await step(2);};
- await aim([.9,1.65,.75],[3.58,1.25,1.15]);await snap('01-stock');
+ await aimStock();await snap('01-stock');
  await page.keyboard.press('Digit1');await step(2);await snap('02-spring');
  report.state=JSON.parse(await page.evaluate(()=>window.render_game_to_text()));
  report.workshopPresent=await page.evaluate(()=>Boolean(window.__wireTheHouse.pvc));
  if(!baseline)assert(report.workshopPresent,'Manual PVC workflow is missing');
  if(!baseline){
   await key('KeyE');assert.equal((await state()).phase,'opening');await snap('03-opening');await step(130);assert.equal((await state()).phase,'loose');
-  await key('KeyE');await step(110);assert.equal((await state()).phase,'marking');await snap('04-marking');
+  await aimStock();await key('KeyE');await step(110);assert.equal((await state()).phase,'marking');await snap('04-marking');
   assert.equal(await page.locator('#pvc-panel').count(),0,'No PVC sidebar panel');
   await key('Tab');assert.equal((await state()).markCm,140);await key('Tab');assert.equal((await state()).markCm,50);
   await page.mouse.move(800,350);await step(2);const beforeMove=(await state()).markCm;
@@ -58,7 +62,7 @@ try{
   }
   assert(Math.abs((await state()).angle-90)<1e-6);await snap('09-bent-90');
   await key('Escape');assert.equal((await state()).focused,false);const saved=(await state()).angle;
-  await aim([1.2,1.65,.6],[2.2,.02,.15]);await key('KeyE');assert.equal((await state()).focused,true);assert.equal((await state()).angle,saved);
+  await aimStock();await key('KeyE');assert.equal((await state()).focused,true);assert.equal((await state()).angle,saved);
   await key('KeyE');assert.equal((await state()).phase,'review');await snap('10-review');
   for(let i=0;i<19;i++)await key('Equal',1);assert.equal((await state()).quantity,20);
   await key('KeyE');await step(100);assert.equal((await state()).phase,'carrying','Finishing a batch must continue with one bent pipe in hand');assert.equal((await state()).prepared,19);assert.equal((await state()).raw,0);assert.equal((await state()).total,20);
@@ -93,6 +97,39 @@ try{
   const installed=await page.evaluate(()=>{const p=window.__wireTheHouse.mission.points[0];return{stage:p.stage,recipe:p.conduit?.userData.pvcRecipe};});assert.equal(installed.stage,'complete');assert.equal(installed.recipe.angles.reduce((a,b)=>a+b,0),90);
   await key('KeyR');assert.equal(await page.evaluate(()=>window.__wireTheHouse.mission.points[0].conduit.children[0].material.opacity),1);
   await key('KeyR');assert.equal(await page.evaluate(()=>window.__wireTheHouse.mission.points[0].conduit.children[0].material.opacity),.4);
+  if(process.argv.includes('--socket-join')){
+    await key('KeyR');
+    const factoryEnd=await page.evaluate(()=>{
+      const pvc=window.__wireTheHouse.pvc,socket=pvc.openSockets[0],frame=pvc.socketFrame(socket);
+      return{point:socket.pointId,end:frame.end.toArray(),direction:frame.direction.toArray(),open:socket.root.userData.socketOpen};
+    });
+    assert.equal(factoryEnd.point,'A');assert.equal(factoryEnd.open,true);
+    const preparedPoint=await page.evaluate(()=>{const g=window.__wireTheHouse,pvc=g.pvc,mesh=pvc.prepared[0].mesh,bend=pvc.bend.at(1.5);g.player.crouched=false;mesh.updateWorldMatrix(true,true);return mesh.localToWorld(mesh.position.clone().set(bend.x,bend.y,0)).toArray();});
+    await step(45);await aim([1.2,1.65,.6],preparedPoint);
+    report.stockAimMsPerCall=await page.evaluate(()=>{const pvc=window.__wireTheHouse.pvc,start=performance.now();for(let i=0;i<500;i++)pvc.stockAimed();return(performance.now()-start)/500;});
+    assert(report.stockAimMsPerCall<1,`Prepared stock aim is too slow: ${report.stockAimMsPerCall.toFixed(3)} ms/call`);
+    await key('KeyE');
+    assert.equal((await state()).phase,'carrying','A second prepared pipe must be held before joining');
+    const [x,y,z]=factoryEnd.end;
+    await aim([x,Math.max(.9,y+1.05),z+.35],[x,y,z]);
+    assert.equal(await page.evaluate(()=>window.__wireTheHouse.pvc.socketTarget()?.pointId??null),'A','The socket must be reachable with the crosshair');
+    const view=[x-.65,Math.max(1.0,y+1.05),z+.5],focus=[x,y,z+.55];
+    await snapAt('21-before-socket-join',view,focus);
+    await snapAt('21b-before-wide',[x+1.3,y+1.35,z+1.1],[x,y,z+.3]);
+    await aim([x,Math.max(.9,y+1.05),z+.35],[x,y,z]);
+    await key('KeyE');await step(5);
+    const joint=await page.evaluate(()=>{
+      const pvc=window.__wireTheHouse.pvc,old=window.__wireTheHouse.mission.points[0].conduit,extension=pvc.openSockets[0].root;
+      const newStart=extension.getWorldPosition(extension.position.clone());
+      return{phase:pvc.phase,joined:pvc.joinedCount,open:pvc.openSockets.length,oldOpen:old.userData.socketOpen,newOpen:extension.userData.socketOpen,insertion:extension.userData.pvcJoin?.insertionMm,newStart:newStart.toArray(),extensionId:extension.userData.studioEntityId};
+    });
+    assert.equal(joint.phase,'batch');assert.equal(joint.joined,1);assert.equal(joint.open,1);assert.equal(joint.oldOpen,false);assert.equal(joint.newOpen,true);assert.equal(joint.insertion,30);
+    assert(Math.abs(Math.hypot(...joint.newStart.map((n,i)=>n-factoryEnd.end[i]))-.03)<.002,'The plain end must sit 30 mm inside the factory socket');
+    assert.equal((await state()).total,20,'Joining must consume exactly one carried pipe');
+    await snapAt('22-after-socket-join',view,focus);
+    await snapAt('22b-after-wide',[x+1.3,y+1.35,z+1.1],[x,y,z+.3]);
+    report.checks.push('aim at existing factory socket -> E inserts plain end 30 mm -> open end transfers to extension; quantity conserved');
+  }
   report.checks.push('prepared bonded box -> measured cut -> free manual hole positions -> four physical 12 mm holes without pipe -> two open rebars -> pipe insertion -> anchored sequential plier tightening; R toggles held and installed PVC');report.pvc=await state();
  }
  report.errors=report.errors.filter(message=>message!=='Pointer Lock disabled for automated verification');

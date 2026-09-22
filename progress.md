@@ -1,5 +1,13 @@
 Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web game named WIRE THE HOUSE, based on real Cyprus residential first-fix practices, editable in Web Game Studio, playable on desktop/mobile, deployed to arisconstantinou/Electrical-Game via GitHub Pages, and ending at FIRST FIX COMPLETE without cable pulling.
 
+## 2026-09-22 · Factory socket PVC join (isolated branch)
+
+- User photo shows a plain 20 mm end and a factory-moulded larger socket on the opposite end. Separate coupler for two plain ends is explicitly later scope.
+- Added a hollow 45 mm socket, 30 mm insertion, aiming guide, and E/USE join from a carried prepared pipe into an installed pipe's open socket. The open socket transfers to the extension; stock count stays conserved.
+- Worked in `codex/pvc-socket-join` from `codex/site-pro-04` HEAD. Shared 5365 listener still serves the dirty `site-pro-04` checkout. The browser test overlays this branch's production `dist` responses only in its own page and never replaces the listener.
+- Typecheck and Vite build passed. `manual-pvc-ui.mjs --dist-overlay --socket-join` passed the existing full manual workflow plus real crosshair/E socket joining with no browser errors. Prepared stock aim was 12.106 ms/call with full-mesh raycasts and 0.15 ms/call after centreline targeting (500 calls, same desktop Chrome test). The before/after joint screenshots show the first-person body and wheelbarrow can obscure the close connection; geometry and 30 mm overlap were asserted numerically.
+- Remaining: coordinate integration into the active `site-pro-04` checkout and run the same browser route without overlay, including a touch USE pass. Do not claim the shared live page has this feature before promotion.
+
 ## 2026-09-22 · Mansion concept and apprentice drawings (in progress)
 
 - New first priority from user: show concept images of a larger Cypriot mansion under construction, actual game-world floor/section/electrical drawings, and make the drawings viewable when aiming at the apprentice. The mansion 3D geometry still requires concept selection before construction. Working assumption: ground + three upper levels, B1+B2, 30 × 28 m, open 10 × 10 m courtyard.

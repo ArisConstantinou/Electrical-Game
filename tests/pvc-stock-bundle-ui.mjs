@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { blockPointerLock } from './browser-safety.mjs';
+import { installDistOverlay } from './dist-overlay.mjs';
 
 const url = process.argv.find(value => value.startsWith('http')) ?? 'http://127.0.0.1:5365/Electrical-Game/';
 const baseline = process.argv.includes('--baseline');
@@ -14,6 +15,7 @@ try {
   const context = await browser.newContext({ viewport: { width: 1366, height: 768 } });
   await blockPointerLock(context);
   const page = await context.newPage();
+  if (process.argv.includes('--dist-overlay')) await installDistOverlay(page);
   page.on('pageerror', error => report.errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') report.errors.push(message.text()); });
   await page.goto(url);

@@ -2,6 +2,9 @@ import * as THREE from 'three';
 import { PvcBend, PVC } from './PvcBend';
 import type { PvcPreset } from './PvcPresets';
 export const pvcMaterial=new THREE.MeshStandardMaterial({color:0xe1e2d8,roughness:.57});
+// The last 45 mm are the factory-moulded female end. A plain 20 mm end
+// enters 30 mm, leaving 15 mm visible before the shoulder.
+export const PVC_SOCKET={start:2.955,shoulder:2.94,outerRadius:.012,innerRadius:.0103,insertion:.03} as const;
 const STOCK_CENTER=new THREE.Vector3(3.46,.02,1.15);
 const STOCK_LEAN=.095;
 const STOCK_DIRECTION=new THREE.Vector3(Math.sin(STOCK_LEAN),Math.cos(STOCK_LEAN),0);
@@ -43,7 +46,10 @@ export class PvcTube extends THREE.Mesh<THREE.BufferGeometry,THREE.MeshStandardM
     for(let i=0;i<=this.sections;i++){
       const p=bend.at(from+(to-from)*i/this.sections),nx=-Math.sin(p.angle),ny=Math.cos(p.angle);
       for(let shell=0;shell<2;shell++)for(let j=0;j<this.sides;j++){
-        const a=j/this.sides*Math.PI*2,r=shell?.008:.01,co=Math.cos(a),si=Math.sin(a),idx=shell*(this.sections+1)*this.sides+i*this.sides+j;
+        const a=j/this.sides*Math.PI*2,s=from+(to-from)*i/this.sections;
+        const flare=THREE.MathUtils.smoothstep(s,PVC_SOCKET.shoulder,PVC_SOCKET.start);
+        const r=shell?THREE.MathUtils.lerp(.008,PVC_SOCKET.innerRadius,flare):THREE.MathUtils.lerp(.01,PVC_SOCKET.outerRadius,flare);
+        const co=Math.cos(a),si=Math.sin(a),idx=shell*(this.sections+1)*this.sides+i*this.sides+j;
         pos.setXYZ(idx,p.x+nx*co*r,p.y+ny*co*r,si*r);norm.setXYZ(idx,nx*co*(shell?-1:1),ny*co*(shell?-1:1),si*(shell?-1:1));
       }
     }
@@ -54,7 +60,7 @@ export class PvcStock extends THREE.Group{
   readonly pipes:THREE.Group[]=[];readonly straps:THREE.Mesh[]=[];
   readonly bundleRoots:THREE.Group[]=[];
   readonly bundleRemaining=Array<number>(PVC_BUNDLE_COUNT).fill(PVC.count);
-  private readonly reserveMeshes:Array<{pipes:THREE.InstancedMesh;ends:THREE.InstancedMesh;straps:THREE.Mesh[]}>=[];
+  private readonly reserveMeshes:Array<{pipes:THREE.InstancedMesh;ends:THREE.InstancedMesh;socketEnds:THREE.InstancedMesh;straps:THREE.Mesh[]}>=[];
   readonly bundleHighlight:THREE.Box3Helper;
   private readonly bundleBox=new THREE.Box3();
   private readonly bundleRay=new THREE.Raycaster();
@@ -66,11 +72,18 @@ export class PvcStock extends THREE.Group{
   constructor(){
     super();this.name='PVC workshop · 20 × 3 m';this.userData.studioEntityId='pvc:workshop';
     const original=new THREE.Group();original.name='PVC bundle 1 · 20 × 3 m';original.userData.pvcBundleIndex=0;this.bundleRoots.push(original);this.add(original);
-    const pipeG=new THREE.CylinderGeometry(.01,.01,3,10,1,true),endG=new THREE.RingGeometry(.008,.01,10);
+    const pipeG=new THREE.LatheGeometry([
+      new THREE.Vector2(.01,0),new THREE.Vector2(.01,PVC_SOCKET.shoulder),
+      new THREE.Vector2(PVC_SOCKET.outerRadius,PVC_SOCKET.start),
+      new THREE.Vector2(PVC_SOCKET.outerRadius,PVC.length),
+    ],10);
+    const endG=new THREE.RingGeometry(.008,.01,10);
+    const socketEndG=new THREE.RingGeometry(PVC_SOCKET.innerRadius,PVC_SOCKET.outerRadius,10);
     for(let i=0;i<PVC.count;i++){
       const group=new THREE.Group();group.userData.pvcStock=i;original.add(group);this.pipes.push(group);
       part(group,pipeG,pvcMaterial,'3 m PVC length',[0,1.5,0]);
-      for(const y of [0,3]){const end=part(group,endG,pvcMaterial,'Open pipe end',[0,y,0]);end.rotation.x=Math.PI/2;}
+      const plain=part(group,endG,pvcMaterial,'Plain 20 mm end',[0,0,0]);plain.rotation.x=Math.PI/2;
+      const socket=part(group,socketEndG,pvcMaterial,'Factory moulded socket',[0,PVC.length,0]);socket.rotation.x=Math.PI/2;
       const mark=part(group,new THREE.CylinderGeometry(.0103,.0103,.005,10,1,true),new THREE.MeshStandardMaterial({color:0x15191b,roughness:.85}),'Permanent marker ring');mark.visible=false;this.marks.push(mark);
     }
     const bandMaterial=new THREE.MeshStandardMaterial({color:0x1b7e78,roughness:.45});
@@ -84,15 +97,18 @@ export class PvcStock extends THREE.Group{
     for(let bundle=1;bundle<PVC_BUNDLE_COUNT;bundle++){
       const root=new THREE.Group();root.name=`PVC bundle ${bundle+1} · 20 × 3 m`;root.userData.pvcBundleIndex=bundle;root.position.set(STOCK_CENTER.x,STOCK_CENTER.y,RESERVE_BUNDLE_Z[bundle-1]);root.rotation.z=-STOCK_LEAN;this.add(root);this.bundleRoots.push(root);
       const barrels=new THREE.InstancedMesh(pipeG,pvcMaterial,PVC.count);barrels.name='Individual 3 m hollow PVC tubes';barrels.castShadow=barrels.receiveShadow=true;root.add(barrels);
-      const ends=new THREE.InstancedMesh(endG,pvcMaterial,PVC.count*2);ends.name='Open PVC tube ends';root.add(ends);
+      const ends=new THREE.InstancedMesh(endG,pvcMaterial,PVC.count);ends.name='Plain PVC tube ends';root.add(ends);
+      const socketEnds=new THREE.InstancedMesh(socketEndG,pvcMaterial,PVC.count);socketEnds.name='Factory moulded PVC sockets';root.add(socketEnds);
       for(let i=0;i<PVC.count;i++){
         const offset=STOCK_BUNDLE_OFFSETS[i];dummy.position.set(offset.x,1.5,offset.y);dummy.rotation.set(0,0,0);dummy.updateMatrix();barrels.setMatrixAt(i,dummy.matrix);
-        for(let end=0;end<2;end++){dummy.position.set(offset.x,end*3,offset.y);dummy.rotation.set(Math.PI/2,0,0);dummy.updateMatrix();ends.setMatrixAt(i*2+end,dummy.matrix);}
+        dummy.rotation.set(Math.PI/2,0,0);
+        dummy.position.set(offset.x,0,offset.y);dummy.updateMatrix();ends.setMatrixAt(i,dummy.matrix);
+        dummy.position.set(offset.x,PVC.length,offset.y);dummy.updateMatrix();socketEnds.setMatrixAt(i,dummy.matrix);
       }
-      barrels.instanceMatrix.needsUpdate=ends.instanceMatrix.needsUpdate=true;
+      barrels.instanceMatrix.needsUpdate=ends.instanceMatrix.needsUpdate=socketEnds.instanceMatrix.needsUpdate=true;
       const bands:THREE.Mesh[]=[];
       for(const y of [.4,1.5,2.6]){const band=part(root,new THREE.TorusGeometry(.055,.004,5,32),bandMaterial,'Rounded factory plastic strap',[0,y,0]);band.rotation.x=Math.PI/2;bands.push(band);}
-      this.reserveMeshes.push({pipes:barrels,ends,straps:bands});
+      this.reserveMeshes.push({pipes:barrels,ends,socketEnds,straps:bands});
     }
     this.bundleHighlight=new THREE.Box3Helper(this.bundleBox,0xffda35);this.bundleHighlight.name='Selected PVC bundle highlight';this.bundleHighlight.visible=false;this.bundleHighlight.raycast=()=>{};this.add(this.bundleHighlight);
     const metal=new THREE.MeshStandardMaterial({color:0xa6b4b4,roughness:.4,metalness:.6});
@@ -111,7 +127,7 @@ export class PvcStock extends THREE.Group{
     if(!Number.isInteger(index)||index<0||index>=PVC_BUNDLE_COUNT)throw new RangeError('Unknown PVC bundle');
     const remaining=Math.max(0,Math.min(PVC.count,Math.floor(count)));this.bundleRemaining[index]=remaining;
     if(index===0){this.pipes.forEach((pipe,i)=>pipe.visible=i<remaining);this.straps.forEach(strap=>strap.visible=remaining>0);}
-    else{const bundle=this.reserveMeshes[index-1];bundle.pipes.count=remaining;bundle.ends.count=remaining*2;bundle.straps.forEach(strap=>strap.visible=remaining>0);}
+    else{const bundle=this.reserveMeshes[index-1];bundle.pipes.count=bundle.ends.count=bundle.socketEnds.count=remaining;bundle.straps.forEach(strap=>strap.visible=remaining>0);}
   }
   bundleCenter(index:number):THREE.Vector3{
     if(!Number.isInteger(index)||index<0||index>=PVC_BUNDLE_COUNT)throw new RangeError('Unknown PVC bundle');
