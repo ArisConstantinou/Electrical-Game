@@ -27,6 +27,7 @@ if(!live)await page.route('http://127.0.0.1:5365/**',async route=>{
 try{
   await page.goto(address);
   await page.waitForFunction(()=>window.__wireTheHouse?.audio,undefined,{timeout:120000});
+  if(!mobile)await page.locator('#apprentice-count').selectOption('0');
   if(mobile)await page.locator('#start-button').tap();else await page.locator('#start-button').click();
   await page.waitForFunction(()=>window.__wireTheHouse.started&&document.querySelector('#start-screen')?.classList.contains('hidden'));
   await page.waitForFunction(()=>window.__wireTheHouse.audio.telemetry.recordedSounds.length===5,undefined,{timeout:30000});
@@ -36,6 +37,12 @@ try{
   await page.waitForTimeout(500);
   await mkdir('output/selected-sounds-ui',{recursive:true});
   await page.screenshot({path:`output/selected-sounds-ui/gameplay-${mobile?'mobile':'desktop'}${live?'-live':''}.png`});
+  if(!mobile){
+    await page.mouse.move(640,400);await page.mouse.down();
+    await page.waitForFunction(()=>window.__wireTheHouse.audio.telemetry.activeLoops.spray===true);
+    await page.mouse.up();
+    await page.waitForFunction(()=>window.__wireTheHouse.audio.telemetry.activeLoops.spray===false);
+  }
   const result=await page.evaluate(async()=>{
     const game=window.__wireTheHouse,audio=game.audio;
     game.step=()=>{};
