@@ -13,11 +13,16 @@ async function steps(page,count=1,dt=1/60){await page.evaluate(({count,dt})=>{fo
 async function aim(page,x,y=1.4,distance=.42){await page.evaluate(({x,y,distance})=>{const g=window.__wireTheHouse,c=g.renderer.camera;g.hammerWorkStance.restore(c);c.position.set(x,g.player.eyeHeight,g.room.brickWall.volume.frontZ+distance);c.lookAt(x,y,g.room.brickWall.volume.frontZ);g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;window.__boxQAStep(0);},{x,y,distance});await steps(page,60);}
 async function shot(page,name){await page.evaluate(async()=>{const g=window.__wireTheHouse;await g.renderer.waitForFrame();g.renderer.render();await g.renderer.waitForFrame();});await page.screenshot({path:`${out}/${name}.png`});}
 async function action(page,mobile){
+  if(await page.evaluate(()=>window.__wireTheHouse.selectedTool==='fitting')){
+    await page.locator('#box-place-assembly').click();
+    await steps(page,1,0);
+    return;
+  }
   if(mobile){const r=await page.locator('#look-joystick').boundingBox();assert(r);const cdp=await page.context().newCDPSession(page);const touch={x:r.x+r.width*.5,y:r.y+r.height*.5,id:18};await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[touch]});await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await cdp.detach();}
   else await page.keyboard.press('KeyE');
   await steps(page,1,0);
 }
-async function select(page,mobile,tool){if(mobile)await page.locator(`[data-tool="${tool}"]`).tap();else await page.keyboard.press(tool==='fitting'?'Digit5':'Digit6');await steps(page,1,0);}
+async function select(page,mobile,tool){if(mobile)await page.locator(`[data-tool="${tool}"]`).tap();else await page.keyboard.press(tool==='fitting'?'Digit5':'Digit6');await steps(page,1,0);if(tool==='fitting'&&!await page.evaluate(()=>window.__wireTheHouse.boxAssemblyActive)){await page.locator('#box-assembly-toggle').click();await steps(page,1,0);}}
 function blockedPlacement(before,after,label){assert.equal(after.visible,false,`${label}: obstructed recess cannot leave the box proud of the finish`);assert(Math.abs(after.mortarMass-before.mortarMass)<1e-6,`${label}: refused placement conserves mortar`);}
 function flushOrBlocked(before,after,label){if(after.visible){const placement=after.placement.find(p=>p.id===after.id);assert(placement.protrusionMm<=1.20001,`${label}: any accepted casing must be flush`);}assert(Math.abs(after.mortarMass-before.mortarMass)<1e-6,`${label}: fit attempt conserves mortar`);}
 async function clearVerticalWorkSlots(page){return page.evaluate(async()=>{
@@ -77,7 +82,10 @@ try{
     await select(page,mobile,'level');await action(page,mobile);const unsupportedLevel=await state(page);assert.notEqual(unsupportedLevel.stage,'leveled');assert.equal(unsupportedLevel.levelVisible,false);
     // Aim at the actually fallen box, settle into low working height and
     // retrieve with the same native control used to place it.
-    await select(page,mobile,'fitting');await steps(page,45);await action(page,mobile);const retrieved=await state(page);assert.equal(retrieved.visible,false,`${name}: native retrieval of fallen box`);oneHand(retrieved,`${name} crouched retrieval`);await shot(page,`${name}-retrieved-in-hand`);
+    await select(page,mobile,'fitting');
+    if(mobile)await page.locator('#mobile-crouch').tap();else await page.keyboard.press('KeyH');
+    await steps(page,45);await aim(page,fallen.point[0],fallen.point[1]+fallen.boxLocal[1],.46);
+    await action(page,mobile);const retrieved=await state(page);assert.equal(retrieved.visible,false,`${name}: native retrieval of fallen box`);oneHand(retrieved,`${name} crouched retrieval`);await shot(page,`${name}-retrieved-in-hand`);
     await aim(page,.7,1.4,.42);await action(page,mobile);const repositioned=await state(page);assert(repositioned.visible);assert(repositioned.point[0]>.5,`${name}: retrieved box moves to new aimed location`);oneHand(repositioned,`${name} repositioned`);
     report.scenarios.push({platform:name,far,blocked,voidSlots,inserted,fallen,multiple,unsupportedLevel,retrieved,repositioned});
     if(!mobile){
