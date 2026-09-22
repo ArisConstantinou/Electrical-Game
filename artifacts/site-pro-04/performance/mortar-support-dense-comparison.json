@@ -1,0 +1,20 @@
+{
+  "method": "390x844 DPR3 Chrome WebGL desktop-host touch emulation; different impact counts, indicative comparison only",
+  "before": {
+    "fps": 59.28,
+    "p95Ms": 20.099999964237213,
+    "impacts": 14,
+    "releaseCalls": 4,
+    "releaseWorstMs": 4.800000011920929,
+    "drawCalls": 750.8
+  },
+  "after": {
+    "fps": 58.32,
+    "p95Ms": 22.399999976158142,
+    "impacts": 20,
+    "releaseCalls": 7,
+    "releaseWorstMs": 1.199999988079071,
+    "drawCalls": 764.2
+  },
+  "physicalPhoneVerified": false
+}

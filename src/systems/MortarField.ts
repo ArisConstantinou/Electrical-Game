@@ -10,6 +10,7 @@ const TETRA = [[0,5,1,6],[0,1,2,6],[0,2,3,6],[0,3,7,6],[0,7,4,6],[0,4,5,6]];
 const LEVEL = .35;
 const CHUNK = 16;
 const FRESH_SECONDS = 3600;
+const SUPPORT_FACES = [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]] as const;
 
 /** Sparse, fixed-world wet-mortar volume. The field stores material quantity;
  * marching tetrahedra emits ONE union skin per spatial chunk, never one shell
@@ -25,6 +26,7 @@ export class MortarField {
   private readonly occupiedMin = new THREE.Vector3(Infinity, Infinity, Infinity);
   private readonly occupiedMax = new THREE.Vector3(-Infinity, -Infinity, -Infinity);
   private meshSamples: {x:number;y:number;z:number;size:number;values:Float64Array}|null=null;
+  private supportScratch:{index:Uint32Array;visited:Uint8Array;supported:Uint8Array}|null=null;
   private readonly settling:Array<{remaining:number;cells:Set<string>;blocked:(p:THREE.Vector3)=>boolean}>=[];
   private key(x: number, y: number, z: number): string { return `${x},${y},${z}`; }
   private chunkKey(x: number, y: number, z: number): string { return this.key(Math.floor(x / CHUNK), Math.floor(y / CHUNK), Math.floor(z / CHUNK)); }
@@ -324,6 +326,12 @@ export class MortarField {
       maxX=Math.max(maxX,node.x);maxY=Math.max(maxY,node.y);maxZ=Math.max(maxZ,node.z);
     }
     const sizeX=maxX-minX+3,sizeY=maxY-minY+3,sizeZ=maxZ-minZ+3;
+    const cellCount=sizeX*sizeY*sizeZ;
+    // Most sites occupy a bounded work wall. Reuse direct lattice tables for
+    // its 27-neighbour connectivity instead of doing map/set probes per cell.
+    // A very wide or sparse save keeps the existing safe numeric/string path.
+    if(Number.isSafeInteger(cellCount)&&cellCount<=1_200_000)
+      return this.releaseUnsupportedDense(solid,minX,minY,minZ,sizeY,sizeZ,cellCount,center);
     const packed=Number.isSafeInteger(sizeX*sizeY*sizeZ);
     const strideY=sizeZ,strideX=sizeY*sizeZ;
     const id=packed
@@ -338,7 +346,7 @@ export class MortarField {
       const members:Node[]=[node];visited.add(first);let anchored=false;
       for(let i=0;i<members.length;i++){
         const n=members[i];
-        if(!anchored)for(const [dx,dy,dz] of [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]])if(solid(q.set((n.x+dx*1.6)*h,(n.y+dy*1.6)*h,(n.z+dz*1.6)*h))){anchored=true;break;}
+        if(!anchored)for(const [dx,dy,dz] of SUPPORT_FACES)if(solid(q.set((n.x+dx*1.6)*h,(n.y+dy*1.6)*h,(n.z+dz*1.6)*h))){anchored=true;break;}
         for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++)for(let dz=-1;dz<=1;dz++){
           const k=id(n.x+dx,n.y+dy,n.z+dz),other=lookup.get(k);if(!visited.has(k)&&other&&other.value>=LEVEL){visited.add(k);members.push(other);}
         }
@@ -349,6 +357,41 @@ export class MortarField {
     for(const node of [...this.nodes.values()]){
       let keep=supported.has(id(node.x,node.y,node.z));
       if(!keep&&node.value<LEVEL)for(let dx=-1;dx<=1&&!keep;dx++)for(let dy=-1;dy<=1&&!keep;dy++)for(let dz=-1;dz<=1;dz++)if(supported.has(id(node.x+dx,node.y+dy,node.z+dz))){keep=true;break;}
+      if(!keep){const kg=node.value*this.nodeMass;mass+=kg;center.addScaledVector(q.set(node.x*h,node.y*h,node.z*h),kg);this.set(node.x,node.y,node.z,0,node.age);}
+    }
+    if(mass>0){center.multiplyScalar(1/mass);this.revision++;}return{mass,point:center};
+  }
+
+  private releaseUnsupportedDense(solid:(point:THREE.Vector3)=>boolean,
+    minX:number,minY:number,minZ:number,sizeY:number,sizeZ:number,cellCount:number,center:THREE.Vector3):{mass:number;point:THREE.Vector3}{
+    const capacity=this.supportScratch?.index.length??0;
+    if(capacity<cellCount)this.supportScratch={index:new Uint32Array(cellCount),visited:new Uint8Array(cellCount),supported:new Uint8Array(cellCount)};
+    const {index,visited,supported}=this.supportScratch!;
+    index.fill(0,0,cellCount);visited.fill(0,0,cellCount);supported.fill(0,0,cellCount);
+    const nodes=[...this.nodes.values()],strideY=sizeZ,strideX=sizeY*sizeZ;
+    const id=(x:number,y:number,z:number)=>(x-minX+1)*strideX+(y-minY+1)*strideY+z-minZ+1;
+    for(let i=0;i<nodes.length;i++){const n=nodes[i];index[id(n.x,n.y,n.z)]=i+1;}
+    const q=new THREE.Vector3(),h=this.spacing;
+    for(const node of nodes){
+      const first=id(node.x,node.y,node.z);
+      if(node.value<LEVEL||visited[first])continue;
+      const members:Node[]=[node];visited[first]=1;let anchored=false;
+      for(let i=0;i<members.length;i++){
+        const n=members[i];
+        if(!anchored)for(const [dx,dy,dz] of SUPPORT_FACES)
+          if(solid(q.set((n.x+dx*1.6)*h,(n.y+dy*1.6)*h,(n.z+dz*1.6)*h))){anchored=true;break;}
+        for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++)for(let dz=-1;dz<=1;dz++){
+          const k=id(n.x+dx,n.y+dy,n.z+dz),other=index[k];
+          if(!visited[k]&&other&&nodes[other-1].value>=LEVEL){visited[k]=1;members.push(nodes[other-1]);}
+        }
+      }
+      if(anchored)for(const member of members)supported[id(member.x,member.y,member.z)]=1;
+    }
+    let mass=0;
+    for(const node of nodes){
+      let keep=!!supported[id(node.x,node.y,node.z)];
+      if(!keep&&node.value<LEVEL)for(let dx=-1;dx<=1&&!keep;dx++)for(let dy=-1;dy<=1&&!keep;dy++)for(let dz=-1;dz<=1;dz++)
+        if(supported[id(node.x+dx,node.y+dy,node.z+dz)]){keep=true;break;}
       if(!keep){const kg=node.value*this.nodeMass;mass+=kg;center.addScaledVector(q.set(node.x*h,node.y*h,node.z*h),kg);this.set(node.x,node.y,node.z,0,node.age);}
     }
     if(mass>0){center.multiplyScalar(1/mass);this.revision++;}return{mass,point:center};

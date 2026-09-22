@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import * as THREE from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
-import { attribute, dot, floor, fract, mix, positionWorld, sin, smoothstep, texture as sampleTexture, uniform, uv, vec2 } from 'three/tsl';
+import { attribute, dot, floor, fract, min, mix, positionWorld, sin, smoothstep, texture as sampleTexture, uniform, uv, vec2 } from 'three/tsl';
 import { GAME_CONFIG } from '../data/gameConfig';
 import { laserBand, laserTint, laserEmission } from '../systems/LaserProjection';
 import type { InstallationDefinition } from '../data/installationRules';
@@ -31,7 +31,13 @@ const grain = fract(sin(dot(floor(positionWorld.xy.mul(1800)), vec2(127.1,311.7)
 const mottling = sin(positionWorld.x.mul(93).add(sin(positionWorld.y.mul(71)))).mul(sin(positionWorld.y.mul(127)));
 const grooves = smoothstep(.82,.99,sin(positionWorld.y.mul(3200)));
 const rawMasonry = masonryColor.mul(grain.mul(.15).add(.90).add(mottling.mul(.045)).sub(grooves.mul(.035)));
-const photographedClay = sampleTexture(brickImage, uv()).rgb.mul(masonryColor.r.div(.49));
+const brickLocalUv = attribute<'vec2'>('brickLocalUv', 'vec2');
+const edgeDistance = min(min(brickLocalUv.x, brickLocalUv.x.oneMinus()), min(brickLocalUv.y, brickLocalUv.y.oneMinus()));
+// A restrained darkening of the clay face at its real mortar boundary gives
+// the intact volume wall the same eased edge read as the reference brickwork.
+// The work surface and fractured geometry remain at their exact hit positions.
+const edgeShade = smoothstep(0, .075, edgeDistance).mul(.13).add(.87);
+const photographedClay = sampleTexture(brickImage, uv()).rgb.mul(masonryColor.r.div(.49)).mul(edgeShade);
 // A face mask keeps real mortar joints, internal chambers and broken edges on
 // their own rough clay/mortar colors in both WebGPU and the WebGL backend.
 wallMaterial.colorNode = mix(mix(rawMasonry, photographedClay, attribute<'float'>('brickFace', 'float').mul(brickImageReady)),laserTint,laserBand);
@@ -272,7 +278,7 @@ export class BrickWall extends THREE.Group {
 
   private addBrickSurfaceAttributes(geometry: THREE.BufferGeometry): void {
     const positions = geometry.getAttribute('position'), normals = geometry.getAttribute('normal'), colors = geometry.getAttribute('color');
-    const coordinates = new Float32Array(positions.count * 2), faces = new Float32Array(positions.count);
+    const coordinates = new Float32Array(positions.count * 2), localCoordinates = new Float32Array(positions.count * 2), faces = new Float32Array(positions.count);
     const pitchX = this.volume.width / 21, course = this.volume.height / 23;
     for (let i = 0; i < positions.count; i += 3) {
       const originalPlane = [0, 1, 2].every(j => {
@@ -289,12 +295,17 @@ export class BrickWall extends THREE.Group {
       const left = -this.volume.width / 2 + column * pitchX + stagger;
       const patch = brickFacePatch(row, column);
       for (let j = 0; j < 3; j++) {
-        coordinates[(i + j) * 2] = patch[0] + patch[2] * (positions.getX(i + j) - left) / pitchX;
-        coordinates[(i + j) * 2 + 1] = patch[1] + patch[3] * (positions.getY(i + j) - row * course) / course;
+        const localU = (positions.getX(i + j) - left) / pitchX;
+        const localV = (positions.getY(i + j) - row * course) / course;
+        coordinates[(i + j) * 2] = patch[0] + patch[2] * localU;
+        coordinates[(i + j) * 2 + 1] = patch[1] + patch[3] * localV;
+        localCoordinates[(i + j) * 2] = localU;
+        localCoordinates[(i + j) * 2 + 1] = localV;
         faces[i + j] = face;
       }
     }
     geometry.setAttribute('uv', new THREE.BufferAttribute(coordinates, 2));
+    geometry.setAttribute('brickLocalUv', new THREE.BufferAttribute(localCoordinates, 2));
     geometry.setAttribute('brickFace', new THREE.BufferAttribute(faces, 1));
   }
 

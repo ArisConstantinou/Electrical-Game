@@ -71,6 +71,26 @@ for (const [name, solid] of cases) {
 }
 {
   const before = new MortarField(), after = new MortarField();
+  populate(before, 26); populate(after, 26);
+  for (const solid of [() => true, q => q.x < -.10]) {
+    const expected = referenceRelease(before, solid), actual = after.releaseUnsupported(solid);
+    assert.equal(actual.mass, expected.mass, 'reused dense scratch: released mass');
+    assert.deepEqual(actual.point.toArray(), expected.point.toArray(), 'reused dense scratch: center');
+    assert.deepEqual([...after.nodes], [...before.nodes], 'reused dense scratch: material');
+  }
+  // Expand the occupied bounds after one release, then shrink them again.
+  // Old index/visited/support flags must never leak into the next query.
+  for (const field of [before, after]) field.set(90, 111, -305, .7, 12, 0);
+  for (const solid of [q => q.x < -.10, () => false]) {
+    const expected = referenceRelease(before, solid), actual = after.releaseUnsupported(solid);
+    assert.equal(actual.mass, expected.mass, 'resized dense scratch: released mass');
+    assert.deepEqual(actual.point.toArray(), expected.point.toArray(), 'resized dense scratch: center');
+    assert.deepEqual([...after.nodes], [...before.nodes], 'resized dense scratch: material');
+  }
+  console.log(JSON.stringify({ name: 'dense scratch reused and resized', nodesAfter: after.nodes.size }));
+}
+{
+  const before = new MortarField(), after = new MortarField();
   for (const field of [before, after]) {
     field.set(-1_000_000, -1_000_000, -1_000_000, .7, 10, 0);
     field.set(1_000_000, 1_000_000, 1_000_000, .6, 10, 0);
