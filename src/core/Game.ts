@@ -256,6 +256,14 @@ export class Game {
     this.wasLeveling = leveling;
     const blockingWork=this.mixing.wheelbarrow.busy||this.pvc.blocksWork||this.mixing.blocksWork&&!['drill','laser','driver'].includes(this.selectedTool);
     const handWork=!blockingWork&&['fitting','level','measure','drill','driver','laser'].includes(this.selectedTool);
+    // A crouched player can bend farther to pick up a casing on the floor.
+    // Latch the posture while that casing is still present: lowering the eyes
+    // changes the ray for a few frames, but must not snap the torso back up.
+    const lowPickupEligible=handWork&&this.selectedTool==='fitting'&&this.player.crouched;
+    const floorBoxAimed=lowPickupEligible&&this.boxPlacement.target(this.renderer.camera)?.boxGroup.userData.placement?.state==='floor';
+    const nearbyFloorBox=lowPickupEligible&&this.mission.points.some(point=>point.boxGroup.visible&&point.boxGroup.userData.placement?.state==='floor'
+      &&Math.hypot(point.position.x-this.renderer.camera.position.x,point.position.z-this.renderer.camera.position.z)<1.25);
+    this.player.lowPickup=Boolean(nearbyFloorBox&&(this.player.lowPickup||floorBoxAimed));
     this.player.wallWorkEnabled=(this.selectedTool==='hammer'||handWork)&&!leveling&&!blockingWork&&!this.apprentice.ownsInput;
     const cuttingStep=(this.room.brickWall.chiselType==='flat'?this.room.brickWall.chiselWidthM:.01)*.36;
     this.player.wallToolTravelSpeedMps=this.selectedTool==='hammer'&&this.input.actionHeld

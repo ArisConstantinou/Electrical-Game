@@ -13,10 +13,11 @@ export class PlayerController {
   wallToolTravelSpeedMps: number | null = null;
   readonly workPosition = { locked: false, distanceM: 0, targetDistanceM: .76, released: false };
   crouched = false;
+  lowPickup = false;
   handWorkTargetY:number|null=null;
   private handWorkEyeHeight:number|null=null;
   private wasHandWork=false;
-  get eyeHeight(): number { return this.crouched || this.input.pressed('ControlLeft') || this.input.pressed('ControlRight') ? .95 : this.handWorkEyeHeight ?? GAME_CONFIG.player.eyeHeight; }
+  get eyeHeight(): number { return this.crouched || this.input.pressed('ControlLeft') || this.input.pressed('ControlRight') ? this.lowPickup ? .68 : .95 : this.handWorkEyeHeight ?? GAME_CONFIG.player.eyeHeight; }
   yaw = 0;
   pitch = -0.62;
   readonly velocity = new THREE.Vector3();

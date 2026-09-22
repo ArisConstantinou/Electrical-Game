@@ -299,7 +299,7 @@ export class HUD {
       });
     };
     root.querySelectorAll<HTMLButtonElement>('[data-box-preset]').forEach(button=>bindHammerButton(`#${button.id}`,()=>dispatchEvent(new CustomEvent('wirehouse:box-preset',{detail:button.dataset.boxPreset}))));
-    bindHammerButton('#box-assembly-toggle',()=>dispatchEvent(new CustomEvent(root.dataset.boxAssembly==='true'?'wirehouse:box-exit-assembly':'wirehouse:box-enter-assembly')));
+    bindHammerButton('#box-assembly-toggle',()=>dispatchEvent(new CustomEvent(this.shell.dataset.boxAssembly==='true'?'wirehouse:box-exit-assembly':'wirehouse:box-enter-assembly')));
     bindHammerButton('#box-undo',()=>dispatchEvent(new CustomEvent('wirehouse:box-undo')));
     bindHammerButton('#box-reset',()=>dispatchEvent(new CustomEvent('wirehouse:box-reset')));
     root.querySelectorAll<HTMLButtonElement>('[data-box-zone]').forEach(button=>bindHammerButton(`[data-box-zone="${button.dataset.boxZone}"]`,()=>dispatchEvent(new CustomEvent('wirehouse:box-attach',{detail:Number(button.dataset.boxZone)}))));
