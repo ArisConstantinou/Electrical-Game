@@ -3,7 +3,8 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import type { PlayerObstacle } from '../player/EquipmentCollision';
 import { brickFacePatch } from './BrickFacePatch';
 import { masonryFaceMaterial } from './BrickFaceMaterial';
-import { siteMaterial } from './SiteMaterials';
+import { siteMaterial, siteSmoothConcreteMaterial } from './SiteMaterials';
+import { curvedWallGeometry, type CurvedWallShape } from './CurvedWallGeometry';
 import { createClaySoffitPreview } from './ClaySoffitPreview';
 import { MansionCourtyard } from './MansionCourtyard';
 import { MansionSurroundings } from './MansionSurroundings';
@@ -189,6 +190,20 @@ export class MansionGroundWing extends THREE.Group {
     this.obstacles.push(obstacle);
     this.editableWallColliders.set(group, { obstacle, matrix: new THREE.Matrix4().makeScale(0, 0, 0) });
     return group;
+  }
+
+  applyEditorConcreteCurve(group: THREE.Group, shape: CurvedWallShape): void {
+    if (group.userData.levelEditorKind !== 'concrete-wall') return;
+    const mesh = group.children.find((child): child is THREE.Mesh => child instanceof THREE.Mesh);
+    if (!mesh) return;
+    mesh.geometry.dispose();
+    mesh.geometry = curvedWallGeometry(shape);
+    if (mesh.material instanceof THREE.Material) mesh.material.dispose();
+    mesh.material = siteSmoothConcreteMaterial();
+    mesh.position.y = 0;
+    group.userData.curveShape = shape;
+    group.updateMatrixWorld(true);
+    this.obstaclesAt(group.position.y);
   }
 
   removeEditorWall(group: THREE.Group): void {

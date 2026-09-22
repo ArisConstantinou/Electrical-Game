@@ -99,6 +99,7 @@ try {
   await page.locator('#level-scene-exit').tap();
   await page.locator('#start-load').tap();
   await page.locator('.start-level-choice').filter({ hasText: 'BASIC · ORIGINAL' }).tap();
+  await page.waitForURL(url => !url.searchParams.has('level') && !url.searchParams.has('mansion'));
   await ready();
   assert.equal(await page.locator('#start-level-current').textContent(), 'BASIC · ORIGINAL');
   const basic = await page.evaluate(() => ({ wing: window.__wireTheHouse.room.mansionWing, wall: window.__wireTheHouse.room.brickWall.visible }));

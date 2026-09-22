@@ -61,6 +61,7 @@ try {
   const rotated = await transform();
   assert(Math.abs(rotated.rotationY - before.rotationY) > .15, `Rotate gesture did not affect wall: ${JSON.stringify({ before, rotated })}`);
   await page.locator('#level-scale').tap();
+  await page.waitForFunction(() => window.__wireTheHouse.levelEditor.gizmo.mode === 'scale');
   await drag(0, -55);
   const scaled = await transform();
   assert(scaled.scale[0] > rotated.scale[0] * 1.1, `Scale gesture did not affect wall: ${JSON.stringify({ rotated, scaled })}`);
@@ -80,16 +81,41 @@ try {
     return { position: editor.camera.position.toArray(), distance: editor.camera.position.distanceTo(editor.orbit.target) };
   });
   const cameraBefore = await cameraState();
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 45, y: 210, id: 1 }] });
-  for (let step = 1; step <= 6; step++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 45 + step * 9, y: 210, id: 1 }] });
+  const orbitPoint = await page.evaluate(() => {
+    const e = window.__wireTheHouse.levelEditor;
+    for (const [x, y] of [[330, 470], [330, 300], [35, 460], [280, 500]]) {
+      if (document.elementFromPoint(x, y)?.id !== 'game-canvas') continue;
+      e.pointerRay({ clientX: x, clientY: y });
+      if (!e.raycaster.intersectObjects([e.gizmo.object], true).length) return { x, y };
+    }
+    throw new Error('No uncovered empty canvas point available for orbit gesture');
+  });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ ...orbitPoint, id: 1 }] });
+  // TOP begins exactly above the floor. A diagonal orbit gesture introduces
+  // polar tilt and yaw together; horizontal-only yaw is visually undefined
+  // at that pole and must not be mistaken for a failed touch gesture.
+  for (let step = 1; step <= 6; step++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: orbitPoint.x + step * 7, y: orbitPoint.y + step * 7, id: 1 }] });
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await page.waitForTimeout(300);
   const cameraAfterOrbit = await cameraState();
   assert(Math.hypot(...cameraAfterOrbit.position.map((value, index) => value - cameraBefore.position[index])) > .05,
     `Empty-space touch orbit did not move camera: ${JSON.stringify({ cameraBefore, cameraAfterOrbit })}`);
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 80, y: 220, id: 1 }] });
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 80, y: 220, id: 1 }, { x: 190, y: 220, id: 2 }] });
-  for (let step = 1; step <= 5; step++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 80 - step * 7, y: 220, id: 1 }, { x: 190 + step * 7, y: 220, id: 2 }] });
+  const pinchStart = await page.evaluate(() => {
+    const rect = document.querySelector('#level-halo-handle').getBoundingClientRect();
+    const first = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    const second = [[first.x + 110, first.y], [first.x - 110, first.y], [260, 350]]
+      .map(([x, y]) => ({ x, y })).find(point => document.elementFromPoint(point.x, point.y)?.id === 'game-canvas');
+    if (!second || !document.elementFromPoint(first.x, first.y)?.closest('#level-halo-handle')) throw new Error('Pinch test needs one finger on Halo and one on canvas');
+    return { first, second };
+  });
+  const { first, second } = pinchStart;
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ ...first, id: 1 }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ ...first, id: 1 }, { ...second, id: 2 }] });
+  const outward = Math.sign(second.x - first.x) || 1;
+  for (let step = 1; step <= 5; step++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [
+    { x: first.x - outward * step * 7, y: first.y, id: 1 },
+    { x: second.x + outward * step * 7, y: second.y, id: 2 },
+  ] });
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await page.waitForTimeout(300);
   const cameraAfterPinch = await cameraState();

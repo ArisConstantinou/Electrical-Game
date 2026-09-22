@@ -19,6 +19,7 @@ try {
     await page.goto('http://127.0.0.1:5365/Electrical-Game/?mansion=preview&renderer=webgl', { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => window.__wireTheHouse?.isReadyForStart, null, { timeout: 120_000 });
     await page.locator('#start-level-editor').click();
+    await page.waitForFunction(() => window.__wireTheHouse?.levelEditor.active, null, { timeout: 120_000 });
     if (isMobile) await page.locator('.level-editor__bottom-nav [data-editor-tab="build"]').click();
     await page.locator('#level-add-brick').click();
     if (isMobile) await page.locator('#level-details-toggle').click();

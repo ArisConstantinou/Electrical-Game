@@ -95,6 +95,29 @@ export function siteMaterial(surface: Surface, color: number, repeatX = 1, repea
   });
 }
 
+/** Continuous cast wall finish without photographic formwork bands or repeated panel boundaries. */
+export function siteSmoothConcreteMaterial(): THREE.MeshStandardMaterial {
+  let texture = materialTextures.get('concrete:smooth');
+  if (!texture) {
+    texture = new THREE.CanvasTexture(source('concrete'));
+    texture.name = 'Continuous cast concrete aggregate';
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.anisotropy = 4;
+    materialTextures.set('concrete:smooth', texture);
+  }
+  return new THREE.MeshStandardMaterial({
+    name: 'Continuous cast concrete',
+    color: 0xc2b9ad,
+    map: texture,
+    bumpMap: texture,
+    bumpScale: .004,
+    roughness: .98,
+    metalness: 0,
+    side: THREE.DoubleSide,
+  });
+}
+
 let siteProScreedTexture: THREE.Texture | null = null;
 export function siteProScreedMaterial(): THREE.MeshStandardMaterial {
   if (!siteProScreedTexture) {

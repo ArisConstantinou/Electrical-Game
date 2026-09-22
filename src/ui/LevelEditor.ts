@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import type { Game } from '../core/Game';
+import type { CurvedWallShape } from '../world/CurvedWallGeometry';
 import './level-editor.css';
 
 type WallKind = 'brick-wall' | 'concrete-wall';
@@ -13,6 +14,10 @@ type WallRecord = {
   position: [number, number, number];
   rotationY: number;
   scale: [number, number, number];
+  chainId?: string;
+  sectionIndex?: number;
+  curveRadius?: number;
+  curveShape?: CurvedWallShape;
 };
 type SurfaceRecord = {
   id: string;
@@ -75,6 +80,14 @@ export async function listAvailableLevelSlots(): Promise<LevelSlot[]> {
 }
 const finiteTriplet = (value: unknown): value is [number, number, number] =>
   Array.isArray(value) && value.length === 3 && value.every(item => typeof item === 'number' && Number.isFinite(item));
+const validCurvedShape = (value: unknown): value is CurvedWallShape => {
+  if (!value || typeof value !== 'object') return false;
+  const shape = value as Partial<CurvedWallShape>;
+  return Array.isArray(shape.center) && shape.center.length === 2 && shape.center.every(Number.isFinite) &&
+    Number.isFinite(shape.radius) && shape.radius! > .12 && shape.radius! < 10000 &&
+    Number.isFinite(shape.startAngle) && Number.isFinite(shape.sweep) && Math.abs(shape.sweep!) <= Math.PI &&
+    Number.isFinite(shape.uvStart);
+};
 
 /** Direct editing of mansion wall assemblies. A wall's visual and collision footprint share one transform. */
 export class LevelEditor {
@@ -108,6 +121,12 @@ export class LevelEditor {
   private cameraMode: 'orbit' | 'pan' = 'orbit';
   private readonly touchPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0));
   private touchDrag: { pointerId: number; mode: 'translate' | 'rotate' | 'scale'; x: number; y: number; position: THREE.Vector3; rotationY: number; scale: THREE.Vector3; planeHit: THREE.Vector3 | null } | null = null;
+  private wallEndpointDrag: { pointerId: number; wall: THREE.Group; fixed: THREE.Vector3; end: -1 | 1 } | null = null;
+  private wallPathActive = false;
+  private wallPathEnd: -1 | 1 = 1;
+  private readonly wallPathPoint = new THREE.Vector3();
+  private readonly editorTouches = new Map<number, THREE.Vector2>();
+  private pinchZoom: { startSpan: number; startDistance: number; direction: THREE.Vector3 } | null = null;
   private down: { x: number; y: number } | null = null;
   private history: LevelDocument[] = [];
   private historyIndex = -1;
@@ -261,9 +280,20 @@ export class LevelEditor {
     this.el('.level-editor__add').insertAdjacentHTML('beforebegin', '<div class="level-editor__build-heading"><strong>▥ BUILD ASSETS</strong><span>STRUCTURE · SNAP 25 cm</span></div>');
     this.el('.level-editor__starts').insertAdjacentHTML('afterend', '<div class="level-editor__scene-actions"><button id="level-scene-settings" type="button">⚙ SETTINGS</button><button id="level-scene-exit" type="button">✕ EXIT EDITOR</button></div>');
     this.el('.level-editor__bar').insertAdjacentHTML('beforeend', '<button id="level-details-toggle" type="button" aria-expanded="false">POSITION / SIZE</button>');
+    this.el('#level-details-toggle').insertAdjacentHTML('afterend', '<button id="level-wall-tools-toggle" type="button">⌁ WALL PATH</button>');
     this.el('#level-name').insertAdjacentHTML('afterend', '<button id="level-details-close" type="button" aria-label="Close editor details">✕</button>');
     this.el('#level-kind').insertAdjacentHTML('afterend', '<button id="level-focus" type="button">FOCUS IN SCENE</button>');
     this.el('#level-focus').insertAdjacentHTML('afterend', '<div id="level-group-edit" hidden><label for="level-group-name">GROUP NAME</label><input id="level-group-name" type="text" maxlength="48"><button id="level-ungroup" type="button">UNGROUP</button></div>');
+    this.el('#level-group-edit').insertAdjacentHTML('afterend', `<div id="level-wall-tools" hidden>
+      <div class="level-wall-tools__heading"><strong>WALL SECTION</strong><span>LIVE GEOMETRY + COLLISION</span></div>
+      <div class="level-wall-tools__ends" role="group" aria-label="Wall continuation endpoint"><button id="level-wall-start" type="button">◉ START</button><button id="level-wall-end" type="button" aria-pressed="true">END ◉</button></div>
+      <button id="level-wall-continue" type="button" aria-pressed="false">＋ CONTINUE · TAP POINTS</button>
+      <div class="level-wall-tools__row"><label for="level-wall-material">MATERIAL</label><select id="level-wall-material"><option value="brick-wall">FIRED CLAY BRICK</option><option value="concrete-wall">CAST CONCRETE</option></select></div>
+      <div class="level-wall-tools__row"><label for="level-wall-radius">CURVE RADIUS m</label><input id="level-wall-radius" type="number" min="0.5" max="50" step="0.25" value="4"></div>
+      <div class="level-wall-tools__curve"><button id="level-wall-curve-left" type="button">↶ CURVE LEFT</button><button id="level-wall-curve-right" type="button">CURVE RIGHT ↷</button></div>
+      <small>Drag either endpoint in the scene, or continue with taps. SNAP joins walls; turn SNAP off for free placement. Every generated section stays independently editable.</small>
+    </div>`);
+    this.el('#level-halo').insertAdjacentHTML('afterend', '<div id="level-wall-endpoints" hidden><button type="button" data-wall-end="-1" aria-label="Drag wall start point">S</button><button type="button" data-wall-end="1" aria-label="Drag wall end point">E</button></div>');
     this.el('.level-editor__bar').insertAdjacentHTML('beforeend', '<small id="level-touch-help"></small>');
     this.el('.level-editor__fields').insertAdjacentHTML('beforebegin', '<div id="level-fields-tabs"><button type="button" data-fields-tab="position">POSITION</button><button type="button" data-fields-tab="size">DIMENSIONS</button></div>');
     this.el<HTMLButtonElement>('#level-focus').disabled = true;
@@ -328,12 +358,26 @@ export class LevelEditor {
     haloHandle.addEventListener('pointermove', event => this.updateTouchDrag(event));
     haloHandle.addEventListener('pointerup', event => { this.endTouchDrag(event); });
     haloHandle.addEventListener('pointercancel', event => { this.endTouchDrag(event); });
+    this.el('#level-wall-start').addEventListener('click', () => this.setWallPathEnd(-1));
+    this.el('#level-wall-end').addEventListener('click', () => this.setWallPathEnd(1));
+    this.el('#level-wall-continue').addEventListener('click', () => this.setWallPathActive(!this.wallPathActive));
+    this.el<HTMLSelectElement>('#level-wall-material').addEventListener('change', event => this.changeSelectedWallMaterial((event.target as HTMLSelectElement).value as WallKind));
+    this.el('#level-wall-curve-left').addEventListener('click', () => this.curveSelectedWall(-1));
+    this.el('#level-wall-curve-right').addEventListener('click', () => this.curveSelectedWall(1));
+    this.panel.querySelectorAll<HTMLButtonElement>('[data-wall-end]').forEach(handle => {
+      handle.addEventListener('pointerdown', event => this.beginWallEndpointDrag(event, Number(handle.dataset.wallEnd) < 0 ? -1 : 1));
+      handle.addEventListener('pointermove', event => this.updateWallEndpointDrag(event));
+      handle.addEventListener('pointerup', event => this.endWallEndpointDrag(event));
+      handle.addEventListener('pointercancel', event => this.endWallEndpointDrag(event));
+    });
     this.el('#level-save-mobile').addEventListener('click', () => this.el('#level-save').click());
     this.el('#level-save-as').addEventListener('click', () => void this.save(true));
     this.el('#level-export-mobile').addEventListener('click', () => this.el('#level-export').click());
-    this.el('#level-translate').addEventListener('click', () => this.setToolMode('translate'));
-    this.el('#level-rotate').addEventListener('click', () => this.setToolMode('rotate'));
-    this.el('#level-scale').addEventListener('click', () => this.setToolMode('scale'));
+    for (const [id, mode] of [['#level-translate', 'translate'], ['#level-rotate', 'rotate'], ['#level-scale', 'scale']] as const) {
+      const button = this.el(id);
+      button.addEventListener('pointerdown', () => this.setToolMode(mode));
+      button.addEventListener('click', () => this.setToolMode(mode));
+    }
     this.el('#level-save').addEventListener('click', () => void this.save());
     this.el('#level-export').addEventListener('click', () => this.export());
     this.el('#level-search').addEventListener('input', () => this.refreshList());
@@ -346,6 +390,14 @@ export class LevelEditor {
     this.el('#level-camera').addEventListener('click', () => this.setCameraMode(this.cameraMode === 'orbit' ? 'pan' : 'orbit'));
     this.el('#level-camera-mobile').addEventListener('click', () => this.setCameraMode(this.cameraMode === 'orbit' ? 'pan' : 'orbit'));
     this.el('#level-details-toggle').addEventListener('click', () => this.setDetailsOpen(true));
+    this.el('#level-wall-tools-toggle').addEventListener('click', () => {
+      // Defer the dock swap until the browser finishes the touch/click
+      // sequence; removing the tapped control mid-gesture can cancel taps.
+      window.setTimeout(() => {
+        this.setDetailsOpen(true);
+        requestAnimationFrame(() => this.el('#level-wall-tools').scrollIntoView({ block: 'nearest' }));
+      }, 0);
+    });
     this.el('#level-details-close').addEventListener('click', () => this.setDetailsOpen(false));
     this.el('#level-browser-toggle').addEventListener('click', () => {
       const open = this.panel.classList.toggle('browser-open');
@@ -367,6 +419,51 @@ export class LevelEditor {
     this.el('#level-grid').addEventListener('change', () => this.setSnap());
     this.panel.querySelectorAll<HTMLInputElement>('[data-axis],[data-size],#level-yaw').forEach(input => input.addEventListener('change', () => this.applyFields()));
     const canvas = this.game.renderer.webgl.domElement;
+    document.addEventListener('pointerdown', event => {
+      if (!this.active || event.pointerType !== 'touch' || !(event.target instanceof Element) ||
+        !event.target.closest('#game-canvas,#level-halo-handle,#level-wall-endpoints button')) return;
+      this.editorTouches.set(event.pointerId, new THREE.Vector2(event.clientX, event.clientY));
+      if (this.editorTouches.size < 2) return;
+      const [first, second] = [...this.editorTouches.values()];
+      this.pinchZoom = {
+        startSpan: Math.max(1, first.distanceTo(second)),
+        startDistance: this.camera.position.distanceTo(this.orbit.target),
+        direction: this.camera.position.clone().sub(this.orbit.target).normalize(),
+      };
+      this.touchDrag = null;
+      this.wallEndpointDrag = null;
+      this.down = null;
+      this.orbit.enabled = false;
+      this.gizmo.enabled = false;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }, true);
+    document.addEventListener('pointermove', event => {
+      if (!this.active || event.pointerType !== 'touch' || !this.editorTouches.has(event.pointerId)) return;
+      this.editorTouches.get(event.pointerId)!.set(event.clientX, event.clientY);
+      if (!this.pinchZoom) return;
+      if (this.editorTouches.size >= 2) {
+        const [first, second] = [...this.editorTouches.values()];
+        const distance = THREE.MathUtils.clamp(
+          this.pinchZoom.startDistance * this.pinchZoom.startSpan / Math.max(1, first.distanceTo(second)),
+          this.orbit.minDistance, this.orbit.maxDistance,
+        );
+        this.camera.position.copy(this.orbit.target).addScaledVector(this.pinchZoom.direction, distance);
+        this.orbit.update();
+      }
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }, true);
+    const endEditorTouch = (event: PointerEvent): void => {
+      if (event.pointerType !== 'touch' || !this.editorTouches.delete(event.pointerId)) return;
+      if (this.pinchZoom && this.editorTouches.size === 0) {
+        this.pinchZoom = null;
+        this.orbit.enabled = this.active;
+        this.gizmo.enabled = true;
+      }
+    };
+    document.addEventListener('pointerup', endEditorTouch, true);
+    document.addEventListener('pointercancel', endEditorTouch, true);
     canvas.addEventListener('pointerdown', event => {
       if (event.pointerType === 'touch' && !event.isPrimary && this.touchDrag) {
         // The first touch may land on a selected wall. Hand control to OrbitControls
@@ -379,7 +476,13 @@ export class LevelEditor {
       }
       this.beginTouchDrag(event);
     }, true);
-    canvas.addEventListener('pointerdown', event => { if (this.active) this.down = { x: event.clientX, y: event.clientY }; });
+    canvas.addEventListener('pointerdown', event => {
+      if (!this.active) return;
+      this.down = { x: event.clientX, y: event.clientY };
+      // Keep editor selection and gestures on the canvas, but do not let the
+      // underlying desktop FPS controls request Pointer Lock again.
+      event.stopPropagation();
+    });
     document.addEventListener('pointermove', event => {
       if (!this.touchDrag || this.touchDrag.pointerId !== event.pointerId) return;
       this.orbit.enabled = this.topOrbit.enabled = false;
@@ -393,6 +496,7 @@ export class LevelEditor {
       if (this.endTouchDrag(event)) return;
       if (!this.active || !this.down || Math.hypot(event.clientX - this.down.x, event.clientY - this.down.y) > 6) return;
       this.down = null;
+      if (this.wallPathActive && this.extendWallAtPointer(event)) return;
       if (this.gizmo.dragging) return;
       const rect = canvas.getBoundingClientRect();
       this.pointer.set((event.clientX - rect.left) / rect.width * 2 - 1, -(event.clientY - rect.top) / rect.height * 2 + 1);
@@ -529,6 +633,209 @@ export class LevelEditor {
     this.recordHistory();
     return true;
   }
+  private wallEndpoints(wall: THREE.Group): [THREE.Vector3, THREE.Vector3] {
+    const half = (wall.userData.length as number) / 2;
+    const alongX = wall.userData.alongX as boolean;
+    wall.updateWorldMatrix(true, false);
+    const start = new THREE.Vector3(alongX ? -half : 0, 0, alongX ? 0 : -half);
+    const end = new THREE.Vector3(alongX ? half : 0, 0, alongX ? 0 : half);
+    return [wall.localToWorld(start), wall.localToWorld(end)];
+  }
+  private setWallPathEnd(end: -1 | 1): void {
+    this.wallPathEnd = end;
+    this.el('#level-wall-start').setAttribute('aria-pressed', String(end === -1));
+    this.el('#level-wall-end').setAttribute('aria-pressed', String(end === 1));
+  }
+  private setWallPathActive(active: boolean): void {
+    this.wallPathActive = active && Boolean(this.selected && this.game.room.mansionWing?.editableWalls.has(this.selected.name));
+    const button = this.el<HTMLButtonElement>('#level-wall-continue');
+    button.setAttribute('aria-pressed', String(this.wallPathActive));
+    button.textContent = this.wallPathActive ? '✓ TAP NEXT POINT · DONE' : '＋ CONTINUE · TAP POINTS';
+    this.panel.classList.toggle('wall-path-active', this.wallPathActive);
+    if (this.wallPathActive) this.status('Tap the next wall point. Drag the scene to orbit; SNAP joins the nearest wall.');
+  }
+  private snapWallPoint(point: THREE.Vector3, excluded: THREE.Group | null): THREE.Vector3 {
+    const result = point.clone();
+    if (!this.el<HTMLInputElement>('#level-snap').checked) return result;
+    const step = Number(this.el<HTMLSelectElement>('#level-grid').value);
+    result.x = Math.round(result.x / step) * step;
+    result.z = Math.round(result.z / step) * step;
+    let bestDistance = Math.max(.34, step * .8);
+    for (const wall of this.game.room.mansionWing?.editableWalls.values() ?? []) {
+      if (wall === excluded || !wall.visible) continue;
+      const [a, b] = this.wallEndpoints(wall);
+      if (Math.abs(a.y - point.y) > .35) continue;
+      const dx = b.x - a.x, dz = b.z - a.z;
+      const denominator = dx * dx + dz * dz;
+      const t = denominator < 1e-6 ? 0 : THREE.MathUtils.clamp(((point.x - a.x) * dx + (point.z - a.z) * dz) / denominator, 0, 1);
+      const candidate = new THREE.Vector3(a.x + dx * t, point.y, a.z + dz * t);
+      const distance = Math.hypot(candidate.x - point.x, candidate.z - point.z);
+      if (distance < bestDistance) { bestDistance = distance; result.copy(candidate); }
+    }
+    return result;
+  }
+  private setWallEndpoints(wall: THREE.Group, startWorld: THREE.Vector3, endWorld: THREE.Vector3): boolean {
+    const inverse = wall.parent?.matrixWorld.clone().invert() ?? new THREE.Matrix4();
+    const start = startWorld.clone().applyMatrix4(inverse);
+    const end = endWorld.clone().applyMatrix4(inverse);
+    const dx = end.x - start.x, dz = end.z - start.z;
+    const length = Math.hypot(dx, dz);
+    if (length < .2) return false;
+    wall.position.set((start.x + end.x) / 2, (start.y + end.y) / 2, (start.z + end.z) / 2);
+    const alongX = wall.userData.alongX as boolean;
+    wall.rotation.y = alongX ? Math.atan2(-dz, dx) : Math.atan2(dx, dz);
+    const base = wall.userData.length as number;
+    if (alongX) wall.scale.x = length / base; else wall.scale.z = length / base;
+    wall.updateMatrixWorld(true);
+    this.game.room.mansionWing?.obstaclesAt(wall.position.y);
+    return true;
+  }
+  private beginWallEndpointDrag(event: PointerEvent, end: -1 | 1): void {
+    const wall = this.selected;
+    if (!wall || !this.game.room.mansionWing?.editableWalls.has(wall.name)) return;
+    const endpoints = this.wallEndpoints(wall);
+    this.wallEndpointDrag = { pointerId: event.pointerId, wall, fixed: endpoints[end === -1 ? 1 : 0].clone(), end };
+    this.touchPlane.setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 1, 0), endpoints[0]);
+    this.orbit.enabled = false;
+    this.gizmo.enabled = false;
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    event.preventDefault();
+  }
+  private updateWallEndpointDrag(event: PointerEvent): void {
+    const drag = this.wallEndpointDrag;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    this.pointerRay(event);
+    const hit = this.raycaster.ray.intersectPlane(this.touchPlane, this.wallPathPoint);
+    if (!hit) return;
+    const moving = this.snapWallPoint(hit, drag.wall);
+    if (drag.end === -1) this.setWallEndpoints(drag.wall, moving, drag.fixed); else this.setWallEndpoints(drag.wall, drag.fixed, moving);
+    this.refreshFields();
+    event.preventDefault();
+  }
+  private endWallEndpointDrag(event: PointerEvent): void {
+    if (!this.wallEndpointDrag || this.wallEndpointDrag.pointerId !== event.pointerId) return;
+    this.wallEndpointDrag = null;
+    this.orbit.enabled = this.active;
+    this.gizmo.enabled = true;
+    this.snapWallEnds();
+    this.refreshFields();
+    this.recordHistory();
+  }
+  private createWallSection(start: THREE.Vector3, end: THREE.Vector3, kind: WallKind, chainId: string, sectionIndex: number): THREE.Group | null {
+    const length = Math.hypot(end.x - start.x, end.z - start.z);
+    if (length < .2) return null;
+    const wall = this.game.room.mansionWing!.addEditorWall(crypto.randomUUID(), kind, length);
+    wall.userData.wallChainId = chainId;
+    wall.userData.wallSectionIndex = sectionIndex;
+    wall.position.set((start.x + end.x) / 2, start.y, (start.z + end.z) / 2);
+    wall.rotation.y = Math.atan2(-(end.z - start.z), end.x - start.x);
+    this.added.add(wall.name);
+    this.game.room.mansionWing!.obstaclesAt(start.y);
+    return wall;
+  }
+  private extendWallAtPointer(event: PointerEvent): boolean {
+    const wall = this.selected;
+    if (!wall || !this.game.room.mansionWing?.editableWalls.has(wall.name)) return false;
+    const anchor = this.wallEndpoints(wall)[this.wallPathEnd === -1 ? 0 : 1];
+    this.touchPlane.setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 1, 0), anchor);
+    this.pointerRay(event);
+    const hit = this.raycaster.ray.intersectPlane(this.touchPlane, this.wallPathPoint);
+    if (!hit) return false;
+    const target = this.snapWallPoint(hit, wall);
+    const chainId = wall.userData.wallChainId as string | undefined ?? crypto.randomUUID();
+    const sectionIndex = Number(wall.userData.wallSectionIndex ?? 0) + 1;
+    const next = this.createWallSection(anchor, target, wall.userData.levelEditorKind as WallKind, chainId, sectionIndex);
+    if (!next) { this.status('Next point is too close. Move at least 20 cm.'); return true; }
+    wall.userData.wallChainId = chainId;
+    this.setWallPathEnd(1);
+    this.selectWall(next);
+    this.setWallPathActive(true);
+    this.status(`Wall section ${sectionIndex + 1} added. Tap again to continue, or press DONE.`);
+    this.recordHistory();
+    return true;
+  }
+  private changeSelectedWallMaterial(kind: WallKind): void {
+    const wall = this.selected;
+    const wing = this.game.room.mansionWing;
+    if (!wall || !wing?.editableWalls.has(wall.name) || wall.userData.levelEditorKind === kind) return;
+    const match = /^Editor (brick-wall|concrete-wall) ([0-9a-f-]{36})$/i.exec(wall.name);
+    if (!match || !this.added.has(wall.name)) {
+      this.el<HTMLSelectElement>('#level-wall-material').value = wall.userData.levelEditorKind as WallKind;
+      this.status('Material replacement is available on added and continued wall sections; authored mansion walls remain protected in this slice.');
+      return;
+    }
+    const oldName = wall.name;
+    const position = wall.position.clone(), quaternion = wall.quaternion.clone(), scale = wall.scale.clone();
+    const metadata = { chainId: wall.userData.wallChainId, sectionIndex: wall.userData.wallSectionIndex,
+      curveRadius: wall.userData.curveRadius, curveShape: wall.userData.curveShape as CurvedWallShape | undefined };
+    const length = wall.userData.length as number;
+    wing.removeEditorWall(wall);
+    this.added.delete(oldName);
+    const replacement = wing.addEditorWall(match[2], kind, length);
+    replacement.position.copy(position); replacement.quaternion.copy(quaternion); replacement.scale.copy(scale);
+    replacement.userData.wallChainId = metadata.chainId; replacement.userData.wallSectionIndex = metadata.sectionIndex; replacement.userData.curveRadius = metadata.curveRadius;
+    if (metadata.curveShape) { replacement.userData.curveShape = metadata.curveShape;
+      if (kind === 'concrete-wall') wing.applyEditorConcreteCurve(replacement, metadata.curveShape); }
+    this.added.add(replacement.name);
+    for (const group of this.groups.values()) group.members = group.members.map(name => name === oldName ? replacement.name : name);
+    this.selectWall(replacement);
+    this.status(kind === 'brick-wall' ? 'Section changed to fired-clay brick.' : 'Section changed to cast concrete.');
+    this.recordHistory();
+  }
+  private curveSelectedWall(side: -1 | 1): void {
+    const wall = this.selected;
+    const wing = this.game.room.mansionWing;
+    if (!wall || !wing?.editableWalls.has(wall.name)) return;
+    if (!this.added.has(wall.name)) { this.status('Curve conversion currently applies to added or continued sections; extend this wall first.'); return; }
+    const [start, end] = this.wallEndpoints(wall);
+    const chord = Math.hypot(end.x - start.x, end.z - start.z);
+    const requested = Number(this.el<HTMLInputElement>('#level-wall-radius').value);
+    const radius = Math.max(chord / 2 + .01, Number.isFinite(requested) ? requested : chord);
+    this.el<HTMLInputElement>('#level-wall-radius').value = radius.toFixed(2);
+    const mid = start.clone().add(end).multiplyScalar(.5);
+    const dx = end.x - start.x, dz = end.z - start.z;
+    const normal = new THREE.Vector3(-dz / chord * side, 0, dx / chord * side);
+    const height = Math.sqrt(Math.max(0, radius * radius - chord * chord / 4));
+    const centre = mid.clone().addScaledVector(normal, height);
+    const angle0 = Math.atan2(start.z - centre.z, start.x - centre.x);
+    const angle1 = Math.atan2(end.z - centre.z, end.x - centre.x);
+    let sweep = angle1 - angle0;
+    while (sweep > Math.PI) sweep -= Math.PI * 2;
+    while (sweep < -Math.PI) sweep += Math.PI * 2;
+    if (Math.sign(sweep) !== Math.sign(side)) sweep += side * Math.PI * 2;
+    if (Math.abs(sweep) > Math.PI) sweep -= Math.sign(sweep) * Math.PI * 2;
+    const count = THREE.MathUtils.clamp(Math.ceil(Math.abs(sweep * radius) / .45), 4, 32);
+    const kind = wall.userData.levelEditorKind as WallKind;
+    const chainId = wall.userData.wallChainId as string | undefined ?? crypto.randomUUID();
+    const baseIndex = Number(wall.userData.wallSectionIndex ?? 0);
+    const scaleY = wall.scale.y, scaleZ = wall.scale.z;
+    const oldName = wall.name;
+    wing.removeEditorWall(wall); this.added.delete(oldName);
+    const sections: THREE.Group[] = [];
+    let from = start;
+    for (let index = 1; index <= count; index++) {
+      const angle = angle0 + sweep * index / count;
+      const to = new THREE.Vector3(centre.x + Math.cos(angle) * radius, start.y, centre.z + Math.sin(angle) * radius);
+      const section = this.createWallSection(from, to, kind, chainId, baseIndex + index - 1);
+      if (section) {
+        section.scale.y = scaleY; section.scale.z *= scaleZ; section.userData.curveRadius = radius * side;
+        const localCenter = section.worldToLocal(centre.clone());
+        const localStart = section.worldToLocal(from.clone());
+        const shape: CurvedWallShape = { center: [localCenter.x, localCenter.z], radius,
+          startAngle: Math.atan2(localStart.z - localCenter.z, localStart.x - localCenter.x),
+          sweep: sweep / count, uvStart: Math.abs(sweep) * radius * (index - 1) / count,
+          capStart: index === 1, capEnd: index === count };
+        section.userData.curveShape = shape;
+        if (kind === 'concrete-wall') wing.applyEditorConcreteCurve(section, shape);
+        sections.push(section);
+      }
+      from = to;
+    }
+    for (const group of this.groups.values()) group.members = group.members.flatMap(name => name === oldName ? sections.map(section => section.name) : [name]);
+    this.setSelection(sections, null, false);
+    this.status(`Curved wall created as ${sections.length} independently editable sections · radius ${radius.toFixed(2)} m.`);
+    this.recordHistory();
+  }
   private recordHistory(): void {
     const document = this.document();
     if (this.historyIndex >= 0 && JSON.stringify(this.history[this.historyIndex]) === JSON.stringify(document)) return;
@@ -570,6 +877,14 @@ export class LevelEditor {
     this.viewMode = mode;
     if (mode === '2d' && this.floorIndex < 0) this.setFloorIndex(0);
     this.panel.dataset.view = mode;
+    // A straight-down camera needs a horizontal up axis. With world Y as up,
+    // OrbitControls starts at its polar limit and one drag direction cannot tilt.
+    this.camera.up.set(0, mode === '2d' ? 0 : 1, mode === '2d' ? -1 : 0);
+    // Three r185 caches this conversion when OrbitControls is constructed.
+    // Keep its orbit basis aligned when the same live camera changes preset.
+    const orbitBasis = this.orbit as OrbitControls & { _quat: THREE.Quaternion; _quatInverse: THREE.Quaternion };
+    orbitBasis._quat.setFromUnitVectors(this.camera.up, new THREE.Vector3(0, 1, 0));
+    orbitBasis._quatInverse.copy(orbitBasis._quat).invert();
     this.orbit.enabled = this.active;
     this.topOrbit.enabled = false;
     this.gizmo.camera = this.camera;
@@ -771,6 +1086,8 @@ export class LevelEditor {
   close(): void {
     if (!this.active) return;
     this.active = false;
+    this.editorTouches.clear();
+    this.pinchZoom = null;
     this.panel.hidden = true;
     this.orbit.enabled = false;
     this.topOrbit.enabled = false;
@@ -781,6 +1098,8 @@ export class LevelEditor {
     this.syncHighlights([]);
     this.gizmo.getHelper().visible = false;
     this.haloElement.hidden = true;
+    this.el('#level-wall-endpoints').hidden = true;
+    this.setWallPathActive(false);
     this.playerMarker.visible = this.apprenticeMarker.visible = this.active;
     this.game.renderer.viewCamera = null;
     this.game.hud.shell.classList.remove('level-editor-open');
@@ -822,6 +1141,32 @@ export class LevelEditor {
     this.haloElement.style.top = `${THREE.MathUtils.clamp(y, 90, maxY)}px`;
     this.haloElement.hidden = false;
   }
+  private updateWallEndpointHandles(): void {
+    const container = this.el('#level-wall-endpoints');
+    const wall = this.selected;
+    if (!wall || this.gizmo.mode !== 'translate' || this.selectedObjects.size !== 1 || !this.game.room.mansionWing?.editableWalls.has(wall.name)) { container.hidden = true; return; }
+    const canvas = this.game.renderer.webgl.domElement.getBoundingClientRect();
+    const panel = this.panel.getBoundingClientRect();
+    const endpoints = this.wallEndpoints(wall);
+    const buttons = [...container.querySelectorAll<HTMLButtonElement>('[data-wall-end]')];
+    const blockedBottom = this.panel.classList.contains('details-open') ? Math.min(panel.height * .58, 500) + 82
+      : this.panel.classList.contains('sheet-open') ? 162 : 78;
+    const usableBottom = panel.height - blockedBottom;
+    let visible = false;
+    for (let index = 0; index < 2; index++) {
+      const projected = endpoints[index].clone().project(this.camera);
+      const button = buttons[index];
+      if (projected.z < -1 || projected.z > 1) { button.hidden = true; continue; }
+      const x = canvas.left - panel.left + (projected.x + 1) * canvas.width / 2;
+      const y = canvas.top - panel.top + (1 - projected.y) * canvas.height / 2;
+      button.hidden = x < -20 || x > panel.width + 20 || y < -20 || y > usableBottom;
+      if (button.hidden) continue;
+      button.style.left = `${x}px`; button.style.top = `${y}px`;
+      button.setAttribute('aria-pressed', String((index === 0 ? -1 : 1) === this.wallPathEnd));
+      visible = true;
+    }
+    container.hidden = !visible;
+  }
   update(): void {
     if (!this.active) return;
     this.orbit.update();
@@ -836,6 +1181,7 @@ export class LevelEditor {
       }
     }
     this.updateHalo();
+    this.updateWallEndpointHandles();
   }
   private resize(): void {
     const canvas = this.game.renderer.webgl.domElement;
@@ -1094,6 +1440,23 @@ export class LevelEditor {
       }
       target.divideScalar(members.length);
     } else target.copy(object.getWorldPosition(new THREE.Vector3()));
+    if (this.cameraPreset === 'top') {
+      const bounds = new THREE.Box3();
+      for (const member of members.length ? members : [object]) bounds.expandByObject(member);
+      const size = bounds.getSize(new THREE.Vector3());
+      const canvas = this.game.renderer.webgl.domElement;
+      const aspect = Math.max(.1, canvas.clientWidth / Math.max(1, canvas.clientHeight));
+      const halfFov = THREE.MathUtils.degToRad(this.camera.fov / 2);
+      const distance = THREE.MathUtils.clamp(Math.max(
+        size.x / (2 * Math.tan(halfFov) * aspect * .68),
+        size.z / (2 * Math.tan(halfFov) * .58),
+        6,
+      ), 6, 48);
+      this.orbit.target.copy(target);
+      this.camera.position.set(target.x, target.y + distance, target.z);
+      this.orbit.update();
+      return;
+    }
     const direction = this.camera.position.clone().sub(this.orbit.target).setY(0).normalize();
     if (direction.lengthSq() < .001) direction.set(1, 0, 1).normalize();
     const spread = members.reduce((largest, member) => Math.max(largest, member.getWorldPosition(new THREE.Vector3()).distanceTo(target)), 0);
@@ -1160,6 +1523,11 @@ export class LevelEditor {
   }
   private refreshFields(): void {
     const object = this.selectedObjects.size > 1 ? this.selectionPivot : this.selected ?? (this.markerSelection === 'player' ? this.playerMarker : this.markerSelection === 'apprentice' ? this.apprenticeMarker : null);
+    const wallSelected = Boolean(this.selected && this.selectedObjects.size === 1 && this.game.room.mansionWing?.editableWalls.has(this.selected.name));
+    this.panel.classList.toggle('wall-selected', wallSelected);
+    this.el('#level-wall-tools').hidden = !wallSelected;
+    if (wallSelected) this.el<HTMLSelectElement>('#level-wall-material').value = this.selected!.userData.levelEditorKind as WallKind;
+    else if (this.wallPathActive) this.setWallPathActive(false);
     this.el<HTMLButtonElement>('#level-focus').disabled = !object;
     this.el<HTMLButtonElement>('[data-fields-tab="size"]').disabled = Boolean(this.markerSelection) || this.selectedObjects.size > 1;
     const group = this.activeGroupId ? this.groups.get(this.activeGroupId) : null;
@@ -1262,6 +1630,10 @@ export class LevelEditor {
       position: wall.position.toArray() as [number, number, number],
       rotationY: wall.rotation.y,
       scale: wall.scale.toArray() as [number, number, number],
+      chainId: typeof wall.userData.wallChainId === 'string' ? wall.userData.wallChainId : undefined,
+      sectionIndex: Number.isFinite(wall.userData.wallSectionIndex) ? Number(wall.userData.wallSectionIndex) : undefined,
+      curveRadius: Number.isFinite(wall.userData.curveRadius) ? Number(wall.userData.curveRadius) : undefined,
+      curveShape: validCurvedShape(wall.userData.curveShape) ? wall.userData.curveShape : undefined,
     });
     const surfaces: SurfaceRecord[] = [];
     for (const surface of this.game.room.mansionWing?.editableSurfaces.values() ?? []) surfaces.push({
@@ -1378,6 +1750,13 @@ export class LevelEditor {
         wall.position.fromArray(record.position);
         wall.rotation.y = record.rotationY;
         wall.scale.fromArray(record.scale);
+        wall.userData.wallChainId = typeof record.chainId === 'string' ? record.chainId : undefined;
+        wall.userData.wallSectionIndex = Number.isFinite(record.sectionIndex) ? record.sectionIndex : undefined;
+        wall.userData.curveRadius = Number.isFinite(record.curveRadius) ? record.curveRadius : undefined;
+        if (validCurvedShape(record.curveShape)) {
+          wall.userData.curveShape = record.curveShape;
+          if (record.kind === 'concrete-wall') wing.applyEditorConcreteCurve(wall, record.curveShape);
+        }
       }
       this.groups.clear();
       if (Array.isArray(data.groups)) for (const group of data.groups) {

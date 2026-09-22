@@ -335,6 +335,36 @@
   #level-editor #level-halo-badge{position:absolute;left:0;bottom:89px;max-width:175px;padding:7px 10px;border:1px solid #79e2e5;border-radius:9px;background:#153b43f3;color:#ecfeff;font-size:11px;font-weight:850;letter-spacing:.035em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   #level-editor #level-halo.halo-right #level-halo-badge{left:auto;right:0}
   #level-editor #level-halo-handle{display:grid;place-items:center;width:76px;height:76px;min-height:76px;padding:0;border:5px solid #b8e4ff;border-right-color:#e9a965;border-bottom-color:#e9a965;border-radius:50%;background:radial-gradient(circle at center,#20343a 0 26px,#263c43 27px 100%);box-shadow:inset 0 0 0 4px #19292e,0 0 0 5px #0f28338a;color:#edfaf7;font-size:27px;touch-action:none;pointer-events:auto;user-select:none}
-  #level-editor #level-halo-handle span{display:grid;place-items:center;width:38px;height:38px;border:2px solid #c4ebf6;border-radius:50%;background:#172c32}
+#level-editor #level-halo-handle span{display:grid;place-items:center;width:38px;height:38px;border:2px solid #c4ebf6;border-radius:50%;background:#172c32}
+}
+
+/* Advanced wall-path editing stays contextual: no permanent panel covers the scene. */
+#level-wall-tools-toggle{display:none}
+#level-editor.wall-selected #level-wall-tools-toggle{display:inline-flex}
+#level-wall-tools{display:grid;gap:8px;margin:9px 0;padding:10px;border:1px solid #6f9a99;border-radius:12px;background:linear-gradient(145deg,#213c40,#172b30);box-shadow:inset 0 1px #ffffff12}
+#level-wall-tools[hidden]{display:none!important}
+.level-wall-tools__heading{display:flex;align-items:end;justify-content:space-between;gap:8px}
+.level-wall-tools__heading strong{color:#f8d19a;font-size:12px;letter-spacing:.08em}
+.level-wall-tools__heading span{color:#8eb6b5;font-size:9px;font-weight:800;letter-spacing:.05em}
+.level-wall-tools__ends,.level-wall-tools__curve{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+#level-wall-tools button{min-height:42px;font-size:11px;font-weight:850}
+#level-wall-tools button[aria-pressed=true],#level-wall-continue[aria-pressed=true]{border-color:#8df3ec;background:#28626a;color:#f3ffff;box-shadow:0 0 0 2px #61d9da2b}
+.level-wall-tools__row{display:grid;grid-template-columns:minmax(0,1fr) minmax(118px,1.2fr);align-items:center;gap:7px}
+.level-wall-tools__row label{color:#f0cf9d;font-size:10px;font-weight:850;letter-spacing:.07em}
+.level-wall-tools__row select,.level-wall-tools__row input{min-width:0;min-height:40px;padding:5px 8px;border:1px solid #91aaa8;border-radius:8px;background:#e9efea;color:#17282b;font-size:13px;font-weight:750}
+#level-wall-tools small{color:#bfd4cf;font-size:11px;line-height:1.35}
+#level-editor header,#level-editor .level-editor__bar,#level-editor aside,#level-editor .level-editor__inspector,#level-editor .level-editor__save,#level-editor .level-editor__bottom-nav{z-index:10}
+#level-editor[data-nav-mode=wheel] .level-editor__wheel{z-index:12}
+#level-wall-endpoints{position:absolute;inset:0;z-index:4;pointer-events:none}
+#level-wall-endpoints[hidden]{display:none!important}
+#level-editor.details-open #level-wall-endpoints,#level-editor.wall-path-active #level-wall-endpoints{display:none!important}
+#level-wall-endpoints button{position:absolute;display:grid;place-items:center;width:46px;height:46px;min-height:46px;transform:translate(-50%,-50%);padding:0;border:3px solid #dffeff;border-radius:50%;background:#127980ee;color:#fff;font:900 12px/1 system-ui;box-shadow:0 0 0 5px #12363db8,0 8px 19px #0009;pointer-events:auto;touch-action:none;user-select:none}
+#level-wall-endpoints button[aria-pressed=true]{background:#b46b2f;border-color:#ffe0a5;box-shadow:0 0 0 5px #4d2d19bd,0 8px 19px #0009}
+#level-editor.wall-path-active #game-canvas{cursor:crosshair}
+@media(max-width:1100px){
+  #level-editor.wall-selected .level-editor__bar{grid-template-columns:repeat(5,minmax(0,1fr))}
+  #level-editor #level-wall-tools-toggle{min-height:42px;padding:4px 2px;font-size:10px}
+  #level-editor .level-editor__inspector #level-wall-tools{grid-column:1/-1;order:4}
+  #level-editor.wall-selected.details-open .level-editor__inspector{height:min(58dvh,500px)}
 }
 @media(max-width:420px){#level-editor[data-tab=build] .level-editor__add{grid-template-columns:repeat(2,minmax(0,1fr))}#level-editor[data-tab=build] .level-editor__add button{min-height:65px;flex-direction:row;font-size:11px}}
