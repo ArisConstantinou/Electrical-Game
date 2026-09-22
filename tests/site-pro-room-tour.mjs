@@ -136,7 +136,7 @@ try {
     });
     assert(slabBearing && slabBearing.min[0] < -4.03 && slabBearing.max[0] > 4.03 && slabBearing.max[2] > 3.77,
       `${device.name}: concrete slab must bear across both side walls and the rear wall: ${JSON.stringify(slabBearing)}`);
-    const clayCeiling = new URL(url).searchParams.get('ceiling') === 'clay-ribbed';
+    const clayCeiling = new URL(url).searchParams.get('ceiling') !== 'concrete';
     const slabUnderside = clayCeiling ? 3.18 : 3;
     assert(Math.abs(slabBearing.min[1] - slabUnderside) < .015 && slabBearing.relief,
       `${device.name}: structural slab position or relief is wrong: ${JSON.stringify(slabBearing)}`);

@@ -84,7 +84,7 @@ export class Room extends THREE.Group {
     ceilingMaterial.emissive.set(0x827366);
     ceilingMaterial.emissiveIntensity = .28;
     const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
-    const clayCeiling = new URLSearchParams(location.search).get('ceiling') === 'clay-ribbed';
+    const clayCeiling = new URLSearchParams(location.search).get('ceiling') !== 'concrete';
     // The clay units occupy an 18 cm structural layer above the wall heads.
     // Keep the poured slab on top of that layer, clear of the exposed underside.
     ceiling.position.set(0, GAME_CONFIG.room.height + 0.08 + (clayCeiling ? .18 : 0), .10);
