@@ -1,0 +1,62 @@
+{
+  "cases": [
+    {
+      "device": "mobile-portrait",
+      "before": {
+        "terrain": true,
+        "neighbour": true,
+        "trees": 9,
+        "lodLevels": 2,
+        "canopyAngle": 0.009280828186114863
+      },
+      "after": {
+        "canopyAngle": 0.014282967327462868,
+        "renderError": ""
+      }
+    },
+    {
+      "device": "mobile-landscape",
+      "before": {
+        "terrain": true,
+        "neighbour": true,
+        "trees": 9,
+        "lodLevels": 2,
+        "canopyAngle": 0.009775985427477861
+      },
+      "after": {
+        "canopyAngle": 0.014442424973973411,
+        "renderError": ""
+      }
+    },
+    {
+      "device": "tablet-portrait",
+      "before": {
+        "terrain": true,
+        "neighbour": true,
+        "trees": 9,
+        "lodLevels": 2,
+        "canopyAngle": 0.014441483305077895
+      },
+      "after": {
+        "canopyAngle": 0.016913534236048265,
+        "renderError": ""
+      }
+    },
+    {
+      "device": "desktop",
+      "before": {
+        "terrain": true,
+        "neighbour": true,
+        "trees": 9,
+        "lodLevels": 2,
+        "canopyAngle": 0.00977306454971882
+      },
+      "after": {
+        "canopyAngle": 0.014890521595623415,
+        "renderError": ""
+      }
+    }
+  ],
+  "errors": [],
+  "note": "Viewport screenshots on Windows, not a physical phone."
+}

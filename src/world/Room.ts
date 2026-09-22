@@ -161,7 +161,10 @@ export class Room extends THREE.Group {
     this.addFormworkMarks();
     this.addConstructionJoints();
     this.addRearWall();
-    this.mansionWing = this.mansionPreview ? new MansionGroundWing(this.exterior.getObjectByName('Olive tree outside unfinished opening') ?? null) : null;
+    this.mansionWing = this.mansionPreview ? new MansionGroundWing(
+      this.exterior.getObjectByName('Olive tree outside unfinished opening') ?? null,
+      this.exterior.getObjectByName('Offset adjacent residential block') ?? null,
+    ) : null;
     if (this.mansionWing) this.add(this.mansionWing);
     // The slab bears over the wall heads and columns. Exposed brick meets its
     // soffit directly, with no decorative inner downstand or shadow band.
