@@ -28,7 +28,7 @@ export class PlayerController {
   private wallAssistEnabled = true;
   private obstacleProvider:(()=>readonly PlayerObstacle[])|null=null;
   private mansionPreview=false;
-  private surfaceProvider:((x:number,z:number)=>number)|null=null;
+  private surfaceProvider:((x:number,z:number,currentFloor:number)=>number)|null=null;
   collisionContacts:string[]=[];
 
   constructor(readonly camera: THREE.PerspectiveCamera, private readonly input: Input) {
@@ -38,7 +38,7 @@ export class PlayerController {
 
   setObstacleProvider(provider:()=>readonly PlayerObstacle[]):void { this.obstacleProvider=provider; }
   setMansionPreview(enabled:boolean):void { this.mansionPreview=enabled; }
-  setSurfaceProvider(provider:(x:number,z:number)=>number):void { this.surfaceProvider=provider; }
+  setSurfaceProvider(provider:(x:number,z:number,currentFloor:number)=>number):void { this.surfaceProvider=provider; }
 
   // All tools share direct aiming. A hard eye-only window prevents precise
   // placement of the work point and introduces a dead zone on every reversal.
@@ -139,8 +139,9 @@ export class PlayerController {
     // Only adjacent 15 cm risers may change the floor height in one movement
     // step. This prevents entering the elevated return flight from ground level
     // or walking off an unfinished landing through empty air.
-    const oldFloor = this.surfaceProvider?.(previousX, previousZ) ?? 0;
-    let nextFloor = this.surfaceProvider?.(this.camera.position.x, this.camera.position.z) ?? 0;
+    const feetY = this.camera.position.y - this.eyeHeight;
+    const oldFloor = this.surfaceProvider?.(previousX, previousZ, feetY) ?? 0;
+    let nextFloor = this.surfaceProvider?.(this.camera.position.x, this.camera.position.z, oldFloor) ?? 0;
     if (Math.abs(nextFloor - oldFloor) > .21) {
       this.camera.position.x = previousX;
       this.camera.position.z = previousZ;

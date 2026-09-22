@@ -6,6 +6,9 @@ export interface PlayerObstacle {
   maxX:number;
   minZ:number;
   maxZ:number;
+  /** Optional range of walkable floor heights for a multi-level site. */
+  minFloorY?:number;
+  maxFloorY?:number;
 }
 
 /** Resolve a circular player body against fixed equipment footprints on X/Z. */

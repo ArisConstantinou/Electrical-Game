@@ -160,7 +160,7 @@ export class Game {
     if (mansionPreview) this.renderer.scene.fog = new THREE.Fog(0xaab9bd, 18, 58);
     this.room = new Room(this.renderer.scene, mansionPreview);
     this.player.setMansionPreview(mansionPreview);
-    if (this.room.mansionWing) this.player.setSurfaceProvider((x,z)=>this.room.mansionWing!.surfaceHeight(x,z));
+    if (this.room.mansionWing) this.player.setSurfaceProvider((x,z,currentFloor)=>this.room.mansionWing!.surfaceHeight(x,z,currentFloor));
     this.renderer.scene.add(this.room);
     this.hoseSupply=new HoseSupplyLine(this.renderer.scene,this.fpsRig.getObjectByName('FPS hose tool')!);
     this.mission = new MissionSystem(this.renderer.scene);

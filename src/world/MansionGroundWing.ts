@@ -42,6 +42,8 @@ export class MansionGroundWing extends THREE.Group {
     this.addStairCore();
     this.addFirstFloorLanding();
     this.addFirstFloorRoom();
+    this.addSecondStairCore();
+    this.addSecondFloorShell();
     // Existing room boundaries remain physically closed except for the new aperture.
     this.obstacles.push(
       { id: 'mansion-room-east', minX: 3.76, maxX: 4.05, minZ: -2.41, maxZ: 3.62 },
@@ -60,21 +62,30 @@ export class MansionGroundWing extends THREE.Group {
 
   update(dt: number): void { this.courtyard.update(dt); }
 
-  surfaceHeight(x: number, z: number): number {
+  surfaceHeight(x: number, z: number, currentFloor = 0): number {
+    const closest = (heights: number[]): number => heights.reduce((best, height) =>
+      Math.abs(height - currentFloor) < Math.abs(best - currentFloor) ? height : best);
     const onFirst = x >= 4.8 && x <= 6.2 && z >= 8 && z < 11.08;
-    if (onFirst) return Math.min(11, Math.floor((z - 8) / .28) + 1) * .15;
+    if (onFirst) {
+      const step = Math.min(11, Math.floor((z - 8) / .28) + 1) * .15;
+      return closest([step, 3.3 + step]);
+    }
     const onLanding = x >= 4.8 && x <= 8.2 && z >= 11.08 && z <= 12.2;
-    if (onLanding) return 1.65;
+    if (onLanding) return closest([1.65, 4.95]);
     const onSecond = x >= 6.8 && x <= 8.2 && z >= 8 && z < 11.08;
-    if (onSecond) return 1.65 + Math.min(11, Math.floor((11.08 - z) / .28) + 1) * .15;
-    if (x >= 6.5 && x <= 8.5 && z >= 4.5 && z < 8) return 3.3;
-    if (x >= 6.5 && x <= 12.5 && z >= 0 && z < 4.5) return 3.3;
+    if (onSecond) {
+      const step = 1.65 + Math.min(11, Math.floor((11.08 - z) / .28) + 1) * .15;
+      return closest([step, 3.3 + step]);
+    }
+    if (x >= 4.48 && x <= 6.6 && z >= 6.5 && z < 8) return closest([0, 3.3]);
+    if (x >= 6.5 && x <= 8.5 && z >= 4.5 && z < 8) return closest([0, 3.3, 6.6]);
+    if (x >= 6.5 && x <= 12.5 && z >= 0 && z < 4.5) return closest([3.3, 6.6]);
     return 0;
   }
 
   obstaclesAt(floorY: number): PlayerObstacle[] {
-    if (floorY < 2.8) return this.obstacles;
-    return this.obstacles.filter(obstacle => obstacle.id !== 'Foyer south fired-clay partition');
+    return this.obstacles.filter(obstacle =>
+      floorY >= (obstacle.minFloorY ?? -Infinity) - .16 && floorY <= (obstacle.maxFloorY ?? Infinity) + .16);
   }
 
   private slab(name: string, width: number, depth: number, x: number, z: number, stairVoid = false): void {
@@ -135,8 +146,12 @@ export class MansionGroundWing extends THREE.Group {
     const matrix = new THREE.Matrix4(), quaternion = new THREE.Quaternion();
     for (let row = 0; row < rows; row++) for (let col = 0; col < columns; col++) {
       const index = row * columns + col;
-      const start = col * pitch + (row % 2) * pitch / 2 + gap / 2;
-      const end = Math.min(length, start + pitch - gap);
+      // Running bond needs a half unit at the start of alternate courses.
+      // Omitting it left a 19 cm dark slot at every other wall corner.
+      const halfStart = row % 2 === 1 && col === 0;
+      const origin = row % 2 === 1 ? (col - 1) * pitch + pitch / 2 : col * pitch;
+      const start = halfStart ? gap / 2 : origin + gap / 2;
+      const end = Math.min(length - gap / 2, halfStart ? pitch / 2 - gap / 2 : origin + pitch - gap / 2);
       const span = Math.max(0, end - start);
       patches.set(brickFacePatch(row, col, alongX ? 6 : 7), index * 4);
       const coordinate = -length / 2 + (start + end) / 2;
@@ -147,7 +162,8 @@ export class MansionGroundWing extends THREE.Group {
     bricks.computeBoundingSphere();
     this.add(bricks);
     this.obstacles.push({ id: name, minX: Math.min(x0, x1) - .12, maxX: Math.max(x0, x1) + .12,
-      minZ: Math.min(z0, z1) - .12, maxZ: Math.max(z0, z1) + .12 });
+      minZ: Math.min(z0, z1) - .12, maxZ: Math.max(z0, z1) + .12,
+      minFloorY: baseY, maxFloorY: baseY + 3 });
   }
 
   private castFrame(x: number, z: number): void {
@@ -282,14 +298,16 @@ export class MansionGroundWing extends THREE.Group {
   private addFirstFloorLanding(): void {
     // A short, supported L1 corridor makes the stair exit usable. Its rough
     // entry is framed but remains doorless until later construction stages.
-    this.wall('L1 west fired-clay corridor wall', 6.5, 4.5, 6.5, 7.95, 3.3);
+    // The west return ends before the upper-stair access deck, leaving a
+    // structural side passage rather than trapping the worker in the corridor.
+    this.wall('L1 west fired-clay corridor wall', 6.5, 4.5, 6.5, 6.65, 3.3);
     this.wall('L1 east fired-clay corridor wall', 8.5, 4.5, 8.5, 7.95, 3.3);
     const roof = new THREE.Mesh(new RoundedBoxGeometry(2.24, .2, 3.68, 2, .012), siteMaterial('concrete', 0xcac3b8, .8, 1.5));
     roof.name = 'L1 corridor structural roof slab';
-    roof.position.set(7.5, 6.58, 6.25);
+    roof.position.set(7.5, 6.5, 6.25);
     roof.castShadow = roof.receiveShadow = true;
     this.add(roof);
-    const clay = createClaySoffitPreview(2, 3.5, 6.3);
+    const clay = createClaySoffitPreview(2, 3.5, 6.22);
     clay.name = 'L1 fired-clay structural soffit';
     clay.position.set(7.5, 0, 6.25);
     this.add(clay);
@@ -316,10 +334,10 @@ export class MansionGroundWing extends THREE.Group {
     this.add(floor);
     const roof = new THREE.Mesh(new RoundedBoxGeometry(6.28, .2, 4.72, 2, .012), siteMaterial('concrete', 0xcac3b8, 2, 1.5));
     roof.name = 'L1 room slab prepared for L2';
-    roof.position.set(9.5, 6.58, 2.25);
+    roof.position.set(9.5, 6.5, 2.25);
     roof.castShadow = roof.receiveShadow = true;
     this.add(roof);
-    const infill = createClaySoffitPreview(6, 4.5, 6.3);
+    const infill = createClaySoffitPreview(6, 4.5, 6.22);
     infill.name = 'L1 room clay and concrete roof construction';
     infill.position.set(9.5, 0, 2.25);
     this.add(infill);
@@ -364,6 +382,116 @@ export class MansionGroundWing extends THREE.Group {
       column.castShadow = column.receiveShadow = true;
       this.add(column);
     }
+  }
+
+  private addSecondStairCore(): void {
+    const concrete = siteMaterial('floor', 0xd7d1c7, .35, .35);
+    const formwork = siteMaterial('concrete', 0xb5ada2, .2, .8);
+    const deck = new THREE.Mesh(new RoundedBoxGeometry(2.15, .18, 1.48, 2, .01), concrete);
+    deck.name = 'Supported L1 side deck leading to L2 stair';
+    deck.position.set(5.55, 3.21, 7.24);
+    deck.castShadow = deck.receiveShadow = true;
+    this.add(deck);
+    const deckColumn = new THREE.Mesh(new RoundedBoxGeometry(.27, 3.21, .27, 2, .008), formwork);
+    for (const z of [6.6, 7.85]) {
+      const support = deckColumn.clone();
+      support.name = 'Cast support under L1 side deck';
+      support.position.set(4.52, 1.6, z);
+      support.castShadow = support.receiveShadow = true;
+      this.add(support);
+    }
+    const edgeSteel = new THREE.MeshStandardMaterial({ color: 0xc2a731, roughness: .62, metalness: .25 });
+    for (const z of [6.56, 7.24, 7.9]) {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(.028, .028, 1.05, 8), edgeSteel);
+      post.name = 'Temporary L1 side-deck edge-protection post';
+      post.position.set(4.48, 3.825, z);
+      post.castShadow = true;
+      this.add(post);
+    }
+    const deckRail = new THREE.Mesh(new THREE.CylinderGeometry(.023, .023, 1.46, 8), edgeSteel);
+    deckRail.name = 'Visible guard at open L1 side deck';
+    deckRail.position.set(4.48, 4.3, 7.23);
+    deckRail.rotation.x = Math.PI / 2;
+    this.add(deckRail);
+    this.obstacles.push({ id: 'L1 side-deck edge guard', minX: 4.42, maxX: 4.53, minZ: 6.51, maxZ: 7.97,
+      minFloorY: 3.3, maxFloorY: 3.3 });
+    const geometry = new RoundedBoxGeometry(1, 1, 1, 2, .006);
+    const treads = new THREE.InstancedMesh(geometry, concrete, 22);
+    const risers = new THREE.InstancedMesh(geometry, formwork, 22);
+    treads.name = 'L1 to L2 cast stair treads';
+    risers.name = 'L1 to L2 cast stair risers';
+    const matrix = new THREE.Matrix4(), quaternion = new THREE.Quaternion();
+    for (let step = 1; step <= 11; step++) {
+      const firstTop = 3.3 + step * .15;
+      const firstZ = 8 + (step - .5) * .28;
+      treads.setMatrixAt(step - 1, matrix.compose(new THREE.Vector3(5.5, firstTop - .065, firstZ), quaternion,
+        new THREE.Vector3(1.38, .13, .28)));
+      risers.setMatrixAt(step - 1, matrix.compose(new THREE.Vector3(5.5, firstTop - .075, firstZ - .14), quaternion,
+        new THREE.Vector3(1.38, .15, .045)));
+      const secondTop = 4.95 + step * .15;
+      const secondZ = 11.08 - (step - .5) * .28;
+      treads.setMatrixAt(step + 10, matrix.compose(new THREE.Vector3(7.5, secondTop - .065, secondZ), quaternion,
+        new THREE.Vector3(1.38, .13, .28)));
+      risers.setMatrixAt(step + 10, matrix.compose(new THREE.Vector3(7.5, secondTop - .075, secondZ + .14), quaternion,
+        new THREE.Vector3(1.38, .15, .045)));
+    }
+    for (const mesh of [treads, risers]) {
+      mesh.castShadow = mesh.receiveShadow = true;
+      mesh.computeBoundingSphere();
+      this.add(mesh);
+    }
+    const landing = new THREE.Mesh(new RoundedBoxGeometry(3.4, .19, 1.12, 2, .009), concrete);
+    landing.name = 'L1 to L2 mid-flight structural landing';
+    landing.position.set(6.5, 4.855, 11.64);
+    landing.castShadow = landing.receiveShadow = true;
+    this.add(landing);
+    // The L1 corridor and room roof slabs have their top at 6.6 m and serve
+    // as the actual L2 floor; no duplicate surface is placed over them.
+    const steel = new THREE.MeshStandardMaterial({ color: 0xc2a731, roughness: .64, metalness: .2 });
+    for (const [x, z0, z1, y] of [[4.72, 8, 12.22, 4.3], [6.5, 8, 11.08, 5.1], [8.3, 8, 12.22, 6.0]]) {
+      const rail = new THREE.Mesh(new THREE.CylinderGeometry(.022, .022, z1 - z0, 8), steel);
+      rail.name = 'Temporary upper stair-edge protection rail';
+      rail.position.set(x, y, (z0 + z1) / 2);
+      rail.rotation.x = Math.PI / 2;
+      this.add(rail);
+    }
+  }
+
+  private addSecondFloorShell(): void {
+    this.wall('L2 west fired-clay corridor wall', 6.5, 4.5, 6.5, 7.95, 6.6);
+    this.wall('L2 east fired-clay corridor wall', 8.5, 4.5, 8.5, 7.95, 6.6);
+    const roof = new THREE.Mesh(new RoundedBoxGeometry(2.24, .2, 3.68, 2, .012), siteMaterial('concrete', 0xcac3b8, .8, 1.5));
+    roof.name = 'L2 corridor structural roof slab';
+    roof.position.set(7.5, 9.8, 6.25);
+    roof.castShadow = roof.receiveShadow = true;
+    this.add(roof);
+    const roomRoof = new THREE.Mesh(new RoundedBoxGeometry(6.28, .2, 4.72, 2, .012), siteMaterial('concrete', 0xcac3b8, 2, 1.5));
+    roomRoof.name = 'L2 office shell slab prepared for next floor';
+    roomRoof.position.set(9.5, 9.8, 2.25);
+    roomRoof.castShadow = roomRoof.receiveShadow = true;
+    this.add(roomRoof);
+    const infill = createClaySoffitPreview(6, 4.5, 9.52);
+    infill.name = 'L2 exposed fired-clay and concrete ceiling construction';
+    infill.position.set(9.5, 0, 2.25);
+    this.add(infill);
+    this.wall('L2 office north perimeter', 6.5, 0, 12.5, 0, 6.6);
+    this.wall('L2 office west perimeter', 6.5, 0, 6.5, 4.5, 6.6);
+    this.wall('L2 office east perimeter', 12.5, 0, 12.5, 4.5, 6.6);
+    this.wall('L2 office south partition', 8.2, 4.5, 12.5, 4.5, 6.6);
+    this.wall('L2 office entrance left masonry pier', 6.5, 4.5, 6.8, 4.5, 6.6);
+    const trim = siteMaterial('floor', 0xd4cdc2, .25, .3);
+    for (const x of [6.8, 8.2]) {
+      const jamb = new THREE.Mesh(new RoundedBoxGeometry(.16, 2.42, .28, 2, .008), trim);
+      jamb.name = 'L2 unfinished door-ready opening jamb without door';
+      jamb.position.set(x, 7.81, 4.5);
+      jamb.castShadow = jamb.receiveShadow = true;
+      this.add(jamb);
+    }
+    const lintel = new THREE.Mesh(new RoundedBoxGeometry(1.56, .28, .32, 2, .008), trim);
+    lintel.name = 'L2 supported rough door opening lintel';
+    lintel.position.set(7.5, 9.16, 4.5);
+    lintel.castShadow = lintel.receiveShadow = true;
+    this.add(lintel);
   }
 
   private addTemporarySafety(): void {

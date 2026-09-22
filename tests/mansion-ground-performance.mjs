@@ -15,6 +15,8 @@ try {
     { name: 'preview-stair-flight', suffix: '&mansion=preview', x: 5.5, z: 9.4, floorY: .9, yaw: Math.PI },
     { name: 'preview-first-floor-room', suffix: '&mansion=preview', x: 7.5, z: 3.7, floorY: 3.3, yaw: 0 },
     { name: 'preview-courtyard', suffix: '&mansion=preview', x: 10.2, z: 13.8, yaw: -.9 },
+    { name: 'preview-upper-stair', suffix: '&mansion=preview', x: 5.5, z: 9.4, floorY: 4.2, yaw: Math.PI },
+    { name: 'preview-second-floor-room', suffix: '&mansion=preview', x: 7.5, z: 3.7, floorY: 6.6, yaw: 0 },
   ]) {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
     await blockPointerLock(context);
