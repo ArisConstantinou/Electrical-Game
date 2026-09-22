@@ -519,6 +519,13 @@ export class LevelEditor {
         if (this.wallPathActive && object.userData.levelEditorGround) continue;
         if (this.wallPathActive && object === this.selected) break;
         if (this.wallPathActive) this.setWallPathActive(false);
+        // Ground fills most top-down pixels. Tap away to clear an existing
+        // selection; tap the same surface again to select and edit it.
+        if (object.userData.levelEditorGround && !this.multiMode && this.selectedObjects.size && !this.selectedObjects.has(object)) {
+          this.setSelection([]);
+          this.status('Selection cleared. Tap the floor or terrain again to edit it.');
+          return;
+        }
         this.selectWall(object, event.ctrlKey || event.shiftKey, hit.point);
         return;
       }
@@ -1602,8 +1609,11 @@ export class LevelEditor {
     this.syncSelectionAnchorFromObject();
     const object = this.selectedObjects.size > 1 ? this.selectionPivot : this.selected ?? (this.markerSelection === 'player' ? this.playerMarker : this.markerSelection === 'apprentice' ? this.apprenticeMarker : null);
     const locked = [...this.selectedObjects].some(item => item.userData.levelEditorLocked);
-    this.panel.querySelectorAll<HTMLInputElement>('[data-axis],[data-size],#level-yaw').forEach(field => { field.disabled = locked; });
-    for (const id of ['#level-translate', '#level-rotate', '#level-scale']) this.el<HTMLButtonElement>(id).disabled = locked;
+    this.panel.querySelectorAll<HTMLInputElement>('[data-axis],[data-size],#level-yaw').forEach(field => {
+      field.disabled = locked || !object;
+      if (!object) field.value = '';
+    });
+    for (const id of ['#level-translate', '#level-rotate', '#level-scale']) this.el<HTMLButtonElement>(id).disabled = locked || !object;
     const wallSelected = Boolean(this.selected && this.selectedObjects.size === 1 && this.game.room.mansionWing?.editableWalls.has(this.selected.name));
     this.panel.classList.toggle('wall-selected', wallSelected);
     this.el('#level-wall-tools').hidden = !wallSelected;

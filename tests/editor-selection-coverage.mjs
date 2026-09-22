@@ -134,6 +134,15 @@ try {
       editor.orbit.update();
     }, { point, height });
     await page.waitForTimeout(80);
+    const clickAway = await clickCenter();
+    if (label === siteParts[0][0]) {
+      assert.equal(await page.locator('[data-axis="x"]').inputValue(), '', 'Deselected dimensions must not show a stale element');
+      assert.equal(await page.locator('[data-axis="x"]').isDisabled(), true, 'Deselected dimensions must not accept edits');
+      await page.screenshot({ path: fileURLToPath(new URL('floor-click-away-after.png', output)) });
+    }
+    assert.equal(clickAway, null, `First click on ${label} must clear the previous selection`);
+    if (label === siteParts[2][0])
+      await page.screenshot({ path: fileURLToPath(new URL('terrain-click-away-desktop.png', output)) });
     const picked = await clickCenter();
     const pickedLabel = await page.evaluate(id => window.__wireTheHouse.room.mansionWing.editableAssets.get(id)?.userData.levelEditorLabel, picked);
     assert.equal(pickedLabel, label, `Click must select visible floor or terrain: ${label}; got ${pickedLabel}`);
@@ -198,6 +207,10 @@ try {
     editor.orbit.update();
   });
   await mobilePage.waitForTimeout(100);
+  await mobilePage.touchscreen.tap(mobileRect.x + mobileRect.width / 2, mobileRect.y + mobileRect.height / 2);
+  assert.equal(await mobilePage.evaluate(() => window.__wireTheHouse.levelEditor.selected?.name ?? null), null,
+    'First portrait tap on terrain must clear the previous asset selection');
+  await mobilePage.screenshot({ path: fileURLToPath(new URL('terrain-click-away-mobile.png', output)) });
   await mobilePage.touchscreen.tap(mobileRect.x + mobileRect.width / 2, mobileRect.y + mobileRect.height / 2);
   const mobileTerrain = await mobilePage.evaluate(() => ({
     label: window.__wireTheHouse.levelEditor.selected?.userData.levelEditorLabel,
