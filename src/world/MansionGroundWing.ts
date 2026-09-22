@@ -172,6 +172,7 @@ export class MansionGroundWing extends THREE.Group {
       head.castShadow = head.receiveShadow = true;
       this.add(head);
     }
+    this.addGarageStructuralJunctions();
     // Staged materials make the construction use legible while leaving the
     // whole vehicle bay empty. Each pile has a matching body obstacle.
     const pallet = new THREE.Mesh(new RoundedBoxGeometry(1.35, .13, .9, 2, .006),
@@ -193,6 +194,89 @@ export class MansionGroundWing extends THREE.Group {
     blocks.computeBoundingSphere();
     this.add(blocks);
     this.obstacles.push({ id: 'Staged garage masonry pallet', minX: 10.35, maxX: 11.85, minZ: -2.4, maxZ: -1.35 });
+  }
+
+  private addGarageStructuralJunctions(): void {
+    // The fired-clay walls are infill inside a cast frame. A continuous
+    // concrete beam meets the real roof slab at each wall head; columns close
+    // its corners. None of these parts is a decorative skirting or doorway.
+    const cast = siteMaterial('concrete', 0xe6e0d5, 1.3, .5);
+    cast.emissive.set(0x777169);
+    cast.emissiveIntensity = .24;
+    const runs: [number, number, number, number][] = [
+      [6.5, 4.5, 6.5, 7.65], [6.5, 4.5, 9, 4.5], [9, 5.75, 9, 7.65],
+      [9, -3.5, 9, 4.25], [18, -3.5, 18, 6], [9, 6, 18, 6],
+      [9, -3.5, 11, -3.5], [16, -3.5, 18, -3.5],
+      [15.5, -3.5, 15.5, -.75], [15.5, 1.25, 15.5, 6],
+      [1.35, 7.65, 6.55, 7.65], [8.45, 7.65, 9, 7.65],
+    ];
+    const corners: [number, number][] = [[9, -3.5], [9, 6], [18, -3.5], [18, 6], [15.5, -3.5], [15.5, 6]];
+    const frame = new THREE.InstancedMesh(new RoundedBoxGeometry(1, 1, 1, 2, .006), cast,
+      runs.length + corners.length);
+    frame.name = 'Cast garage frame: continuous ring beams and slab-to-beam columns';
+    const matrix = new THREE.Matrix4(), quaternion = new THREE.Quaternion();
+    runs.forEach(([x0, z0, x1, z1], index) => {
+      const alongX = Math.abs(x1 - x0) > Math.abs(z1 - z0);
+      frame.setMatrixAt(index, matrix.compose(new THREE.Vector3((x0 + x1) / 2, 2.94, (z0 + z1) / 2),
+        quaternion, new THREE.Vector3(alongX ? Math.abs(x1 - x0) : .36, .36,
+          alongX ? .36 : Math.abs(z1 - z0))));
+    });
+    corners.forEach(([x, z], index) => frame.setMatrixAt(runs.length + index,
+      matrix.compose(new THREE.Vector3(x, 1.54, z), quaternion, new THREE.Vector3(.34, 3.08, .34))));
+    frame.castShadow = frame.receiveShadow = true;
+    frame.computeBoundingSphere();
+    this.add(frame);
+    this.addGarageWallFootContact();
+  }
+
+  private addGarageWallFootContact(): void {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128; canvas.height = 64;
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    const pixels = context.createImageData(128, 64);
+    for (let y = 0; y < 64; y++) for (let x = 0; x < 128; x++) {
+      const distance = y / 63;
+      const ragged = .07 * Math.sin(x * .28) + .035 * Math.sin(x * .79 + 1.2);
+      const grain = Math.sin(x * 14.7 + y * 8.3) * Math.sin(x * 4.1 - y * 17.1);
+      const coverage = 1 - THREE.MathUtils.smoothstep(distance + ragged, .08, .96);
+      const index = (y * 128 + x) * 4;
+      pixels.data[index] = 113;
+      pixels.data[index + 1] = 105;
+      pixels.data[index + 2] = 94;
+      pixels.data[index + 3] = Math.round(255 * coverage * (.18 + .065 * Math.max(0, grain)));
+    }
+    context.putImageData(pixels, 0, 0);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.wrapS = THREE.RepeatWrapping;
+    const material = new THREE.MeshStandardMaterial({ map: texture, transparent: true, depthWrite: false,
+      side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, roughness: 1 });
+    const positions: number[] = [], uvs: number[] = [], indices: number[] = [];
+    const quad = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, d: THREE.Vector3) => {
+      const start = positions.length / 3, length = a.distanceTo(b) / 1.2;
+      positions.push(...a.toArray(), ...b.toArray(), ...c.toArray(), ...d.toArray());
+      uvs.push(0, 0, length, 0, 0, 1, length, 1);
+      indices.push(start, start + 1, start + 2, start + 1, start + 3, start + 2);
+    };
+    const wallAndFloor = (a: THREE.Vector3, b: THREE.Vector3, inward: THREE.Vector3) => {
+      quad(a, b, a.clone().add(new THREE.Vector3(0, .16, 0)), b.clone().add(new THREE.Vector3(0, .16, 0)));
+      const floorA = a.clone().setY(.004), floorB = b.clone().setY(.004);
+      quad(floorA, floorB, floorA.clone().add(inward), floorB.clone().add(inward));
+    };
+    wallAndFloor(new THREE.Vector3(9.126, 0, -3.36), new THREE.Vector3(9.126, 0, 4.23), new THREE.Vector3(.19, 0, 0));
+    wallAndFloor(new THREE.Vector3(9.14, 0, -3.374), new THREE.Vector3(10.98, 0, -3.374), new THREE.Vector3(0, 0, .19));
+    wallAndFloor(new THREE.Vector3(16.02, 0, -3.374), new THREE.Vector3(17.86, 0, -3.374), new THREE.Vector3(0, 0, .19));
+    wallAndFloor(new THREE.Vector3(17.874, 0, -3.36), new THREE.Vector3(17.874, 0, 5.86), new THREE.Vector3(-.19, 0, 0));
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+    const contact = new THREE.Mesh(geometry, material);
+    contact.name = 'Feathered construction dust shared by garage slab and brick foot';
+    contact.raycast = () => undefined;
+    this.add(contact);
   }
 
   private slab(name: string, width: number, depth: number, x: number, z: number, stairVoid = false): void {

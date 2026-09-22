@@ -1,5 +1,13 @@
 Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web game named WIRE THE HOUSE, based on real Cyprus residential first-fix practices, editable in Web Game Studio, playable on desktop/mobile, deployed to arisconstantinou/Electrical-Game via GitHub Pages, and ending at FIRST FIX COMPLETE without cable pulling.
 
+## 2026-09-22 · Garage wall/roof junction visual revision
+
+- Continued clean `codex/site-pro-04-mansion` from pushed `cbf5ed6`; the shared 5365 preview was verified as this worktree and never replaced. Protected default mode remains separate from `?mansion=preview`.
+- Same-pose mobile portrait/desktop screenshots were captured before geometry edits. The garage's independent-looking wall/roof seam was replaced with instanced cast ring beams and corner columns tying the clay infill to the actual roof slab. A small transparent dust contact touches both the brick foot and floor. The first dark beam and regularly spaced mortar bits were visually rejected and corrected/removed before final screenshots.
+- Research basis: Cyprus engineering project portfolio documents reinforced-concrete frames and ribbed slabs with clay infill in a real older building; existing Poly Haven concrete texture is CC0. This is visual construction logic, not a structural design approval. Same-camera screenshots: `artifacts/site-pro-04/review/mansion-garage-junction/`.
+- Mobile-portrait garage/workshop walk and partition collision passed after the edit; TypeScript and production Vite build passed. The final 390×844 DPR3 Windows Chrome WebGL profile completed with no render errors: default room 492 calls / p95 19.5 ms; preview garage 580 calls / p95 19.1 ms, versus 576 calls / p95 18.1 ms in the prior short run. The new junction costs four garage draw calls after instancing beams and columns together. The default-room timing also shifted, so short-run p95 values cannot establish a code-caused slowdown or physical-device performance. Broad floor material, daylight response, whole-shell program and physical-phone acceptance remain open.
+- The generic `develop-web-game` client ran but its five-second Start click found the button still disabled while preparing the water/site runtime; its screenshot is a start screen and is not gameplay acceptance. The focused route/view tests wait until the game is ready, enter gameplay and passed without page errors.
+
 ## 2026-09-22 · Site Pro 04 mansion ground garage preview
 
 - Protected default room and port 5365 remain unchanged. Work is in `codex/site-pro-04-mansion`; the last pushed upper-level/exterior milestone is `f446505`. This new garage work is preview-only and has not been published to `main`.

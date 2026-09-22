@@ -1,0 +1,27 @@
+{
+  "label": "after",
+  "cases": [
+    {
+      "device": "mobile-portrait",
+      "camera": [
+        12,
+        1.65,
+        1.6
+      ],
+      "yaw": 0.82,
+      "pitch": -0.03
+    },
+    {
+      "device": "desktop",
+      "camera": [
+        12,
+        1.65,
+        1.6
+      ],
+      "yaw": 0.82,
+      "pitch": -0.03
+    }
+  ],
+  "errors": [],
+  "note": "Windows Chrome viewport screenshots, not physical devices."
+}
