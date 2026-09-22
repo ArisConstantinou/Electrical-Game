@@ -141,6 +141,38 @@ export class MansionGroundWing extends THREE.Group {
       wall.updateWorldMatrix(true, false);
       if (entry.matrix.equals(wall.matrixWorld)) continue;
       entry.matrix.copy(wall.matrixWorld);
+      const curve=wall.userData.levelEditorKind==='concrete-wall'
+        ? wall.userData.curveShape as CurvedWallShape|undefined : undefined;
+      if(curve){
+        const scale=new THREE.Vector3().setFromMatrixScale(wall.matrixWorld);
+        const count=Math.max(1,Math.ceil(Math.abs(curve.radius*curve.sweep)*Math.max(scale.x,scale.z)/.15));
+        const point=(angle:number,radius:number)=>this.corner.set(
+          curve.center[0]+Math.cos(angle)*radius,0,
+          curve.center[1]+Math.sin(angle)*radius).applyMatrix4(wall.matrixWorld).clone();
+        const segments:NonNullable<PlayerObstacle['segments']>[number][]=[];
+        obstacle.minX=obstacle.minZ=Infinity;
+        obstacle.maxX=obstacle.maxZ=-Infinity;
+        for(let index=0;index<count;index++){
+          const a=curve.startAngle+curve.sweep*index/count;
+          const b=curve.startAngle+curve.sweep*(index+1)/count;
+          const mid=(a+b)/2,center=point(mid,curve.radius);
+          const halfWidth=Math.max(center.distanceTo(point(mid,curve.radius-.12)),
+            center.distanceTo(point(mid,curve.radius+.12)))+.005;
+          const start=point(a,curve.radius),end=point(b,curve.radius);
+          segments.push({ax:start.x,az:start.z,bx:end.x,bz:end.z,halfWidth});
+          obstacle.minX=Math.min(obstacle.minX,start.x-halfWidth,end.x-halfWidth);
+          obstacle.maxX=Math.max(obstacle.maxX,start.x+halfWidth,end.x+halfWidth);
+          obstacle.minZ=Math.min(obstacle.minZ,start.z-halfWidth,end.z-halfWidth);
+          obstacle.maxZ=Math.max(obstacle.maxZ,start.z+halfWidth,end.z+halfWidth);
+        }
+        obstacle.segments=segments;
+        const floor=point(curve.startAngle,curve.radius).y;
+        obstacle.minFloorY=floor;
+        this.corner.set(0,3,0).applyMatrix4(wall.matrixWorld);
+        obstacle.maxFloorY=this.corner.y;
+        continue;
+      }
+      obstacle.segments=undefined;
       const length = wall.userData.length as number;
       const alongX = wall.userData.alongX as boolean;
       const halfX = (alongX ? length : .24) / 2;
@@ -202,6 +234,7 @@ export class MansionGroundWing extends THREE.Group {
     mesh.material = siteSmoothConcreteMaterial();
     mesh.position.y = 0;
     group.userData.curveShape = shape;
+    this.editableWallColliders.get(group)?.matrix.makeScale(0,0,0);
     group.updateMatrixWorld(true);
     this.obstaclesAt(group.position.y);
   }
