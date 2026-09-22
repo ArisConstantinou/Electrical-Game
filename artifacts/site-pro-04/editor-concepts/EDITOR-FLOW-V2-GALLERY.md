@@ -1,39 +1,17 @@
-# Mobile Level Editor — five distinct navigation concepts
+# Mobile Level Editor — πέντε διαφορετικά πλήρη UI concepts
 
-These are **UI storyboards**, not the implemented editor. Each image uses a capture of the live game world and shows the same task in sequence: clean canvas → open navigation → choose a brick wall in Build → position its preview → select and edit with the offset Orbit Halo → switch to live top view and isolate a floor. The captions between frames name the state; they are not permanent top panels in the proposed UI.
+Κάθε σύνδεσμος ανοίγει **μία μόνο οθόνη κινητού** (780 × 1748 JPEG), ώστε το navigation ή το εργαλείο να φαίνεται αμέσως. Αυτά είναι **mockups πάνω σε λήψη του παιχνιδιού**, όχι το τελικό λειτουργικό UI. Τα πέντε concepts διαφέρουν στον τρόπο που ανοίγουν οι εντολές, όχι μόνο στα χρώματα. Το Orbit Halo στο Edit βρίσκεται δίπλα στο επιλεγμένο αντικείμενο.
 
-Every primary action combines a symbol and a short label. The compact closed controls use a single recognizable symbol to give the 3D world almost the entire screen. Asset cards use material thumbnails. The selected wall gets a cyan outline and name badge; the Orbit Halo sits beside the wall rather than over its center.
+| Concept | Ανοιχτό navigation | Build assets | Τοποθέτηση | Edit / Orbit | 2D / όροφος |
+|---|---|---|---|---|---|
+| **01 Dock Nest** — κάτω dock που κλείνει σε μικρό τόξο | [Δες το ανοιχτό dock](editor-ui-01-nav.jpg) | [Άνοιγμα Build](editor-ui-01-build.jpg) | [Τοποθέτηση τοίχου](editor-ui-01-place.jpg) | [Edit](editor-ui-01-edit.jpg) | [View](editor-ui-01-view.jpg) |
+| **02 Asset Track** — πλαϊνό συρόμενο rail | [Δες το ανοιχτό rail](editor-ui-02-nav.jpg) | [Άνοιγμα Build](editor-ui-02-build.jpg) | [Τοποθέτηση τοίχου](editor-ui-02-place.jpg) | [Edit](editor-ui-02-edit.jpg) | [View](editor-ui-02-view.jpg) |
+| **03 Orbit Wheel** — ακτινωτό menu | [Δες το ανοιχτό wheel](editor-ui-03-nav.jpg) | [Άνοιγμα Build](editor-ui-03-build.jpg) | [Τοποθέτηση τοίχου](editor-ui-03-place.jpg) | [Edit](editor-ui-03-edit.jpg) | [View](editor-ui-03-view.jpg) |
+| **04 Context Cards** — προσωρινή κάρτα για την τρέχουσα εργασία | [Δες την ανοιχτή κάρτα](editor-ui-04-nav.jpg) | [Build asset card](editor-ui-04-build.jpg) | [Τοποθέτηση τοίχου](editor-ui-04-place.jpg) | [Edit](editor-ui-04-edit.jpg) | [View](editor-ui-04-view.jpg) |
+| **05 Dual Thumb** — δύο χειριστήρια αντίχειρα που επεκτείνονται | [Δες τα ανοιχτά controls](editor-ui-05-nav.jpg) | [Άνοιγμα Build](editor-ui-05-build.jpg) | [Τοποθέτηση τοίχου](editor-ui-05-place.jpg) | [Edit](editor-ui-05-edit.jpg) | [View](editor-ui-05-view.jpg) |
 
-## 01 — Dock Nest
+Το **01** δείχνει συγκεκριμένα αυτό που ζήτησες: κλειστό μένει μόνο μικρό τόξο στο κάτω μέρος και με άγγιγμα ανοίγει το dock. Στο **04**, η ανοιχτή κάρτα Build *είναι* το navigation, γι' αυτό οι εικόνες Nav και Build δείχνουν την ίδια κατάσταση.
 
-Only a small arc remains when the dock is closed. Tap it to expand the bottom navigation; tap the arc/close gesture again to recover the full scene. Build opens a temporary asset drawer. This is the clearest familiar layout and the direct answer to the requested collapsible bottom navigation.
+Στις εικόνες View, το 2D είναι ζωντανή κάτοψη του 3D χώρου με επιλογή B2, B1, G-0 και L1–L4. Οι εικόνες αυτές δείχνουν την πρόταση του UI· δεν αποδεικνύουν ότι όλοι οι όροφοι είναι ήδη υλοποιημένοι.
 
-![Dock Nest full mobile flow](editor-flow-v2-01.png)
-
-## 02 — Asset Track
-
-A narrow edge handle opens a vertical rail from the left. Build and floor controls open beside that rail, keeping the bottom free. The rail closes completely when inspecting the model.
-
-![Asset Track full mobile flow](editor-flow-v2-02.png)
-
-## 03 — Orbit Wheel
-
-A thumb-sized hub opens a radial command wheel. Choose Build, Edit, Group, View, or Save, and the wheel disappears while that task's temporary controls open. Shortcuts for Select, View, and Save stay accessible at the bottom.
-
-![Orbit Wheel full mobile flow](editor-flow-v2-03.png)
-
-## 04 — Context Cards
-
-One small Build launcher sits in the corner of the clean canvas. It opens a floating contextual asset card; selecting an object brings only its editing controls. The card closes to reveal the entire scene again. No fixed navigation bar.
-
-![Context Cards full mobile flow](editor-flow-v2-04.png)
-
-## 05 — Dual Thumb
-
-Two small thumb controls remain when collapsed: Build on the left, View on the right. They expand into separate left/right action belts. The asset library is a horizontal strip suited to quick thumb browsing.
-
-![Dual Thumb full mobile flow](editor-flow-v2-05.png)
-
-The floor example shows B2, B1, G-0, and L1–L4. In 2D only the chosen floor remains visible and editable; 3D can use the same isolation. The 2D backdrop is a top view of the rendered game world, not a blueprint illustration.
-
-Design references: [SketchUp for iPad customizable radial toolbar](https://help.sketchup.com/en/sketchup-ipad/customizing-sketchup-ipad), [Onshape mobile touch navigation and precision selection](https://cad.onshape.com/help/Content/Mobile/mobile_touch_interface_videos.htm), [Onshape resizable mobile feature list](https://cad.onshape.com/help/Content/PartStudio/part_studios.htm). These informed the control patterns; the graphics and layout here are original proposals for Site Pro 04.
+Αναφορές σχεδιασμού: [SketchUp for iPad — radial toolbar](https://help.sketchup.com/en/sketchup-ipad/customizing-sketchup-ipad), [Onshape — mobile touch navigation](https://cad.onshape.com/help/Content/Mobile/mobile_touch_interface_videos.htm). Οι γραφικές συνθέσεις είναι προτάσεις για το Site Pro 04.
