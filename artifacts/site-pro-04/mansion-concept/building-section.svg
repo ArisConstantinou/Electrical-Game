@@ -2,22 +2,22 @@
 <defs><pattern id="soil" width="22" height="22" patternUnits="userSpaceOnUse"><rect width="22" height="22" fill="#b59673"/><path d="M0 17l8-4 8 3 6-6" fill="none" stroke="#937451" stroke-width="2"/></pattern><pattern id="brick" width="28" height="14" patternUnits="userSpaceOnUse"><rect width="28" height="14" fill="#b66d50"/><path d="M0 0h28M0 7h28M14 0v7M0 7v7M28 7v7" stroke="#ead5bd" stroke-width="1"/></pattern></defs>
 <rect width="1200" height="1450" fill="#f5f1e7"/>
 <text x="64" y="70" font-family="Arial,sans-serif" font-weight="700" font-size="45" fill="#183039">SITE PRO 04 · ΤΟΜΗ ΚΑΤΟΙΚΙΑΣ</text>
-<text x="64" y="113" font-family="Arial,sans-serif" font-size="26" fill="#556367">4 επίπεδα πάνω από έδαφος · 2 υπόγεια · 3,3–3,4 m ανά επίπεδο</text>
+<text x="64" y="113" font-family="Arial,sans-serif" font-size="26" fill="#556367">5 επίπεδα πάνω από έδαφος · 2 υπόγεια · 3,3–3,4 m ανά επίπεδο</text>
 <rect x="70" y="737" width="1060" height="509" fill="url(#soil)"/>
 <path d="M70 737h1060" stroke="#607768" stroke-width="8"/>
-<g fill="#e9e5d9" stroke="#263e43" stroke-width="5"><rect x="170" y="627" width="850" height="111"/><rect x="170" y="517" width="850" height="110"/><rect x="170" y="407" width="850" height="110"/><rect x="245" y="297" width="700" height="110"/><rect x="170" y="738" width="850" height="160"/><rect x="170" y="898" width="850" height="160"/></g>
-<g fill="url(#brick)" stroke="#263e43" stroke-width="4"><rect x="170" y="635" width="47" height="94"/><rect x="973" y="635" width="47" height="94"/><rect x="170" y="525" width="47" height="94"/><rect x="973" y="525" width="47" height="94"/><rect x="170" y="415" width="47" height="94"/><rect x="973" y="415" width="47" height="94"/><rect x="245" y="305" width="47" height="94"/><rect x="898" y="305" width="47" height="94"/></g>
-<g stroke="#768481" stroke-width="13"><path d="M165 737h860M165 627h860M165 517h860M240 407h710M165 898h860M165 1058h860M240 297h710"/></g>
+<g fill="#e9e5d9" stroke="#263e43" stroke-width="5"><rect x="170" y="627" width="850" height="111"/><rect x="170" y="517" width="850" height="110"/><rect x="170" y="407" width="850" height="110"/><rect x="245" y="297" width="700" height="110"/><rect x="325" y="187" width="540" height="110"/><rect x="170" y="738" width="850" height="160"/><rect x="170" y="898" width="850" height="160"/></g>
+<g fill="url(#brick)" stroke="#263e43" stroke-width="4"><rect x="170" y="635" width="47" height="94"/><rect x="973" y="635" width="47" height="94"/><rect x="170" y="525" width="47" height="94"/><rect x="973" y="525" width="47" height="94"/><rect x="170" y="415" width="47" height="94"/><rect x="973" y="415" width="47" height="94"/><rect x="245" y="305" width="47" height="94"/><rect x="898" y="305" width="47" height="94"/><rect x="325" y="195" width="47" height="94"/><rect x="818" y="195" width="47" height="94"/></g>
+<g stroke="#768481" stroke-width="13"><path d="M165 737h860M165 627h860M165 517h860M240 407h710M165 898h860M165 1058h860M240 297h710M320 187h550"/></g>
 <rect x="493" y="407" width="202" height="330" fill="#dce7d4" stroke="#527461" stroke-width="4" stroke-dasharray="12 8"/>
 <circle cx="598" cy="678" r="35" fill="#799574"/><path d="M598 711v25" stroke="#735b3f" stroke-width="11"/>
 <text x="498" y="386" font-family="Arial,sans-serif" font-size="22" font-weight="700" fill="#305b4b">ΑΝΟΙΧΤΟ ΑΙΘΡΙΟ</text>
-<rect x="780" y="319" width="80" height="725" fill="#b9c5bd" stroke="#26434a" stroke-width="4"/>
-<path d="M785 691h68l-68-50h68l-68-50h68l-68-50h68l-68-50h68l-68-50h68M785 850h68l-68-50h68l-68-50h68M785 995h68l-68-50h68l-68-50h68" fill="none" stroke="#47656b" stroke-width="4"/>
-<g font-family="Arial,sans-serif" font-weight="700" font-size="24" fill="#203b44"><text x="248" y="361">L3 · STUDIO / ΒΕΡΑΝΤΑ</text><text x="235" y="471">L2 · ΓΡΑΦΕΙΟ / ΞΕΝΩΝΕΣ</text><text x="235" y="581">L1 · ΥΠΝΟΔΩΜΑΤΙΑ</text><text x="235" y="693">G · ΕΡΓΑΣΙΑ / ΚΟΥΖΙΝΑ / ΚΑΘΙΣΤΙΚΟ</text><text x="236" y="822">B1 · ΓΚΑΡΑΖ / ΜΗΧΑΝΕΣ / ΕΡΓΑΣΤΗΡΙΟ</text><text x="236" y="980">B2 · ΗΛΕΚΤΡΟΜΗΧΑΝΟΛΟΓΙΚΑ / ΑΠΟΘΗΚΕΣ</text></g>
-<path d="M75 737L169 737M75 898h95M75 1058h95M1050 297h60M1050 407h60M1050 517h60M1050 627h60M1050 737h60" stroke="#a44f35" stroke-width="3"/>
-<g font-family="Arial,sans-serif" font-size="21" fill="#a44f35"><text x="48" y="765">±0</text><text x="59" y="920">−3,4</text><text x="59" y="1080">−6,8</text><text x="1040" y="319">+13,2</text><text x="1040" y="429">+9,9</text><text x="1040" y="539">+6,6</text><text x="1040" y="649">+3,3</text></g>
+<rect x="780" y="209" width="80" height="835" fill="#b9c5bd" stroke="#26434a" stroke-width="4"/>
+<path d="M785 691h68l-68-50h68l-68-50h68l-68-50h68l-68-50h68l-68-50h68M785 850h68l-68-50h68l-68-50h68M785 995h68l-68-50h68l-68-50h68M785 319h68l-68-50h68l-68-50h68" fill="none" stroke="#47656b" stroke-width="4"/>
+<g font-family="Arial,sans-serif" font-weight="700" font-size="24" fill="#203b44"><text x="385" y="251">L4 · STUDIO / ΒΕΡΑΝΤΑ</text><text x="310" y="361">L3 · ΚΑΘΙΣΤΙΚΟ / ΒΕΡΑΝΤΑ</text><text x="235" y="471">L2 · ΓΡΑΦΕΙΟ / ΞΕΝΩΝΕΣ</text><text x="235" y="581">L1 · ΥΠΝΟΔΩΜΑΤΙΑ</text><text x="235" y="693">G · ΕΡΓΑΣΙΑ / ΚΟΥΖΙΝΑ / ΚΑΘΙΣΤΙΚΟ</text><text x="236" y="822">B1 · ΓΚΑΡΑΖ / ΜΗΧΑΝΕΣ / ΕΡΓΑΣΤΗΡΙΟ</text><text x="236" y="980">B2 · ΗΛΕΚΤΡΟΜΗΧΑΝΟΛΟΓΙΚΑ / ΑΠΟΘΗΚΕΣ</text></g>
+<path d="M75 737L169 737M75 898h95M75 1058h95M1050 187h60M1050 297h60M1050 407h60M1050 517h60M1050 627h60M1050 737h60" stroke="#a44f35" stroke-width="3"/>
+<g font-family="Arial,sans-serif" font-size="21" fill="#a44f35"><text x="48" y="765">±0</text><text x="59" y="920">−3,4</text><text x="59" y="1080">−6,8</text><text x="1040" y="209">+16,5</text><text x="1040" y="319">+13,2</text><text x="1040" y="429">+9,9</text><text x="1040" y="539">+6,6</text><text x="1040" y="649">+3,3</text></g>
 <text x="72" y="1282" font-family="Arial,sans-serif" font-size="24" font-weight="700" fill="#233d43">ΣΥΝΕΧΗΣ ΦΕΡΟΥΣΑ ΛΟΓΙΚΗ</text>
 <text x="72" y="1319" font-family="Arial,sans-serif" font-size="21" fill="#526164">Πλάκες, κολόνες, οπτοπλινθοδομή πλήρωσης · ενιαίο κλιμακοστάσιο.</text>
 <text x="72" y="1350" font-family="Arial,sans-serif" font-size="21" fill="#526164">Στόχος παιχνιδιού· πάχη και οπλισμό θα όριζε μηχανικός.</text>
-<text x="72" y="1410" font-family="Arial,sans-serif" font-size="22" font-weight="700" fill="#a44f35">ΣΧΕΔΙΟ ΕΝΝΟΙΑΣ ΓΙΑ ΕΠΙΛΟΓΗ · ΟΧΙ ΣΤΑΤΙΚΗ ΜΕΛΕΤΗ</text>
+<text x="72" y="1410" font-family="Arial,sans-serif" font-size="22" font-weight="700" fill="#a44f35">ΕΠΙΛΕΓΜΕΝΗ ΔΙΑΤΑΞΗ 5+2 · ΟΧΙ ΣΤΑΤΙΚΗ ΜΕΛΕΤΗ</text>
 </svg>

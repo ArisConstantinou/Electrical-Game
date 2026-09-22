@@ -9,6 +9,7 @@ import { matteMaterial, siteMaterial, siteProScreedMaterial } from './SiteMateri
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { ExteriorCourtyard } from './ExteriorCourtyard';
 import { createClaySoffitPreview } from './ClaySoffitPreview';
+import { MansionGroundWing } from './MansionGroundWing';
 
 /** Constant-time hit on a raised clay face; backing remains hittable in joints. */
 const setBrickFaceRaycast = (
@@ -34,8 +35,9 @@ export class Room extends THREE.Group {
   readonly intactPracticeWall: BrickWall;
   readonly referenceWalls: THREE.Object3D[] = [];
   readonly exterior: ExteriorCourtyard;
+  readonly mansionWing: MansionGroundWing | null;
 
-  constructor(scene: THREE.Scene) {
+  constructor(scene: THREE.Scene, private readonly mansionPreview = false) {
     super();
     this.name = 'Living room first-fix site';
     this.userData.studioEntityId = 'world:living-room';
@@ -159,6 +161,8 @@ export class Room extends THREE.Group {
     this.addFormworkMarks();
     this.addConstructionJoints();
     this.addRearWall();
+    this.mansionWing = this.mansionPreview ? new MansionGroundWing() : null;
+    if (this.mansionWing) this.add(this.mansionWing);
     // The slab bears over the wall heads and columns. Exposed brick meets its
     // soffit directly, with no decorative inner downstand or shadow band.
     this.addWallHeadContact();
@@ -265,44 +269,73 @@ export class Room extends THREE.Group {
     const rearGroup = new THREE.Group();
     rearGroup.name = 'Rear masonry work surface';
     rearGroup.userData.studioEntityId = 'world:rear-wall';
-    const wall = new THREE.Mesh(
-      new THREE.BoxGeometry(GAME_CONFIG.room.width, GAME_CONFIG.room.height, .16),
-      matteMaterial(0x746d64),
-    );
-    wall.name = 'Solid rear masonry backing';
-    wall.userData.referenceLaserReceiver = true;
-    wall.position.set(0, GAME_CONFIG.room.height / 2, rearZ + .08);
-    wall.receiveShadow = true;
-    rearGroup.add(wall);
-
     const brickWidth = GAME_CONFIG.room.width / 21, course = GAME_CONFIG.room.height / 23, gap = .006;
     const columns = 22, rows = 23;
+    const openingHalfWidth = 1.35, openingHeight = 18 * course;
+    const backingMaterial = matteMaterial(0x746d64);
+    const backing = (name: string, x: number, y: number, width: number, height: number): void => {
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(width, height, .16), backingMaterial);
+      wall.name = name;
+      wall.userData.referenceLaserReceiver = true;
+      wall.position.set(x, y, rearZ + .08);
+      wall.receiveShadow = true;
+      rearGroup.add(wall);
+    };
+    if (this.mansionPreview) {
+      const flank = GAME_CONFIG.room.width / 2 - openingHalfWidth;
+      backing('Left rear masonry backing', -(openingHalfWidth + flank / 2), GAME_CONFIG.room.height / 2, flank, GAME_CONFIG.room.height);
+      backing('Right rear masonry backing', openingHalfWidth + flank / 2, GAME_CONFIG.room.height / 2, flank, GAME_CONFIG.room.height);
+      backing('Supported rear lintel backing', 0, (GAME_CONFIG.room.height + openingHeight) / 2,
+        openingHalfWidth * 2, GAME_CONFIG.room.height - openingHeight);
+      const frameMaterial = siteMaterial('floor', 0xdad4ca, .15, .72);
+      for (const x of [-openingHalfWidth - .13, openingHalfWidth + .13]) {
+        const jamb = new THREE.Mesh(new RoundedBoxGeometry(.26, GAME_CONFIG.room.height, .26, 2, .012), frameMaterial);
+        jamb.name = 'Exposed concrete passage jamb';
+        jamb.position.set(x, GAME_CONFIG.room.height / 2, rearZ + .035);
+        jamb.castShadow = jamb.receiveShadow = true;
+        rearGroup.add(jamb);
+      }
+      const lintel = new THREE.Mesh(new RoundedBoxGeometry(openingHalfWidth * 2 + .52, .29, .30, 2, .012), frameMaterial);
+      lintel.name = 'Cast concrete passage lintel';
+      lintel.position.set(0, openingHeight + .145, rearZ + .035);
+      lintel.castShadow = lintel.receiveShadow = true;
+      rearGroup.add(lintel);
+    } else backing('Solid rear masonry backing', 0, GAME_CONFIG.room.height / 2, GAME_CONFIG.room.width, GAME_CONFIG.room.height);
     const geometry = new RoundedBoxGeometry(1, 1, 1, 2, .035);
-    const patchRects = new Float32Array(columns * rows * 4);
+    const instancesPerUnit = this.mansionPreview ? 2 : 1;
+    const patchRects = new Float32Array(columns * rows * instancesPerUnit * 4);
     geometry.setAttribute('brickPatch', new THREE.InstancedBufferAttribute(patchRects, 4));
-    const bricks = new THREE.InstancedMesh(geometry, masonryFaceMaterial, columns * rows);
-    bricks.name = 'Full staggered rear clay courses';
+    const bricks = new THREE.InstancedMesh(geometry, masonryFaceMaterial, columns * rows * instancesPerUnit);
+    bricks.name = this.mansionPreview ? 'Staggered rear clay courses around structural opening' : 'Full staggered rear clay courses';
     bricks.userData.textureSource = 'red-brick-polyhaven-1k.jpg';
     bricks.userData.studioEntityId = 'world:rear-exposed-masonry';
     const matrix = new THREE.Matrix4(), position = new THREE.Vector3(), rotation = new THREE.Quaternion(), scale = new THREE.Vector3();
     for (let row = 0; row < rows; row++) for (let column = 0; column < columns; column++) {
-      const index = row * columns + column;
+      const index = (row * columns + column) * instancesPerUnit;
       const left = -GAME_CONFIG.room.width / 2 + column * brickWidth + (row % 2) * brickWidth / 2;
       const right = Math.min(GAME_CONFIG.room.width / 2, left + brickWidth - gap);
       const clippedLeft = Math.max(-GAME_CONFIG.room.width / 2, left + gap / 2);
       const base = brickFacePatch(row, column, 3);
       const fullLeft = left + gap / 2;
-      patchRects.set(right > clippedLeft ? [base[0] + base[2] * (clippedLeft - fullLeft) / (brickWidth - gap), base[1],
-        base[2] * (right - clippedLeft) / (brickWidth - gap), base[3]] : [base[0], base[1], 0, base[3]], index * 4);
-      position.set((clippedLeft + right) / 2, (row + .5) * course, rearZ - .010);
-      scale.set(Math.max(0, right - clippedLeft), course - gap, .020);
-      matrix.compose(position, rotation, scale);
-      bricks.setMatrixAt(index, matrix);
+      const segments = this.mansionPreview && row < 18
+        ? [[clippedLeft, Math.min(right, -openingHalfWidth)], [Math.max(clippedLeft, openingHalfWidth), right]]
+        : [[clippedLeft, right]];
+      for (let part = 0; part < instancesPerUnit; part++) {
+        const [start, end] = segments[part] ?? [0, 0];
+        const width = Math.max(0, end - start);
+        patchRects.set(width > 0 ? [base[0] + base[2] * (start - fullLeft) / (brickWidth - gap), base[1],
+          base[2] * width / (brickWidth - gap), base[3]] : [base[0], base[1], 0, base[3]], (index + part) * 4);
+        position.set((start + end) / 2, (row + .5) * course, rearZ - .010);
+        scale.set(width, width > 0 ? course - gap : 0, width > 0 ? .020 : 0);
+        matrix.compose(position, rotation, scale);
+        bricks.setMatrixAt(index + part, matrix);
+      }
     }
     bricks.castShadow = bricks.receiveShadow = true;
     bricks.computeBoundingSphere();
     setBrickFaceRaycast(bricks, new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, 0, rearZ - .020), point => {
       if (point.y <= 0 || point.y >= GAME_CONFIG.room.height || point.x <= -GAME_CONFIG.room.width / 2 || point.x >= GAME_CONFIG.room.width / 2) return false;
+      if (this.mansionPreview && point.y < openingHeight && Math.abs(point.x) < openingHalfWidth) return false;
       const row = Math.floor(point.y / course), rowY = point.y - row * course;
       const shiftedX = point.x + GAME_CONFIG.room.width / 2 - (row % 2) * brickWidth / 2;
       const column = Math.floor(shiftedX / brickWidth);
@@ -480,7 +513,10 @@ export class Room extends THREE.Group {
     const material = siteMaterial('concrete', 0xb0aca5, 2.1, .25);
     material.side = THREE.DoubleSide;
     const strips: Array<{from: THREE.Vector3; to: THREE.Vector3; inward: THREE.Vector3; column?: boolean}> = [
-      {from:new THREE.Vector3(-3.78,0,3.485),to:new THREE.Vector3(3.78,0,3.485),inward:new THREE.Vector3(0,0,-1)},
+      ...(this.mansionPreview ? [
+        {from:new THREE.Vector3(-3.78,0,3.485),to:new THREE.Vector3(-1.35,0,3.485),inward:new THREE.Vector3(0,0,-1)},
+        {from:new THREE.Vector3(1.35,0,3.485),to:new THREE.Vector3(3.78,0,3.485),inward:new THREE.Vector3(0,0,-1)},
+      ] : [{from:new THREE.Vector3(-3.78,0,3.485),to:new THREE.Vector3(3.78,0,3.485),inward:new THREE.Vector3(0,0,-1)}]),
       {from:new THREE.Vector3(-3.79,0,-3.58),to:new THREE.Vector3(3.79,0,-3.58),inward:new THREE.Vector3(0,0,1)},
       {from:new THREE.Vector3(-3.785,0,-3.58),to:new THREE.Vector3(-3.785,0,3.48),inward:new THREE.Vector3(1,0,0)},
       {from:new THREE.Vector3(3.785,0,-3.58),to:new THREE.Vector3(3.785,0,3.48),inward:new THREE.Vector3(-1,0,0)},

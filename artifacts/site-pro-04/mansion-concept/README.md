@@ -1,15 +1,15 @@
 # Site Pro 04 — Cypriot mansion construction site
 
-Status: visual and plan concept for review; the mansion geometry is **not yet built into gameplay**. The three SVG drawings are accessible in-game by aiming at the apprentice and pressing USE/E. The current 7.6 × 7.2 m work room and port 5365 remain the protected playable baseline. Four levels above grade and two below are the working design assumption; the requested range is three to five above grade.
+Status: the user selected **five levels above grade and two below** on 2026-09-22. An opt-in `?mansion=preview` branch now connects the existing work room to an unfinished brick passage, ground foyer, two-flight cast stair and a first L1 room with an unfinished door-ready opening. The stair is continuously walked at its real 3.3 m rise, with no teleport or installed door. This is an **incomplete construction slice**, not the full mansion or a release. The lift core, garages, two basements and remaining floors still need construction. The three SVG drawings are accessible in-game by aiming at the apprentice and pressing USE/E. The current 7.6 × 7.2 m work room and port 5365 remain the protected default playable baseline.
 
 ## Reviewable images and drawings
 
 - `exterior-concept.png`: AI-generated massing/material concept, not a screenshot or measured plan.
-- `section-concept.png`: AI-generated cutaway explaining program and construction character, not a measured plan.
+- `section-concept.png`: earlier AI-generated cutaway explaining program and construction character, not a measured plan; its old four-level massing is superseded by the selected 5+2 section drawing.
 - `ground-corridor-concept.png`: AI-generated eye-level view from the future ground circulation spine toward the open courtyard, kitchen rough-ins and stair/lift core. The actual current game room is not yet connected to this space.
 - `basement-garage-concept.png`: AI-generated eye-level B1 garage/workshop and ramp study with stairs toward B2. The garage is an empty construction zone with materials, temporary lights and open shafts; no vehicles or fitted doors.
 - `ground-floor.svg` / `.png`: original dimensioned concept zoning for a 30 × 28 m ground floor and 10 × 10 m open courtyard; the existing 7.6 × 7.2 m room remains in its current world position.
-- `building-section.svg` / `.png`: original vertical program at B2, B1, G, L1, L2 and L3 with indicative elevations.
+- `building-section.svg` / `.png`: selected vertical program at B2, B1, G, L1, L2, L3 and L4 with indicative elevations.
 - `electrical-workroom.svg` / `.png`: original front-wall elevation using actual game installation point data: A at x=−1.72 m, B at x=0 m, C at x=+1.65 m; A/B bottom edge 0.30 m and C bottom edge 1.20 m. Dashed PVC routes are explicitly proposed and do not claim an installed or energized circuit.
 
 The in-game viewer has tabs for the three drawings, a readable horizontally pannable portrait view, a full-sheet overview toggle and a live progress line for point heights and PVC cuts. It is reachable with USE/E when the crosshair is on the apprentice; V remains the existing direct shortcut. The whole-house electrical distribution, protective devices, wiring sizes and final circuit routes remain open design decisions, rather than fabricated engineering data.
@@ -37,7 +37,8 @@ The drawings here are original game-world schematics. Manufacturer/architect ima
 - G at `y=0 m`: the protected present room and the courtyard-centred social/service wings.
 - L1 at `y≈+3.3 m`: family bedrooms, master suite, corridor and shaded verandas.
 - L2 at `y≈+6.6 m`: office/workspace, guest rooms, gym/flexible rooms and terraces.
-- L3 at `y≈+9.9 m`: smaller family lounge/studio, roof terrace and service access; roof plane around `y≈+13.2 m`.
+- L3 at `y≈+9.9 m`: smaller family lounge and terrace.
+- L4 at `y≈+13.2 m`: stepped-back studio, terrace and service access; roof plane around `y≈+16.5 m`.
 
 ## Buildable game integration
 
@@ -47,10 +48,10 @@ Keep the sole live preview at `http://127.0.0.1:5365/Electrical-Game/`; an opt-i
 
 ## First acceptance slice and sequence
 
-1. **Reference/plan gate:** approve floor count, ground orientation and the two concept drawings. Replace any mismatch before building geometry.
-2. **Playable sample of final quality:** preserve the current room; cut one correctly supported unfinished masonry opening into a new corridor; build the stair/lift core and ground private garage/workshop with convincing Cypriot construction materials, open apertures, collision and 3-touch MOVE+AIM+USE. Same-camera before/after and a complete walk out/back are required.
-3. **Whole shell and basement navigation:** add the four stepped levels, B1/B2, garage ramp, courtyard/verandas and all circulation while keeping level streaming and stable saves.
+1. **Reference/plan gate:** the user selected five above-grade levels plus two basements; the ground footprint, courtyard and existing room position stay as drawn. The section drawing now matches 5+2. The older AI cutaway remains a material reference only.
+2. **Playable sample of final quality:** preserve the current room; cut one correctly supported unfinished masonry opening into a new corridor; build the stair/lift core and ground private garage/workshop with convincing Cypriot construction materials, open apertures, collision and 3-touch MOVE+AIM+USE. The opening, corridor, foyer, stair and first L1 room are in the isolated preview. Desktop/mobile-emulated walking passed from the work room to the foyer and back, and from the stair base through the L1 open doorway and back down. Further visual quality, lift/garage, simultaneous touch in the new space and physical-phone acceptance are still open. Same-camera before/after are required before release.
+3. **Whole shell and basement navigation:** add the five stepped above-grade levels, B1/B2, garage ramp, courtyard/verandas and all circulation while keeping level streaming and stable saves.
 4. **Room-by-room construction state:** kitchen, living areas, bedrooms, service rooms, client work areas, electrical/plumbing rough-ins, material deposition and distinctive, non-repeating damage/finishing stages.
 5. **Final QA:** full route and tool interactions on each floor, hitboxes/occlusion, visual comparisons in daylight and work lighting, supported devices, p95/worst frame timings, draw calls, RAM/VRAM where measurable and a physical-phone pass. Concept drawings alone do not complete this work.
 
-Open decisions: exact count above grade and whether B2 should be fully explorable at first release. The working default is four above-grade levels and two explorable basements. Garage spaces describe future use only; the playable construction phase contains no vehicles, doors or garage shutters.
+Open decision: whether B2 should be fully explorable in the first staged preview; the final selected house includes both basements. Garage spaces describe future use only; the playable construction phase contains no vehicles, doors or garage shutters.

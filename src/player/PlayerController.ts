@@ -27,6 +27,8 @@ export class PlayerController {
   private mobileDragSensitivity = 0.0032;
   private wallAssistEnabled = true;
   private obstacleProvider:(()=>readonly PlayerObstacle[])|null=null;
+  private mansionPreview=false;
+  private surfaceProvider:((x:number,z:number)=>number)|null=null;
   collisionContacts:string[]=[];
 
   constructor(readonly camera: THREE.PerspectiveCamera, private readonly input: Input) {
@@ -35,6 +37,8 @@ export class PlayerController {
   }
 
   setObstacleProvider(provider:()=>readonly PlayerObstacle[]):void { this.obstacleProvider=provider; }
+  setMansionPreview(enabled:boolean):void { this.mansionPreview=enabled; }
+  setSurfaceProvider(provider:(x:number,z:number)=>number):void { this.surfaceProvider=provider; }
 
   // All tools share direct aiming. A hard eye-only window prevents precise
   // placement of the work point and introduces a dead zone on every reversal.
@@ -124,13 +128,27 @@ export class PlayerController {
       this.velocity.z=(this.camera.position.z-previousZ)/dt;
     }
     const radius = GAME_CONFIG.player.radius;
-    this.camera.position.x = THREE.MathUtils.clamp(this.camera.position.x, -GAME_CONFIG.room.width / 2 + radius, GAME_CONFIG.room.width / 2 - radius);
+    this.camera.position.x = this.mansionPreview
+      ? THREE.MathUtils.clamp(this.camera.position.x, -GAME_CONFIG.room.width / 2 + radius, 12.5 - radius)
+      : THREE.MathUtils.clamp(this.camera.position.x, -GAME_CONFIG.room.width / 2 + radius, GAME_CONFIG.room.width / 2 - radius);
     // The masonry facade stands inside the room's architectural bounds.
     // Apply body clearance independently of tool bracing and view direction:
     // looking along the wall must not disable the player's collision barrier.
-    this.camera.position.z = THREE.MathUtils.clamp(this.camera.position.z, GAME_CONFIG.room.wallFrontZ + radius, GAME_CONFIG.room.depth / 2 - radius);
+    this.camera.position.z = THREE.MathUtils.clamp(this.camera.position.z, GAME_CONFIG.room.wallFrontZ + radius,
+      this.mansionPreview ? 12.6 - radius : GAME_CONFIG.room.depth / 2 - radius);
+    // Only adjacent 15 cm risers may change the floor height in one movement
+    // step. This prevents entering the elevated return flight from ground level
+    // or walking off an unfinished landing through empty air.
+    const oldFloor = this.surfaceProvider?.(previousX, previousZ) ?? 0;
+    let nextFloor = this.surfaceProvider?.(this.camera.position.x, this.camera.position.z) ?? 0;
+    if (Math.abs(nextFloor - oldFloor) > .21) {
+      this.camera.position.x = previousX;
+      this.camera.position.z = previousZ;
+      this.velocity.x = this.velocity.z = 0;
+      nextFloor = oldFloor;
+    }
     work.distanceM=this.camera.position.z-GAME_CONFIG.room.wallFrontZ;
-    this.camera.position.y = THREE.MathUtils.damp(this.camera.position.y, this.eyeHeight, 14, dt);
+    this.camera.position.y = THREE.MathUtils.damp(this.camera.position.y, this.eyeHeight + nextFloor, 14, dt);
     if(handFocus){handFocus.x+=this.camera.position.x-previousX;this.camera.lookAt(handFocus);this.pitch=this.camera.rotation.x;this.yaw=this.camera.rotation.y;}
   }
 

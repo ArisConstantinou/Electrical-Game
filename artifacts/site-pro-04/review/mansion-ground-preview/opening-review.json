@@ -1,0 +1,30 @@
+{
+  "pose": {
+    "x": 1.8,
+    "y": 1.65,
+    "z": 0.4,
+    "yaw": 2.65,
+    "pitch": -0.08
+  },
+  "cases": [
+    {
+      "mode": "default",
+      "wing": false,
+      "position": [
+        1.8,
+        1.65,
+        0.4
+      ]
+    },
+    {
+      "mode": "mansion-preview",
+      "wing": true,
+      "position": [
+        1.8,
+        1.65,
+        0.4
+      ]
+    }
+  ],
+  "errors": []
+}

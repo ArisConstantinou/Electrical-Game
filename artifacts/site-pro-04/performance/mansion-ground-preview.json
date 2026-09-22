@@ -1,0 +1,51 @@
+{
+  "environment": "390x844 DPR3 Chrome WebGL mobile emulation on Windows host; not physical phone",
+  "cases": [
+    {
+      "name": "released-room",
+      "frames": 133,
+      "p95Ms": 19,
+      "maxMs": 20.399999976158142,
+      "meanDrawCalls": 492,
+      "meanTriangles": 1850741,
+      "renderError": ""
+    },
+    {
+      "name": "preview-same-room-pose",
+      "frames": 133,
+      "p95Ms": 18.700000047683716,
+      "maxMs": 20,
+      "meanDrawCalls": 547,
+      "meanTriangles": 2225069,
+      "renderError": ""
+    },
+    {
+      "name": "preview-new-foyer",
+      "frames": 133,
+      "p95Ms": 18.100000023841858,
+      "maxMs": 19.900000035762787,
+      "meanDrawCalls": 585,
+      "meanTriangles": 1792671,
+      "renderError": ""
+    },
+    {
+      "name": "preview-stair-flight",
+      "frames": 133,
+      "p95Ms": 18.100000023841858,
+      "maxMs": 19.099999964237213,
+      "meanDrawCalls": 520,
+      "meanTriangles": 1761091,
+      "renderError": ""
+    },
+    {
+      "name": "preview-first-floor-room",
+      "frames": 133,
+      "p95Ms": 18.600000023841858,
+      "maxMs": 19.80000001192093,
+      "meanDrawCalls": 527,
+      "meanTriangles": 1940551,
+      "renderError": ""
+    }
+  ],
+  "errors": []
+}

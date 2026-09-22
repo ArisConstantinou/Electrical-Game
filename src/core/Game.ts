@@ -156,7 +156,10 @@ export class Game {
     this.renderer.camera.add(this.fpsRig);
     this.renderer.scene.add(this.renderer.camera);
     this.workerBody=new WorkerBody(this.renderer.scene);
-    this.room = new Room(this.renderer.scene);
+    const mansionPreview = new URLSearchParams(location.search).get('mansion') === 'preview';
+    this.room = new Room(this.renderer.scene, mansionPreview);
+    this.player.setMansionPreview(mansionPreview);
+    if (this.room.mansionWing) this.player.setSurfaceProvider((x,z)=>this.room.mansionWing!.surfaceHeight(x,z));
     this.renderer.scene.add(this.room);
     this.hoseSupply=new HoseSupplyLine(this.renderer.scene,this.fpsRig.getObjectByName('FPS hose tool')!);
     this.mission = new MissionSystem(this.renderer.scene);
@@ -167,7 +170,8 @@ export class Game {
     this.conduit = new ConduitSystem(this.renderer.scene, this.room.brickWall);
     this.mortar = new MortarSystem(this.renderer.scene, this.room.brickWall, this.mission.points);
     this.mixing = new MixingStation(this);
-    this.player.setObstacleProvider(()=>[...this.mixing.collisionObstacles(),...this.apprentice?.collisionObstacles()??[]]);
+    this.player.setObstacleProvider(()=>[...this.mixing.collisionObstacles(),...this.apprentice?.collisionObstacles()??[],
+      ...this.room.mansionWing?.obstaclesAt(this.player.camera.position.y-this.player.eyeHeight)??[]]);
     this.mixing.onSound=(kind,intensity)=>this.audio.play(kind,intensity);
     this.mortar.reserveScoop = amount => this.mixing.reserveScoop(amount);
     this.mortar.scoopBond = () => this.mixing.bondFactor;
