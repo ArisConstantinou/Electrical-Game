@@ -1,0 +1,313 @@
+{
+  "mobileIsEmulation": true,
+  "cases": [
+    {
+      "name": "portrait-390",
+      "left": {
+        "x": 70.546875,
+        "y": 682.453125,
+        "width": 113.09375,
+        "height": 113.09375,
+        "r": 56.546875
+      },
+      "right": {
+        "x": 319.453125,
+        "y": 682.453125,
+        "width": 113.09375,
+        "height": 113.09375,
+        "r": 56.546875
+      },
+      "use": {
+        "x": 326,
+        "y": 547.40625,
+        "width": 88,
+        "height": 85.1875,
+        "r": 44
+      },
+      "responses": [
+        {
+          "fraction": 0,
+          "value": 0
+        },
+        {
+          "fraction": 0.04,
+          "value": 0
+        },
+        {
+          "fraction": 0.12,
+          "value": 0.014509971226619088
+        },
+        {
+          "fraction": 0.25,
+          "value": 0.10232752664657697
+        },
+        {
+          "fraction": 0.5,
+          "value": 0.34695485986778546
+        },
+        {
+          "fraction": 1,
+          "value": 1
+        }
+      ],
+      "threeFinger": true
+    },
+    {
+      "name": "landscape-844",
+      "left": {
+        "x": 61,
+        "y": 275,
+        "width": 94,
+        "height": 94,
+        "r": 47
+      },
+      "right": {
+        "x": 783,
+        "y": 275,
+        "width": 94,
+        "height": 94,
+        "r": 47
+      },
+      "use": {
+        "x": 798,
+        "y": 181.40625,
+        "width": 74,
+        "height": 77.1875,
+        "r": 37
+      },
+      "responses": [
+        {
+          "fraction": 0,
+          "value": 0
+        },
+        {
+          "fraction": 0.04,
+          "value": 0
+        },
+        {
+          "fraction": 0.12,
+          "value": 0.014509993939134365
+        },
+        {
+          "fraction": 0.25,
+          "value": 0.10232752664657697
+        },
+        {
+          "fraction": 0.5,
+          "value": 0.34695485986778546
+        },
+        {
+          "fraction": 1,
+          "value": 1
+        }
+      ],
+      "threeFinger": true
+    },
+    {
+      "name": "portrait-320",
+      "left": {
+        "x": 66,
+        "y": 583,
+        "width": 104,
+        "height": 104,
+        "r": 52
+      },
+      "right": {
+        "x": 254,
+        "y": 583,
+        "width": 104,
+        "height": 104,
+        "r": 52
+      },
+      "use": {
+        "x": 256,
+        "y": 443.40625,
+        "width": 88,
+        "height": 85.1875,
+        "r": 44
+      },
+      "responses": [
+        {
+          "fraction": 0,
+          "value": 0
+        },
+        {
+          "fraction": 0.04,
+          "value": 0
+        },
+        {
+          "fraction": 0.12,
+          "value": 0.014509980180590356
+        },
+        {
+          "fraction": 0.25,
+          "value": 0.10232752664657697
+        },
+        {
+          "fraction": 0.5,
+          "value": 0.34695485986778546
+        },
+        {
+          "fraction": 1,
+          "value": 1
+        }
+      ],
+      "threeFinger": true
+    },
+    {
+      "name": "landscape-667",
+      "left": {
+        "x": 61,
+        "y": 260,
+        "width": 94,
+        "height": 94,
+        "r": 47
+      },
+      "right": {
+        "x": 606,
+        "y": 260,
+        "width": 94,
+        "height": 94,
+        "r": 47
+      },
+      "use": {
+        "x": 621,
+        "y": 166.40625,
+        "width": 74,
+        "height": 77.1875,
+        "r": 37
+      },
+      "responses": [
+        {
+          "fraction": 0,
+          "value": 0
+        },
+        {
+          "fraction": 0.04,
+          "value": 0
+        },
+        {
+          "fraction": 0.12,
+          "value": 0.014509993939134365
+        },
+        {
+          "fraction": 0.25,
+          "value": 0.10232752664657697
+        },
+        {
+          "fraction": 0.5,
+          "value": 0.34695485986778546
+        },
+        {
+          "fraction": 1,
+          "value": 1
+        }
+      ],
+      "threeFinger": true
+    },
+    {
+      "name": "portrait-820",
+      "left": {
+        "x": 76,
+        "y": 1020,
+        "width": 124,
+        "height": 124,
+        "r": 62
+      },
+      "right": {
+        "x": 744,
+        "y": 1020,
+        "width": 124,
+        "height": 124,
+        "r": 62
+      },
+      "use": {
+        "x": 756,
+        "y": 883.40625,
+        "width": 88,
+        "height": 85.1875,
+        "r": 44
+      },
+      "responses": [
+        {
+          "fraction": 0,
+          "value": 0
+        },
+        {
+          "fraction": 0.04,
+          "value": 0
+        },
+        {
+          "fraction": 0.12,
+          "value": 0.014510019582307855
+        },
+        {
+          "fraction": 0.25,
+          "value": 0.10232752664657697
+        },
+        {
+          "fraction": 0.5,
+          "value": 0.34695485986778546
+        },
+        {
+          "fraction": 1,
+          "value": 1
+        }
+      ],
+      "threeFinger": true
+    },
+    {
+      "name": "landscape-1024",
+      "left": {
+        "x": 76,
+        "y": 608,
+        "width": 124,
+        "height": 124,
+        "r": 62
+      },
+      "right": {
+        "x": 948,
+        "y": 608,
+        "width": 124,
+        "height": 124,
+        "r": 62
+      },
+      "use": {
+        "x": 960,
+        "y": 471.40625,
+        "width": 88,
+        "height": 85.1875,
+        "r": 44
+      },
+      "responses": [
+        {
+          "fraction": 0,
+          "value": 0
+        },
+        {
+          "fraction": 0.04,
+          "value": 0
+        },
+        {
+          "fraction": 0.12,
+          "value": 0.014510019582307855
+        },
+        {
+          "fraction": 0.25,
+          "value": 0.10232752664657697
+        },
+        {
+          "fraction": 0.5,
+          "value": 0.34695485986778546
+        },
+        {
+          "fraction": 1,
+          "value": 1
+        }
+      ],
+      "threeFinger": true
+    }
+  ],
+  "errors": [],
+  "passed": true
+}

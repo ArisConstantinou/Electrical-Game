@@ -3,8 +3,9 @@ import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {blockPointerLock} from './browser-safety.mjs';
 const out='output/mobile-aligned-controls';await mkdir(out,{recursive:true});
+const controlsOnly=process.argv.includes('--controls-only');
 const report={mobileIsEmulation:true,cases:[],errors:[]},browser=await chromium.launch({channel:'chrome',headless:true});
-try{for(const viewport of [{width:390,height:844},{width:844,height:390},{width:320,height:740},{width:667,height:375}]){
+try{for(const viewport of [{width:390,height:844},{width:844,height:390},{width:320,height:740},{width:667,height:375},{width:820,height:1180},{width:1024,height:768}]){
  const name=(viewport.width<viewport.height?'portrait':'landscape')+'-'+viewport.width,context=await browser.newContext({viewport,isMobile:true,hasTouch:true,deviceScaleFactor:1});await blockPointerLock(context);
  const page=await context.newPage();await page.routeWebSocket('**',()=>{});page.on('pageerror',e=>report.errors.push(e.message));
  await page.goto('http://127.0.0.1:5365/Electrical-Game/?renderer=webgl');await page.locator('#start-button').tap({timeout:120000});await page.waitForFunction(()=>window.__wireTheHouse?.workerBody.loaded);await page.waitForTimeout(1200);
@@ -12,7 +13,7 @@ try{for(const viewport of [{width:390,height:844},{width:844,height:390},{width:
  const step=async(n=1)=>page.evaluate(n=>{for(let i=0;i<n;i++)window.controlStep(1/60,0,false);},n);
  const state=()=>page.evaluate(()=>{const g=window.__wireTheHouse;return{move:{...g.input.mobileMove},look:{...g.input.mobileLook},held:g.input.actionHeld,driving:g.mixing.wheelbarrow.driving,fast:g.mixing.wheelbarrow.mobileFast,speed:g.mixing.wheelbarrow.speed,yaw:g.player.yaw,position:g.renderer.camera.position.toArray()};});
  const center=async(sel)=>{const r=await page.locator(sel).boundingBox();assert(r,sel+' visible');return{...r,x:r.x+r.width/2,y:r.y+r.height/2,r:r.width/2};};
- const left=await center('#joystick'),right=await center('#look-joystick');assert(Math.abs(left.y-right.y)<1,'Pads share horizontal centre line');assert.equal(left.width,right.width);
+ const left=await center('#joystick'),right=await center('#look-joystick'),use=await center('#site-pro-use');assert(Math.abs(left.y-right.y)<1,'Pads share horizontal centre line');assert.equal(left.width,right.width);
  const cdp=await context.newCDPSession(page),points=new Map();
  const down=async(id,x,y)=>{points.set(id,{id,x,y});await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[...points.values()]});};
  const move=async(id,x,y)=>{points.set(id,{id,x,y});await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[...points.values()]});};
@@ -25,8 +26,9 @@ try{for(const viewport of [{width:390,height:844},{width:844,height:390},{width:
  }
  for(let i=2;i<responses.length;i++)assert(responses[i].value>responses[i-1].value,'Movement curve is monotonic');assert(responses[3].value<.15,'Quarter travel allows fine positioning');assert(responses.at(-1).value>.99);
  await down(1,left.x+8,left.y+5);assert.deepEqual((await state()).move,{x:0,y:0},'Off-centre press starts neutral');await move(1,left.x+8+left.r,left.y+5-left.r);assert(Math.abs(Math.hypot(...Object.values((await state()).move))-1)<1e-5,'Diagonal speed bounded');
- await down(2,right.x,right.y);await move(2,right.x+right.r*.3,right.y);let s=await state();assert(s.held&&s.move.x>0&&s.look.x>0,'Independent move, aim and held use');await step(12);await cancel();s=await state();assert(!s.held);assert.deepEqual(s.move,{x:0,y:0});assert.deepEqual(s.look,{x:0,y:0});
+ await down(2,right.x,right.y);await move(2,right.x+right.r*.3,right.y);await down(3,use.x,use.y);let s=await state();assert(s.held&&s.move.x>0&&s.look.x>0,'Three fingers independently move, aim and hold USE');const beforePlay=s;await step(12);const duringPlay=await state();assert(duringPlay.held&&Math.abs(duringPlay.position[0]-beforePlay.position[0])>.005&&Math.abs(duringPlay.yaw-beforePlay.yaw)>.001,'Player moves and turns while USE remains held');await cancel();await page.waitForFunction(()=>{const input=window.__wireTheHouse.input;return !input.actionHeld&&input.mobileMove.x===0&&input.mobileMove.y===0&&input.mobileLook.x===0&&input.mobileLook.y===0;});s=await state();assert(!s.held);assert.deepEqual(s.move,{x:0,y:0});assert.deepEqual(s.look,{x:0,y:0});
  await step();await page.evaluate(async()=>{const g=window.__wireTheHouse;g.renderer.render();await g.renderer.waitForFrame();});await page.screenshot({path:`${out}/${name}-aligned.png`});
+ if(controlsOnly){report.cases.push({name,left,right,use,responses,threeFinger:true});await context.close();continue;}
  // Place the player near the real tray, then use its actual touch interaction.
  await page.evaluate(()=>{const g=window.__wireTheHouse,cart=g.mixing.wheelbarrow,root=cart.model.group;g.mixing.setActive(false);g.player.velocity.set(0,0,0);g.renderer.camera.position.copy(root.localToWorld(g.renderer.camera.position.clone().set(0,1.65,-1.1)));g.player.yaw=root.rotation.y+Math.PI;g.player.pitch=-.60;});await step(3);
  await page.locator('#mobile-interact').tap();await step(90);assert((await state()).driving,'Touch enters wheelbarrow');
