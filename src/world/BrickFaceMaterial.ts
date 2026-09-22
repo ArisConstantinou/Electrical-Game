@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { attribute, texture as sampleTexture, uv } from 'three/tsl';
+import { attribute, mix, texture as sampleTexture, uv, vec2 } from 'three/tsl';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
+import { clayRibShade, siteClayImage, siteClayReady } from './BrickRibbing';
 
 // Poly Haven "Red Brick" by Rob Tuytel, CC0: https://polyhaven.com/a/red_brick
 // Physical clay units choose mortar-free photographed patches; the geometry
@@ -13,4 +14,6 @@ brickFace.wrapS = brickFace.wrapT = THREE.RepeatWrapping;
 export const masonryFaceMaterial = new MeshStandardNodeMaterial({ roughness: 1 });
 masonryFaceMaterial.name = 'Varied photographed fired-clay units';
 const patch = attribute<'vec4'>('brickPatch', 'vec4');
-masonryFaceMaterial.colorNode = sampleTexture(brickFace, uv().mul(patch.zw).add(patch.xy)).rgb;
+const photographed = sampleTexture(brickFace, uv().mul(patch.zw).add(patch.xy)).rgb;
+const clayInterior = sampleTexture(siteClayImage, vec2(uv().x, uv().y.mul(.66).add(.32))).rgb;
+masonryFaceMaterial.colorNode = mix(photographed, clayInterior, siteClayReady.mul(.42)).mul(clayRibShade);

@@ -8,6 +8,7 @@ import type { InstallationDefinition } from '../data/installationRules';
 import type { InstallationPoint } from '../electrical/InstallationPoint';
 import { MasonryVolume, type MasonryFragment, type MasonryVolumeOptions } from './MasonryVolume';
 import { brickFacePatch } from './BrickFacePatch';
+import { clayRibShade, siteClayImage, siteClayReady } from './BrickRibbing';
 
 export type SprayMode = 'dots' | 'live';
 export type MasonryImpactKind = 'chase-chip' | 'demolish-chip' | 'demolish-crack' | 'demolish-spall' | 'demolish-split' | 'demolish-break';
@@ -29,18 +30,19 @@ wallMaterial.name = 'Reference clay face with independent fractured masonry';
 const masonryColor = attribute<'vec3'>('color', 'vec3');
 const grain = fract(sin(dot(floor(positionWorld.xy.mul(1800)), vec2(127.1,311.7))).mul(43758.5453));
 const mottling = sin(positionWorld.x.mul(93).add(sin(positionWorld.y.mul(71)))).mul(sin(positionWorld.y.mul(127)));
-const grooves = smoothstep(.82,.99,sin(positionWorld.y.mul(3200)));
-const rawMasonry = masonryColor.mul(grain.mul(.15).add(.90).add(mottling.mul(.045)).sub(grooves.mul(.035)));
+const rawMasonry = masonryColor.mul(grain.mul(.15).add(.90).add(mottling.mul(.045)));
 const brickLocalUv = attribute<'vec2'>('brickLocalUv', 'vec2');
 const edgeDistance = min(min(brickLocalUv.x, brickLocalUv.x.oneMinus()), min(brickLocalUv.y, brickLocalUv.y.oneMinus()));
 // A restrained darkening of the clay face at its real mortar boundary gives
 // the intact volume wall the same eased edge read as the reference brickwork.
 // The work surface and fractured geometry remain at their exact hit positions.
 const edgeShade = smoothstep(0, .075, edgeDistance).mul(.13).add(.87);
-const photographedClay = sampleTexture(brickImage, uv()).rgb.mul(masonryColor.r.div(.49)).mul(edgeShade);
+const photographedClay = sampleTexture(brickImage, uv()).rgb.mul(masonryColor.r.div(.49));
+const clayInterior = sampleTexture(siteClayImage, vec2(brickLocalUv.x, brickLocalUv.y.mul(.66).add(.32))).rgb;
+const finishedClay = mix(photographedClay, clayInterior, siteClayReady.mul(.42)).mul(edgeShade).mul(clayRibShade);
 // A face mask keeps real mortar joints, internal chambers and broken edges on
 // their own rough clay/mortar colors in both WebGPU and the WebGL backend.
-wallMaterial.colorNode = mix(mix(rawMasonry, photographedClay, attribute<'float'>('brickFace', 'float').mul(brickImageReady)),laserTint,laserBand);
+wallMaterial.colorNode = mix(mix(rawMasonry, finishedClay, attribute<'float'>('brickFace', 'float').mul(brickImageReady)),laserTint,laserBand);
 wallMaterial.emissiveNode=laserEmission;
 type MeshData = ReturnType<MasonryVolume['buildChunkMesh']>;
 
