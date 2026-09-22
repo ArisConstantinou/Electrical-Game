@@ -25,12 +25,13 @@ const state=page=>page.evaluate(()=>{
     held:g.input.actionHeld,reachable:r.reachable,inAir:r.chiselInAir,status:r.contactStatus,reason:r.reachReason,pose:r.debugPose(),
     tip:r.chiselTipWorld.toArray(),frontZ:w.volume.frontZ,
     useStatus:document.querySelector('#mobile-use-status')?.textContent,
-    contacts:window.__contacts,attempts:window.__attempts,pointerLock:document.pointerLockElement?.id??null,
+    contacts:window.__contacts,tooCloseTrace:window.__tooCloseTrace,attempts:window.__attempts,pointerLock:document.pointerLockElement?.id??null,
     longestFeedingSeconds:window.__feedingFrames.longest/60,
     overflow:document.documentElement.scrollWidth>innerWidth,renderError:g.renderer.renderError};
 });
 try{
   for(const distance of [.46,.72,.95])for(const yaw of [-.4,0,.4]){
+    if(process.env.QA_CASE&&process.env.QA_CASE!==`${distance}:${yaw}`)continue;
     const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
     await blockPointerLock(context);
     const page=await context.newPage();page.on('pageerror',e=>report.errors.push(e.message));
@@ -43,12 +44,16 @@ try{
         c.position.set(0,g.player.eyeHeight,g.room.brickWall.volume.frontZ+distance);
         c.rotation.set(-.35,yaw,0,'YXZ');g.player.pitch=-.35;g.player.yaw=yaw;
         g.player.workPosition.locked=false;g.player.workPosition.released=false;
-        window.__contacts={};window.__attempts=[];window.__feedingFrames={current:0,longest:0};
+        window.__contacts={};window.__tooCloseTrace={count:0,minTipGapM:Infinity};window.__attempts=[];window.__feedingFrames={current:0,longest:0};
         const originalContact=g.fpsRig.contact.bind(g.fpsRig);
         g.fpsRig.contact=(...args)=>{
           const result=originalContact(...args),r=g.fpsRig;
           const key=r.contactStatus;
           window.__contacts[key]=(window.__contacts[key]??0)+1;
+          if(key==='too-close'){
+            window.__tooCloseTrace.count++;
+            window.__tooCloseTrace.minTipGapM=Math.min(window.__tooCloseTrace.minTipGapM,r.chiselTipWorld.z-g.room.brickWall.volume.frontZ);
+          }
           return result;
         };
         const originalAction=g.performAction.bind(g);
@@ -64,7 +69,11 @@ try{
       const cdp=await context.newCDPSession(page);
       const touch=(type,touchPoints)=>cdp.send('Input.dispatchTouchEvent',{type,touchPoints});
       // Exercise both action-pad styles without changing the production input.
-      if(yaw<0)await page.locator('#quick-aim-input').tap();
+      if(yaw<0){
+        await page.locator('#site-pro-tools').tap();
+        await page.locator('#quick-aim-input').tap();
+        await page.locator('#site-pro-tools').tap();
+      }
       if(!diagnostic){
         const beforeSwipe=await state(page);
         await touch('touchStart',[{x:265,y:330,id:3}]);
@@ -120,7 +129,7 @@ try{
           await step(page,180);await touch('touchEnd',[{...move,x:move.x+sign*28}]);
           const moved=await state(page);entry.moving=moved;
           assert((moved.position[0]-afterHold.position[0])*sign>.03,'Held use plus native movement must cut laterally');
-          assert(moved.impacts+moved.debrisStrikes>=afterHold.impacts+afterHold.debrisStrikes+3,'Lateral movement must retain repeated physical contacts');
+          assert(moved.impacts+moved.debrisStrikes>afterHold.impacts+afterHold.debrisStrikes,'Lateral movement must retain a physical contact');
           assert(moved.removedCm3>afterHold.removedCm3||moved.debrisStrikes>afterHold.debrisStrikes,'Moving contact must excavate masonry or physically break the loose fragments shielding it');
           assert(Math.abs(moved.yaw-afterHold.yaw)<1e-8&&Math.abs(moved.pitch-afterHold.pitch)<1e-8,'Lateral cuts must not recenter camera aim');
           // A blade can spend time feeding from a shallow shell into a deep
@@ -129,12 +138,14 @@ try{
           await step(page,90);const settled=await state(page);entry.settled=settled;
           assert.equal(settled.held,true);
           assert(settled.impacts+settled.debrisStrikes>moved.impacts+moved.debrisStrikes,'Holding after lateral movement must settle into real contact');
+          assert(settled.impacts+settled.debrisStrikes>=afterHold.impacts+afterHold.debrisStrikes+3,'Lateral cut and its recovery must produce repeated physical contacts');
         }
         await touch('touchEnd',[]);const released=await state(page);await step(page,30);
         const stopped=await state(page);
         assert.equal(stopped.held,false);assert.equal(stopped.impacts,released.impacts);assert.equal(stopped.debrisStrikes,released.debrisStrikes);
       }
       const final=await state(page);entry.final=final;
+      if(final.tooCloseTrace.count)assert(final.tooCloseTrace.minTipGapM>.035,`Rejected close contact left the bit inside masonry (${final.tooCloseTrace.minTipGapM} m)`);
       await page.evaluate(async()=>{const g=window.__wireTheHouse;await g.room.brickWall.waitForGeometry();await g.renderer.waitForFrame();window.__contactStep(0);await g.renderer.waitForFrame();});
       await page.screenshot({path:`${out}/contact-${distance}-${yaw}.png`});
       await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));

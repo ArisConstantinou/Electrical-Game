@@ -360,7 +360,29 @@ export class FPSRig extends THREE.Group {
       const clearance=housing.clone().normalize().multiplyScalar(.19-housing.length());
       clearance.applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion()));
       hammer.position.copy(this.worldToLocal(hammer.getWorldPosition(new THREE.Vector3()).add(clearance)));
-      this.constrainHeldTool(camera);this.poseArms(camera);
+      this.constrainHeldTool(camera);
+      hammer.updateWorldMatrix(true,true);
+      // Head clearance can push an oblique chisel farther into an open chase.
+      // A rejected strike must also present the entire bit in front of the
+      // facade, where the player can see that stepping back is required.
+      const tip=hammer.localToWorld(this.tipAnchor.clone());
+      const withdraw=Math.max(0,wall.volume.frontZ+.04-tip.z);
+      if(withdraw>0){
+        hammer.position.copy(this.worldToLocal(hammer.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0,0,withdraw))));
+        hammer.updateWorldMatrix(true,true);
+      }
+      // Retraction along the wall normal can bring the motor back toward the
+      // eye. Resolve that remaining overlap in the wall plane, preserving the
+      // visible bit clearance and the player's fixed view.
+      const motor=hammer.localToWorld(new THREE.Vector3(.02,-.055,-.1));
+      const fromEye=motor.sub(camera.getWorldPosition(new THREE.Vector3()));
+      const planar=Math.hypot(fromEye.x,fromEye.y);
+      const minimumPlanar=Math.sqrt(Math.max(0,.195*.195-fromEye.z*fromEye.z));
+      if(planar<minimumPlanar){
+        const direction=planar>1e-5?new THREE.Vector3(fromEye.x/planar,fromEye.y/planar,0):new THREE.Vector3(0,-1,0);
+        hammer.position.copy(this.worldToLocal(hammer.getWorldPosition(new THREE.Vector3()).addScaledVector(direction,minimumPlanar-planar)));
+      }
+      this.poseArms(camera);
       this.chiselTipWorld.copy(hammer.localToWorld(this.tipAnchor.clone()));
       return null;
     }

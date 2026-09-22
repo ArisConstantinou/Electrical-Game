@@ -7,7 +7,7 @@ const out=process.argv[3]??'output/hammer-strafe-continuity';
 await mkdir(out,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const step=(page,frames)=>page.evaluate(async frames=>{for(let i=0;i<frames;i++){window.__strafeStep(1/60);if((i+1)%12===0)await window.__wireTheHouse.chasing.waitForDebrisSplits();}await window.__wireTheHouse.chasing.waitForDebrisSplits();},frames);
-const report={url,mobileIsEmulation:true,fixture:'Real keyboard A/D plus E or simultaneous move/look-stick touch. Fixed initial camera and deterministic simulation clock; all impacts, cavity contacts and tool poses use production code. OS Pointer Lock is blocked before navigation.',cases:[],errors:[]};
+const report={url,mobileIsEmulation:true,fixture:'Real keyboard A/D plus E or simultaneous floating move-stick and USE touch. Fixed initial camera and deterministic simulation clock; all impacts, cavity contacts and tool poses use production code. OS Pointer Lock is blocked before navigation.',cases:[],errors:[]};
 try {
 for(const mobile of [false,true])for(const sign of [-1,1]){
  const name=`${mobile?'mobile':'desktop'}-${sign<0?'left':'right'}`;
@@ -15,14 +15,15 @@ for(const mobile of [false,true])for(const sign of [-1,1]){
  await blockPointerLock(context);const page=await context.newPage();page.on('pageerror',error=>report.errors.push(`${name}: ${error.message}`));
  await page.goto(url);await page.waitForFunction(()=>window.__wireTheHouse?.renderer.renderCamera,{timeout:120000});
  const click=id=>page.locator(id)[mobile?'tap':'click']();await click('#start-button');
- if(mobile)await click('[data-tool="hammer"]');else await page.keyboard.press('Digit4');
+ if(mobile){await click('#site-pro-tools');await click('#mobile-tool-slider [data-tool="hammer"]');}
+ else await page.keyboard.press('Digit4');
  await page.evaluate(sign=>{const g=window.__wireTheHouse,c=g.renderer.camera;window.__strafeStep=g.step.bind(g);g.step=()=>{};
  c.position.set(-sign*.9,1.65,g.room.brickWall.volume.frontZ+.9);c.lookAt(-sign*.5,1.35,g.room.brickWall.volume.frontZ);g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;},sign);
  // Approach uses normal player input and establishes the real physical standoff.
  await page.keyboard.down('KeyW');await step(page,120);await page.keyboard.up('KeyW');
  await step(page,120);
  let cdp;
- if(mobile){cdp=await context.newCDPSession(page);const m=await page.locator('#joystick').boundingBox(),a=await page.locator('#look-joystick').boundingBox();await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{id:1,x:m.x+m.width*.5+sign*m.width*.43,y:m.y+m.height*.5},{id:2,x:a.x+a.width*.5,y:a.y+a.height*.5}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{id:1,x:m.x+m.width*.5+sign*m.width*.43,y:m.y+m.height*.5},{id:2,x:a.x+a.width*.5+4,y:a.y+a.height*.5}]});await step(page,90);}
+ if(mobile){cdp=await context.newCDPSession(page);const m=await page.locator('#mobile-move-zone').boundingBox(),u=await page.locator('#site-pro-use').boundingBox();const anchor={x:m.x+m.width*.5,y:m.y+m.height*.5},use={x:u.x+u.width*.5,y:u.y+u.height*.5};await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{id:1,...anchor}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{id:1,x:anchor.x+sign*55,y:anchor.y}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{id:1,x:anchor.x+sign*55,y:anchor.y},{id:2,...use}]});await page.evaluate(sign=>{const g=window.__wireTheHouse;assertMobile(g.input.mobileMove.x*sign>.05&&g.input.actionHeld);function assertMobile(ok){if(!ok)throw new Error(`Touch owners failed: ${JSON.stringify({move:g.input.mobileMove,held:g.input.actionHeld,owners:{move:g.mobileControls.joystickPointer,use:g.mobileControls.usePointer}})}`);}},sign);await step(page,90);}
  else {await page.keyboard.down(sign<0?'KeyA':'KeyD');await page.keyboard.down('KeyE');}
  const samples=await page.evaluate(async()=>{const g=window.__wireTheHouse,result=[];
   for(let i=0;i<600;i++){window.__strafeStep(1/60);const c=g.renderer.camera,t=g.fpsRig.chiselTipWorld;
@@ -48,7 +49,7 @@ for(const mobile of [false,true])for(const sign of [-1,1]){
  assert(maximumBackwardTipM<.0002,`${name}: bit reset opposite held strafe by ${maximumBackwardTipM} m`);
  assert(last.impacts-first.impacts>20,`${name}: continuous cutting stopped`);
  assert(last.removed>first.removed,`${name}: no actual masonry removed`);
- assert(Math.abs(last.camera[0]-first.camera[0])>1,`${name}: test did not cross several brick/cavity boundaries`);
+ assert(Math.abs(last.camera[0]-first.camera[0])>1,`${name}: test did not cross several brick/cavity boundaries (${Math.abs(last.camera[0]-first.camera[0])} m)`);
  await page.evaluate(async()=>{const g=window.__wireTheHouse;await g.chasing.waitForDebrisSplits();await g.room.brickWall.waitForGeometry();await g.renderer.waitForFrame();window.__strafeStep(0);await g.renderer.waitForFrame();});
  await page.screenshot({path:`${out}/${name}.png`});
  const ui=await page.evaluate(()=>({overflow:document.documentElement.scrollWidth>innerWidth,pointerLock:document.pointerLockElement?.id??null,error:window.__wireTheHouse.renderer.renderError}));
