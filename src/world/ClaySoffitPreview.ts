@@ -40,7 +40,9 @@ export function createClaySoffitPreview(width: number, depth: number, height: nu
   const ribMaterial = siteMaterial('concrete', 0xe6e2dc, .25, depth / 2);
   ribMaterial.emissive.set(0x827366);
   ribMaterial.emissiveIntensity = .28;
-  const ribGeometry = new THREE.BoxGeometry(.105, .18, depth);
+  // In the photographed clay-joist system the concrete core is flanked by
+  // fired-clay bearing faces. Expose the center, not a full-width grey stripe.
+  const ribGeometry = new THREE.BoxGeometry(.035, .18, depth);
   const ribs = new THREE.InstancedMesh(ribGeometry, ribMaterial, bays + 1);
   ribs.name = 'Flush load-bearing concrete ribs';
   ribs.receiveShadow = true;
@@ -51,5 +53,19 @@ export function createClaySoffitPreview(width: number, depth: number, height: nu
   }
   ribs.computeBoundingSphere();
   group.add(ribs);
+  const casingGeometry = new THREE.BoxGeometry(.035, .18, depth);
+  const casingPatches = new Float32Array((bays + 1) * 2 * 4);
+  casingGeometry.setAttribute('brickPatch', new THREE.InstancedBufferAttribute(casingPatches, 4));
+  const casings = new THREE.InstancedMesh(casingGeometry, claySoffitFaceMaterial, (bays + 1) * 2);
+  casings.name = 'Clay bearing faces along concrete joists';
+  casings.receiveShadow = true;
+  casings.raycast = () => undefined;
+  for (let i = 0; i <= bays; i++) for (let side = 0; side < 2; side++) {
+    const index = i * 2 + side;
+    casingPatches.set(brickFacePatch(i, side, 4), index * 4);
+    casings.setMatrixAt(index, matrix.makeTranslation(-width / 2 + i * width / bays + (side ? .035 : -.035), height + .09, 0));
+  }
+  casings.computeBoundingSphere();
+  group.add(casings);
   return group;
 }

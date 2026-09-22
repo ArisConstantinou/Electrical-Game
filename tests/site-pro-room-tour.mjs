@@ -124,6 +124,7 @@ try {
       const clay = room.getObjectByName('Clay and concrete ribbed soffit preview');
       const infill = clay?.getObjectByName('Individual fired-clay ceiling infill units');
       const ribs = clay?.getObjectByName('Flush load-bearing concrete ribs');
+      const casings = clay?.getObjectByName('Clay bearing faces along concrete joists');
       const bounds = object => {
         if (!object) return null;
         object.computeBoundingBox();
@@ -131,7 +132,7 @@ try {
         return { min: box.min.toArray(), max: box.max.toArray() };
       };
       return { min: world.min.toArray(), max: world.max.toArray(), relief: Boolean(ceiling.material.normalMap?.image?.width),
-        infill: bounds(infill), ribs: bounds(ribs) };
+        infill: bounds(infill), ribs: bounds(ribs), casings: bounds(casings) };
     });
     assert(slabBearing && slabBearing.min[0] < -4.03 && slabBearing.max[0] > 4.03 && slabBearing.max[2] > 3.77,
       `${device.name}: concrete slab must bear across both side walls and the rear wall: ${JSON.stringify(slabBearing)}`);
@@ -140,11 +141,13 @@ try {
     assert(Math.abs(slabBearing.min[1] - slabUnderside) < .015 && slabBearing.relief,
       `${device.name}: structural slab position or relief is wrong: ${JSON.stringify(slabBearing)}`);
     if (clayCeiling) {
-      assert(slabBearing.infill && slabBearing.ribs &&
+      assert(slabBearing.infill && slabBearing.ribs && slabBearing.casings &&
         Math.abs(slabBearing.infill.min[1] - 3) < .01 &&
         Math.abs(slabBearing.ribs.min[1] - 3) < .01 &&
+        Math.abs(slabBearing.casings.min[1] - 3) < .01 &&
         Math.abs(slabBearing.infill.max[1] - slabBearing.min[1]) < .01 &&
-        Math.abs(slabBearing.ribs.max[1] - slabBearing.min[1]) < .01,
+        Math.abs(slabBearing.ribs.max[1] - slabBearing.min[1]) < .01 &&
+        Math.abs(slabBearing.casings.max[1] - slabBearing.min[1]) < .01,
       `${device.name}: clay infill, ribs, wall heads and slab must form one bearing layer: ${JSON.stringify(slabBearing)}`);
     }
     report.cases.push({ device: device.name, view: 'structural-slab-bearing', state: slabBearing });
