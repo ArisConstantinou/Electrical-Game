@@ -342,6 +342,10 @@ export class ApprenticeSystem {
     if(action==='point'||action==='plan'){
       window.dispatchEvent(new CustomEvent('wirehouse:box-exit-assembly'));
       this.mode=action;this.ghost.visible=false;this.paper.visible=false;g.input.resetTransientInput();
+      // Pointing still aims through the player's camera on desktop. Keep the
+      // cursor locked there; only the readable plan needs a free pointer.
+      if(action==='point'&&matchMedia('(any-pointer: fine)').matches)window.dispatchEvent(new Event('wirehouse:request-desktop-look-lock'));
+      else if(document.pointerLockElement)void document.exitPointerLock();
       if(action==='point'){this.pipeSelection=null;g.pvc.stock.highlightBundle(null);}
       if(action==='plan')this.drawPlan();
       this.message=action==='point'?'Έδαφος: πάτημα για μετακίνηση · κράτημα για εντολές · τοίχος: USE':'Ηλεκτρολογικό σχέδιο · T επιστροφή στις οδηγίες';

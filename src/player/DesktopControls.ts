@@ -9,6 +9,7 @@ export class DesktopControls {
   private wheelSelected = false;
 
   constructor(surface: HTMLElement, private readonly lockTarget: HTMLElement, player: PlayerController, input: Input) {
+    addEventListener('wirehouse:request-desktop-look-lock', () => this.requestLock(false));
     let primaryDown = false;
     let wasPointerLocked = document.pointerLockElement === this.lockTarget;
     const exitBoxAssembly = ():void => {
@@ -19,6 +20,14 @@ export class DesktopControls {
     };
     surface.addEventListener('pointerdown', event => {
       if ((event.pointerType && event.pointerType !== 'mouse') || (event.target as Element).closest('button,input,select,textarea,label,a,summary,#settings-panel')) return;
+      if (!document.querySelector('#start-screen')?.classList.contains('hidden') || surface.classList.contains('settings-open') || surface.classList.contains('model-open')) return;
+      if(event.button===0&&surface.dataset.apprenticeMode&&surface.dataset.apprenticeMode!=='off'&&document.pointerLockElement!==this.lockTarget)this.requestLock(false);
+      if(surface.dataset.apprenticeMode && surface.dataset.apprenticeMode !== 'off'){
+        if(event.button===0&&!primaryDown){
+          event.preventDefault();primaryDown=true;input.actionHeld=true;input.actionRequested=true;
+        }
+        return;
+      }
       if (event.button === 2) {
         event.preventDefault();
         input.actionHeld = false;
