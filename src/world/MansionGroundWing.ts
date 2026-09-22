@@ -5,23 +5,40 @@ import { brickFacePatch } from './BrickFacePatch';
 import { masonryFaceMaterial } from './BrickFaceMaterial';
 import { siteMaterial } from './SiteMaterials';
 import { createClaySoffitPreview } from './ClaySoffitPreview';
+import { MansionCourtyard } from './MansionCourtyard';
 
 /** First traversable part of the approved ground plan, kept out of the released room. */
 export class MansionGroundWing extends THREE.Group {
   readonly obstacles: PlayerObstacle[] = [];
+  readonly courtyard: MansionCourtyard;
 
-  constructor() {
+  constructor(oliveSource: THREE.Object3D | null) {
     super();
     this.name = 'Mansion ground circulation construction slice';
     this.userData.studioEntityId = 'world:mansion-ground-wing';
     this.slab('Rough supported passage slab', 2.7, 4.1, 0, 5.65);
     this.slab('Ground foyer slab', 10.35, 5.0, 3.825, 10.1, true);
+    this.slab('Shaded north circulation return', 10.35, 2.9, 3.825, 14.05);
     this.wall('Passage west fired-clay partition', -1.35, 3.62, -1.35, 7.65);
     this.wall('Passage east fired-clay partition', 1.35, 3.62, 1.35, 7.65);
-    this.wall('Foyer west fired-clay partition', -1.35, 7.65, -1.35, 12.6);
-    this.wall('Foyer north fired-clay perimeter', -1.35, 12.6, 9, 12.6);
-    this.wall('Foyer east fired-clay perimeter', 9, 7.65, 9, 12.6);
+    this.wall('Foyer west fired-clay partition', -1.35, 7.65, -1.35, 15.5);
+    this.wall('Foyer north fired-clay perimeter', -1.35, 15.5, 9, 15.5);
+    // The 2.4 m opening is a true route into the open courtyard. Structural
+    // piers and lintel are visible; there is no glazing or fitted door.
+    this.wall('Courtyard west masonry pier before aperture', 9, 6, 9, 13);
+    this.wall('Courtyard west masonry pier after aperture', 9, 15, 9, 16);
+    this.addCourtyardOpeningFrame();
+    this.wall('Courtyard east solid pier A', 18, 6, 18, 8);
+    this.wall('Courtyard east solid pier B', 18, 10, 18, 12);
+    this.wall('Courtyard east solid pier C', 18, 14, 18, 16);
+    this.addCourtyardWindowBand(8, 10);
+    this.addCourtyardWindowBand(12, 14);
+    this.wall('Courtyard north fired-clay enclosure', 9, 16, 18, 16);
+    this.wall('Courtyard south fired-clay enclosure', 9, 6, 18, 6);
     this.wall('Foyer south fired-clay partition', 1.35, 7.65, 9, 7.65);
+    this.courtyard = new MansionCourtyard(oliveSource);
+    this.add(this.courtyard);
+    this.obstacles.push(...this.courtyard.obstacles);
     this.addStairCore();
     this.addFirstFloorLanding();
     this.addFirstFloorRoom();
@@ -36,8 +53,12 @@ export class MansionGroundWing extends THREE.Group {
     this.castFrame(-1.35, 12.6);
     this.castFrame(9, 12.6);
     this.castFrame(9, 7.65);
+    this.castFrame(-1.35, 15.5);
+    this.castFrame(9, 15.5);
     this.addTemporarySafety();
   }
+
+  update(dt: number): void { this.courtyard.update(dt); }
 
   surfaceHeight(x: number, z: number): number {
     const onFirst = x >= 4.8 && x <= 6.2 && z >= 8 && z < 11.08;
@@ -135,6 +156,72 @@ export class MansionGroundWing extends THREE.Group {
     column.position.set(x, 1.58, z);
     column.castShadow = column.receiveShadow = true;
     this.add(column);
+  }
+
+  private addCourtyardOpeningFrame(): void {
+    const concrete = siteMaterial('floor', 0xd7d0c4, .24, .55);
+    for (const z of [12.91, 15.09]) {
+      const jamb = new THREE.Mesh(new RoundedBoxGeometry(.29, 3.0, .22, 2, .009), concrete);
+      jamb.name = 'Raw courtyard aperture concrete jamb';
+      jamb.position.set(9, 1.5, z);
+      jamb.castShadow = jamb.receiveShadow = true;
+      this.add(jamb);
+    }
+    const lintel = new THREE.Mesh(new RoundedBoxGeometry(.34, .3, 2.76, 2, .009), concrete);
+    lintel.name = 'Structural lintel over doorless courtyard passage';
+    lintel.position.set(9, 2.61, 14.0);
+    lintel.castShadow = lintel.receiveShadow = true;
+    this.add(lintel);
+    const geometry = new THREE.BoxGeometry(1, 1, 1), patches = new Float32Array(16 * 4);
+    geometry.setAttribute('brickPatch', new THREE.InstancedBufferAttribute(patches, 4));
+    const clay = new THREE.InstancedMesh(geometry, masonryFaceMaterial, 16);
+    clay.name = 'Fired-clay masonry bearing above courtyard lintel';
+    const matrix = new THREE.Matrix4();
+    for (let row = 0; row < 2; row++) for (let col = 0; col < 8; col++) {
+      const index = row * 8 + col;
+      patches.set(brickFacePatch(row, col, 14), index * 4);
+      clay.setMatrixAt(index, matrix.compose(new THREE.Vector3(9, 2.82 + row * .12, 12.84 + (col + .5) * .29),
+        new THREE.Quaternion(), new THREE.Vector3(.23, .113, .283)));
+    }
+    clay.castShadow = clay.receiveShadow = true;
+    clay.computeBoundingSphere(); this.add(clay);
+  }
+
+  private addCourtyardWindowBand(z0: number, z1: number): void {
+    const mortar = siteMaterial('floor', 0x938b7f, .5, .5);
+    for (const [name, y0, y1] of [
+      ['sill masonry', 0, 1.04], ['head masonry', 2.43, 3],
+    ] as const) {
+      const backing = new THREE.Mesh(new THREE.BoxGeometry(.20, y1 - y0, z1 - z0), mortar);
+      backing.name = `Courtyard east window ${name}`;
+      backing.position.set(18, (y0 + y1) / 2, (z0 + z1) / 2);
+      backing.castShadow = backing.receiveShadow = true;
+      this.add(backing);
+      const course = 3 / 23, rows = Math.ceil((y1 - y0) / course), cols = 6;
+      const geometry = new THREE.BoxGeometry(1, 1, 1), patches = new Float32Array(rows * cols * 4);
+      geometry.setAttribute('brickPatch', new THREE.InstancedBufferAttribute(patches, 4));
+      const bricks = new THREE.InstancedMesh(geometry, masonryFaceMaterial, rows * cols);
+      bricks.name = `Individual fired-clay units in ${name}`;
+      const matrix = new THREE.Matrix4();
+      for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
+        const index = row * cols + col, y = y0 + (row + .5) * (y1 - y0) / rows;
+        const z = z0 + (col + .5) * (z1 - z0) / cols;
+        patches.set(brickFacePatch(row, col, 17), index * 4);
+        bricks.setMatrixAt(index, matrix.compose(new THREE.Vector3(18, y, z), new THREE.Quaternion(),
+          new THREE.Vector3(.24, (y1 - y0) / rows - .006, (z1 - z0) / cols - .006)));
+      }
+      bricks.castShadow = bricks.receiveShadow = true;
+      bricks.computeBoundingSphere(); this.add(bricks);
+    }
+    const concrete = siteMaterial('floor', 0xd6cfc4, .22, .25);
+    for (const [label, y] of [['raw sill', 1.04], ['supported lintel', 2.43]] as const) {
+      const edge = new THREE.Mesh(new RoundedBoxGeometry(.36, .13, z1 - z0 + .24, 2, .009), concrete);
+      edge.name = `Courtyard ${label} at window ${z0}`;
+      edge.position.set(18, y, (z0 + z1) / 2);
+      edge.castShadow = edge.receiveShadow = true;
+      this.add(edge);
+    }
+    this.obstacles.push({ id: `court-open-window-sill-${z0}`, minX: 17.86, maxX: 18.14, minZ: z0, maxZ: z1 });
   }
 
   private addStairCore(): void {

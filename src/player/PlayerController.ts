@@ -129,13 +129,13 @@ export class PlayerController {
     }
     const radius = GAME_CONFIG.player.radius;
     this.camera.position.x = this.mansionPreview
-      ? THREE.MathUtils.clamp(this.camera.position.x, -GAME_CONFIG.room.width / 2 + radius, 12.5 - radius)
+      ? THREE.MathUtils.clamp(this.camera.position.x, -GAME_CONFIG.room.width / 2 + radius, 18 - radius)
       : THREE.MathUtils.clamp(this.camera.position.x, -GAME_CONFIG.room.width / 2 + radius, GAME_CONFIG.room.width / 2 - radius);
     // The masonry facade stands inside the room's architectural bounds.
     // Apply body clearance independently of tool bracing and view direction:
     // looking along the wall must not disable the player's collision barrier.
     this.camera.position.z = THREE.MathUtils.clamp(this.camera.position.z, GAME_CONFIG.room.wallFrontZ + radius,
-      this.mansionPreview ? 12.6 - radius : GAME_CONFIG.room.depth / 2 - radius);
+      this.mansionPreview ? 16 - radius : GAME_CONFIG.room.depth / 2 - radius);
     // Only adjacent 15 cm risers may change the floor height in one movement
     // step. This prevents entering the elevated return flight from ground level
     // or walking off an unfinished landing through empty air.

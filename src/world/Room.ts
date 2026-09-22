@@ -161,7 +161,7 @@ export class Room extends THREE.Group {
     this.addFormworkMarks();
     this.addConstructionJoints();
     this.addRearWall();
-    this.mansionWing = this.mansionPreview ? new MansionGroundWing() : null;
+    this.mansionWing = this.mansionPreview ? new MansionGroundWing(this.exterior.getObjectByName('Olive tree outside unfinished opening') ?? null) : null;
     if (this.mansionWing) this.add(this.mansionWing);
     // The slab bears over the wall heads and columns. Exposed brick meets its
     // soffit directly, with no decorative inner downstand or shadow band.
@@ -204,7 +204,7 @@ export class Room extends THREE.Group {
     addLighting(scene);
   }
 
-  update(dt: number): void { this.exterior.update(dt); }
+  update(dt: number): void { this.exterior.update(dt); this.mansionWing?.update(dt); }
 
   private addSideBrickCourses(side: THREE.Group, wallX: number, hasOpening: boolean): void {
     const pitch = GAME_CONFIG.room.depth / 20, course = GAME_CONFIG.room.height / 23, gap = .006;
