@@ -13,6 +13,8 @@ export class RoomWaterSystem {
   readonly field=new RoomWaterField();
   readonly group=new THREE.Group();
   readonly surfaceGeometry=new THREE.BufferGeometry();
+  /** Conservative bounds of wet cells for skipping optical passes only when water is off-screen. */
+  readonly wetBounds=new THREE.Box3();
   readonly surface=new THREE.Mesh(this.surfaceGeometry,new THREE.MeshPhysicalMaterial({color:0x94bdc4,roughness:.12,metalness:.05,transparent:true,opacity:.62,depthWrite:false}));
   readonly droplets=new THREE.InstancedMesh(new THREE.SphereGeometry(1,10,8),new THREE.MeshPhysicalMaterial({color:0xb6c9cc,roughness:.07,metalness:0,transparent:true,opacity:.18,depthWrite:false}),128);
   readonly streaks=new THREE.LineSegments(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({color:0xc5e7eb,transparent:true,opacity:.22}));
@@ -270,6 +272,20 @@ export class RoomWaterSystem {
       }
       this.positions[v*3+1]=Math.max(.0002,height/count);this.thickness[v]=opticalDepth/this.opticalWeightSums[v];
       hasWater ||= depth>0.000003;
+    }
+    let minX=f.columns,minZ=f.rows,maxX=-1,maxZ=-1,maxHeight=0;
+    for(let z=0;z<f.rows;z++)for(let x=0;x<f.columns;x++){
+      const index=z*f.columns+x,depth=f.depths[index];
+      if(depth<=.000003)continue;
+      minX=Math.min(minX,x);minZ=Math.min(minZ,z);
+      maxX=Math.max(maxX,x);maxZ=Math.max(maxZ,z);
+      maxHeight=Math.max(maxHeight,f.bed[index]+depth);
+    }
+    if(maxX<0)this.wetBounds.makeEmpty();
+    else{
+      const margin=Math.max(f.dx,f.dz)+.12;
+      this.wetBounds.min.set(f.minX+minX*f.dx-margin,-.12,f.minZ+minZ*f.dz-margin);
+      this.wetBounds.max.set(f.minX+(maxX+1)*f.dx+margin,maxHeight+.12,f.minZ+(maxZ+1)*f.dz+margin);
     }
     // Keep dry perimeter triangles: their zero waterDepth lets the Water Pro
     // alpha fade finish continuously rather than clipping at a wet-cell edge.

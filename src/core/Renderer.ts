@@ -37,6 +37,9 @@ export class Renderer {
   // One initial/transition update synchronizes the vendor mesh and underwater
   // fog. Once dry, water optical passes have no pixels to contribute.
   private waterWasVisible=true;
+  private readonly waterFrustum=new THREE.Frustum();
+  private readonly waterProjection=new THREE.Matrix4();
+  private readonly waterEye=new THREE.Vector3();
   private renderTask:Promise<void>|null=null;
   private pendingSize:{width:number;height:number}|null=null;
   private lastRenderTime=performance.now();
@@ -241,6 +244,15 @@ export class Renderer {
     this.renderCamera.quaternion.multiply(this.gazeQuaternion.setFromEuler(this.gazeEuler));
     this.renderCamera.updateMatrixWorld(true);
   }
+  private waterInView(room:RoomWaterSystem):boolean{
+    if(!room.surface.visible||room.wetBounds.isEmpty())return false;
+    const eye=this.activeRenderCamera.getWorldPosition(this.waterEye),bounds=room.wetBounds;
+    if(eye.x>=bounds.min.x&&eye.x<=bounds.max.x&&eye.z>=bounds.min.z&&eye.z<=bounds.max.z&&
+      eye.y<room.field.surfaceAt(eye.x,eye.z)+.02)return true;
+    this.waterProjection.multiplyMatrices(this.activeRenderCamera.projectionMatrix,this.activeRenderCamera.matrixWorldInverse);
+    this.waterFrustum.setFromProjectionMatrix(this.waterProjection);
+    return this.waterFrustum.intersectsBox(bounds);
+  }
   /** True means renderCamera now contains the accepted frame's exact view. */
   render():boolean{
     if(this.framePending)return false;
@@ -255,7 +267,7 @@ export class Renderer {
     if(this.modelScene){this.gpu.info.reset();this.drawScene(this.modelScene);return true;}
     this.prepareMaterials();
     const now=performance.now(),dt=Math.min(.05,(now-this.lastRenderTime)/1000);this.lastRenderTime=now;
-    const waterVisible=this.roomWater?.surface.visible??false;
+    const waterVisible=this.roomWater?this.waterInView(this.roomWater):false;
     const updateWater=this.water&&(waterVisible||this.waterWasVisible);
     this.waterWasVisible=waterVisible;
     if(!this.water||!updateWater){

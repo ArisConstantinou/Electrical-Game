@@ -1377,3 +1377,9 @@ Original prompt for this task: Selecting BOX should show an initial box in the l
 - Original sound request: use the five exact recordings shown in Photo 1–5 (Mixkit Tape measure extend; Pixabay concrete mixer by drebddronefish, drill hammer action by Pagey1969, Spray Can by DavidGallie, Rotary Hammer by SoundReality).
 - Worktree: codex/selected-construction-sounds from f7fca9e. Port 5365 remains assigned to the active mansion checkout; do not replace its listener without coordination.
 - Added trimmed mono WAV recordings, source/license manifest, sample-backed spray/drill/mixer/demo loops and tape extend cue. Isolated build and desktop/mobile Chrome audio tests passed with five decoded recordings, active sample gains, muted synthetic fallbacks and no page errors. The live mansion checkout also passed source provenance, desktop/mobile audio loading, and the existing construction-audio regression. The shared listener was preserved.
+
+## 2026-09-22 · Off-screen water render pass culling
+
+- Wet-cell bounds now gate Water Pro's optical update only when no water can enter the camera frustum. A transition update clears the vendor's visibility/fog state; visible water still receives every optical pass.
+- In Windows Chrome mobile 390×844 DPR3 WebGL emulation, eight steady off-screen wet frames made 0 FFT passes/frame, compared with 56/frame when the old always-update policy was forced; visible water also made 56/frame. `tests/water-pass-attribution.mjs` and `tests/renderer-dry-water.mjs` passed, including dry/wet/drain transitions on WebGL and WebGPU. TypeScript and production build passed. See `artifacts/site-pro-04/review/performance/water-pass-attribution.json`.
+- These are render-pass counts, not physical-phone FPS. Broader frame-time, hitbox, complete mansion, and real-device acceptance remain open.

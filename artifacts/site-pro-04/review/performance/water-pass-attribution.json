@@ -1,0 +1,185 @@
+{
+  "method": "Windows Chrome mobile 390x844 DPR3 WebGL, paused gameplay, eight dry and eight 12L wet frames. Counts are renderer invocations, not physical-device FPS.",
+  "dry": {
+    "name": "dry",
+    "frames": 8,
+    "totalCallsPerFrame": [
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4
+    ],
+    "passes": [
+      {
+        "target": "screen",
+        "camera": "Independent eye view camera",
+        "mainScene": true,
+        "totalCalls": 24,
+        "passes": 8
+      },
+      {
+        "target": "ShadowMap:1024x1024",
+        "camera": "OrthographicCamera",
+        "mainScene": true,
+        "totalCalls": 8,
+        "passes": 8
+      }
+    ]
+  },
+  "wet": {
+    "name": "wet-offscreen",
+    "frames": 8,
+    "totalCallsPerFrame": [
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4
+    ],
+    "passes": [
+      {
+        "target": "screen",
+        "camera": "Independent eye view camera",
+        "mainScene": true,
+        "totalCalls": 24,
+        "passes": 8
+      },
+      {
+        "target": "ShadowMap:1024x1024",
+        "camera": "OrthographicCamera",
+        "mainScene": true,
+        "totalCalls": 8,
+        "passes": 8
+      }
+    ]
+  },
+  "forced": {
+    "name": "wet-forced-old-policy",
+    "frames": 8,
+    "totalCallsPerFrame": [
+      67,
+      67,
+      67,
+      67,
+      67,
+      67,
+      67,
+      67
+    ],
+    "passes": [
+      {
+        "target": "unnamed:256x256",
+        "camera": "OrthographicCamera",
+        "mainScene": false,
+        "totalCalls": 448,
+        "passes": 448
+      },
+      {
+        "target": "unnamed:682x1477",
+        "camera": "Independent eye view camera",
+        "mainScene": false,
+        "totalCalls": 40,
+        "passes": 40
+      },
+      {
+        "target": "unnamed:682x1477",
+        "camera": "Independent eye view camera",
+        "mainScene": true,
+        "totalCalls": 16,
+        "passes": 8
+      },
+      {
+        "target": "screen",
+        "camera": "Independent eye view camera",
+        "mainScene": true,
+        "totalCalls": 16,
+        "passes": 8
+      },
+      {
+        "target": "ShadowMap:1024x1024",
+        "camera": "OrthographicCamera",
+        "mainScene": true,
+        "totalCalls": 8,
+        "passes": 8
+      },
+      {
+        "target": "unnamed:682x1477",
+        "camera": "OrthographicCamera",
+        "mainScene": false,
+        "totalCalls": 8,
+        "passes": 8
+      }
+    ]
+  },
+  "visible": {
+    "name": "wet-visible",
+    "frames": 8,
+    "totalCallsPerFrame": [
+      67,
+      67,
+      67,
+      67,
+      67,
+      67,
+      67,
+      67
+    ],
+    "passes": [
+      {
+        "target": "unnamed:256x256",
+        "camera": "OrthographicCamera",
+        "mainScene": false,
+        "totalCalls": 448,
+        "passes": 448
+      },
+      {
+        "target": "unnamed:682x1477",
+        "camera": "Independent eye view camera",
+        "mainScene": false,
+        "totalCalls": 40,
+        "passes": 40
+      },
+      {
+        "target": "unnamed:682x1477",
+        "camera": "Independent eye view camera",
+        "mainScene": true,
+        "totalCalls": 16,
+        "passes": 8
+      },
+      {
+        "target": "screen",
+        "camera": "Independent eye view camera",
+        "mainScene": true,
+        "totalCalls": 16,
+        "passes": 8
+      },
+      {
+        "target": "ShadowMap:1024x1024",
+        "camera": "OrthographicCamera",
+        "mainScene": true,
+        "totalCalls": 8,
+        "passes": 8
+      },
+      {
+        "target": "unnamed:682x1477",
+        "camera": "OrthographicCamera",
+        "mainScene": false,
+        "totalCalls": 8,
+        "passes": 8
+      }
+    ]
+  },
+  "wetInView": true,
+  "waterVisible": true,
+  "waterProActive": true,
+  "waterLitres": 12,
+  "error": "",
+  "errors": []
+}
