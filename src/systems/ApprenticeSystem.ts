@@ -69,6 +69,11 @@ export class ApprenticeSystem {
   private readonly aimRay=new THREE.Ray();
   private readonly aimDirection=new THREE.Vector3();
   private readonly apprenticeAimCenter=new THREE.Vector3();
+  private readonly aimCapsuleStart=new THREE.Vector3();
+  private readonly aimCapsuleEnd=new THREE.Vector3();
+  private readonly aimClosestPoint=new THREE.Vector3();
+  private readonly aimRaycaster=new THREE.Raycaster();
+  private readonly aimScreenCenter=new THREE.Vector2();
   private readonly groundMenu=document.createElement('section');
   private readonly groundMarker=new THREE.Group();
   private readonly groundRoute:THREE.Line<THREE.BufferGeometry,THREE.LineDashedMaterial>;
@@ -223,12 +228,39 @@ export class ApprenticeSystem {
     this.aimRay.set(camera.position,this.aimDirection);
     this.apprenticeAimCenter.set(this.camera.position.x,1.35,this.camera.position.z);
     const distance=camera.position.distanceTo(this.apprenticeAimCenter);
-    return distance<3.5&&this.aimRay.distanceSqToPoint(this.apprenticeAimCenter)<.42*.42;
+    if(distance>=3.5||this.aimRay.distanceSqToPoint(this.apprenticeAimCenter)>=.42*.42)return false;
+    camera.updateMatrixWorld();
+    this.aimRaycaster.setFromCamera(this.aimScreenCenter,camera);
+    this.aimRaycaster.far=3.5;
+    const visibleHit=(root:THREE.Object3D,hits:THREE.Intersection[])=>hits.find(hit=>{
+      let object:THREE.Object3D|null=hit.object;
+      while(object){if(!object.visible)return false;if(object===root)return true;object=object.parent;}
+      return false;
+    });
+    // Raycasting the animated skinned mesh costs tens of milliseconds on the
+    // desktop and mobile profiles. Two tight body-space capsules follow the
+    // worker's actual root position without skinning every vertex on the CPU.
+    let workerDistance=Infinity;
+    const capsule=(low:number,high:number,radius:number)=>{
+      this.aimCapsuleStart.set(this.body.position.x,low,this.body.position.z);
+      this.aimCapsuleEnd.set(this.body.position.x,high,this.body.position.z);
+      if(this.aimRay.distanceSqToSegment(this.aimCapsuleStart,this.aimCapsuleEnd,this.aimClosestPoint)<=radius*radius)
+        workerDistance=Math.min(workerDistance,camera.position.distanceTo(this.aimClosestPoint));
+    };
+    capsule(.78,1.52,.21);
+    capsule(1.55,1.75,.145);
+    if(workerDistance===Infinity)return false;
+    const wallHit=this.game.room.brickWall.aim(camera,workerDistance);
+    if(wallHit&&camera.position.distanceTo(wallHit.point)<workerDistance-.02)return false;
+    const equipment=this.game.mixing.models;
+    for(const root of [equipment.group,equipment.wheelbarrow.group]){
+      const nearer=visibleHit(root,this.aimRaycaster.intersectObject(root,true));
+      if(nearer&&nearer.distance<workerDistance-.02)return false;
+    }
+    return true;
   }
   tryOpenDrawingsOnAim():boolean {
     if((this.mode!=='off'&&this.mode!=='point')||!this.aimedAtApprentice())return false;
-    const hit=this.game.room.brickWall.aim(this.game.renderer.camera,3.5);
-    if(hit&&this.game.renderer.camera.position.distanceTo(hit.point)<this.game.renderer.camera.position.distanceTo(this.apprenticeAimCenter)-.25)return false;
     this.drawingTab='electrical';this.drawingFit=false;this.mobilePlan.classList.remove('drawing-fit');this.command('plan');return this.ownsInput;
   }
   get telemetry(){return{count:this.count,mode:this.mode,phase:this.phase,groundTarget:this.groundTarget,groundFollowup:this.groundTarget?this.groundFollowup:null,groundIntent:this.groundIntent,groundMenuOpen:!this.groundMenu.hidden,blockedFrom:this.blockedFrom,workStep:this.phase==='construction'?this.workStep:null,workCursor:this.workCursor,workTargets:this.workTargets.length,workContactReady:this.workContactReady,workGripReachM:this.workGripReachM,workTargetRangeM:this.workTargetRangeM,wallApproach:this.wallApproach,batchCycle:this.batchCycle,cementDone:this.cementDone,sandDone:this.sandDone,carriedKg:this.carriedKg,workFailure:this.workFailure,waiting:this.waiting,message:this.message,position:this.camera.position.toArray(),highlightSamples:this.lines.length,strikes:this.strikes,removedVolume:this.removedVolume,job:this.job?{anchor:this.job.anchor.toArray(),modules:this.job.modules,cursor:this.job.cursor,targets:this.job.targets.length,fitRefinements:this.job.fitRefinements}:null,pipeSelection:this.pipeSelection,pipeJob:this.pipeJob?{...this.pipeJob}:null,crew:this.crew.slice(0,this.count-1).map(worker=>({index:worker.index,active:worker.active,done:worker.done,position:worker.camera.position.toArray()})),pipeBatch:this.pipeBatch.telemetry,pipeYard:this.pipeYard.telemetry,bundles:[...this.game.pvc.stock.bundleRemaining]};}

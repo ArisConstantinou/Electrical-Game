@@ -31,14 +31,22 @@ try {
       g.player.pitch = -.22;
     });
     await page.waitForTimeout(500);
-    const aimDiagnostic = await page.evaluate(() => { const g=window.__wireTheHouse,a=g.apprentice,c=g.renderer.camera;return {started:g.started,count:a.count,bodyVisible:a.body.visible,bodyLoaded:a.body.loaded,player:c.position.toArray(),yaw:g.player.yaw,pitch:g.player.pitch,apprentice:a.camera.position.toArray(),direction:c.getWorldDirection(a.aimDirection).toArray(),mode:a.mode}; });
+    if(config.name==='mobile-portrait'){
+      const nearMiss=await page.evaluate(()=>{const g=window.__wireTheHouse,a=g.apprentice,c=g.renderer.camera;c.rotation.y=.24;c.updateMatrixWorld(true);a.groundRay.setFromCamera(a.groundPoint.set(0,0),c);const meshHits=a.groundRay.intersectObject(a.body,true).length,opens=a.tryOpenDrawingsOnAim();c.rotation.y=0;c.updateMatrixWorld(true);if(opens)a.command('point');return{meshHits,opens};});
+      assert.equal(nearMiss.meshHits,0,'Crosshair is outside the actual apprentice mesh');
+      assert.equal(nearMiss.opens,false,'Near-miss beside apprentice must not open drawings');
+      const equipmentOcclusion=await page.evaluate(()=>{const g=window.__wireTheHouse,a=g.apprentice,c=g.renderer.camera,group=g.mixing.models.group,mixer=g.mixing.models.concreteMixer;let source; mixer.traverse(object=>{if(!source&&object.isMesh)source=object;});const blocker=source.clone(false);blocker.geometry=source.geometry.clone();blocker.geometry.center();blocker.position.copy(group.worldToLocal(c.position.clone().lerp(a.camera.position,.5)));blocker.scale.setScalar(3);blocker.visible=true;group.add(blocker);group.updateWorldMatrix(true,true);const blockerHits=a.aimRaycaster.intersectObject(blocker,true).length,opens=a.tryOpenDrawingsOnAim();group.remove(blocker);blocker.geometry.dispose();if(opens)a.command('point');return{blockerHits,opens};});
+      assert(equipmentOcclusion.blockerHits>0,'Foreground construction equipment covers the worker');
+      assert.equal(equipmentOcclusion.opens,false,'Equipment in front of apprentice keeps USE priority');
+    }
+    const aimMs=await page.evaluate(()=>{const a=window.__wireTheHouse.apprentice,start=performance.now();for(let i=0;i<200;i++)a.aimedAtApprentice();return(performance.now()-start)/200;});
+    assert(aimMs<4,`${config.name}: apprentice targeting costs ${aimMs.toFixed(2)} ms per query`);
     const promptVisible=await page.locator('#apprentice-drawing-prompt').isVisible();
     assert(promptVisible,`${config.name}: looking at apprentice shows drawing prompt`);
     await page.screenshot({path:`${out}/${config.name}-aim.png`});
     if(config.isMobile)await page.locator('#site-pro-use').tap();else await page.keyboard.press('e');
     await page.waitForFunction(()=>window.__wireTheHouse?.apprentice.mode==='plan',null,{timeout:10000});
     const aimed = await page.evaluate(() => window.__wireTheHouse.apprentice.mode === 'plan');
-    if(!aimed)console.log(config.name,aimDiagnostic,await page.evaluate(()=>{const g=window.__wireTheHouse;return {mode:g.apprentice.mode,actionRequested:g.input.actionRequested,actionHeld:g.input.actionHeld,interactionRequested:g.input.interactionRequested,message:g.apprentice.telemetry.message,promptHidden:document.querySelector('#apprentice-drawing-prompt').hidden};}));
     assert(aimed, `${config.name}: looking at apprentice opens drawings`);
     await page.locator('#apprentice-mobile-plan').waitFor({ state: 'visible' });
     const labels = await page.locator('[data-drawing-tab]').allTextContents();
@@ -62,7 +70,7 @@ try {
     assert(bounds && bounds.x >= 0 && bounds.y >= 0 && bounds.x + bounds.width <= config.viewport.width + 1 && bounds.y + bounds.height <= config.viewport.height + 1, `${config.name}: drawing viewer fits viewport`);
     await page.locator('[data-drawing-close]').click();
     await page.locator('#apprentice-mobile-plan').waitFor({state:'hidden',timeout:5000});
-    report.cases.push({ name: config.name, labels, bounds, aimOpened: aimed });
+    report.cases.push({ name: config.name, labels, bounds, aimOpened: aimed, aimedCheckMs:aimMs });
     await context.close();
   }
   assert.deepEqual(report.errors, []);
