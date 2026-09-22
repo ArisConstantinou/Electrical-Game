@@ -14,6 +14,9 @@ import { MAX_WRIST_REACH_M,type WorkerGripTarget } from '../player/WorkerArm';
 import {ApprenticePipeBatch,APPRENTICE_PIPE_LENGTH_M,APPRENTICE_PIPE_TARGET,type ApprenticePipeKind} from './ApprenticePipeBatch';
 import {ApprenticePipeYard} from './ApprenticePipeYard';
 import {ApprenticeCrewMate} from './ApprenticeCrewMate';
+import electricalDrawingUrl from '../../artifacts/site-pro-04/mansion-concept/electrical-workroom.svg?url';
+import groundFloorDrawingUrl from '../../artifacts/site-pro-04/mansion-concept/ground-floor.svg?url';
+import buildingSectionDrawingUrl from '../../artifacts/site-pro-04/mansion-concept/building-section.svg?url';
 
 type Phase='idle'|'directed'|'fetching'|'picking-up'|'lifting'|'walking'|'breaking'|'construction'|'pipe'|'done'|'blocked';
 type Mode='off'|'point'|'layout'|'pipe-choice'|'plan';
@@ -60,6 +63,12 @@ export class ApprenticeSystem {
   private readonly status=document.createElement('div');
   private readonly paperCanvas=document.createElement('canvas');
   private readonly mobilePlan=document.createElement('section');
+  private readonly drawingPrompt=document.createElement('div');
+  private drawingTab:'electrical'|'ground'|'section'='electrical';
+  private drawingFit=false;
+  private readonly aimRay=new THREE.Ray();
+  private readonly aimDirection=new THREE.Vector3();
+  private readonly apprenticeAimCenter=new THREE.Vector3();
   private readonly groundMenu=document.createElement('section');
   private readonly groundMarker=new THREE.Group();
   private readonly groundRoute:THREE.Line<THREE.BufferGeometry,THREE.LineDashedMaterial>;
@@ -180,11 +189,13 @@ export class ApprenticeSystem {
     this.groundMenu.hidden=true;game.hud.shell.append(this.groundMenu);
     this.groundMenu.addEventListener('click',event=>{const action=(event.target as HTMLElement).closest<HTMLButtonElement>('[data-ground]')?.dataset.ground as GroundAction|undefined;if(!action||!this.groundGesture)return;this.issueGroundOrder(this.groundGesture.point,action);this.closeGroundMenu();});
     this.mobilePlan.id='apprentice-mobile-plan';this.mobilePlan.setAttribute('aria-label','Ηλεκτρολογικό σχέδιο');this.mobilePlan.hidden=true;game.hud.shell.append(this.mobilePlan);
+    this.mobilePlan.addEventListener('click',event=>{const target=event.target as HTMLElement,tab=target.closest<HTMLButtonElement>('[data-drawing-tab]')?.dataset.drawingTab;if(tab==='electrical'||tab==='ground'||tab==='section'){this.drawingTab=tab;this.drawPlan();}else if(target.closest('[data-drawing-zoom]')){this.drawingFit=!this.drawingFit;this.mobilePlan.classList.toggle('drawing-fit',this.drawingFit);this.mobilePlan.querySelector('[data-drawing-zoom]')!.textContent=this.drawingFit?'ΜΕΓΕΘΥΝΣΗ':'ΣΥΝΟΛΟ';}else if(target.closest('[data-drawing-close]'))this.command('cancel');});
+    this.drawingPrompt.id='apprentice-drawing-prompt';this.drawingPrompt.textContent=matchMedia('(pointer:coarse)').matches?'USE · ΣΧΕΔΙΑ':'E · ΣΧΕΔΙΑ';this.drawingPrompt.hidden=true;game.hud.shell.append(this.drawingPrompt);
     this.toolbar.addEventListener('click',e=>{const action=(e.target as HTMLElement).closest<HTMLButtonElement>('[data-apprentice]')?.dataset.apprentice;if(action)this.command(action);});
     this.bindGroundGesture(game.renderer.webgl.domElement);
     addEventListener('keydown',e=>{
       if(!game.started||e.repeat||e.target instanceof Element&&e.target.closest('input,textarea,select,[contenteditable="true"]')||game.hud.shell.classList.contains('settings-open')||game.modelInspector?.active)return;
-      const action=e.code==='KeyT'&&!e.shiftKey?'point':e.code==='KeyV'&&!e.shiftKey?'plan':e.code==='KeyE'&&this.mode==='point'?'layout':e.code==='Digit1'&&this.mode==='pipe-choice'?'pipe-socket':e.code==='Digit2'&&this.mode==='pipe-choice'?'pipe-switch':e.code==='Enter'&&this.mode==='layout'?'confirm':e.code==='Enter'&&this.groundIntent==='break'?'break-now':e.code==='Escape'&&this.mode!=='off'?'cancel':null;
+      const action=e.code==='KeyT'&&!e.shiftKey?'point':e.code==='KeyV'&&!e.shiftKey?'plan':e.code==='KeyE'&&this.mode==='point'&&!this.aimedAtApprentice()?'layout':e.code==='Digit1'&&this.mode==='pipe-choice'?'pipe-socket':e.code==='Digit2'&&this.mode==='pipe-choice'?'pipe-switch':e.code==='Enter'&&this.mode==='layout'?'confirm':e.code==='Enter'&&this.groundIntent==='break'?'break-now':e.code==='Escape'&&this.mode!=='off'?'cancel':null;
       if(action){e.preventDefault();e.stopImmediatePropagation();game.input.resetTransientInput();this.command(action);}
     },{capture:true});
     addEventListener('wirehouse:select-tool',()=>{this.mode='off';this.paper.visible=false;this.ghost.visible=false;});
@@ -205,6 +216,21 @@ export class ApprenticeSystem {
   }
   collisionObstacles(){return !this.game.started||this.count===0?[]:[{id:'apprentice-1',minX:this.camera.position.x-.18,maxX:this.camera.position.x+.18,minZ:this.camera.position.z-.08,maxZ:this.camera.position.z+.28},...this.crew.slice(0,this.count-1).map(worker=>worker.obstacle)];}
   get bareHands():boolean{return this.mode==='point'||this.mode==='pipe-choice'||this.mode==='plan';}
+  private aimedAtApprentice():boolean {
+    if(!this.game.started||this.count===0||!this.body.visible||!this.body.loaded)return false;
+    const camera=this.game.renderer.camera;
+    camera.getWorldDirection(this.aimDirection);
+    this.aimRay.set(camera.position,this.aimDirection);
+    this.apprenticeAimCenter.set(this.camera.position.x,1.35,this.camera.position.z);
+    const distance=camera.position.distanceTo(this.apprenticeAimCenter);
+    return distance<3.5&&this.aimRay.distanceSqToPoint(this.apprenticeAimCenter)<.42*.42;
+  }
+  tryOpenDrawingsOnAim():boolean {
+    if((this.mode!=='off'&&this.mode!=='point')||!this.aimedAtApprentice())return false;
+    const hit=this.game.room.brickWall.aim(this.game.renderer.camera,3.5);
+    if(hit&&this.game.renderer.camera.position.distanceTo(hit.point)<this.game.renderer.camera.position.distanceTo(this.apprenticeAimCenter)-.25)return false;
+    this.drawingTab='electrical';this.drawingFit=false;this.mobilePlan.classList.remove('drawing-fit');this.command('plan');return this.ownsInput;
+  }
   get telemetry(){return{count:this.count,mode:this.mode,phase:this.phase,groundTarget:this.groundTarget,groundFollowup:this.groundTarget?this.groundFollowup:null,groundIntent:this.groundIntent,groundMenuOpen:!this.groundMenu.hidden,blockedFrom:this.blockedFrom,workStep:this.phase==='construction'?this.workStep:null,workCursor:this.workCursor,workTargets:this.workTargets.length,workContactReady:this.workContactReady,workGripReachM:this.workGripReachM,workTargetRangeM:this.workTargetRangeM,wallApproach:this.wallApproach,batchCycle:this.batchCycle,cementDone:this.cementDone,sandDone:this.sandDone,carriedKg:this.carriedKg,workFailure:this.workFailure,waiting:this.waiting,message:this.message,position:this.camera.position.toArray(),highlightSamples:this.lines.length,strikes:this.strikes,removedVolume:this.removedVolume,job:this.job?{anchor:this.job.anchor.toArray(),modules:this.job.modules,cursor:this.job.cursor,targets:this.job.targets.length,fitRefinements:this.job.fitRefinements}:null,pipeSelection:this.pipeSelection,pipeJob:this.pipeJob?{...this.pipeJob}:null,crew:this.crew.slice(0,this.count-1).map(worker=>({index:worker.index,active:worker.active,done:worker.done,position:worker.camera.position.toArray()})),pipeBatch:this.pipeBatch.telemetry,pipeYard:this.pipeYard.telemetry,bundles:[...this.game.pvc.stock.bundleRemaining]};}
 
   command(action:string):void {
@@ -261,7 +287,7 @@ export class ApprenticeSystem {
     }
     if(action==='point'||action==='plan'){
       window.dispatchEvent(new CustomEvent('wirehouse:box-exit-assembly'));
-      this.mode=action;this.ghost.visible=false;this.paper.visible=action==='plan';g.input.resetTransientInput();
+      this.mode=action;this.ghost.visible=false;this.paper.visible=false;g.input.resetTransientInput();
       if(action==='point'){this.pipeSelection=null;g.pvc.stock.highlightBundle(null);}
       if(action==='plan')this.drawPlan();
       this.message=action==='point'?'Έδαφος: πάτημα για μετακίνηση · κράτημα για εντολές · τοίχος: USE':'Ηλεκτρολογικό σχέδιο · T επιστροφή στις οδηγίες';
@@ -870,6 +896,7 @@ export class ApprenticeSystem {
     const returnButton=this.game.hud.shell.querySelector<HTMLButtonElement>('#apprentice-return');
     if(returnButton)returnButton.hidden=!this.game.started||this.count===0||this.mode!=='off';
     this.mobilePlan.hidden=!this.game.started||this.mode!=='plan';
+    this.drawingPrompt.hidden=(this.mode!=='off'&&this.mode!=='point')||!this.aimedAtApprentice();
     this.game.hud.shell.dataset.apprenticeMode=this.mode;
     const tool=this.game.hud.shell.querySelector<HTMLElement>('#tool-status')!;
     tool.dataset.directive=this.mode==='point'||this.mode==='pipe-choice'?'ΔΑΧΤΥΛΟ · ΚΙΤΡΙΝΗ ΕΠΙΣΗΜΑΝΣΗ':this.mode==='plan'?'ΗΛΕΚΤΡΟΛΟΓΙΚΟ ΣΧΕΔΙΟ':'';
@@ -924,11 +951,8 @@ export class ApprenticeSystem {
     ctx.fillStyle='#122f39';ctx.font='23px sans-serif';ctx.fillText('T: δείξε τοίχο ή μάτσα PVC   ·   E: διάταξη κουτιών   ·   OK: ανάθεση',47,739);
     this.paper.material.map!.needsUpdate=true;
     const points=this.game.mission.points.filter(point=>!point.definition.id.startsWith('extra-')||point.boxGroup.visible);
-    const planPoints=points.map(point=>{
-      const x=250+point.position.x*82,y=215-point.definition.bottom*90;
-      const kind=point.definition.kind==='switch'?'SW':'ΠΡ';
-      return`<path d="M ${x} ${y+7} V 224" class="plan-route"/><rect x="${x-7}" y="${y-7}" width="14" height="14" class="plan-box"/><text x="${x}" y="${y-16}" text-anchor="middle">${point.definition.id} · ${kind}</text>`;
-    }).join('');
-    this.mobilePlan.innerHTML=`<h2>ΗΛΕΚΤΡΟΛΟΓΙΚΟ ΣΧΕΔΙΟ</h2><p>Μπροστινός τοίχος · PVC Ø20 mm</p><svg viewBox="0 0 500 245" role="img" aria-label="Θέσεις πριζών και διακόπτη στον μπροστινό τοίχο"><rect x="10" y="8" width="480" height="218" class="plan-wall"/><path d="M 10 107 H 490 M 10 188 H 490" class="plan-height"/>${planPoints}<text x="16" y="101">120 cm</text><text x="16" y="182">30 cm</text></svg><div class="mobile-plan-points">${points.map(point=>`<span><b>${point.definition.id}</b> ${point.definition.kind==='switch'?'switch':'πρίζα'} · ${Math.round(point.definition.bottom*100)} cm</span>`).join('')}</div><p class="mobile-plan-batch">Πρίζα: <b>${this.pipeBatch.telemetry.finishedSocket}/20 × 50 cm</b><br>Switch: <b>${this.pipeBatch.telemetry.finishedSwitch}/20 × 140 cm</b></p>${this.job?`<p class="mobile-plan-job">Τρέχουσα εντολή: ${this.job.modules.map(m=>m.kind).join(' + ')}</p>`:''}<p>T: δείξε τοίχο ή μάτσα PVC · E: διάταξη κουτιών · OK: ανάθεση</p>`;
+    const drawings={electrical:{label:'Ηλεκτρολογικό',url:electricalDrawingUrl},ground:{label:'Ισόγειο',url:groundFloorDrawingUrl},section:{label:'Τομή ορόφων',url:buildingSectionDrawingUrl}};
+    const active=drawings[this.drawingTab];
+    this.mobilePlan.innerHTML=`<div class="drawing-header"><strong>ΣΧΕΔΙΑ ΕΡΓΟΤΑΞΙΟΥ</strong><div class="drawing-header-actions"><button type="button" data-drawing-zoom aria-label="Εναλλαγή μεγέθυνσης σχεδίου">${this.drawingFit?'ΜΕΓΕΘΥΝΣΗ':'ΣΥΝΟΛΟ'}</button><button type="button" data-drawing-close aria-label="Κλείσιμο σχεδίων">ΚΛΕΙΣΕ ×</button></div></div><div class="drawing-tabs" role="tablist" aria-label="Επιλογή σχεδίου">${Object.entries(drawings).map(([key,drawing])=>`<button type="button" role="tab" data-drawing-tab="${key}" aria-selected="${key===this.drawingTab}">${drawing.label}</button>`).join('')}</div><div class="drawing-scroll"><img src="${active.url}" alt="${active.label} κατοικίας Site Pro 04" draggable="false"/></div><div class="drawing-live"><b>Ζωντανή εργασία:</b> ${points.map(point=>`${point.definition.id}: ${point.definition.kind==='switch'?'διακόπτης':'πρίζα'} ${Math.round(point.definition.bottom*100)} cm`).join(' · ')}<br>Κοπές PVC: πρίζα ${this.pipeBatch.telemetry.finishedSocket}/20 · switch ${this.pipeBatch.telemetry.finishedSwitch}/20${this.job?` · εντολή ${this.job.modules.map(m=>m.kind).join('+')}`:''}</div>`;
   }
 }

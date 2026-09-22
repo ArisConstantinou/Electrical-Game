@@ -295,7 +295,8 @@ export class Game {
     this.fpsRig.workPositionLocked=this.player.workPosition.locked;
     this.actionCooldown = this.selectedTool==='hammer'?this.actionCooldown-dt:Math.max(0,this.actionCooldown-dt);
     let requested = this.input.consumeAction();
-    const interactionRequested = this.input.consumeInteraction();
+    let interactionRequested = this.input.consumeInteraction();
+    if((requested||interactionRequested)&&this.apprentice.tryOpenDrawingsOnAim()){requested=false;interactionRequested=false;}
     const apprenticeOwnedInput=this.apprentice.handleInput(requested);
     if(apprenticeOwnedInput)requested=false;
     const pvcOwnedInput=(!apprenticeOwnedInput&&!this.mixing.wheelbarrow.busy&&this.pvc.handleInput(dt,requested,interactionRequested));

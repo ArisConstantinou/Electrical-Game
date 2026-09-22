@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1320" viewBox="0 0 1200 1320">
+<defs><pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="#dce5e3" stroke-width="1"/></pattern></defs>
+<rect width="1200" height="1320" fill="#f6f3e9"/>
+<text x="62" y="70" font-family="Arial,sans-serif" font-size="43" font-weight="700" fill="#17323b">ΗΛΕΚΤΡΟΛΟΓΙΚΟ · ΥΠΑΡΧΟΝ ΔΩΜΑΤΙΟ</text>
+<text x="62" y="111" font-family="Arial,sans-serif" font-size="24" fill="#53646a">SITE PRO 04 · πραγματικές θέσεις αποστολής · όψη μπροστινού τοίχου</text>
+<rect x="119" y="180" width="962" height="575" fill="url(#grid)" stroke="#17323b" stroke-width="6"/>
+<path d="M119 755H1081" stroke="#6a5547" stroke-width="12"/>
+<path d="M119 525H1081M119 295H1081" stroke="#9cafb5" stroke-width="2" stroke-dasharray="8 9"/>
+<text x="134" y="283" font-family="Arial,sans-serif" font-size="21" fill="#4b6a76">2,40 m</text>
+<text x="134" y="514" font-family="Arial,sans-serif" font-size="21" fill="#4b6a76">1,20 m</text>
+<text x="134" y="744" font-family="Arial,sans-serif" font-size="21" fill="#4b6a76">±0,00 m</text>
+<path d="M270 755V694M600 755V694M913 755V524" fill="none" stroke="#1c7c9c" stroke-width="5" stroke-dasharray="11 8"/>
+<g stroke="#176c8b" stroke-width="5" fill="#e7f5f7"><rect x="251" y="676" width="39" height="18"/><rect x="581" y="676" width="39" height="18"/><rect x="904" y="506" width="18" height="18"/></g>
+<g font-family="Arial,sans-serif" fill="#17323b"><text x="219" y="638" font-size="29" font-weight="700">A · ΠΡΙΖΕΣ</text><text x="230" y="670" font-size="21">2G + 1G</text><text x="552" y="638" font-size="29" font-weight="700">B · ΠΡΙΖΑ</text><text x="582" y="670" font-size="21">2G</text><text x="846" y="463" font-size="29" font-weight="700">C · ΔΙΑΚΟΠΤΗΣ</text><text x="894" y="495" font-size="21">1G</text></g>
+<g stroke="#a34c34" stroke-width="3" fill="none"><path d="M270 780v39M600 780v39M913 780v39M119 794h962"/></g>
+<g font-family="Arial,sans-serif" font-size="20" fill="#a34c34"><text x="235" y="846">x = −1,72 m</text><text x="578" y="846">x = 0 m</text><text x="870" y="846">x = +1,65 m</text><text x="144" y="885">Οριζόντια συντεταγμένη από κέντρο τοίχου · A/B κάτω ακμή 0,30 m · C κάτω ακμή 1,20 m</text></g>
+<rect x="62" y="930" width="1076" height="281" rx="14" fill="#e8e4d8"/>
+<text x="86" y="977" font-family="Arial,sans-serif" font-size="26" font-weight="700" fill="#17323b">ΥΠΟΜΝΗΜΑ ΕΡΓΑΣΙΑΣ</text>
+<path d="M93 1018h75" stroke="#1c7c9c" stroke-width="5" stroke-dasharray="11 8"/>
+<text x="187" y="1025" font-family="Arial,sans-serif" font-size="22" fill="#17323b">Προτεινόμενη κατακόρυφη όδευση PVC Ø20 mm, όχι υφιστάμενο κύκλωμα</text>
+<text x="92" y="1073" font-family="Arial,sans-serif" font-size="22" fill="#17323b">Το σχέδιο ακολουθεί INSTALLATION_POINTS του παιχνιδιού και ενημερώνεται από την πρόοδο.</text>
+<text x="92" y="1111" font-family="Arial,sans-serif" font-size="22" fill="#17323b">Δεν καθορίζονται ακόμη πίνακας, παροχή, προστασίες ή τελική συνδεσμολογία.</text>
+<text x="92" y="1150" font-family="Arial,sans-serif" font-size="22" fill="#17323b">Πριν πραγματική εγκατάσταση απαιτείται μελέτη αδειούχου ηλεκτρολόγου και ισχύοντες κανόνες.</text>
+<text x="62" y="1278" font-family="Arial,sans-serif" font-size="20" font-weight="700" fill="#a34c34">ΣΧΕΔΙΟ ΠΑΙΧΝΙΔΙΟΥ · ΜΕΤΡΗΜΕΝΕΣ ΘΕΣΕΙΣ, ΟΧΙ ΣΧΕΔΙΟ ΚΑΤΑΣΚΕΥΗΣ</text>
+</svg>

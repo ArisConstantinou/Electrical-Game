@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1400" viewBox="0 0 1200 1400">
+  <rect width="1200" height="1400" fill="#f4f1e9"/>
+  <text x="70" y="78" fill="#172529" font-family="Arial,sans-serif" font-size="47" font-weight="700">SITE PRO 04 · ΚΥΠΡΙΑΚΗ ΚΑΤΟΙΚΙΑ</text>
+  <text x="70" y="125" fill="#526062" font-family="Arial,sans-serif" font-size="27">ΙΣΟΓΕΙΟ · concept χώρων υπό κατασκευή · 30 × 28 m</text>
+  <rect x="150" y="204" width="900" height="840" rx="7" fill="#c8c2b7" stroke="#172529" stroke-width="7"/>
+  <rect x="150" y="204" width="228" height="216" fill="#bb6c4d" stroke="#172529" stroke-width="5"/>
+  <text x="170" y="265" fill="#fffaf0" font-family="Arial,sans-serif" font-size="25" font-weight="700">ΥΠΑΡΧΟΝ</text>
+  <text x="170" y="300" fill="#fffaf0" font-family="Arial,sans-serif" font-size="25" font-weight="700">ΔΩΜΑΤΙΟ</text>
+  <text x="170" y="335" fill="#fffaf0" font-family="Arial,sans-serif" font-size="22">7,6 × 7,2 m</text>
+  <text x="170" y="371" fill="#fffaf0" font-family="Arial,sans-serif" font-size="21">ηλεκτρολογική εργασία</text>
+  <rect x="124" y="281" width="26" height="81" fill="#e3f0e9" stroke="#172529" stroke-width="3"/>
+  <text x="160" y="412" fill="#fffaf0" font-family="Arial,sans-serif" font-size="17">ανοιχτό παράθυρο</text>
+  <rect x="150" y="444" width="240" height="60" fill="#d6cbb7" stroke="#172529" stroke-width="4"/>
+  <text x="164" y="480" fill="#172529" font-family="Arial,sans-serif" font-size="21" font-weight="700">ΝΕΑ ΠΟΡΤΑ →</text>
+  <rect x="150" y="504" width="240" height="300" fill="#d6b69a" stroke="#172529" stroke-width="4"/>
+  <text x="174" y="617" fill="#172529" font-family="Arial,sans-serif" font-size="26" font-weight="700">ΞΕΝΩΝΑΣ</text>
+  <text x="174" y="652" fill="#172529" font-family="Arial,sans-serif" font-size="22">και βοηθητικός χώρος</text>
+  <rect x="150" y="804" width="240" height="240" fill="#c8a786" stroke="#172529" stroke-width="4"/>
+  <text x="171" y="900" fill="#172529" font-family="Arial,sans-serif" font-size="27" font-weight="700">ΚΟΥΖΙΝΑ</text>
+  <text x="171" y="938" fill="#172529" font-family="Arial,sans-serif" font-size="23">+ pantry / rough-ins</text>
+  <rect x="390" y="204" width="420" height="300" fill="#e5d9c7" stroke="#172529" stroke-width="4"/>
+  <text x="430" y="280" fill="#172529" font-family="Arial,sans-serif" font-size="31" font-weight="700">ΕΙΣΟΔΟΣ · FOYER</text>
+  <text x="430" y="323" fill="#172529" font-family="Arial,sans-serif" font-size="23">φαρδύς διάδρομος / φυσικό φως</text>
+  <rect x="404" y="348" width="152" height="144" fill="#9aa9a2" stroke="#172529" stroke-width="4"/>
+  <text x="420" y="396" fill="#172529" font-family="Arial,sans-serif" font-size="24" font-weight="700">ΣΚΑΛΑ</text>
+  <text x="420" y="429" fill="#172529" font-family="Arial,sans-serif" font-size="22">+ ΑΝΕΛΚ.</text>
+  <rect x="810" y="204" width="240" height="300" fill="#a1a6a1" stroke="#172529" stroke-width="4"/>
+  <text x="835" y="287" fill="#172529" font-family="Arial,sans-serif" font-size="28" font-weight="700">ΙΔΙΩΤΙΚΟ</text>
+  <text x="835" y="325" fill="#172529" font-family="Arial,sans-serif" font-size="28" font-weight="700">ΓΚΑΡΑΖ</text>
+  <text x="835" y="364" fill="#172529" font-family="Arial,sans-serif" font-size="22">8 × 10 m</text>
+  <rect x="390" y="504" width="120" height="300" fill="#efe6d5" stroke="#172529" stroke-width="4"/>
+  <text x="422" y="538" fill="#172529" font-family="Arial,sans-serif" font-size="19" font-weight="700" transform="rotate(90 422 538)">ΣΚΙΑΣΜΕΝΟΣ ΔΙΑΔΡΟΜΟΣ</text>
+  <rect x="510" y="504" width="300" height="300" fill="#dfe7d7" stroke="#172529" stroke-width="5"/>
+  <circle cx="658" cy="636" r="54" fill="#829778"/><circle cx="704" cy="682" r="30" fill="#a6b694"/>
+  <text x="543" y="745" fill="#172529" font-family="Arial,sans-serif" font-size="33" font-weight="700">ΑΝΟΙΧΤΗ ΑΥΛΗ</text>
+  <text x="594" y="779" fill="#172529" font-family="Arial,sans-serif" font-size="23">10 × 10 m</text>
+  <rect x="810" y="504" width="120" height="300" fill="#efe6d5" stroke="#172529" stroke-width="4"/>
+  <text x="842" y="538" fill="#172529" font-family="Arial,sans-serif" font-size="19" font-weight="700" transform="rotate(90 842 538)">ΣΚΙΑΣΜΕΝΗ ΒΕΡΑΝΤΑ</text>
+  <rect x="930" y="504" width="120" height="300" fill="#baa584" stroke="#172529" stroke-width="4"/>
+  <text x="955" y="548" fill="#172529" font-family="Arial,sans-serif" font-size="19" font-weight="700" transform="rotate(90 955 548)">WORKSHOP ΠΕΛΑΤΗ</text>
+  <rect x="390" y="804" width="180" height="240" fill="#efe6d5" stroke="#172529" stroke-width="4"/>
+  <text x="414" y="892" fill="#172529" font-family="Arial,sans-serif" font-size="22" font-weight="700">ΜΕΓΑΛΟΣ</text>
+  <text x="414" y="925" fill="#172529" font-family="Arial,sans-serif" font-size="22" font-weight="700">ΔΙΑΔΡΟΜΟΣ</text>
+  <rect x="570" y="804" width="225" height="240" fill="#c7a98d" stroke="#172529" stroke-width="4"/>
+  <text x="604" y="913" fill="#172529" font-family="Arial,sans-serif" font-size="30" font-weight="700">ΤΡΑΠΕΖΑΡΙΑ</text>
+  <rect x="795" y="804" width="255" height="240" fill="#bd9b7d" stroke="#172529" stroke-width="4"/>
+  <text x="830" y="913" fill="#172529" font-family="Arial,sans-serif" font-size="30" font-weight="700">ΚΑΘΙΣΤΙΚΟ</text>
+  <text x="70" y="1125" fill="#172529" font-family="Arial,sans-serif" font-size="26" font-weight="700">ΚΑΤΑΣΚΕΥΑΣΤΙΚΗ ΛΟΓΙΚΗ</text>
+  <text x="70" y="1170" fill="#526062" font-family="Arial,sans-serif" font-size="23">Το σημερινό δωμάτιο δεν μετακινείται. Νέα πόρτα → διάδρομος → κλιμακοστάσιο.</text>
+  <text x="70" y="1210" fill="#526062" font-family="Arial,sans-serif" font-size="23">Πήλινη τοιχοποιία, σκυρόδεμα, βαθιές σκιάσεις, ανοιχτή αυλή — όλα υπό κατασκευή.</text>
+  <text x="70" y="1250" fill="#526062" font-family="Arial,sans-serif" font-size="23">Οι χώροι είναι ζώνες παιχνιδιού· τελικές πόρτες/φέροντα στοιχεία χρειάζονται 3D έλεγχο.</text>
+  <text x="70" y="1336" fill="#a45238" font-family="Arial,sans-serif" font-size="21" font-weight="700">CONCEPT ΓΙΑ ΕΓΚΡΙΣΗ · ΟΧΙ SCREENSHOT ΤΟΥ ΠΑΙΧΝΙΔΙΟΥ</text>
+</svg>

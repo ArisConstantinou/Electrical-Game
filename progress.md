@@ -1,5 +1,13 @@
 Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web game named WIRE THE HOUSE, based on real Cyprus residential first-fix practices, editable in Web Game Studio, playable on desktop/mobile, deployed to arisconstantinou/Electrical-Game via GitHub Pages, and ending at FIRST FIX COMPLETE without cable pulling.
 
+## 2026-09-22 · Mansion concept and apprentice drawings (in progress)
+
+- New first priority from user: show concept images of a larger Cypriot mansion under construction, actual game-world floor/section/electrical drawings, and make the drawings viewable when aiming at the apprentice. The mansion 3D geometry still requires concept selection before construction. Working assumption: ground + three upper levels, B1+B2, 30 × 28 m, open 10 × 10 m courtyard.
+- Original `artifacts/site-pro-04/mansion-concept` deliverables: two generated visual concepts and SVG/PNG ground-floor, six-level section, and existing workroom electrical elevation. Electrical A/B/C positions and heights were checked against `INSTALLATION_POINTS`; proposed PVC routes are marked as proposals, not built circuits.
+- In-game apprentice drawings viewer: aim at apprentice and press mobile USE or desktop E; three tabs, live installation progress, readable portrait zoom/overview and close. Existing V shortcut remains. The current room/work systems and 5365 preview are retained.
+- TypeScript check, Vite build, apprentice navigation and focused browser test passed on live 5365 source for mobile portrait, tablet landscape and desktop. The browser test exercised real mobile USE/desktop E, three tabs, image loading, mobile zoom and close with zero page errors. Screenshots and report: `output/mansion-drawings-ui/`. Mobile browser is Chrome emulation, not a physical iPhone.
+- Next: user chooses/approves the massing and floor count, then build the first corridor/stair/garage slice at final visual quality with collision and performance proof. Whole-house electrical circuit design is still to be specified after the spatial concept is accepted.
+
 ## 2026-09-21 · Site Pro 04 implementation (in progress)
 
 - User selected concept 04, Site Pro, for portrait/landscape mobile, tablet and desktop. The complete request includes visual quality, compact responsive UI, simultaneous move/aim/tool use, performance, smoothness and better target hitboxes. This is a staged implementation, not a finished release.
