@@ -253,7 +253,7 @@ export class Game {
   step(dt: number, waterDt = dt, present = true): void {
     this.restoreInspectionVisibility();
     if(this.modelInspector.active&&!this.modelInspector.live){
-      for(const sound of ['spray','hose','drill','driver','trowel','mixer'] as const)this.audio.setContinuous(sound,false);
+      for(const sound of ['spray','hose','drill','driver','trowel','mixer','hammer'] as const)this.audio.setContinuous(sound,false);
       this.modelInspector.update(dt);if(present)this.renderer.render();return;
     }
     this.modelInspector.beforeWorld(dt);
@@ -396,6 +396,7 @@ export class Game {
     else if(this.selectedTool==='drill'||this.selectedTool==='driver')this.fpsRig.poseReferenceTool(this.renderer.camera,this.selectedTool,this.laserLevel.target,this.laserLevel.targetNormal,this.laserLevel.working,dt);
     else if(this.selectedTool==='laser')this.fpsRig.poseLaser(this.renderer.camera);
     else this.fpsRig.poseArms(this.renderer.camera);
+    this.audio.setContinuous('hammer',this.started&&!apprenticeOwnedInput&&!blockingWork&&!leveling&&this.selectedTool==='hammer'&&this.input.actionHeld&&this.hammerSpeed>0&&this.fpsRig.contactStatus==='ready');
     if(!['hammer','hose','measure','drill','driver'].includes(this.selectedTool))this.fpsRig.constrainWorkSurfaces(this.renderer.camera,this.workSurfaces.frontForBounds);
     const waterHit = this.selectedTool === 'spray' || mortarTool ? this.room.brickWall.aim(this.renderer.camera) : null;
     const wallAim = Boolean(waterHit);
@@ -556,8 +557,8 @@ export class Game {
     const retrieving=this.selectedTool==='fitting'&&target.boxGroup.visible;
     const result=this.interaction.action(target,this.selectedTool,this.renderer.camera,continuing);
     if(result.success){
-      const sound=({hammer:'hammer',fitting:'box',level:'level',spring:'spring',cutter:'cutter'} as Partial<Record<RigTool,ConstructionSound>>)[this.selectedTool];
-      if(sound)this.audio.play(sound,this.selectedTool==='hammer'?Math.min(1.35,.6+this.room.brickWall.chiselEnergyJ/8):1);
+      const sound=({fitting:'box',level:'level',spring:'spring',cutter:'cutter'} as Partial<Record<RigTool,ConstructionSound>>)[this.selectedTool];
+      if(sound)this.audio.play(sound);
     }
     if(this.selectedTool==='fitting'){if(result.success)this.boxFitPreview.clearGuide();else this.boxFitPreview.pin(this.renderer.camera,this.boxAssembly.snapshot.modules);this.boxFitPreview.invalidate();}
     if(retrieving&&result.success){this.boxAssembly.restore(target.definition.boxLayout??target.boxGroup.layout);this.syncBoxAssembly();}
@@ -836,6 +837,7 @@ export class Game {
     if(changed&&this.selectedTool==='fitting'&&tool==='hammer')this.boxFitPreview.pin(this.renderer.camera,this.boxAssembly.snapshot.modules);
     if(changed){this.mobileControls.cancelActiveGestures();this.mortar.cancel();const point=this.mission.activePoint;if(point?.stage==='leveling')this.pendingSceneActions.push(()=>this.leveling.cancel(point));}
     this.selectedTool = tool;
+    if(changed&&tool==='measure')this.audio.play('measure');
     if(changed||tool!=='fitting')this.setBoxAssemblyActive(false);
     // Keep the established spray -> hammer gesture useful, but queue exactly
     // one hammer strike rather than turning a held pointer into auto-repeat.
@@ -872,6 +874,7 @@ export class Game {
     if(this.animationFrame!==null)cancelAnimationFrame(this.animationFrame);this.animationFrame=null;
     this.mobileControls.cancelActiveGestures();this.input.resetTransientInput();
     this.mortar.cancel();
+    this.audio.stopAll();
     this.renderer.suspend();
   };
   private async resumeLifecycle():Promise<void>{
