@@ -1,0 +1,469 @@
+{
+  "mobileIsEmulation": true,
+  "cases": [
+    {
+      "name": "portrait-390",
+      "left": {
+        "x": 70.546875,
+        "y": 682.453125,
+        "width": 113.09375,
+        "height": 113.09375,
+        "r": 56.546875
+      },
+      "right": {
+        "x": 319.453125,
+        "y": 682.453125,
+        "width": 113.09375,
+        "height": 113.09375,
+        "r": 56.546875
+      },
+      "responses": [
+        {
+          "fraction": 0,
+          "value": 0
+        },
+        {
+          "fraction": 0.04,
+          "value": 0
+        },
+        {
+          "fraction": 0.12,
+          "value": 0.014509971226619088
+        },
+        {
+          "fraction": 0.25,
+          "value": 0.10232752664657697
+        },
+        {
+          "fraction": 0.5,
+          "value": 0.34695485986778546
+        },
+        {
+          "fraction": 1,
+          "value": 1
+        }
+      ],
+      "normal": {
+        "move": {
+          "x": 0,
+          "y": -0.34695485986778546
+        },
+        "look": {
+          "x": 0,
+          "y": 0
+        },
+        "held": false,
+        "driving": true,
+        "fast": false,
+        "speed": 0.3643026028611748,
+        "yaw": 3.141592653589793,
+        "position": [
+          -1.15,
+          1.65,
+          -0.6239263196185101
+        ]
+      },
+      "release": {
+        "x": 258,
+        "y": 742,
+        "width": 118,
+        "height": 44,
+        "r": 59
+      },
+      "fast": {
+        "x": 132,
+        "y": 742,
+        "width": 118,
+        "height": 44,
+        "r": 59
+      }
+    },
+    {
+      "name": "landscape-844",
+      "left": {
+        "x": 61,
+        "y": 275,
+        "width": 94,
+        "height": 94,
+        "r": 47
+      },
+      "right": {
+        "x": 783,
+        "y": 275,
+        "width": 94,
+        "height": 94,
+        "r": 47
+      },
+      "responses": [
+        {
+          "fraction": 0,
+          "value": 0
+        },
+        {
+          "fraction": 0.04,
+          "value": 0
+        },
+        {
+          "fraction": 0.12,
+          "value": 0.014509993939134365
+        },
+        {
+          "fraction": 0.25,
+          "value": 0.10232752664657697
+        },
+        {
+          "fraction": 0.5,
+          "value": 0.34695485986778546
+        },
+        {
+          "fraction": 1,
+          "value": 1
+        }
+      ],
+      "normal": {
+        "move": {
+          "x": 0,
+          "y": -0.34695485986778546
+        },
+        "look": {
+          "x": 0,
+          "y": 0
+        },
+        "held": false,
+        "driving": true,
+        "fast": false,
+        "speed": 0.3643026028611748,
+        "yaw": 3.141592653589793,
+        "position": [
+          -1.15,
+          1.65,
+          -0.6239263196185101
+        ]
+      },
+      "release": {
+        "x": 485,
+        "y": 288,
+        "width": 118,
+        "height": 44,
+        "r": 59
+      },
+      "fast": {
+        "x": 359,
+        "y": 288,
+        "width": 118,
+        "height": 44,
+        "r": 59
+      }
+    },
+    {
+      "name": "portrait-320",
+      "left": {
+        "x": 66,
+        "y": 583,
+        "width": 104,
+        "height": 104,
+        "r": 52
+      },
+      "right": {
+        "x": 254,
+        "y": 583,
+        "width": 104,
+        "height": 104,
+        "r": 52
+      },
+      "responses": [
+        {
+          "fraction": 0,
+          "value": 0
+        },
+        {
+          "fraction": 0.04,
+          "value": 0
+        },
+        {
+          "fraction": 0.12,
+          "value": 0.014509980180590356
+        },
+        {
+          "fraction": 0.25,
+          "value": 0.10232752664657697
+        },
+        {
+          "fraction": 0.5,
+          "value": 0.34695485986778546
+        },
+        {
+          "fraction": 1,
+          "value": 1
+        }
+      ],
+      "normal": {
+        "move": {
+          "x": 0,
+          "y": -0.34695485986778546
+        },
+        "look": {
+          "x": 0,
+          "y": 0
+        },
+        "held": false,
+        "driving": true,
+        "fast": false,
+        "speed": 0.3643026028611748,
+        "yaw": 3.141592653589793,
+        "position": [
+          -1.15,
+          1.65,
+          -0.6239263196185101
+        ]
+      },
+      "release": {
+        "x": 223,
+        "y": 638,
+        "width": 118,
+        "height": 44,
+        "r": 59
+      },
+      "fast": {
+        "x": 97,
+        "y": 638,
+        "width": 118,
+        "height": 44,
+        "r": 59
+      }
+    },
+    {
+      "name": "landscape-667",
+      "left": {
+        "x": 61,
+        "y": 260,
+        "width": 94,
+        "height": 94,
+        "r": 47
+      },
+      "right": {
+        "x": 606,
+        "y": 260,
+        "width": 94,
+        "height": 94,
+        "r": 47
+      },
+      "responses": [
+        {
+          "fraction": 0,
+          "value": 0
+        },
+        {
+          "fraction": 0.04,
+          "value": 0
+        },
+        {
+          "fraction": 0.12,
+          "value": 0.014509993939134365
+        },
+        {
+          "fraction": 0.25,
+          "value": 0.10232752664657697
+        },
+        {
+          "fraction": 0.5,
+          "value": 0.34695485986778546
+        },
+        {
+          "fraction": 1,
+          "value": 1
+        }
+      ],
+      "normal": {
+        "move": {
+          "x": 0,
+          "y": -0.34695485986778546
+        },
+        "look": {
+          "x": 0,
+          "y": 0
+        },
+        "held": false,
+        "driving": true,
+        "fast": false,
+        "speed": 0.3643026028611748,
+        "yaw": 3.141592653589793,
+        "position": [
+          -1.15,
+          1.65,
+          -0.6239263196185101
+        ]
+      },
+      "release": {
+        "x": 396.5,
+        "y": 273,
+        "width": 118,
+        "height": 44,
+        "r": 59
+      },
+      "fast": {
+        "x": 270.5,
+        "y": 273,
+        "width": 118,
+        "height": 44,
+        "r": 59
+      }
+    },
+    {
+      "name": "portrait-820",
+      "left": {
+        "x": 76,
+        "y": 1020,
+        "width": 124,
+        "height": 124,
+        "r": 62
+      },
+      "right": {
+        "x": 744,
+        "y": 1020,
+        "width": 124,
+        "height": 124,
+        "r": 62
+      },
+      "responses": [
+        {
+          "fraction": 0,
+          "value": 0
+        },
+        {
+          "fraction": 0.04,
+          "value": 0
+        },
+        {
+          "fraction": 0.12,
+          "value": 0.014510019582307855
+        },
+        {
+          "fraction": 0.25,
+          "value": 0.10232752664657697
+        },
+        {
+          "fraction": 0.5,
+          "value": 0.34695485986778546
+        },
+        {
+          "fraction": 1,
+          "value": 1
+        }
+      ],
+      "normal": {
+        "move": {
+          "x": 0,
+          "y": -0.34695485986778546
+        },
+        "look": {
+          "x": 0,
+          "y": 0
+        },
+        "held": false,
+        "driving": true,
+        "fast": false,
+        "speed": 0.3643026028611748,
+        "yaw": 3.141592653589793,
+        "position": [
+          -1.15,
+          1.65,
+          -0.6239263196185101
+        ]
+      },
+      "release": {
+        "x": 473,
+        "y": 1078,
+        "width": 118,
+        "height": 44,
+        "r": 59
+      },
+      "fast": {
+        "x": 347,
+        "y": 1078,
+        "width": 118,
+        "height": 44,
+        "r": 59
+      }
+    },
+    {
+      "name": "landscape-1024",
+      "left": {
+        "x": 76,
+        "y": 608,
+        "width": 124,
+        "height": 124,
+        "r": 62
+      },
+      "right": {
+        "x": 948,
+        "y": 608,
+        "width": 124,
+        "height": 124,
+        "r": 62
+      },
+      "responses": [
+        {
+          "fraction": 0,
+          "value": 0
+        },
+        {
+          "fraction": 0.04,
+          "value": 0
+        },
+        {
+          "fraction": 0.12,
+          "value": 0.014510019582307855
+        },
+        {
+          "fraction": 0.25,
+          "value": 0.10232752664657697
+        },
+        {
+          "fraction": 0.5,
+          "value": 0.34695485986778546
+        },
+        {
+          "fraction": 1,
+          "value": 1
+        }
+      ],
+      "normal": {
+        "move": {
+          "x": 0,
+          "y": -0.34695485986778546
+        },
+        "look": {
+          "x": 0,
+          "y": 0
+        },
+        "held": false,
+        "driving": true,
+        "fast": false,
+        "speed": 0.3643026028611748,
+        "yaw": 3.141592653589793,
+        "position": [
+          -1.15,
+          1.65,
+          -0.6239263196185101
+        ]
+      },
+      "release": {
+        "x": 575,
+        "y": 666,
+        "width": 118,
+        "height": 44,
+        "r": 59
+      },
+      "fast": {
+        "x": 449,
+        "y": 666,
+        "width": 118,
+        "height": 44,
+        "r": 59
+      }
+    }
+  ],
+  "errors": [],
+  "passed": true
+}

@@ -8,6 +8,11 @@ Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web gam
 - TypeScript check, Vite build, apprentice navigation and focused browser test passed on live 5365 source for mobile portrait, tablet landscape and desktop. The browser test exercised real mobile USE/desktop E, three tabs, image loading, mobile zoom and close with zero page errors. Screenshots and report: `output/mansion-drawings-ui/`. Mobile browser is Chrome emulation, not a physical iPhone.
 - Next: user chooses/approves the massing and floor count, then build the first corridor/stair/garage slice at final visual quality with collision and performance proof. Whole-house electrical circuit design is still to be specified after the spatial concept is accepted.
 
+## 2026-09-22 · Six-layout mobile cart and three-touch regression recovery
+
+- Reproduced the long-standing full `mobile-aligned-controls.mjs` failure at `Touch enters wheelbarrow`. The camera really targeted the cart, but startup had placed the apprentice in `point` mode, which owns USE and intentionally prevents station interaction. The test now exits that mode explicitly for its manual-cart scenario and asserts the cart is directly targeted before tapping INTERACT. No gameplay or target-selection code was altered to make the test pass.
+- The complete six-layout test now passes: phone portrait/landscape, small phone portrait/landscape and tablet portrait/landscape. It verifies simultaneous MOVE+AIM+held USE with real player movement and yaw, cancel/release state, cart entry, steering, fast hold and release. Browser errors: none. `artifacts/site-pro-04/performance/mobile-aligned-six-layouts.json` and representative screenshots preserve the evidence. This is desktop-host Chrome touch emulation, not a physical iPhone or tablet benchmark.
+
 ## 2026-09-21 · Site Pro 04 implementation (in progress)
 
 - User selected concept 04, Site Pro, for portrait/landscape mobile, tablet and desktop. The complete request includes visual quality, compact responsive UI, simultaneous move/aim/tool use, performance, smoothness and better target hitboxes. This is a staged implementation, not a finished release.
