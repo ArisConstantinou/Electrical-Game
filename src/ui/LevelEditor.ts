@@ -1311,7 +1311,14 @@ export class LevelEditor {
     const wing = this.game.room.mansionWing;
     for (let current: THREE.Object3D | null = object; current && current !== wing; current = current.parent)
       if (!current.visible) return false;
-    return true;
+    // Floor isolation and the top cut can hide every child while leaving its
+    // edit pivot visible. Such a list item has nothing the user can tap.
+    let hasVisibleGeometry = false;
+    object.traverseVisible(node => {
+      if (node instanceof THREE.Mesh && !node.userData.levelEditorHighlight && !node.userData.levelEditorPickProxy)
+        hasVisibleGeometry = true;
+    });
+    return hasVisibleGeometry;
   }
   private syncHighlights(targets: Iterable<THREE.Group>): void {
     const wanted = new Set(targets);
