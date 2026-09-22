@@ -327,9 +327,9 @@ export class Room extends THREE.Group {
   }
 
   private addWallHeadContact(): void {
-    // A thin packed head joint feathers cement dust over the top clay course.
-    // The treatment follows the actual brick faces; it is visual only and
-    // leaves the hollow masonry, roof slab and work raycasts untouched.
+    // A packed head joint leaves cement dust on BOTH the top clay course and
+    // the poured soffit. One-sided staining made the materials meet at a
+    // perfectly straight, visually disconnected line.
     const canvas = document.createElement('canvas');
     canvas.width = 256; canvas.height = 64;
     const context = canvas.getContext('2d');
@@ -338,20 +338,20 @@ export class Room extends THREE.Group {
     for (let y = 0; y < canvas.height; y++) for (let x = 0; x < canvas.width; x++) {
       const rise = 1 - y / (canvas.height - 1);
       const speckle = Math.sin(x * 13.73 + y * 8.31) * Math.sin(x * 3.61 - y * 18.17);
-      const edge = Math.sin(x * .14) * .08 + Math.sin(x * .49) * .035;
-      const coverage = THREE.MathUtils.smoothstep(rise + edge, .23, .94);
-      const alpha = coverage * (.23 + Math.max(0, speckle) * .13);
+      const edge = Math.sin(x * .14) * .10 + Math.sin(x * .49) * .05;
+      const coverage = THREE.MathUtils.smoothstep(rise + edge, .16, .91);
+      const alpha = coverage * (.32 + Math.max(0, speckle) * .12);
       const index = (y * canvas.width + x) * 4;
-      pixels.data[index] = 148;
-      pixels.data[index + 1] = 139;
-      pixels.data[index + 2] = 123;
+      pixels.data[index] = 146;
+      pixels.data[index + 1] = 137;
+      pixels.data[index + 2] = 124;
       pixels.data[index + 3] = Math.round(alpha * 255);
     }
     context.putImageData(pixels, 0, 0);
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.wrapS = THREE.RepeatWrapping;
-    const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1 });
+    const material = new THREE.MeshStandardMaterial({ map: texture, transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, roughness: 1 });
     const positions: number[] = [], uvs: number[] = [], indices: number[] = [];
     const quad = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, d: THREE.Vector3) => {
       const start = positions.length / 3, length = a.distanceTo(b);
@@ -359,7 +359,7 @@ export class Room extends THREE.Group {
       uvs.push(0, 0, length / 1.4, 0, 0, 1, length / 1.4, 1);
       indices.push(start, start + 1, start + 2, start + 1, start + 3, start + 2);
     };
-    const headY = GAME_CONFIG.room.height, wallFootY = headY - .085;
+    const headY = GAME_CONFIG.room.height, wallFootY = headY - .14;
     const head = (a: THREE.Vector3, b: THREE.Vector3) => {
       quad(a.clone().setY(wallFootY), b.clone().setY(wallFootY), a.clone().setY(headY), b.clone().setY(headY));
     };
@@ -377,6 +377,53 @@ export class Room extends THREE.Group {
     contact.raycast = () => undefined;
     this.add(contact);
 
+    // The same site dust feathers a short distance across the underside of
+    // the slab. Its broken edge is alpha-masked, not a raised decorative trim.
+    const soffitCanvas = document.createElement('canvas');
+    soffitCanvas.width = 256; soffitCanvas.height = 64;
+    const soffitContext = soffitCanvas.getContext('2d');
+    if (soffitContext) {
+      const soffitPixels = soffitContext.createImageData(256, 64);
+      for (let y = 0; y < 64; y++) for (let x = 0; x < 256; x++) {
+        const fromWall = y / 63;
+        const ragged = Math.sin(x * .16) * .12 + Math.sin(x * .47 + 1.3) * .07;
+        const grain = Math.sin(x * 17.7 + y * 11.3) * Math.sin(x * 3.1 - y * 19.1);
+        const alpha = (1 - THREE.MathUtils.smoothstep(fromWall + ragged, .12, .88)) * (.22 + Math.max(0, grain) * .09);
+        const index = (y * 256 + x) * 4;
+        soffitPixels.data[index] = 132;
+        soffitPixels.data[index + 1] = 125;
+        soffitPixels.data[index + 2] = 115;
+        soffitPixels.data[index + 3] = Math.round(alpha * 255);
+      }
+      soffitContext.putImageData(soffitPixels, 0, 0);
+      const soffitTexture = new THREE.CanvasTexture(soffitCanvas);
+      soffitTexture.colorSpace = THREE.SRGBColorSpace;
+      soffitTexture.wrapS = THREE.RepeatWrapping;
+      const soffitMaterial = new THREE.MeshStandardMaterial({ map: soffitTexture, transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, roughness: 1 });
+      const slabPositions: number[] = [], slabUvs: number[] = [], slabIndices: number[] = [];
+      const slabEdge = (a: THREE.Vector3, b: THREE.Vector3, inward: THREE.Vector3) => {
+        const start = slabPositions.length / 3, width = .105, length = a.distanceTo(b);
+        const nearA = a.clone().setY(headY - .002), nearB = b.clone().setY(headY - .002);
+        const farA = nearA.clone().addScaledVector(inward, width), farB = nearB.clone().addScaledVector(inward, width);
+        slabPositions.push(...nearA.toArray(), ...nearB.toArray(), ...farA.toArray(), ...farB.toArray());
+        slabUvs.push(0, 0, length / 1.4, 0, 0, 1, length / 1.4, 1);
+        slabIndices.push(start, start + 2, start + 1, start + 1, start + 2, start + 3);
+      };
+      slabEdge(new THREE.Vector3(-3, 0, GAME_CONFIG.room.wallFrontZ + .005), new THREE.Vector3(3, 0, GAME_CONFIG.room.wallFrontZ + .005), new THREE.Vector3(0, 0, 1));
+      slabEdge(new THREE.Vector3(-3.77, 0, 3.575), new THREE.Vector3(3.77, 0, 3.575), new THREE.Vector3(0, 0, -1));
+      slabEdge(new THREE.Vector3(-3.772, 0, -3.57), new THREE.Vector3(-3.772, 0, 3.57), new THREE.Vector3(1, 0, 0));
+      slabEdge(new THREE.Vector3(3.772, 0, -3.57), new THREE.Vector3(3.772, 0, 3.57), new THREE.Vector3(-1, 0, 0));
+      const slabGeometry = new THREE.BufferGeometry();
+      slabGeometry.setAttribute('position', new THREE.Float32BufferAttribute(slabPositions, 3));
+      slabGeometry.setAttribute('uv', new THREE.Float32BufferAttribute(slabUvs, 2));
+      slabGeometry.setIndex(slabIndices); slabGeometry.computeVertexNormals();
+      const soffitDust = new THREE.Mesh(slabGeometry, soffitMaterial);
+      soffitDust.name = 'Feathered cement dust across slab soffit';
+      soffitDust.userData.studioEntityId = 'world:slab-head-contact';
+      soffitDust.raycast = () => undefined;
+      this.add(soffitDust);
+    }
+
     const bedPositions: number[] = [], bedUvs: number[] = [], bedIndices: number[] = [];
     const beds = [
       [new THREE.Vector3(-3, 0, GAME_CONFIG.room.wallFrontZ + .007), new THREE.Vector3(3, 0, GAME_CONFIG.room.wallFrontZ + .007)],
@@ -389,8 +436,8 @@ export class Room extends THREE.Group {
       const start = bedPositions.length / 3;
       for (let i = 0; i <= steps; i++) {
         const t = i / steps, point = from.clone().lerp(to, t);
-        const uneven = .0025 * Math.sin(i * 2.37 + edge * 1.7) + .0013 * Math.sin(i * 5.19 - edge);
-        bedPositions.push(point.x, headY - .010 + uneven, point.z, point.x, headY + .001, point.z);
+        const uneven = .006 * Math.sin(i * 2.37 + edge * 1.7) + .003 * Math.sin(i * 5.19 - edge);
+        bedPositions.push(point.x, headY - .016 + uneven, point.z, point.x, headY + .001, point.z);
         bedUvs.push(t * length, 0, t * length, 1);
         if (i < steps) {
           const a = start + i * 2;
