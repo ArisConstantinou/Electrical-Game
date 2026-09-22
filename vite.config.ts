@@ -4,6 +4,19 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, readdir, rename, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
+const waterCanvasReadbackHint = (): Plugin => ({
+  name: 'wire-house-water-canvas-readback-hint',
+  enforce: 'pre',
+  transform(source, id) {
+    if (!id.replaceAll('\\', '/').split('?')[0].endsWith('/src/generated/room-water-runtime.js')) return null;
+    // Water Pro reads eight 2048px masks from these temporary canvases.
+    // Hint Chrome before the first readback; keep the vendor source untouched.
+    const original = 'n=p.getContext("2d");if(!n)throw new Error("createSprayTexture: 2D canvas unavailable")';
+    if (source.split(original).length !== 2) throw new Error('Water Pro canvas readback call changed; review the integration');
+    return source.replace(original, 'n=p.getContext("2d",{willReadFrequently:!0});if(!n)throw new Error("createSprayTexture: 2D canvas unavailable")');
+  },
+});
+
 const studioOverrides = (): Plugin => ({
   name: 'wire-house-studio-overrides',
   configureServer(server) {
@@ -119,7 +132,7 @@ const levelEditorDocument = (): Plugin => ({
 export default defineConfig({
   base: '/Electrical-Game/',
   cacheDir: '.vite-cache',
-  plugins: [studioOverrides(), levelEditorDocument()],
+  plugins: [waterCanvasReadbackHint(), studioOverrides(), levelEditorDocument()],
   server: { host: '127.0.0.1', port: 5365, strictPort: true },
   preview: { host: '127.0.0.1', port: 5365, strictPort: true },
   build: { target: 'es2022', sourcemap: false },

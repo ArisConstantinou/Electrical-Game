@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Renderer } from './Renderer';
 import { Input } from './Input';
+import { FramePacer, readFrameRateLimit, FRAME_RATE_STORAGE_KEY, type FrameRateLimit } from './FramePacer';
 import { AssetManager } from './AssetManager';
 import { HammerWorkStance } from '../player/HammerWorkStance';
 import { PlayerController } from '../player/PlayerController';
@@ -110,6 +111,8 @@ export class Game {
     catch { return 'floating'; }
   })();
   started = false;
+  frameRateLimit: FrameRateLimit = readFrameRateLimit();
+  private readonly framePacer = new FramePacer();
   private readonly chasing: ChasingSystem;
   private readonly interaction: InteractionSystem;
   private lastTime = performance.now();
@@ -212,6 +215,7 @@ export class Game {
     this.apprentice = new ApprenticeSystem(this, this.chasing);
     new MobileHUD();
     this.bindEvents();
+    this.hud.setFrameRateLimit(this.frameRateLimit);
     this.modelInspector=new ModelInspector(this);
     this.levelEditor=new LevelEditor(this);
     const levelPicker = root.querySelector<HTMLElement>('#start-level-picker')!;
@@ -265,6 +269,8 @@ export class Game {
     addEventListener('wirehouse:graphics-lost',()=>{this.suspendLifecycle();if(!document.hidden)queueMicrotask(()=>void this.resumeLifecycle());});
     this.hud.onStart(() => {
       this.started = true;
+      this.framePacer.reset();
+      this.lastTime = performance.now();
       if(this.apprentice.count>=1){
         this.mixing.wheelbarrow.beginEmpty();
         // Touch players now choose Coordinator explicitly from the bottom bar.
@@ -554,6 +560,7 @@ export class Game {
   renderState(): string {
     const point = this.mission.activePoint;
     return JSON.stringify({
+      framePacing: { limit: this.frameRateLimit, effectiveLimit: this.started || this.levelEditor.active || this.modelInspector.active ? this.frameRateLimit : 15, paused: this.lifecyclePaused },
       apprentice:this.apprentice.telemetry,
       mortar: this.mortar.telemetry,
       pvc: this.pvc.telemetry,
@@ -690,6 +697,14 @@ export class Game {
   }
 
   private bindEvents(): void {
+    addEventListener('wirehouse:frame-rate-limit', event => {
+      const limit = (event as CustomEvent<number>).detail;
+      if (limit !== 0 && limit !== 30 && limit !== 60 && limit !== 120) return;
+      this.frameRateLimit = limit;
+      this.framePacer.reset();
+      this.hud.setFrameRateLimit(limit);
+      try { localStorage.setItem(FRAME_RATE_STORAGE_KEY, String(limit)); } catch { /* Session choice still works. */ }
+    });
     addEventListener('wirehouse:box-preset',event=>{
       const preset=(event as CustomEvent<string>).detail;
       if(preset!=='1G'&&preset!=='2G'&&preset!=='2G+1G')return;
@@ -952,6 +967,7 @@ export class Game {
       // Phone lock time is not simulation time: no queued strikes, throws or
       // water emission may catch up when the screen wakes.
       this.lastTime=performance.now();this.actionCooldown=0;this.lifecyclePaused=false;
+      this.framePacer.reset();
       this.animationFrame=requestAnimationFrame(this.loop);
     }catch(error){
       this.renderer.renderError=String(error);
@@ -967,6 +983,8 @@ export class Game {
     // positions and shadows. Keep elapsed time until the next accepted frame;
     // keyboard/touch intent and mouse angles continue to accumulate meanwhile.
     if(this.renderer.framePending){this.animationFrame=requestAnimationFrame(this.loop);return;}
+    const limit = this.started || this.levelEditor.active || this.modelInspector.active ? this.frameRateLimit : 15;
+    if (!this.framePacer.accept(time, limit)) { this.animationFrame=requestAnimationFrame(this.loop);return; }
     const elapsed = Math.max(0,Math.min((time - this.lastTime) / 1000,.25));
     this.lastTime = time;
     // Preserve simulation time on slow GPUs using bounded physics steps, with

@@ -187,10 +187,13 @@ button {
 .hammer-speed-setting input,.hammer-speed-setting small { grid-column:1 / -1; width:100%; }
 .hammer-speed-setting input { min-height:28px; accent-color:#e6995e; }
 .hammer-speed-setting small { font-size:12px; line-height:1.3; }
+.frame-rate-setting select { grid-column:1 / -1; width:100%; min-height:44px; padding:6px; color:#f3f0e7; background:#263c3a; border:1px solid #718784; border-radius:5px; font:inherit; font-size:16px; }
+.frame-rate-setting small { font-size:14px; }
 #settings-panel { max-height: calc(100dvh - 100px); overflow-y: auto; }
 #game-shell.settings-open #settings-scrim {z-index:13;}
 #game-shell.settings-open #settings-panel {z-index:14;background:linear-gradient(145deg,rgba(28,26,22,.97),rgba(28,26,22,.94));}
 #game-shell.settings-open #settings-toggle {z-index:15;}
+#game-shell.settings-open #mobile-tool-slider, #game-shell.settings-open #apprentice-controls {visibility:hidden;pointer-events:none;}
 #chisel-width-hint {font-size:14px;}
 #mobile-control-settings small { font-size: 14px; }
 
