@@ -20,7 +20,8 @@ export class ExteriorCourtyard extends THREE.Group {
     const groundAlbedo = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}assets/site-materials/gravelly_sand-albedo-512.webp`);
     groundAlbedo.colorSpace = THREE.SRGBColorSpace;
     groundAlbedo.wrapS = groundAlbedo.wrapT = THREE.RepeatWrapping;
-    groundAlbedo.repeat.set(15.7 / 2.5, 17 / 2.5);
+    // World-scaled UVs below preserve the 2.5 m scan size at every distance.
+    groundAlbedo.repeat.set(1, 1);
     groundAlbedo.anisotropy = 4;
     const earth = new THREE.MeshStandardMaterial({ name: 'Photographed compacted courtyard gravel', map: groundAlbedo, roughness: 1 });
     const vergeAlbedo = groundAlbedo.clone();
@@ -62,19 +63,36 @@ export class ExteriorCourtyard extends THREE.Group {
       parent.add(mesh); return mesh;
     };
 
-    const groundGeometry = new THREE.PlaneGeometry(15.7, 17, 32, 34);
-    groundGeometry.rotateX(-Math.PI / 2);
-    const groundPositions = groundGeometry.getAttribute('position');
-    for (let i = 0; i < groundPositions.count; i++) {
-      const x = groundPositions.getX(i), z = groundPositions.getZ(i);
-      const height = .010 * Math.sin(x * .83 + z * .27) + .007 * Math.sin(z * 1.37 - x * .41)
-        + .003 * Math.sin(x * 4.7 + z * 3.1);
-      groundPositions.setY(i, height);
+    // Use dense spacing beside the playable room and progressively wider
+    // cells toward the horizon. A short rectangular ground plane exposed its
+    // edge as a bright wedge under the olive tree when viewed through the hole.
+    const xValues = Array.from({ length: 17 }, (_, i) => -19.55 - 110 * (1 - i / 16) ** 2);
+    for (let i = 1; i <= 32; i++) xValues.push(-19.55 + i * 15.7 / 32);
+    const zValues = Array.from({ length: 11 }, (_, i) => -8.5 - 90 * (1 - i / 10) ** 2);
+    for (let i = 1; i <= 34; i++) zValues.push(-8.5 + i * 17 / 34);
+    for (let i = 1; i <= 10; i++) zValues.push(8.5 + 90 * (i / 10) ** 2);
+    const groundVertices: number[] = [], groundUVs: number[] = [], groundIndices: number[] = [];
+    const groundHeight = (x: number, z: number): number => {
+      const localX = x + 11.7;
+      return .010 * Math.sin(localX * .83 + z * .27) + .007 * Math.sin(z * 1.37 - localX * .41)
+        + .003 * Math.sin(localX * 4.7 + z * 3.1);
+    };
+    for (const z of zValues) for (const x of xValues) {
+      const localX = x + 11.7;
+      groundVertices.push(x, groundHeight(x, z), z);
+      groundUVs.push(localX / 2.5 + 15.7 / 5, z / 2.5 + 17 / 5);
     }
+    for (let row = 0; row < zValues.length - 1; row++) for (let col = 0; col < xValues.length - 1; col++) {
+      const a = row * xValues.length + col, b = a + xValues.length;
+      groundIndices.push(a, b, a + 1, a + 1, b, b + 1);
+    }
+    const groundGeometry = new THREE.BufferGeometry();
+    groundGeometry.setAttribute('position', new THREE.Float32BufferAttribute(groundVertices, 3));
+    groundGeometry.setAttribute('uv', new THREE.Float32BufferAttribute(groundUVs, 2));
+    groundGeometry.setIndex(groundIndices);
     groundGeometry.computeVertexNormals();
     const ground = new THREE.Mesh(groundGeometry, earth);
     ground.name = 'Compacted courtyard ground';
-    ground.position.x = -11.7;
     ground.receiveShadow = true;
     ground.raycast = () => undefined;
     this.add(ground);
