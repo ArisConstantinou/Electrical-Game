@@ -43,6 +43,7 @@ try {
     assert(aimMs<4,`${config.name}: apprentice targeting costs ${aimMs.toFixed(2)} ms per query`);
     const promptVisible=await page.locator('#apprentice-drawing-prompt').isVisible();
     assert(promptVisible,`${config.name}: looking at apprentice shows drawing prompt`);
+    assert.equal(await page.locator('#apprentice-drawing-prompt').textContent(),config.isMobile?'ΣΧΕΔΙΑ':'E · ΣΧΕΔΙΑ',`${config.name}: aim caption must not duplicate the mobile USE button`);
     await page.screenshot({path:`${out}/${config.name}-aim.png`});
     if(config.isMobile)await page.locator('#site-pro-use').tap();else await page.keyboard.press('e');
     await page.waitForFunction(()=>window.__wireTheHouse?.apprentice.mode==='plan',null,{timeout:10000});

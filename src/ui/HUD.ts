@@ -96,6 +96,8 @@ export class HUD {
             <div id="mobile-control-settings" aria-label="Mobile aim settings">
               <button id="movement-stick-mode" type="button" aria-label="Change movement joystick style"><span>MOVE JOYSTICK</span><b>FLOATING</b></button>
               <button id="aim-input-mode" type="button" aria-label="Change aim input style"><span>AIM INPUT</span><b>DRAG</b></button>
+              <button id="tool-selector-layout" type="button" aria-label="Change mobile tool selector" aria-pressed="false"><span>TOOL SELECTOR</span><b>HORIZONTAL</b></button>
+              <small>Horizontal strip is the default. Wheel groups the same tools into two rings.</small>
 
               <button id="aim-speed" type="button" aria-label="Change aim sensitivity"><span>AIM SPEED</span><b>NORMAL</b></button>
               <button id="wall-assist" type="button" aria-label="Toggle automatic wall precision"><span>WALL ASSIST</span><b>AUTO</b></button>
@@ -219,7 +221,8 @@ export class HUD {
             <button id="tool-mode-toggle" type="button" aria-label="Change selected tool mode">
               <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 10h15l-3-3m3 3-3 3M25 22H10l3 3m-3-3 3-3"/></svg><span>LIVE</span>
             </button>
-            <button id="site-pro-tools" type="button" aria-label="Open tools" aria-controls="mobile-tool-slider" aria-expanded="false"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="m6 24 13-13M18 9a6 6 0 0 0 8-7l-4 4-4-2-2-4a6 6 0 0 0-7 8L3 15a5 5 0 0 0 7 7l8-8"/></svg><span>TOOLS</span></button>
+            <button id="site-pro-tools" type="button" aria-label="Worker tools" aria-controls="mobile-tool-slider" aria-expanded="false" aria-pressed="true"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="m6 24 13-13M18 9a6 6 0 0 0 8-7l-4 4-2-4a6 6 0 0 0-7 8L3 15a5 5 0 0 0 7 7l8-8"/></svg><span>WORKER</span></button>
+            <button id="site-pro-coordinator" type="button" aria-label="Coordinator commands" aria-pressed="false"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="7" r="3"/><path d="M16 10v9m0-6-9 5m9-5 9 5M11 29l5-10 5 10M3 4h7m-7 4h5"/></svg><span>COORDINATOR</span></button>
             <nav id="mobile-tool-slider" aria-label="Select tool">
               <button type="button" data-tool="measure" aria-label="Tape measure"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 5h17a5 5 0 0 1 5 5v10H5zM8 20v8h11M12 6v7M17 6v4M22 6v7M8 24h4"/><circle cx="17" cy="14" r="3"/></svg><span>MEASURE</span></button>
               <button type="button" data-tool="drill" aria-label="Drill fixing hole"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 7h15v10H3zM18 10h7M25 9v4M6 17v10h9v-4l-3-6M5 27h12"/></svg><span>DRILL</span></button>
@@ -233,6 +236,9 @@ export class HUD {
               <button type="button" data-tool="cutter" aria-label="Pipe cutter"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="11" cy="23" r="5"/><circle cx="23" cy="23" r="5"/><path d="M14 19 25 5M20 19 8 5M8 5h17"/></svg><span>CUTTER</span></button>
               <button type="button" data-tool="trowel" aria-label="Mortar trowel"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="m3 27 5-17 14 9zM15 15l5-7 8-4"/></svg><span>TROWEL</span></button>
               <button type="button" data-tool="hose" aria-label="Water hose"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="m5 9 14 4-4 7-8-4zM10 18v8c0 5 14 4 15 0M22 10l6-3M23 15h6M21 20l6 3"/></svg><span>HOSE</span></button>
+              <button id="tool-wheel-next" type="button" data-wheel-page="work" aria-label="More tools"><b aria-hidden="true">•••</b><span>MORE</span></button>
+              <button id="tool-wheel-back" type="button" data-wheel-page="utility" aria-label="Back to work tools"><b aria-hidden="true">←</b><span>BACK</span></button>
+              <button id="tool-wheel-center" type="button" aria-label="Close tool wheel"><small>SELECTED</small><strong>SPRAY</strong><span>CLOSE ×</span></button>
             </nav>
           </div>
           <section id="start-screen" class="screen-panel">
@@ -328,6 +334,8 @@ export class HUD {
     root.querySelector('#mortar-angle-down')!.addEventListener('click',()=>dispatchEvent(new CustomEvent('wirehouse:mortar-angle',{detail:-5})));
     root.querySelector('#mortar-angle-up')!.addEventListener('click',()=>dispatchEvent(new CustomEvent('wirehouse:mortar-angle',{detail:5})));
     this.shell = root.querySelector('#game-shell')!;
+    try { this.shell.dataset.toolSelector = localStorage.getItem('wirehouse:tool-selector') === 'wheel' ? 'wheel' : 'horizontal'; }
+    catch { this.shell.dataset.toolSelector = 'horizontal'; }
     this.objective = root.querySelector('#objective')!;
     this.prompt = root.querySelector('#interaction-prompt')!;
     this.progress = root.querySelector('#mission-progress')!;
@@ -347,6 +355,18 @@ export class HUD {
     root.querySelector('#aim-control-mode')?.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:cycle-aim-control')));
     root.querySelector('#aim-input-mode')?.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:cycle-aim-input')));
     root.querySelector('#movement-stick-mode')?.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:cycle-movement-stick')));
+    const toolLayout = root.querySelector<HTMLButtonElement>('#tool-selector-layout')!;
+    const updateToolLayout = (): void => {
+      const wheel = this.shell.dataset.toolSelector === 'wheel';
+      toolLayout.querySelector('b')!.textContent = wheel ? 'WHEEL' : 'HORIZONTAL';
+      toolLayout.setAttribute('aria-pressed', String(wheel));
+    };
+    updateToolLayout();
+    toolLayout.addEventListener('click', () => {
+      this.shell.dataset.toolSelector = this.shell.dataset.toolSelector === 'wheel' ? 'horizontal' : 'wheel';
+      updateToolLayout();
+      try { localStorage.setItem('wirehouse:tool-selector', this.shell.dataset.toolSelector); } catch { /* Private browsing can block storage. */ }
+    });
     root.querySelector('#aim-speed')?.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:cycle-aim-speed')));
     root.querySelector('#wall-assist')?.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:toggle-wall-assist')));
     root.querySelector('#tool-mode-toggle')?.addEventListener('click', event => {
@@ -356,13 +376,50 @@ export class HUD {
       if (kind === 'hammer') window.dispatchEvent(new CustomEvent('wirehouse:cycle-hammer-mode'));
     });
     const toolsToggle = root.querySelector<HTMLButtonElement>('#site-pro-tools')!;
+    const coordinatorToggle = root.querySelector<HTMLButtonElement>('#site-pro-coordinator')!;
+    this.shell.dataset.bottomRole='worker';
+    const setBottomRole = (role:'worker'|'coordinator'):void => {
+      this.shell.dataset.bottomRole=role;
+      toolsToggle.setAttribute('aria-pressed',String(role==='worker'));
+      coordinatorToggle.setAttribute('aria-pressed',String(role==='coordinator'));
+    };
+    const wheelPages = {work:['measure','spray','hammer','fitting','trowel','hose'],utility:['drill','driver','laser','level','spring','cutter']};
+    const wheelNav = root.querySelector<HTMLElement>('#mobile-tool-slider')!;
+    for (const [page,tools] of Object.entries(wheelPages)) {
+      const buttons = [...tools.map(tool => wheelNav.querySelector<HTMLButtonElement>(`[data-tool="${tool}"]`)!),root.querySelector<HTMLButtonElement>(page==='work'?'#tool-wheel-next':'#tool-wheel-back')!];
+      buttons.forEach((button,index) => {
+        button.dataset.wheelPage = page;
+        const angle = -Math.PI/2 + index * 2*Math.PI/buttons.length;
+        button.style.setProperty('--wheel-x',`${50+35*Math.cos(angle)}%`);
+        button.style.setProperty('--wheel-y',`${50+35*Math.sin(angle)}%`);
+      });
+    }
+    root.querySelector('#tool-wheel-next')!.addEventListener('click', () => { this.shell.dataset.toolWheelPage='utility'; });
+    root.querySelector('#tool-wheel-back')!.addEventListener('click', () => { this.shell.dataset.toolWheelPage='work'; });
     const setToolsOpen = (open: boolean): void => {
       this.shell.dataset.toolsOpen = String(open);
+      if(open)this.shell.dataset.toolWheelPage=wheelPages.utility.includes(this.selectedTool)?'utility':'work';
       toolsToggle.setAttribute('aria-expanded', String(open));
-      toolsToggle.setAttribute('aria-label', open ? 'Close tools' : 'Open tools');
-      toolsToggle.querySelector('span')!.textContent = open ? 'CLOSE' : 'TOOLS';
+      toolsToggle.setAttribute('aria-label', open ? 'Close worker tools' : 'Worker tools');
+      toolsToggle.querySelector('span')!.textContent = 'WORKER';
     };
-    const toggleTools = (): void => setToolsOpen(this.shell.dataset.toolsOpen !== 'true');
+    const toggleTools = (): void => {
+      if(this.shell.dataset.bottomRole==='coordinator'){
+        setBottomRole('worker');
+        window.dispatchEvent(new CustomEvent('wirehouse:select-tool',{detail:this.selectedTool}));
+        setToolsOpen(true);
+      } else setToolsOpen(this.shell.dataset.toolsOpen !== 'true');
+    };
+    coordinatorToggle.addEventListener('click',()=>{
+      if(this.shell.dataset.bottomRole==='coordinator')return;
+      if(document.querySelector<HTMLSelectElement>('#apprentice-count')?.value==='0'){
+        this.notify('Επίλεξε Apprentice στην αρχική οθόνη για οδηγίες.',false,1800);return;
+      }
+      setToolsOpen(false);
+      setBottomRole('coordinator');
+      window.dispatchEvent(new CustomEvent('wirehouse:coordinator-open'));
+    });
+    root.querySelector('#tool-wheel-center')!.addEventListener('click', () => setToolsOpen(false));
     let toolsTouch: { id: number; x: number; y: number; travel: number } | null = null;
     toolsToggle.addEventListener('pointerdown', event => {
       if (event.pointerType === 'mouse') return;
@@ -381,7 +438,9 @@ export class HUD {
     });
     toolsToggle.addEventListener('pointercancel', event => { if (toolsTouch?.id === event.pointerId) toolsTouch = null; });
     toolsToggle.addEventListener('click', event => { if (event instanceof PointerEvent && event.pointerType !== 'mouse') return; toggleTools(); });
-    window.addEventListener('wirehouse:select-tool', () => setToolsOpen(false));
+    window.addEventListener('wirehouse:select-tool', () => {setToolsOpen(false);setBottomRole('worker');});
+    window.addEventListener('wirehouse:coordinator-close',()=>setBottomRole('worker'));
+    window.addEventListener('wirehouse:coordinator-entered',()=>{setToolsOpen(false);setBottomRole('coordinator');});
     const settingsToggle = root.querySelector<HTMLButtonElement>('#settings-toggle');
     const settingsPanel = root.querySelector<HTMLElement>('#settings-panel');
     const setSettingsOpen = (open: boolean): void => {
@@ -460,6 +519,7 @@ export class HUD {
       button.setAttribute('aria-pressed', String(selected));
       if(selected&&toolChanged){const nav=button.parentElement!;nav.scrollLeft=button.offsetLeft-(nav.clientWidth-button.offsetWidth)/2;}
     });
+    if(toolChanged)this.shell.querySelector('#tool-wheel-center strong')!.textContent=selectedTool.toUpperCase();
     const modeToggle = this.shell.querySelector<HTMLButtonElement>('#tool-mode-toggle');
     const hasContextMode = selectedTool === 'spray' || selectedTool === 'hammer' || selectedTool === 'hose';
     modeToggle?.classList.toggle('visible', hasContextMode);

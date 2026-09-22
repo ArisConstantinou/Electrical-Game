@@ -195,7 +195,7 @@ export class ApprenticeSystem {
     this.groundMenu.addEventListener('click',event=>{const action=(event.target as HTMLElement).closest<HTMLButtonElement>('[data-ground]')?.dataset.ground as GroundAction|undefined;if(!action||!this.groundGesture)return;this.issueGroundOrder(this.groundGesture.point,action);this.closeGroundMenu();});
     this.mobilePlan.id='apprentice-mobile-plan';this.mobilePlan.setAttribute('aria-label','Ηλεκτρολογικό σχέδιο');this.mobilePlan.hidden=true;game.hud.shell.append(this.mobilePlan);
     this.mobilePlan.addEventListener('click',event=>{const target=event.target as HTMLElement,tab=target.closest<HTMLButtonElement>('[data-drawing-tab]')?.dataset.drawingTab;if(tab==='electrical'||tab==='ground'||tab==='section'){this.drawingTab=tab;this.drawPlan();}else if(target.closest('[data-drawing-zoom]')){this.drawingFit=!this.drawingFit;this.mobilePlan.classList.toggle('drawing-fit',this.drawingFit);this.mobilePlan.querySelector('[data-drawing-zoom]')!.textContent=this.drawingFit?'ΜΕΓΕΘΥΝΣΗ':'ΣΥΝΟΛΟ';}else if(target.closest('[data-drawing-close]'))this.command('cancel');});
-    this.drawingPrompt.id='apprentice-drawing-prompt';this.drawingPrompt.textContent=matchMedia('(pointer:coarse)').matches?'USE · ΣΧΕΔΙΑ':'E · ΣΧΕΔΙΑ';this.drawingPrompt.hidden=true;game.hud.shell.append(this.drawingPrompt);
+    this.drawingPrompt.id='apprentice-drawing-prompt';this.drawingPrompt.textContent=matchMedia('(pointer:coarse)').matches?'ΣΧΕΔΙΑ':'E · ΣΧΕΔΙΑ';this.drawingPrompt.hidden=true;game.hud.shell.append(this.drawingPrompt);
     this.toolbar.addEventListener('click',e=>{const action=(e.target as HTMLElement).closest<HTMLButtonElement>('[data-apprentice]')?.dataset.apprentice;if(action)this.command(action);});
     this.bindGroundGesture(game.renderer.webgl.domElement);
     addEventListener('keydown',e=>{
@@ -204,6 +204,7 @@ export class ApprenticeSystem {
       if(action){e.preventDefault();e.stopImmediatePropagation();game.input.resetTransientInput();this.command(action);}
     },{capture:true});
     addEventListener('wirehouse:select-tool',()=>{this.mode='off';this.paper.visible=false;this.ghost.visible=false;});
+    addEventListener('wirehouse:coordinator-open',()=>this.command('point'));
     addEventListener('wirehouse:cycle-tool',()=>{if(this.mode!=='layout'){this.mode='off';this.paper.visible=false;}});
     this.presentUI();
   }
@@ -924,6 +925,10 @@ export class ApprenticeSystem {
     this.game.workerBody.poseDirective(this.game.renderer.camera,this.mode==='plan');
   }
   private presentUI():void{
+    if(this.mode==='off'&&this.game.hud.shell.dataset.bottomRole==='coordinator')
+      window.dispatchEvent(new CustomEvent('wirehouse:coordinator-close'));
+    else if(this.mode!=='off'&&this.game.hud.shell.dataset.bottomRole!=='coordinator'&&matchMedia('(pointer:coarse)').matches)
+      window.dispatchEvent(new CustomEvent('wirehouse:coordinator-entered'));
     this.toolbar.hidden=!this.game.started||this.count===0||this.mode==='off';
     const returnButton=this.game.hud.shell.querySelector<HTMLButtonElement>('#apprentice-return');
     if(returnButton)returnButton.hidden=!this.game.started||this.count===0||this.mode!=='off';
