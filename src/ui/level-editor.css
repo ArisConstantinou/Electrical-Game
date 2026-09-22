@@ -1,0 +1,340 @@
+#start-level-editor{width:100%;min-height:52px;border:1px solid #e4aa70;border-radius:4px;background:#1b2729e8;color:#f9ead3;font:800 19px/1 'Barlow Condensed',sans-serif;letter-spacing:.12em;cursor:pointer}
+#start-level-editor:disabled{opacity:.55;cursor:wait}
+#start-level-editor:focus-visible{outline:3px solid #ffd481;outline-offset:3px}
+#game-shell.level-editor-open > :not(#game-stage):not(#level-editor){visibility:hidden!important;pointer-events:none!important}
+#level-editor[hidden]{display:none!important}
+#level-editor{position:absolute;inset:0;z-index:20;pointer-events:none;color:#f5ead7;font:14px/1.3 system-ui,sans-serif}
+#level-editor header,#level-editor .level-editor__bar,#level-editor aside,#level-editor .level-editor__inspector{pointer-events:auto;background:rgba(20,29,30,.96);border:1px solid #8c8573;box-shadow:0 8px 28px #0008}
+#level-editor header{position:absolute;top:max(10px,env(safe-area-inset-top));left:12px;right:12px;height:65px;display:flex;align-items:center;justify-content:space-between;padding:8px 14px}
+#level-editor .level-editor__header-actions{display:flex;gap:8px}
+#level-settings-panel{position:absolute;z-index:3;top:max(80px,calc(env(safe-area-inset-top) + 70px));right:12px;padding:12px;display:grid;gap:7px;background:#1c2b2dee;border:1px solid #dbbd88;pointer-events:auto}
+#level-settings-panel[hidden]{display:none}
+#level-settings-panel label{font-size:11px;font-weight:800;color:#e7bb7c}
+#level-settings-panel select{min-height:40px;padding:5px;background:#f7f0e3;color:#1a2526}
+#level-editor header small{color:#e2a45f;font-size:10px;letter-spacing:.12em}
+#level-editor h2{margin:1px 0 0;font:800 25px/1 'Barlow Condensed',sans-serif;letter-spacing:.1em}
+#level-editor button,#level-editor select,#level-editor input{font:inherit}
+#level-editor button{min-height:36px;padding:6px 10px;background:#304143;color:#f7eddb;border:1px solid #a3a292;border-radius:4px;cursor:pointer}
+#level-editor button:disabled{opacity:.45;cursor:default}
+#level-editor button:hover:not(:disabled),#level-editor button:focus-visible{border-color:#ffd071;background:#455657}
+#level-editor .level-editor__bar{position:absolute;top:max(84px,calc(env(safe-area-inset-top) + 74px));left:12px;right:12px;min-height:46px;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:6px;padding:5px}
+#level-editor .level-editor__bar label{white-space:nowrap;margin:0 5px}
+#level-editor aside{position:absolute;top:max(140px,calc(env(safe-area-inset-top) + 130px));bottom:12px;left:12px;width:min(270px,32vw);padding:12px;display:flex;flex-direction:column;gap:8px}
+#level-editor aside>label{font-weight:800;letter-spacing:.08em;color:#eac78e}
+#level-search{min-height:38px;padding:7px;background:#f5f2eb;color:#182424;border:0;border-radius:4px}
+#level-list{overflow:auto;min-height:50px;flex:1;display:grid;align-content:start;gap:3px}
+#level-list button{text-align:left;overflow-wrap:anywhere;font-size:12px}
+#level-list button.selected{border-color:#ffd071;background:#6c5738}
+#level-editor .level-editor__add,#level-editor .level-editor__starts{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+#level-editor .level-editor__add button,#level-editor .level-editor__starts button{font-size:11px;line-height:1.1;padding:4px}
+#level-apprentice-index{min-height:40px;min-width:0;padding:5px;background:#f5f2eb;color:#182424;border:1px solid #89918f;border-radius:4px;font-size:12px!important}
+#level-editor .level-editor__inspector{position:absolute;top:max(140px,calc(env(safe-area-inset-top) + 130px));bottom:12px;right:12px;width:min(272px,34vw);padding:12px;overflow:auto}
+#level-editor .level-editor__inspector b{display:block;font-size:15px}
+#level-editor .level-editor__inspector p{font-size:12px;color:#d6caba}
+#level-editor .level-editor__history{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0}
+#level-editor .level-editor__history button{min-height:44px}
+#level-editor .level-editor__fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+#level-editor .level-editor__fields label{font-size:11px;font-weight:700;color:#e7bb7c}
+#level-editor .level-editor__fields input{display:block;width:100%;min-width:0;min-height:38px;padding:6px;background:#f5f2eb;color:#1b2525;border:1px solid #89918f;border-radius:4px;font-size:14px}
+#level-editor.marker-selected .level-editor__fields label:has([data-size]){display:none}
+#level-delete{width:100%;margin-top:10px}
+#level-status{min-height:35px}
+#level-editor .level-editor__save,#level-editor .level-editor__bottom-nav,#level-editor .level-editor__wheel{display:none}
+#level-editor .level-editor__save{position:absolute}
+@media(max-width:1100px){
+  #level-editor header{height:54px;left:6px;right:6px}
+  #level-editor h2{font-size:21px}
+  #level-editor .level-editor__bar{display:none;top:max(70px,calc(env(safe-area-inset-top) + 60px));left:6px;right:6px;max-height:91px;overflow:auto}
+  #level-editor[data-tab=transform] .level-editor__bar{display:flex}
+  #level-editor .level-editor__bar button{font-size:12px;min-height:40px;padding:4px 8px}
+  #level-editor .level-editor__bar #level-save,#level-editor .level-editor__bar #level-export{display:none}
+  #level-editor .level-editor__bar select{max-width:85px;font-size:12px}
+  #level-editor aside,#level-editor .level-editor__inspector,#level-editor .level-editor__save{display:none;top:auto;bottom:calc(max(6px,env(safe-area-inset-bottom)) + 62px);left:auto;right:6px;width:min(420px,calc(100% - 12px));height:min(37vh,340px);padding:10px}
+  #level-editor[data-tab=select] aside,#level-editor[data-tab=build] aside,#level-editor[data-tab=starts] aside{display:flex}
+  #level-editor[data-tab=transform] .level-editor__inspector{display:block}
+  #level-editor[data-tab=save] .level-editor__save{display:grid;align-content:start;gap:8px;height:auto;max-height:min(37vh,340px);overflow:auto;pointer-events:auto;background:rgba(20,29,30,.96);border:1px solid #8c8573}
+  #level-editor .level-editor__save p{margin:0;font-size:14px}
+  #level-editor .level-editor__save b{font-size:16px}
+  #level-editor .level-editor__save button{min-height:48px}
+  #level-editor[data-tab=select] .level-editor__add,#level-editor[data-tab=select] .level-editor__starts{display:none}
+  #level-editor[data-tab=build] aside>label,#level-editor[data-tab=build] #level-search,#level-editor[data-tab=build] #level-filter,#level-editor[data-tab=build] #level-list,#level-editor[data-tab=build] .level-editor__starts{display:none}
+  #level-editor[data-tab=starts] aside>label,#level-editor[data-tab=starts] #level-search,#level-editor[data-tab=starts] #level-filter,#level-editor[data-tab=starts] #level-list,#level-editor[data-tab=starts] .level-editor__add{display:none}
+  #level-editor[data-tab=build] aside,#level-editor[data-tab=starts] aside{height:auto;min-height:115px}
+  #level-editor .level-editor__add button,#level-editor .level-editor__starts button{min-height:48px;font-size:12px}
+  #level-editor .level-editor__starts{grid-template-columns:1fr 1fr}
+  #level-editor .level-editor__starts #level-player{grid-row:1 / 3}
+  #level-editor .level-editor__starts #level-apprentice-index{min-height:48px}
+  #level-editor .level-editor__fields{gap:6px}
+  #level-editor .level-editor__fields input{min-height:44px;padding:4px;font-size:14px}
+  #level-editor[data-nav-mode=bottom] .level-editor__bottom-nav{position:absolute;bottom:max(6px,env(safe-area-inset-bottom));left:6px;right:6px;height:56px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:3px;padding:3px;pointer-events:auto;background:#172628ef;border:1px solid #9e9a85;box-shadow:0 5px 24px #000a}
+  #level-editor .level-editor__bottom-nav button{min-width:0;min-height:48px;padding:4px 1px;font-size:11px;font-weight:800;letter-spacing:.02em}
+  #level-editor [data-editor-tab][aria-current=true]{background:#9b622b;border-color:#ffd071;color:#fff}
+  #level-editor[data-nav-mode=wheel] .level-editor__wheel{position:absolute;bottom:max(6px,env(safe-area-inset-bottom));left:50%;display:block;width:58px;height:58px;transform:translateX(-50%);pointer-events:auto}
+  #level-wheel-toggle{position:absolute;z-index:2;inset:0;width:58px;height:58px;border-radius:50%!important;border:2px solid #ffd071!important;background:#354547!important;font-size:26px!important}
+  #level-editor .level-editor__wheel-ring{display:none;position:absolute;left:50%;bottom:-5px;width:254px;height:254px;transform:translateX(-50%);border-radius:50%;border:5px solid #e3ad66;background:conic-gradient(#36484a 0 72deg,#405357 72deg 144deg,#36484a 144deg 216deg,#405357 216deg 288deg,#36484a 288deg 360deg);box-shadow:0 5px 30px #000b}
+  #level-editor.wheel-open .level-editor__wheel-ring{display:block}
+  #level-editor .level-editor__wheel-ring button{position:absolute;min-width:72px;min-height:42px;padding:3px;font-size:11px;font-weight:800}
+  #level-editor .level-editor__wheel-ring button:nth-child(1){left:91px;top:8px}
+  #level-editor .level-editor__wheel-ring button:nth-child(2){right:9px;top:70px}
+  #level-editor .level-editor__wheel-ring button:nth-child(3){right:22px;bottom:50px}
+  #level-editor .level-editor__wheel-ring button:nth-child(4){left:22px;bottom:50px}
+  #level-editor .level-editor__wheel-ring button:nth-child(5){left:9px;top:70px}
+  #level-editor[data-nav-mode=wheel] aside,#level-editor[data-nav-mode=wheel] .level-editor__inspector,#level-editor[data-nav-mode=wheel] .level-editor__save{bottom:calc(max(6px,env(safe-area-inset-bottom)) + 65px)}
+}
+@media(max-width:700px){
+  #level-editor aside,#level-editor .level-editor__inspector,#level-editor .level-editor__save{left:6px;right:6px;width:auto;height:min(34vh,285px)}
+  #level-editor[data-tab=save] .level-editor__save{height:auto;max-height:min(38vh,320px)}
+  #level-editor[data-tab=build] aside,#level-editor[data-tab=starts] aside{height:auto}
+  #level-editor .level-editor__bar{justify-content:flex-start}
+  #level-editor .level-editor__bar button{font-size:11px;min-height:36px}
+}
+
+/* Site Pro editor surface: a compact tool, with the model remaining the canvas. */
+#level-editor{--editor-bg:#172126;--editor-card:#202d32;--editor-line:#566568;--editor-ink:#f6f4ef;--editor-muted:#b9c5c4;--editor-accent:#f1b86a;color:var(--editor-ink);font:500 14px/1.35 system-ui,sans-serif}
+#level-editor header,#level-editor .level-editor__bar,#level-editor aside,#level-editor .level-editor__inspector,#level-editor .level-editor__save{background:linear-gradient(155deg,#233238f5,#172126f8);border:1px solid #73838599;border-radius:14px;box-shadow:0 16px 40px #0a1015a3, inset 0 1px #ffffff16}
+#level-editor header{padding:8px 15px;gap:10px}
+#level-editor header small{font:700 10px/1.2 system-ui,sans-serif;letter-spacing:.13em;color:var(--editor-accent)}
+#level-editor h2{font:800 25px/1.05 system-ui,sans-serif;letter-spacing:.035em}
+#level-editor .level-editor__scene{display:flex;align-items:center;gap:6px;margin-top:4px;color:#c6d1d0;font-size:10px;font-weight:700;letter-spacing:.1em}
+#level-editor .level-editor__scene span{width:7px;height:7px;border-radius:50%;background:#8cd6a6;box-shadow:0 0 0 3px #8cd6a629}
+#level-editor button{background:linear-gradient(180deg,#35464a,#2c3b3f);border:1px solid #708083;color:#f8f4ed;border-radius:9px;box-shadow:inset 0 1px #ffffff13;transition:background-color .12s,border-color .12s,transform .12s}
+#level-editor button:active:not(:disabled){transform:scale(.98)}
+#level-editor button:hover:not(:disabled),#level-editor button:focus-visible{background:#46585c;border-color:#f1b86a;outline:none}
+#level-editor button:focus-visible,#level-editor input:focus-visible,#level-editor select:focus-visible{outline:2px solid #ffd895;outline-offset:2px}
+#level-editor .level-editor__icon-button{display:inline-flex;align-items:center;justify-content:center;gap:7px}
+#level-editor .level-editor__icon{flex:none;width:19px;height:19px}
+#level-editor .level-editor__header-actions button{width:42px;height:42px;padding:0;background:#2e3b3e;border-radius:11px}
+#level-editor #level-camera[aria-pressed=true]{background:#9a6234;border-color:#ffd18b;color:#fff4e4}
+#level-editor .level-editor__bar{gap:4px;min-height:48px}
+#level-editor .level-editor__bar button{min-height:38px;font-size:12px;font-weight:700;letter-spacing:.035em}
+#level-editor .level-editor__bar label{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:#e9d9be}
+#level-editor .level-editor__bar #level-snap{width:17px;height:17px;accent-color:#e9a957}
+#level-editor .level-editor__bar select{min-height:36px;border-radius:8px;padding:4px 6px;background:#e6e5dc;color:#1b292b;border:1px solid #d4cdbc}
+#level-editor aside,#level-editor .level-editor__inspector{padding:14px}
+#level-editor aside>label{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;letter-spacing:.11em;color:#f4d3a2}
+#level-count{font-size:10px;letter-spacing:0;color:#acb9b8;font-weight:600;white-space:nowrap}
+#level-search{background:#dfe6e3;padding-left:13px;border:1px solid #758988;border-radius:10px;font-size:13px}
+#level-filter{min-height:36px;padding:5px 9px;background:#2e3e42;color:#f4ede2;border:1px solid #667d7e;border-radius:9px;font-size:12px;font-weight:700}
+#level-focus{width:100%;min-height:38px;margin:2px 0 3px;background:#3d504e!important;border-color:#92aea3!important;color:#e7f3e9!important;font-size:11px!important;font-weight:800!important;letter-spacing:.06em}
+#level-editor .level-editor__bar button[aria-pressed=true]{background:#9a6234;border-color:#ffd18b;color:#fff3df}
+#level-touch-help{display:none;color:#d8e6dc;font-size:11px;font-weight:700;line-height:1.2}
+#level-list{gap:5px;padding-right:2px}
+#level-list button{position:relative;min-height:41px;padding:7px 8px 7px 15px;background:#2c3b3f;text-align:left;border-color:#566a6d;font-size:12px;font-weight:600;line-height:1.2}
+#level-list button:before{content:'';position:absolute;left:6px;top:calc(50% - 8px);height:16px;width:3px;border-radius:3px;background:#b4774d}
+#level-list button.selected{background:#4b4336;border-color:#f1b86a;color:#ffedcf}
+#level-list button.selected:before{background:#ffd18b}
+#level-editor .level-editor__add,#level-editor .level-editor__starts{padding-top:7px;border-top:1px solid #66767877}
+#level-editor .level-editor__add button,#level-editor .level-editor__starts button{min-height:43px;text-align:center;font-size:11px;font-weight:750;letter-spacing:.02em}
+#level-editor .level-editor__add button .level-editor__icon{width:17px;height:17px;color:#f1b86a}
+#level-editor .level-editor__inspector b{font-size:16px;line-height:1.2}
+#level-editor .level-editor__inspector p{color:#bac8c5;font-size:12px}
+#level-editor .level-editor__history{margin:12px 0 14px;gap:8px}
+#level-editor .level-editor__history button{font-size:12px;font-weight:750}
+#level-editor .level-editor__fields{gap:8px}
+#level-editor .level-editor__fields label{padding:7px 8px 8px;background:#29383c;border:1px solid #4c6264;border-radius:9px;color:#f1cf9d;font-size:10px;letter-spacing:.09em}
+#level-editor .level-editor__fields input{margin-top:4px;min-height:30px;background:#e5ebe7;border-color:#d2d8d1;border-radius:6px;font-weight:650;color:#1a292c}
+#level-editor .level-editor__fields label:nth-child(1){border-top:2px solid #e88075}
+#level-editor .level-editor__fields label:nth-child(2){border-top:2px solid #87c78e}
+#level-editor .level-editor__fields label:nth-child(3){border-top:2px solid #7ca4e8}
+#level-delete{background:#503a36!important;border-color:#9d6559!important}
+#level-editor .level-editor__save{padding:15px}
+#level-editor .level-editor__save b{font-size:17px;letter-spacing:.04em}
+#level-editor .level-editor__save p{color:#c8d1ce;line-height:1.4}
+#level-editor .level-editor__save button[id*=save]{background:#aa7139;border-color:#ffd18b;color:#fff;font-weight:800}
+#level-editor #level-status,#level-editor #level-save-status{color:#d9d0b9;overflow-wrap:anywhere}
+#level-settings-panel{border-radius:12px;background:#213034f8;box-shadow:0 15px 30px #0008}
+@media(min-width:1101px){#level-editor .level-editor__inspector{bottom:auto;max-height:calc(100% - 152px)}}
+@media(max-width:1100px){
+  #level-editor[data-tab=transform] #level-touch-help{display:block;flex:1;min-width:215px;padding:2px 5px;border-left:2px solid #a9d2ba}
+  #level-editor header{min-height:58px;height:auto;padding:7px 11px}
+  #level-editor h2{font-size:20px}
+  #level-editor .level-editor__scene{font-size:9px}
+  #level-editor .level-editor__header-actions button{width:39px;height:39px}
+  #level-editor aside,#level-editor .level-editor__inspector{padding:12px}
+  #level-editor .level-editor__add button,#level-editor .level-editor__starts button{min-height:48px}
+  #level-editor[data-nav-mode=bottom] .level-editor__bottom-nav{height:65px;bottom:max(5px,env(safe-area-inset-bottom));background:#152126f7;border:1px solid #8ca09d;border-radius:15px;box-shadow:0 12px 35px #0b1317c7}
+  #level-editor .level-editor__bottom-nav button{display:flex;flex-direction:column;gap:2px;min-height:55px;border:0;background:transparent;box-shadow:none;border-radius:11px;color:#cfdbd7;font-size:11px}
+  #level-editor .level-editor__bottom-nav .level-editor__icon{width:20px;height:20px}
+  #level-editor .level-editor__bottom-nav [aria-current=true]{background:#9a6234;color:#fff3df;box-shadow:inset 0 1px #ffd5995e}
+  #level-editor aside,#level-editor .level-editor__inspector,#level-editor .level-editor__save{bottom:calc(max(5px,env(safe-area-inset-bottom)) + 72px)}
+  #level-editor[data-nav-mode=wheel] aside,#level-editor[data-nav-mode=wheel] .level-editor__inspector,#level-editor[data-nav-mode=wheel] .level-editor__save{bottom:calc(max(5px,env(safe-area-inset-bottom)) + 69px)}
+  #level-editor .level-editor__wheel-ring{background:#1c2b30f7;border:3px solid #bd8b55;box-shadow:0 12px 40px #000c}
+  #level-editor .level-editor__wheel-ring button{display:flex;flex-direction:column;gap:1px;align-items:center;border-radius:14px;background:#34464a;color:#fff}
+  #level-editor .level-editor__wheel-ring .level-editor__icon{width:17px;height:17px}
+  #level-wheel-toggle{display:flex!important;align-items:center;justify-content:center;border:2px solid #eeb870!important;background:#35474b!important}
+}
+@media(max-width:700px){
+  #level-editor .level-editor__scene{display:none}
+  #level-editor header{min-height:54px}
+  #level-editor .level-editor__save{padding:12px}
+  #level-editor .level-editor__save button{min-height:46px}
+}
+
+#level-fields-tabs{display:none}
+@media(max-width:1100px){
+  #level-editor[data-tab=transform] .level-editor__inspector{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));align-content:start;gap:6px}
+  #level-editor .level-editor__inspector b,#level-editor .level-editor__inspector #level-kind,#level-editor #level-fields-tabs,#level-editor .level-editor__fields,#level-editor #level-delete,#level-editor #level-status{grid-column:1/-1}
+  #level-editor .level-editor__inspector #level-kind{margin:0}
+  #level-editor .level-editor__inspector #level-focus{grid-column:1;margin:0;min-height:44px;font-size:0!important}
+  #level-editor .level-editor__inspector #level-focus::after{content:'FOCUS';font-size:11px}
+  #level-editor .level-editor__inspector .level-editor__history{grid-column:2/4;margin:0;gap:4px}
+  #level-editor[data-tab=transform] #level-delete{grid-column:4;grid-row:3;margin:0;min-height:44px;font-size:0!important}
+  #level-editor[data-tab=transform] #level-delete::after{content:'DELETE';font-size:11px}
+  #level-fields-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:#152328;padding:3px;border:1px solid #526568;border-radius:9px}
+  #level-fields-tabs button{min-height:34px;border:0;background:transparent;font-size:11px;font-weight:800}
+  #level-fields-tabs button[aria-pressed=true]{background:#9a6234;color:#fff5e6}
+  #level-editor[data-fields-mode=position] .level-editor__fields label:has([data-size]),#level-editor[data-fields-mode=size] .level-editor__fields label:has([data-axis]),#level-editor[data-fields-mode=size] .level-editor__fields label:has(#level-yaw){display:none}
+  #level-editor .level-editor__fields label{padding:4px 6px}
+}
+@media(max-width:700px){
+  #level-editor[data-tab=transform] .level-editor__inspector{height:min(37vh,315px)}
+}
+@media(min-width:701px) and (max-width:1100px){
+  #level-editor .level-editor__bar{top:max(87px,calc(env(safe-area-inset-top) + 77px))}
+}
+
+#level-selection-actions{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+#level-editor #level-selection-actions button{min-height:44px;padding:5px;font-size:11px;font-weight:800;letter-spacing:.025em}
+#level-editor #level-multi-toggle[aria-pressed=true]{background:#9a6234;border-color:#ffd18b;color:#fff3df}
+#level-group-list{display:flex;gap:5px;overflow-x:auto;min-height:0}
+#level-group-list:empty{display:none}
+#level-editor #level-group-list button{flex:none;min-height:34px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-weight:700;border-color:#d1a56c}
+#level-editor #level-group-list button.selected{background:#9a6234;border-color:#ffd18b}
+#level-editor #level-list button.selected,#level-editor #level-group-list button.selected{background:#21444b;border-color:#63efff;color:#e8fcff}
+#level-editor #level-list button.selected:before{background:#63efff}
+#level-group-edit{display:grid;grid-template-columns:1fr auto;gap:6px;margin:7px 0;padding:8px;background:#2b3c40;border:1px solid #708789;border-radius:9px}
+#level-group-edit[hidden]{display:none}
+#level-group-edit label{grid-column:1/-1;color:#f1cf9d;font-size:10px;font-weight:800;letter-spacing:.08em}
+#level-group-edit input{min-width:0;padding:5px 8px;border:1px solid #869999;border-radius:6px;background:#e5ebe7;color:#1a292c}
+#level-editor #level-group-edit button{min-height:42px;font-size:11px;font-weight:800}
+#level-editor.multi-selected .level-editor__fields label:has([data-size]){display:none}
+@media(max-width:1100px){
+  #level-editor[data-tab=build] #level-selection-actions,#level-editor[data-tab=build] #level-group-list,#level-editor[data-tab=starts] #level-selection-actions,#level-editor[data-tab=starts] #level-group-list{display:none}
+  #level-editor #level-group-edit{grid-column:1/-1}
+  #level-editor .level-editor__history{order:1}
+  #level-editor #level-fields-tabs{order:2}
+  #level-editor .level-editor__fields{order:3}
+  #level-editor #level-group-edit{order:4}
+  #level-editor #level-status{order:5}
+  #level-editor .level-editor__inspector b{position:sticky;top:0;z-index:2;padding:5px 7px;background:#213238;border:1px solid #526f76;border-radius:7px}
+  #level-editor[data-tab=select] aside{height:min(42vh,380px)}
+}
+
+/* Touch layout: tools are a second tier of the bottom navigation; sheets open on demand. */
+#level-browser-toggle,#level-details-toggle,#level-details-close{display:none}
+@media(max-width:1100px){
+  #level-editor header{min-height:50px;height:50px}
+  #level-editor header small{font-size:8px}
+  #level-editor h2{font-size:17px}
+  #level-editor .level-editor__scene{display:none}
+  #level-editor .level-editor__header-actions button{width:36px;height:36px}
+  #level-editor .level-editor__bar{top:auto;bottom:calc(max(5px,env(safe-area-inset-bottom)) + 72px);left:6px;right:6px;max-height:none;overflow:visible;padding:5px;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
+  #level-editor[data-tab=transform]:not(.details-open) .level-editor__bar{display:grid}
+  #level-editor.details-open .level-editor__bar{display:none!important}
+  #level-editor .level-editor__bar #level-translate,#level-editor .level-editor__bar #level-rotate,#level-editor .level-editor__bar #level-scale,#level-editor .level-editor__bar #level-details-toggle{min-height:42px;padding:4px 2px;font-size:11px}
+  #level-editor .level-editor__bar label{justify-content:center;min-height:42px;margin:0;font-size:11px}
+  #level-editor .level-editor__bar select{width:100%;max-width:none;min-height:42px}
+  #level-editor .level-editor__bar #level-touch-help{display:none}
+  #level-details-toggle{display:block!important;font-weight:800!important;background:#31616c!important;border-color:#75ddea!important}
+  #level-editor[data-tab=transform] .level-editor__inspector{display:none}
+  #level-editor.details-open[data-tab=transform] .level-editor__inspector{display:grid;bottom:calc(max(5px,env(safe-area-inset-bottom)) + 72px);height:min(42vh,340px)}
+  #level-details-close{display:block!important;position:sticky;top:0;z-index:3;grid-column:4;grid-row:1;min-height:30px!important;padding:2px 6px!important;justify-self:end}
+  #level-editor .level-editor__inspector b{padding-right:36px}
+  #level-editor[data-tab=select] aside{height:auto;min-height:54px;max-height:min(42vh,360px);padding:5px;overflow:hidden}
+  #level-editor[data-tab=select]:not(.browser-open) aside> :not(#level-browser-toggle){display:none!important}
+  #level-editor #level-browser-toggle{display:block;width:100%;min-height:43px;background:#31505a;border-color:#75ddea;font-size:12px;font-weight:800;letter-spacing:.06em}
+  #level-editor #level-browser-toggle span{float:right;font-size:17px;line-height:10px}
+  #level-editor.browser-open[data-tab=select] aside{height:min(42vh,360px);padding:9px;overflow:auto}
+#level-editor.browser-open #level-browser-toggle span{transform:rotate(180deg)}
+  #level-editor[data-tab=build] #level-browser-toggle,#level-editor[data-tab=starts] #level-browser-toggle{display:none}
+}
+
+/* One small view control opens a temporary floor sheet; no floor panel remains over the canvas. */
+#level-view-trigger{position:absolute;z-index:4;top:max(142px,calc(env(safe-area-inset-top) + 132px));right:12px;min-height:43px!important;padding:6px 12px!important;pointer-events:auto;background:#183e43ed!important;border-color:#80d9da!important;font-size:13px!important;font-weight:800!important}
+#level-view-panel{position:absolute;z-index:5;top:max(191px,calc(env(safe-area-inset-top) + 181px));right:12px;width:min(310px,calc(100% - 24px));display:grid;gap:9px;padding:12px;pointer-events:auto;background:#192d31f5;border:1px solid #8bd6d0;border-radius:15px;box-shadow:0 15px 38px #000b;backdrop-filter:blur(10px)}
+#level-view-panel[hidden]{display:none!important}
+#level-view-panel .level-view__modes{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+#level-view-panel .level-view__sides{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+#level-view-panel .level-view__sides button{min-height:42px;font-size:12px;font-weight:800}
+#level-view-panel .level-view__sides button[aria-pressed=true]{background:#a36a42;border-color:#f9cd93}
+#level-view-panel [data-level-view]{min-height:44px;font-weight:800}
+#level-view-panel [data-level-view][aria-pressed=true]{background:#a36a42;border-color:#f9cd93}
+#level-view-panel label{color:#f2d7a8;font-size:12px;font-weight:800;letter-spacing:.08em}
+#level-view-panel select{width:100%;min-height:44px;padding:7px;background:#edf1eb;color:#17292b;border:1px solid #90aead;border-radius:8px;font-size:14px}
+#level-view-panel small{color:#c8dcd5;font-size:12px;line-height:1.3}
+#level-view-panel #level-view-close{min-height:42px;font-weight:800}
+#level-editor[data-view="2d"] #level-camera{display:none}
+@media(max-width:1100px){#level-view-trigger{top:max(62px,calc(env(safe-area-inset-top) + 57px));right:7px}#level-view-panel{top:max(110px,calc(env(safe-area-inset-top) + 105px));right:7px}}
+
+/* Level library: Basic is a read-only launch choice; named saves live in separate slots. */
+.start-level-current{display:block;width:100%;color:#f7dca8;font:700 14px/1.2 'Barlow Condensed',sans-serif;letter-spacing:.14em;text-align:center;text-shadow:0 1px 5px #111}
+.start-level-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%}
+.start-level-actions button{min-height:48px;border:1px solid #d7ad78;border-radius:8px;background:#1b2729e8;color:#f9ead3;font:800 16px/1 'Barlow Condensed',sans-serif;letter-spacing:.08em;cursor:pointer}
+.start-level-actions button:hover,.start-level-actions button:focus-visible{background:#384840;outline:2px solid #ffd481;outline-offset:2px}
+.start-level-picker{position:absolute;z-index:8;left:50%;top:50%;transform:translate(-50%,-50%);width:min(460px,calc(100% - 28px));max-height:min(70vh,620px);overflow:auto;padding:17px;border:1px solid #d9b882;border-radius:18px;background:#19282df7;box-shadow:0 25px 80px #0b1116da;color:#f9ead3}
+.start-level-picker[hidden]{display:none}
+.start-level-picker__heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:12px;font:800 23px/1 'Barlow Condensed',sans-serif;letter-spacing:.08em}
+#start-level-picker-close{min-width:44px;min-height:44px;border:1px solid #8a978f;border-radius:10px;background:#293b40;color:#fff;font-size:20px;cursor:pointer}
+#start-level-list{display:grid;gap:9px}
+.start-level-choice{display:grid;gap:3px;width:100%;min-height:64px;padding:10px 14px;border:1px solid #778c89;border-radius:11px;background:#273b3f;color:#fff;text-align:left;cursor:pointer}
+.start-level-choice:hover,.start-level-choice:focus-visible{border-color:#ffd481;background:#39514c;outline:2px solid #ffd481;outline-offset:1px}
+.start-level-choice strong{font:800 18px/1.2 'Barlow Condensed',sans-serif;letter-spacing:.04em}
+.start-level-choice small{font:500 14px/1.3 system-ui,sans-serif;color:#d7dfd8}
+#level-editor .level-editor__save label{font-size:13px;font-weight:800;letter-spacing:.08em;color:#f2d3a9}
+#level-editor #level-slot-name{width:100%;min-height:46px;padding:9px 12px;border:1px solid #a2aaa0;border-radius:9px;background:#f4f6f2;color:#162326;font:600 16px system-ui,sans-serif}
+#level-editor #level-save-as{border-color:#c6aa83;background:#304342;color:#fff;font-weight:750}
+@media(max-width:600px){.start-level-actions button{font-size:15px}.start-level-picker{max-height:72dvh}}
+
+/* Concept 01 · Dock Nest. The live scene keeps the canvas; each dock tab opens one temporary sheet. */
+#level-dock-toggle,#level-view-quick,.level-editor__build-heading,.level-editor__scene-actions{display:none}
+#level-halo{display:none}
+#level-halo[hidden]{display:none!important}
+@media(max-width:1100px){
+  #level-editor header{display:none!important}
+  #level-editor #level-view-trigger,#level-editor #level-view-panel{display:none!important}
+  #level-editor:not(.sheet-open) aside,#level-editor:not(.sheet-open) .level-editor__bar,#level-editor:not(.sheet-open) .level-editor__inspector,#level-editor:not(.sheet-open) .level-editor__save,#level-editor.dock-collapsed aside,#level-editor.dock-collapsed .level-editor__bar,#level-editor.dock-collapsed .level-editor__inspector,#level-editor.dock-collapsed .level-editor__save{display:none!important}
+  #level-editor:not(.details-open) .level-editor__inspector{display:none!important}
+  #level-editor[data-nav-mode=bottom] .level-editor__bottom-nav{height:62px;left:8px;right:8px;bottom:max(8px,env(safe-area-inset-bottom));padding:4px;border:1px solid #a2b9b6;border-radius:18px;background:#192e33f3;box-shadow:0 13px 32px #061115bb}
+  #level-editor[data-nav-mode=bottom] #level-dock-toggle{display:grid;place-items:center;position:absolute;z-index:2;top:-23px;left:50%;width:78px;height:25px;min-height:25px;transform:translateX(-50%);padding:0;border:1px solid #a2b9b6;border-bottom:0;border-radius:23px 23px 0 0;background:#192e33f5;color:#f5ca8c;box-shadow:none;font:800 19px/1 system-ui,sans-serif}
+  #level-editor .level-editor__bottom-nav [data-editor-tab]{min-height:52px;gap:1px;font-size:11px;letter-spacing:.025em}
+  #level-editor .level-editor__bottom-nav [data-editor-tab][aria-current=true]{background:#b9743d;border:1px solid #f1b778;color:#fff6e8}
+  #level-editor[data-nav-mode=bottom].dock-collapsed .level-editor__bottom-nav{left:50%;right:auto;width:72px;height:24px;transform:translateX(-50%);padding:0;border-radius:24px 24px 7px 7px}
+  #level-editor[data-nav-mode=bottom].dock-collapsed .level-editor__bottom-nav [data-editor-tab]{display:none}
+  #level-editor[data-nav-mode=bottom].dock-collapsed #level-dock-toggle{top:-13px;width:72px;height:39px;min-height:39px;border-bottom:1px solid #a2b9b6;border-radius:26px 26px 7px 7px;background:#192e33f5}
+  #level-editor aside,#level-editor .level-editor__bar,#level-editor .level-editor__save,#level-editor .level-editor__inspector{left:8px;right:8px;width:auto;bottom:calc(max(8px,env(safe-area-inset-bottom)) + 70px);max-height:min(46dvh,390px);border-color:#9fbcb9;border-radius:18px;background:linear-gradient(160deg,#21383cf8,#172b30fa)}
+  #level-editor.sheet-open[data-tab=select]:not(.browser-open) aside{height:auto;max-height:none;overflow:visible}
+  #level-editor.sheet-open[data-tab=select]:not(.browser-open) aside> :not(#level-browser-toggle):not(#level-view-quick){display:none!important}
+  #level-editor.sheet-open[data-tab=select] aside>#level-view-quick{display:grid!important;gap:7px}
+  #level-view-quick .level-view__modes{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  #level-view-quick .level-view__sides{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+  #level-view-quick .level-view__sides button{min-height:42px;padding:4px 2px;font-size:11px;font-weight:800;letter-spacing:0}
+  #level-view-quick .level-view__sides button[aria-pressed=true]{background:#a96b3c;border-color:#ffcb8d;color:#fff}
+  #level-view-quick [data-level-view]{min-height:44px;font-weight:800}
+  #level-view-quick [data-level-view][aria-pressed=true]{background:#a96b3c;border-color:#ffcb8d;color:#fff}
+  #level-view-quick label{color:#f6d5a2;font-size:12px;font-weight:800;letter-spacing:.08em}
+  #level-floor-quick{width:100%;min-height:44px;padding:7px 10px;border:1px solid #a2b7b4;border-radius:10px;background:#e5edeb;color:#15282c;font-size:14px!important}
+  #level-camera-mobile{min-height:44px;border-color:#78a9ad;color:#e7faf8;font-size:13px;font-weight:800}
+  #level-camera-mobile[aria-pressed=true]{border-color:#ffc989;background:#9a6234;color:#fff4e4}
+  #level-editor.sheet-open[data-tab=select] #level-browser-toggle{display:block;min-height:44px;background:#315157;border-color:#8dd6d3}
+  #level-editor.browser-open[data-tab=select] aside{height:min(46dvh,390px);overflow:auto}
+  #level-editor.browser-open[data-tab=select] aside>#level-view-quick{display:none!important}
+  #level-editor.browser-open[data-tab=select] #level-group-list{flex:0 0 auto;min-height:38px;overflow-y:hidden}
+  #level-editor.browser-open[data-tab=select] #level-list{flex:1 1 auto;min-height:40px}
+  #level-editor[data-tab=build] aside,#level-editor[data-tab=starts] aside{height:auto;padding:12px}
+  #level-editor.sheet-open[data-tab=build] .level-editor__build-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#f7e8d0}
+  #level-editor .level-editor__build-heading strong{font:800 14px/1.2 system-ui,sans-serif;letter-spacing:.04em}
+  #level-editor .level-editor__build-heading span{font-size:11px;color:#f1c587;font-weight:750}
+  #level-editor[data-tab=build] .level-editor__add{grid-template-columns:repeat(4,minmax(0,1fr));border-top:0;padding-top:3px}
+  #level-editor[data-tab=build] .level-editor__add button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-height:78px;padding:6px 2px;font-size:10px;line-height:1.15;overflow-wrap:anywhere}
+  #level-editor[data-tab=build] .level-editor__add .level-editor__icon{width:26px;height:26px}
+  #level-editor.sheet-open[data-tab=starts] .level-editor__scene-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  #level-editor .level-editor__scene-actions button{min-height:44px;font-size:12px;font-weight:800}
+  #level-editor #level-settings-panel{top:auto;right:8px;bottom:calc(max(8px,env(safe-area-inset-bottom)) + 72px);min-width:185px}
+  #level-editor #level-halo{display:block;position:absolute;z-index:5;width:78px;height:78px;pointer-events:none;filter:drop-shadow(0 7px 12px #071418b8)}
+  #level-editor #level-halo::before{content:'';position:absolute;left:-42px;top:-20px;width:62px;border-top:2px dashed #97eeed;transform:rotate(41deg);transform-origin:right center;opacity:.9}
+  #level-editor #level-halo-badge{position:absolute;left:0;bottom:89px;max-width:175px;padding:7px 10px;border:1px solid #79e2e5;border-radius:9px;background:#153b43f3;color:#ecfeff;font-size:11px;font-weight:850;letter-spacing:.035em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #level-editor #level-halo.halo-right #level-halo-badge{left:auto;right:0}
+  #level-editor #level-halo-handle{display:grid;place-items:center;width:76px;height:76px;min-height:76px;padding:0;border:5px solid #b8e4ff;border-right-color:#e9a965;border-bottom-color:#e9a965;border-radius:50%;background:radial-gradient(circle at center,#20343a 0 26px,#263c43 27px 100%);box-shadow:inset 0 0 0 4px #19292e,0 0 0 5px #0f28338a;color:#edfaf7;font-size:27px;touch-action:none;pointer-events:auto;user-select:none}
+  #level-editor #level-halo-handle span{display:grid;place-items:center;width:38px;height:38px;border:2px solid #c4ebf6;border-radius:50%;background:#172c32}
+}
+@media(max-width:420px){#level-editor[data-tab=build] .level-editor__add{grid-template-columns:repeat(2,minmax(0,1fr))}#level-editor[data-tab=build] .level-editor__add button{min-height:65px;flex-direction:row;font-size:11px}}

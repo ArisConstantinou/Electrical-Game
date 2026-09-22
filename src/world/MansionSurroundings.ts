@@ -51,9 +51,9 @@ export class MansionSurroundings extends THREE.Group {
     albedo.anisotropy = 4;
     const ground = new THREE.MeshStandardMaterial({ name: 'Measured gravel scan over rising Cypriot terrain',
       map: albedo, color: 0xc9c5b4, vertexColors: true, roughness: 1 });
-    const nx = 68, nz = 82, positions: number[] = [], uvs: number[] = [], colors: number[] = [], indices: number[] = [];
+    const nx = 85, nz = 82, positions: number[] = [], uvs: number[] = [], colors: number[] = [], indices: number[] = [];
     for (let iz = 0; iz <= nz; iz++) for (let ix = 0; ix <= nx; ix++) {
-      const x = -3.85 + ix * 84 / nx, z = -43 + iz * 102 / nz;
+      const x = -25 + ix * 105.15 / nx, z = -43 + iz * 102 / nz;
       positions.push(x, this.terrainHeight(x, z), z);
       uvs.push(x / 2.5, z / 2.5);
       const variation = .91 + .065 * Math.sin(x * .17 + z * .13) + .035 * Math.sin(x * .41 - z * .34);

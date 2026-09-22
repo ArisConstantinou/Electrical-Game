@@ -48,7 +48,7 @@ export class Room extends THREE.Group {
     // surface while the main installation wall starts at the PVC phase.
     this.intactPracticeWall = new BrickWall([]);
     this.intactPracticeWall.name = 'Untouched right-hand masonry practice wall';
-    this.intactPracticeWall.userData.studioEntityId = 'world:intact-practice-wall';
+    this.intactPracticeWall.setStudioEntityId('world:intact-practice-wall');
     this.intactPracticeWall.rotation.y = -Math.PI / 2;
     this.intactPracticeWall.position.x = GAME_CONFIG.room.width / 2 - Math.abs(GAME_CONFIG.room.wallFrontZ) - .002;
     this.referenceWalls.push(this.intactPracticeWall);

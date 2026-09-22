@@ -11,6 +11,12 @@ import { MansionSurroundings } from './MansionSurroundings';
 /** First traversable part of the approved ground plan, kept out of the released room. */
 export class MansionGroundWing extends THREE.Group {
   readonly obstacles: PlayerObstacle[] = [];
+  readonly editableWalls = new Map<string, THREE.Group>();
+  readonly editableSurfaces = new Map<string, THREE.Group>();
+  private readonly editableWallColliders = new Map<THREE.Group, { obstacle: PlayerObstacle; matrix: THREE.Matrix4 }>();
+  private readonly corner = new THREE.Vector3();
+  private readonly inverseSurfaceMatrix = new THREE.Matrix4();
+  private emptyTemplate = false;
   readonly courtyard: MansionCourtyard;
   readonly surroundings: MansionSurroundings;
 
@@ -78,7 +84,12 @@ export class MansionGroundWing extends THREE.Group {
 
   update(dt: number): void { this.courtyard.update(dt); this.surroundings.update(dt); }
 
+  setEmptyTemplate(enabled: boolean): void { this.emptyTemplate = enabled; }
+
   surfaceHeight(x: number, z: number, currentFloor = 0): number {
+    const placed = this.editorSurfaceHeight(x, z, currentFloor);
+    if (placed !== null) return placed;
+    if (this.emptyTemplate) return 0;
     const closest = (heights: number[]): number => heights.reduce((best, height) =>
       Math.abs(height - currentFloor) < Math.abs(best - currentFloor) ? height : best);
     const onFirst = x >= 4.8 && x <= 6.2 && z >= 8 && z < 11.08;
@@ -104,9 +115,131 @@ export class MansionGroundWing extends THREE.Group {
     return 0;
   }
 
+  private editorSurfaceHeight(x: number, z: number, currentFloor: number): number | null {
+    let best: number | null = null;
+    let difference = Infinity;
+    for (const surface of this.editableSurfaces.values()) {
+      surface.updateWorldMatrix(true, false);
+      this.corner.set(x, 0, z).applyMatrix4(this.inverseSurfaceMatrix.copy(surface.matrixWorld).invert());
+      const width = surface.userData.length as number;
+      const depth = surface.userData.depth as number;
+      if (Math.abs(this.corner.x) > width / 2 || Math.abs(this.corner.z) > depth / 2) continue;
+      const kind = surface.userData.levelEditorKind as 'floor' | 'stair';
+      const candidate = kind === 'stair'
+        ? surface.position.y + Math.min(11, Math.floor((this.corner.z + depth / 2) / (depth / 11)) + 1) * .15 * surface.scale.y
+        : surface.position.y;
+      const gap = Math.abs(candidate - currentFloor);
+      if (gap < (kind === 'stair' ? 1.8 : .45) && gap < difference) { best = candidate; difference = gap; }
+    }
+    return best;
+  }
+
   obstaclesAt(floorY: number): PlayerObstacle[] {
+    for (const [wall, entry] of this.editableWallColliders) {
+      const obstacle = entry.obstacle;
+      wall.updateWorldMatrix(true, false);
+      if (entry.matrix.equals(wall.matrixWorld)) continue;
+      entry.matrix.copy(wall.matrixWorld);
+      const length = wall.userData.length as number;
+      const alongX = wall.userData.alongX as boolean;
+      const halfX = (alongX ? length : .24) / 2;
+      const halfZ = (alongX ? .24 : length) / 2;
+      obstacle.minX = obstacle.minZ = Infinity;
+      obstacle.maxX = obstacle.maxZ = -Infinity;
+      for (const x of [-halfX, halfX]) for (const z of [-halfZ, halfZ]) {
+        this.corner.set(x, 0, z).applyMatrix4(wall.matrixWorld);
+        obstacle.minX = Math.min(obstacle.minX, this.corner.x);
+        obstacle.maxX = Math.max(obstacle.maxX, this.corner.x);
+        obstacle.minZ = Math.min(obstacle.minZ, this.corner.z);
+        obstacle.maxZ = Math.max(obstacle.maxZ, this.corner.z);
+      }
+      obstacle.minX -= .01; obstacle.maxX += .01;
+      obstacle.minZ -= .01; obstacle.maxZ += .01;
+      this.corner.set(0, 0, 0).applyMatrix4(wall.matrixWorld);
+      obstacle.minFloorY = this.corner.y;
+      this.corner.set(0, 3, 0).applyMatrix4(wall.matrixWorld);
+      obstacle.maxFloorY = this.corner.y;
+    }
     return this.obstacles.filter(obstacle =>
+      (!this.emptyTemplate || obstacle.id.startsWith('Editor ')) &&
       floorY >= (obstacle.minFloorY ?? -Infinity) - .16 && floorY <= (obstacle.maxFloorY ?? Infinity) + .16);
+  }
+
+  addEditorWall(id: string, kind: 'brick-wall' | 'concrete-wall', length = 3): THREE.Group {
+    const name = `Editor ${kind} ${id}`;
+    if (this.editableWalls.has(name)) throw new Error(`Duplicate level wall ${id}`);
+    if (kind === 'brick-wall') {
+      this.wall(name, -length / 2, 0, length / 2, 0);
+      return this.editableWalls.get(name)!;
+    }
+    const group = new THREE.Group();
+    group.name = name;
+    group.userData.studioEntityId = `mansion:wall:${id}`;
+    group.userData.levelEditorKind = kind;
+    group.userData.length = length;
+    group.userData.alongX = true;
+    const mesh = new THREE.Mesh(new RoundedBoxGeometry(length, 3, .24, 2, .01), siteMaterial('concrete', 0xc2b9ad, length / 2, 1.5));
+    mesh.name = `${name} cast face`;
+    mesh.position.y = 1.5;
+    mesh.castShadow = mesh.receiveShadow = true;
+    group.add(mesh);
+    this.add(group);
+    this.editableWalls.set(name, group);
+    const obstacle = { id: name, minX: -length / 2, maxX: length / 2, minZ: -.12, maxZ: .12, minFloorY: 0, maxFloorY: 3 };
+    this.obstacles.push(obstacle);
+    this.editableWallColliders.set(group, { obstacle, matrix: new THREE.Matrix4().makeScale(0, 0, 0) });
+    return group;
+  }
+
+  removeEditorWall(group: THREE.Group): void {
+    this.editableWalls.delete(group.name);
+    this.editableWallColliders.delete(group);
+    const index = this.obstacles.findIndex(item => item.id === group.name);
+    if (index >= 0) this.obstacles.splice(index, 1);
+    group.removeFromParent();
+  }
+
+  addEditorSurface(id: string, kind: 'floor' | 'stair', width = 3, depth = 3.08): THREE.Group {
+    const name = `Editor ${kind} ${id}`;
+    if (this.editableSurfaces.has(name)) throw new Error(`Duplicate level surface ${id}`);
+    const group = new THREE.Group();
+    group.name = name;
+    group.userData.studioEntityId = `mansion:surface:${id}`;
+    group.userData.levelEditorKind = kind;
+    group.userData.length = width;
+    group.userData.depth = depth;
+    const concrete = siteMaterial('concrete', 0xc5bdb1, width / 2, depth / 2);
+    if (kind === 'floor') {
+      const slab = new THREE.Mesh(new RoundedBoxGeometry(width, .18, depth, 2, .01), concrete);
+      slab.name = `${name} supported concrete slab`;
+      slab.position.y = -.09;
+      slab.castShadow = slab.receiveShadow = true;
+      group.add(slab);
+    } else {
+      for (let step = 0; step < 11; step++) {
+        const tread = new THREE.Mesh(new RoundedBoxGeometry(width, .16, depth / 11, 2, .008), concrete);
+        tread.name = `${name} cast step ${step + 1}`;
+        tread.position.set(0, (step + 1) * .15 - .08, -depth / 2 + (step + .5) * depth / 11);
+        tread.castShadow = tread.receiveShadow = true;
+        group.add(tread);
+      }
+      for (const side of [-1, 1]) {
+        const stringer = new THREE.Mesh(new RoundedBoxGeometry(.12, 1.65, depth, 2, .008), concrete);
+        stringer.name = `${name} cast side support`;
+        stringer.position.set(side * (width / 2 + .04), .825, 0);
+        stringer.rotation.x = Math.atan2(1.65, depth);
+        stringer.castShadow = stringer.receiveShadow = true;
+        group.add(stringer);
+      }
+    }
+    this.add(group);
+    this.editableSurfaces.set(name, group);
+    return group;
+  }
+
+  removeEditorSurface(group: THREE.Group): void {
+    this.editableSurfaces.delete(group.name);
+    group.removeFromParent();
   }
 
   private addGroundGarage(): void {
@@ -319,11 +452,20 @@ export class MansionGroundWing extends THREE.Group {
     const alongX = Math.abs(x1 - x0) > Math.abs(z1 - z0);
     const length = Math.hypot(x1 - x0, z1 - z0);
     const centreX = (x0 + x1) / 2, centreZ = (z0 + z1) / 2;
+    const editable = new THREE.Group();
+    editable.name = name;
+    editable.userData.studioEntityId = `mansion:wall:${name.toLowerCase().replaceAll(/[^a-z0-9]+/g, '-')}`;
+    editable.userData.levelEditorKind = 'brick-wall';
+    editable.userData.length = length;
+    editable.userData.alongX = alongX;
+    editable.position.set(centreX, baseY, centreZ);
+    this.add(editable);
+    this.editableWalls.set(name, editable);
     const backing = new THREE.Mesh(new THREE.BoxGeometry(alongX ? length : .20, 3, alongX ? .20 : length), siteMaterial('concrete', 0x8b8176, length / 2, 1.5));
     backing.name = `${name} mortar backing`;
-    backing.position.set(centreX, baseY + 1.5, centreZ);
+    backing.position.set(0, 1.5, 0);
     backing.castShadow = backing.receiveShadow = true;
-    this.add(backing);
+    editable.add(backing);
     const pitch = .38, course = 3 / 23, gap = .006;
     const columns = Math.ceil(length / pitch) + 1, rows = 23;
     const patches = new Float32Array(columns * rows * 4);
@@ -346,15 +488,17 @@ export class MansionGroundWing extends THREE.Group {
       const span = Math.max(0, end - start);
       patches.set(brickFacePatch(row, col, alongX ? 6 : 7), index * 4);
       const coordinate = -length / 2 + (start + end) / 2;
-      const position = new THREE.Vector3(centreX + (alongX ? coordinate : 0), baseY + (row + .5) * course, centreZ + (alongX ? 0 : coordinate));
+      const position = new THREE.Vector3(alongX ? coordinate : 0, (row + .5) * course, alongX ? 0 : coordinate);
       const size = new THREE.Vector3(alongX ? span : .24, span ? course - gap : 0, alongX ? .24 : span);
       bricks.setMatrixAt(index, matrix.compose(position, quaternion, size));
     }
     bricks.computeBoundingSphere();
-    this.add(bricks);
-    this.obstacles.push({ id: name, minX: Math.min(x0, x1) - .12, maxX: Math.max(x0, x1) + .12,
+    editable.add(bricks);
+    const obstacle: PlayerObstacle = { id: name, minX: Math.min(x0, x1) - .12, maxX: Math.max(x0, x1) + .12,
       minZ: Math.min(z0, z1) - .12, maxZ: Math.max(z0, z1) + .12,
-      minFloorY: baseY, maxFloorY: baseY + 3 });
+      minFloorY: baseY, maxFloorY: baseY + 3 };
+    this.obstacles.push(obstacle);
+    this.editableWallColliders.set(editable, { obstacle, matrix: new THREE.Matrix4().makeScale(0, 0, 0) });
   }
 
   private castFrame(x: number, z: number): void {

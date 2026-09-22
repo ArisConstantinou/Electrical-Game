@@ -11,7 +11,9 @@ export class Renderer {
   readonly camera = new THREE.PerspectiveCamera(72, 1, 0.025, 60);
   /** Logical camera owns the body/rig; this detached camera owns only the image. */
   readonly renderCamera = new THREE.PerspectiveCamera(72, 1, 0.025, 60);
-  viewCamera:THREE.PerspectiveCamera|null=null;
+  readonly orthographicRenderCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, .05, 180);
+  private activeRenderCamera:THREE.Camera=this.renderCamera;
+  viewCamera:THREE.PerspectiveCamera|THREE.OrthographicCamera|null=null;
   modelScene:THREE.Scene|null=null;
   modelViewport:{x:number;y:number;width:number;height:number}|null=null;
   eyeYaw = 0;
@@ -217,6 +219,14 @@ export class Renderer {
     });
   }
   private snapshotRenderCamera():void{
+    if(this.viewCamera instanceof THREE.OrthographicCamera){
+      this.viewCamera.updateMatrixWorld(true);
+      this.orthographicRenderCamera.copy(this.viewCamera,false);
+      this.orthographicRenderCamera.updateMatrixWorld(true);
+      this.activeRenderCamera=this.orthographicRenderCamera;
+      return;
+    }
+    this.activeRenderCamera=this.renderCamera;
     if(this.viewCamera){this.viewCamera.updateMatrixWorld(true);this.renderCamera.copy(this.viewCamera,false);this.renderCamera.updateMatrixWorld(true);return;}
     this.camera.updateWorldMatrix(true,true);
     // Copy projection too, so resizing and Studio lens changes are reflected
@@ -263,9 +273,9 @@ export class Renderer {
   }
   async waitForFrame():Promise<void>{await this.ready;await this.renderTask;}
   private drawScene(scene:THREE.Scene):void{
-    const rect=this.modelViewport;if(!rect){this.gpu.render(scene,this.renderCamera);return;}
+    const rect=this.modelViewport;if(!rect){this.gpu.render(scene,this.activeRenderCamera);return;}
     const viewport=this.gpu.getViewport(new THREE.Vector4()),scissor=this.gpu.getScissor(new THREE.Vector4()),test=this.gpu.getScissorTest();
-    try{this.gpu.setViewport(rect.x,rect.y,rect.width,rect.height);this.gpu.setScissor(rect.x,rect.y,rect.width,rect.height);this.gpu.setScissorTest(true);this.gpu.render(scene,this.renderCamera);}
+    try{this.gpu.setViewport(rect.x,rect.y,rect.width,rect.height);this.gpu.setScissor(rect.x,rect.y,rect.width,rect.height);this.gpu.setScissorTest(true);this.gpu.render(scene,this.activeRenderCamera);}
     finally{this.gpu.setViewport(viewport);this.gpu.setScissor(scissor);this.gpu.setScissorTest(test);}
   }
 }

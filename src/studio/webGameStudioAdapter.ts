@@ -5,7 +5,8 @@ const FORMAT = 'web-game-studio-runtime-message' as const;
 const PROTOCOL = 'web-game-studio-adapter' as const;
 const VERSION = 1 as const;
 const GAME_ID = 'wire-the-house-electrical-game';
-const ENTRYPOINT_ID = 'living-room-first-fix';
+const ENTRYPOINT_ID = new URLSearchParams(location.search).get('mansion') === 'preview' ? 'mansion-construction' : 'living-room-first-fix';
+const OVERRIDES_URL = `/__wire-house-studio-overrides?entrypoint=${ENTRYPOINT_ID}`;
 const CAPABILITIES = ['scene-hierarchy', 'object-transforms', 'materials', 'cameras-lights', 'animations', 'physics-bodies', 'physics-colliders', 'physics-joints', 'gameplay-state', 'save-overrides'] as const;
 const ALLOWED_ORIGINS = new Set(['http://127.0.0.1:5347', 'http://localhost:5347']);
 const TOKEN = /^[A-Za-z0-9_-]{32,128}$/;
@@ -22,7 +23,16 @@ let restored = false;
 let persistedOperations: PatchOperation[] = [];
 
 const record = (value: unknown): RecordValue | null => value !== null && typeof value === 'object' && !Array.isArray(value) && [Object.prototype, null].includes(Object.getPrototypeOf(value)) ? value as RecordValue : null;
-const hash = (value: string): string => { let output = 2166136261; for (let index = 0; index < value.length; index += 1) output = Math.imul(output ^ value.charCodeAt(index), 16777619); return (output >>> 0).toString(36); };
+const hash = (value: string): string => {
+  let output = 2166136261, second = 0x9e3779b9;
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    output = Math.imul(output ^ code, 16777619);
+    second = Math.imul(second ^ (code + 17), 2246822519);
+  }
+  const first = (output >>> 0).toString(36);
+  return ENTRYPOINT_ID === 'mansion-construction' ? `${first}-${(second >>> 0).toString(36)}` : first;
+};
 const hierarchyPath = (object: THREE.Object3D): string => {
   const segments: string[] = [];
   let cursor: THREE.Object3D | null = object;
@@ -38,7 +48,13 @@ const hierarchyPath = (object: THREE.Object3D): string => {
 const nodeId = (object: THREE.Object3D): string => {
   if ((object as THREE.Scene).isScene) return 'node:scene';
   const authored = object.userData.studioEntityId;
-  return `node:${hash(typeof authored === 'string' && authored.trim() ? `authored:${authored.trim()}` : hierarchyPath(object))}`;
+  const stable = typeof authored === 'string' && authored.trim() ? authored.trim() : '';
+  // Factory-made soffits and masonry reuse authored labels; only level-editor
+  // entities own globally unique IDs. Namespace other mansion nodes by path.
+  const identity = ENTRYPOINT_ID === 'mansion-construction'
+    ? stable.startsWith('mansion:wall:') || stable.startsWith('mansion:surface:') ? `authored:${stable}` : `path:${hierarchyPath(object)}|authored:${stable}`
+    : stable ? `authored:${stable}` : hierarchyPath(object);
+  return `node:${hash(identity)}`;
 };
 const property = (path: string, el: string, en: string, kind: string, value: Json, editable = true, group = 'object', extra: RecordValue = {}): RecordValue => ({ path, label: { el, en }, kind, value, editable, group, ...extra });
 const buildContext = (game: Game): Context => {
@@ -47,7 +63,7 @@ const buildContext = (game: Game): Context => {
   const nodes = new Map<string, THREE.Object3D>(), materials = new Map<string, THREE.Material>(), cameras = new Map<string, THREE.Camera>(), lights = new Map<string, THREE.Light>();
   for (const object of objects) {
     const id = nodeId(object);
-    if (nodes.has(id)) throw new Error(`Stable node ID collision: ${id}`);
+    if (nodes.has(id)) throw new Error(`Stable node ID collision: ${id} (${nodes.get(id)!.name} / ${object.name})`);
     nodes.set(id, object);
     const raw = (object as THREE.Mesh).material;
     for (const [slot, material] of (raw ? (Array.isArray(raw) ? raw : [raw]) : []).entries()) if (![...materials.values()].includes(material)) materials.set(`material:${hash(`${id}:${slot}:${material.type}:${material.name}`)}`, material);
@@ -111,7 +127,7 @@ const applyOperation = (game: Game, operation: PatchOperation): (() => void) => 
 
 const restoreOverrides = async (game: Game): Promise<void> => {
   if (restored) return; restored = true;
-  try { const response = await fetch('/__wire-house-studio-overrides', { cache: 'no-store' }); if (!response.ok) return; const payload = record(await response.json()); if (!payload || payload.version !== 1 || !Array.isArray(payload.operations)) return; for (const raw of payload.operations) { const item = record(raw); if (item) applyOperation(game, item as unknown as PatchOperation); } persistedOperations = payload.operations.filter(item => record(item)) as PatchOperation[]; } catch { /* A missing sidecar is the clean initial state. */ }
+  try { const response = await fetch(OVERRIDES_URL, { cache: 'no-store' }); if (!response.ok) return; const payload = record(await response.json()); if (!payload || payload.version !== 1 || !Array.isArray(payload.operations)) return; for (const raw of payload.operations) { const item = record(raw); if (item) applyOperation(game, item as unknown as PatchOperation); } persistedOperations = payload.operations.filter(item => record(item)) as PatchOperation[]; } catch { /* A missing sidecar is the clean initial state. */ }
 };
 
 const handleMessage = async (event: MessageEvent<unknown>): Promise<void> => {
@@ -135,7 +151,7 @@ const handleMessage = async (event: MessageEvent<unknown>): Promise<void> => {
   if (message.type === 'studio/save') {
     const baseRevision = typeof message.baseRevision === 'number' ? message.baseRevision : -1;
     if (baseRevision !== session.revision) { send(session, { type: 'adapter/save-reject', replyTo: message.messageId, baseRevision: Math.max(0, baseRevision), currentRevision: session.revision, code: 'REVISION_CONFLICT', message: { el: 'Η έκδοση άλλαξε πριν την αποθήκευση.', en: 'The revision changed before save.' } }); return; }
-    try { const response = await fetch('/__wire-house-studio-overrides', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ version: 1, revision: session.revision, operations: persistedOperations }) }); const result = record(await response.json()); if (!response.ok || !result || typeof result.savedAt !== 'string' || typeof result.contentHash !== 'string') throw new Error('Sidecar endpoint rejected the save'); send(session, { type: 'adapter/save-ack', replyTo: message.messageId, revision: session.revision, savedAt: result.savedAt, contentHash: result.contentHash }); }
+    try { const response = await fetch(OVERRIDES_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ version: 1, revision: session.revision, operations: persistedOperations }) }); const result = record(await response.json()); if (!response.ok || !result || typeof result.savedAt !== 'string' || typeof result.contentHash !== 'string') throw new Error('Sidecar endpoint rejected the save'); send(session, { type: 'adapter/save-ack', replyTo: message.messageId, revision: session.revision, savedAt: result.savedAt, contentHash: result.contentHash }); }
     catch (error) { send(session, { type: 'adapter/save-reject', replyTo: message.messageId, baseRevision, currentRevision: session.revision, code: 'PERSISTENCE_FAILED', message: { el: `Η αποθήκευση απέτυχε: ${error instanceof Error ? error.message : String(error)}`, en: `Save failed: ${error instanceof Error ? error.message : String(error)}` } }); }
   }
 };

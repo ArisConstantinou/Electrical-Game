@@ -247,6 +247,10 @@ export class HUD {
               <h1>WIRE <span>THE HOUSE</span></h1>
               <div class="start-actions">
                 <button id="start-button" type="button">START</button>
+                <span id="start-level-current" class="start-level-current">BASIC · ORIGINAL</span>
+                <button id="start-level-editor" type="button" disabled>LEVEL EDITOR</button>
+                <div class="start-level-actions"><button id="start-load" type="button">▤ LOAD LEVEL</button><button id="start-new" type="button">✣ NEW SITE</button></div>
+                <section id="start-level-picker" class="start-level-picker" aria-label="Choose a level" hidden><div class="start-level-picker__heading"><b>LOAD LEVEL</b><button id="start-level-picker-close" type="button" aria-label="Close level list">✕</button></div><div id="start-level-list"></div></section>
                 <div class="start-utilities" aria-label="Preview and settings">
                   <button id="start-models" type="button" aria-label="Open 3D models" title="3D Models">
                     <svg viewBox="0 0 32 32" aria-hidden="true"><path d="m16 3 11 6-11 6L5 9zM5 9v13l11 7 11-7V9M16 15v14"/></svg><span>3D MODELS</span>

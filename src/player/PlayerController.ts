@@ -28,6 +28,7 @@ export class PlayerController {
   private wallAssistEnabled = true;
   private obstacleProvider:(()=>readonly PlayerObstacle[])|null=null;
   private mansionPreview=false;
+  private emptySite=false;
   private surfaceProvider:((x:number,z:number,currentFloor:number)=>number)|null=null;
   collisionContacts:string[]=[];
 
@@ -38,6 +39,7 @@ export class PlayerController {
 
   setObstacleProvider(provider:()=>readonly PlayerObstacle[]):void { this.obstacleProvider=provider; }
   setMansionPreview(enabled:boolean):void { this.mansionPreview=enabled; }
+  setEmptySite(enabled:boolean):void { this.emptySite=enabled; }
   setSurfaceProvider(provider:(x:number,z:number,currentFloor:number)=>number):void { this.surfaceProvider=provider; }
 
   // All tools share direct aiming. A hard eye-only window prevents precise
@@ -128,14 +130,16 @@ export class PlayerController {
       this.velocity.z=(this.camera.position.z-previousZ)/dt;
     }
     const radius = GAME_CONFIG.player.radius;
-    this.camera.position.x = this.mansionPreview
+    this.camera.position.x = this.emptySite
+      ? THREE.MathUtils.clamp(this.camera.position.x, -3.5 + radius, 26.5 - radius)
+      : this.mansionPreview
       ? THREE.MathUtils.clamp(this.camera.position.x, -GAME_CONFIG.room.width / 2 + radius, 18 - radius)
       : THREE.MathUtils.clamp(this.camera.position.x, -GAME_CONFIG.room.width / 2 + radius, GAME_CONFIG.room.width / 2 - radius);
     // The masonry facade stands inside the room's architectural bounds.
     // Apply body clearance independently of tool bracing and view direction:
     // looking along the wall must not disable the player's collision barrier.
-    this.camera.position.z = THREE.MathUtils.clamp(this.camera.position.z, GAME_CONFIG.room.wallFrontZ + radius,
-      this.mansionPreview ? 16 - radius : GAME_CONFIG.room.depth / 2 - radius);
+    this.camera.position.z = THREE.MathUtils.clamp(this.camera.position.z, this.emptySite ? -6 + radius : GAME_CONFIG.room.wallFrontZ + radius,
+      this.emptySite ? 22 - radius : this.mansionPreview ? 16 - radius : GAME_CONFIG.room.depth / 2 - radius);
     // Only adjacent 15 cm risers may change the floor height in one movement
     // step. This prevents entering the elevated return flight from ground level
     // or walking off an unfinished landing through empty air.

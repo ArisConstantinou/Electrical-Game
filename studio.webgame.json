@@ -13,6 +13,11 @@
         "id": "living-room-first-fix",
         "name": { "el": "Σαλόνι — Πρώτη εγκατάσταση", "en": "Living room — First fix" },
         "route": "/Electrical-Game/?studio=1"
+      },
+      {
+        "id": "mansion-construction",
+        "name": { "el": "Έπαυλη υπό κατασκευή", "en": "Mansion construction" },
+        "route": "/Electrical-Game/?studio=1&mansion=preview&renderer=webgl"
       }
     ]
   },

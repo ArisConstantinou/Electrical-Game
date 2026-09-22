@@ -44,6 +44,20 @@ const groundButton=(action:GroundAction,label:string,icon:string,title:string)=>
 /** One independent apprentice. Job confirmation is the only demolition entry point. */
 export class ApprenticeSystem {
   mode:Mode='off';phase:Phase='idle';count=1;
+  private readonly editorStartOverrides = new Map<number, THREE.Vector3>();
+  private readonly editorStartYawOverrides = new Map<number, number>();
+  editorStart(index:number):THREE.Vector3 {
+    if(index<1||index>5)throw new Error('Apprentice index must be 1-5');
+    return (this.editorStartOverrides.get(index) ?? (index===1?this.camera.position:this.crew[index-2]?.camera.position) ?? new THREE.Vector3(2.65,1.65,.25+index*.39)).clone();
+  }
+  editorStartYaw(index:number):number { return this.editorStartYawOverrides.get(index) ?? (index===1?this.camera.rotation.y:this.crew[index-2]?.camera.rotation.y) ?? 0; }
+  setEditorStart(index:number,position:THREE.Vector3,yaw=this.editorStartYaw(index)):void {
+    if(index<1||index>5||!Number.isFinite(position.x)||!Number.isFinite(position.y)||!Number.isFinite(position.z)||!Number.isFinite(yaw))throw new Error('Invalid apprentice start');
+    this.editorStartOverrides.set(index,position.clone());
+    this.editorStartYawOverrides.set(index,yaw);
+    const camera=index===1?this.camera:this.crew[index-2]?.camera;
+    if(camera){camera.position.copy(position);camera.rotation.y=yaw;}
+  }
   readonly ready:Promise<void>;
   readonly body:WorkerBody;
   readonly camera=new THREE.PerspectiveCamera(65,1,.025,60);
@@ -214,7 +228,14 @@ export class ApprenticeSystem {
     const start=document.querySelector<HTMLButtonElement>('#start-button')!;
     if(count>this.crew.length+1){
       start.disabled=true;start.textContent='PREPARING APPRENTICES…';
-      for(let index=this.crew.length+2;index<=count;index++)this.crew.push(new ApprenticeCrewMate(this.game,index,this.pipeBatch,this.pipeYard));
+      for(let index=this.crew.length+2;index<=count;index++){
+        const worker=new ApprenticeCrewMate(this.game,index,this.pipeBatch,this.pipeYard);
+        const start=this.editorStartOverrides.get(index);
+        if(start)worker.camera.position.copy(start);
+        const yaw=this.editorStartYawOverrides.get(index);
+        if(yaw!==undefined)worker.camera.rotation.y=yaw;
+        this.crew.push(worker);
+      }
     }
     this.crewReady=Promise.all(this.crew.slice(0,Math.max(0,count-1)).map(worker=>worker.ready)).then(()=>{});
     await this.crewReady;

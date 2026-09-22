@@ -1,0 +1,1416 @@
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { TransformControls } from 'three/addons/controls/TransformControls.js';
+import type { Game } from '../core/Game';
+import './level-editor.css';
+
+type WallKind = 'brick-wall' | 'concrete-wall';
+type SurfaceKind = 'floor' | 'stair';
+type WallRecord = {
+  id: string;
+  kind: WallKind;
+  length: number;
+  position: [number, number, number];
+  rotationY: number;
+  scale: [number, number, number];
+};
+type SurfaceRecord = {
+  id: string;
+  kind: SurfaceKind;
+  width: number;
+  depth: number;
+  position: [number, number, number];
+  rotationY: number;
+  scale: [number, number, number];
+};
+type GroupRecord = { id: string; name: string; members: string[] };
+type LevelDocument = { version: 1; name?: string; template?: 'mansion' | 'blank'; walls: WallRecord[]; surfaces: SurfaceRecord[]; groups?: GroupRecord[]; playerStart: [number, number, number]; playerStartYaw: number; apprenticeStart: [number, number, number]; apprenticeStarts: [number, number, number][]; apprenticeStartYaws: number[] };
+export type LevelSlot = { id: string; name: string; updatedAt: string; template: 'mansion' | 'blank' };
+const LEGACY_STORAGE_KEY = 'wirehouse:level-editor:mansion:v1';
+const MIGRATED_KEY = 'wirehouse:level-editor:legacy-imported:v1';
+const SLOTS_KEY = 'wirehouse:level-editor:slots:v1';
+const slotKey = (id: string): string => `wirehouse:level-editor:slot:${id}`;
+const validSlotId = (id: string): boolean => /^[0-9a-f-]{36}$/i.test(id);
+const originalSiteSystems = new Set([
+  'Living room first-fix mission', 'Wet mortar, water and construction spills', 'mortar-mixing-station',
+  'ready-mortar-wheelbarrow', 'Recoverable spilled wheelbarrow mortar', 'Water Pro room puddles, runoff and flood',
+  'PVC workshop · 20 × 3 m', 'PVC drilled rebar fasteners', 'PVC physical working piece',
+  'Apprentice cut PVC racks', 'Apprentice 1', 'Apprentice yellow directive', 'Apprentice box preview',
+]);
+export function listLevelSlots(): LevelSlot[] {
+  try {
+    const stored = JSON.parse(localStorage.getItem(SLOTS_KEY) ?? '[]') as unknown;
+    const slots = Array.isArray(stored) ? stored.filter((item): item is LevelSlot => item && typeof item === 'object' &&
+      validSlotId(item.id) && typeof item.name === 'string' && typeof item.updatedAt === 'string' &&
+      (item.template === 'mansion' || item.template === 'blank')) : [];
+    const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (legacy && !localStorage.getItem(MIGRATED_KEY)) {
+      const id = crypto.randomUUID();
+      const entry: LevelSlot = { id, name: 'Previous editor save', updatedAt: new Date().toISOString(), template: 'mansion' };
+      localStorage.setItem(slotKey(id), legacy);
+      slots.push(entry);
+      localStorage.setItem(SLOTS_KEY, JSON.stringify(slots));
+      localStorage.setItem(MIGRATED_KEY, id);
+    }
+    return slots.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  } catch { return []; }
+}
+export async function listAvailableLevelSlots(): Promise<LevelSlot[]> {
+  const slots = listLevelSlots();
+  try {
+    const response = await fetch('/__wire-house-mansion-level?list=1', { cache: 'no-store' });
+    if (!response.ok) return slots;
+    const payload = await response.json() as { slots?: unknown };
+    if (!Array.isArray(payload.slots)) return slots;
+    for (const item of payload.slots) {
+      if (!item || typeof item !== 'object') continue;
+      const candidate = item as Partial<LevelSlot>;
+      if (typeof candidate.id !== 'string' || (candidate.id !== 'legacy' && !validSlotId(candidate.id)) ||
+        typeof candidate.name !== 'string' || typeof candidate.updatedAt !== 'string' ||
+        (candidate.template !== 'mansion' && candidate.template !== 'blank')) continue;
+      if (!slots.some(slot => slot.id === candidate.id)) slots.push(candidate as LevelSlot);
+    }
+  } catch { /* Published builds use browser-local slots. */ }
+  return slots.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+const finiteTriplet = (value: unknown): value is [number, number, number] =>
+  Array.isArray(value) && value.length === 3 && value.every(item => typeof item === 'number' && Number.isFinite(item));
+
+/** Direct editing of mansion wall assemblies. A wall's visual and collision footprint share one transform. */
+export class LevelEditor {
+  readonly panel = document.createElement('section');
+  readonly camera = new THREE.PerspectiveCamera(55, 1, .05, 180);
+  readonly topCamera = new THREE.OrthographicCamera(-8, 8, 16, -16, .05, 180);
+  readonly orbit: OrbitControls;
+  readonly topOrbit: OrbitControls;
+  readonly gizmo: TransformControls;
+  active = false;
+  private selected: THREE.Group | null = null;
+  private readonly selectedObjects = new Set<THREE.Group>();
+  private readonly selectionPivot = new THREE.Group();
+  private readonly pivotMatrix = new THREE.Matrix4();
+  private readonly groups = new Map<string, GroupRecord>();
+  private multiMode = false;
+  private activeGroupId: string | null = null;
+  private added = new Set<string>();
+  private playerStart = new THREE.Vector3();
+  private playerStartYaw = 0;
+  private apprenticeStart = new THREE.Vector3();
+  private readonly apprenticeStarts = new Map<number, THREE.Vector3>();
+  private readonly apprenticeStartYaws = new Map<number, number>();
+  private apprenticeIndex = 1;
+  private playerMarker = new THREE.Mesh(new THREE.ConeGeometry(.22, .6, 12), new THREE.MeshBasicMaterial({ color: 0xffcf43, depthTest: false }));
+  private apprenticeMarker = new THREE.Mesh(new THREE.ConeGeometry(.22, .6, 12), new THREE.MeshBasicMaterial({ color: 0x59d7e5, depthTest: false }));
+  private markerSelection: 'player' | 'apprentice' | null = null;
+  private readonly raycaster = new THREE.Raycaster();
+  private readonly pointer = new THREE.Vector2();
+  private readonly highlights = new Map<THREE.Group, THREE.Group>();
+  private cameraMode: 'orbit' | 'pan' = 'orbit';
+  private readonly touchPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0));
+  private touchDrag: { pointerId: number; mode: 'translate' | 'rotate' | 'scale'; x: number; y: number; position: THREE.Vector3; rotationY: number; scale: THREE.Vector3; planeHit: THREE.Vector3 | null } | null = null;
+  private down: { x: number; y: number } | null = null;
+  private history: LevelDocument[] = [];
+  private historyIndex = -1;
+  private tab: 'select' | 'build' | 'transform' | 'starts' | 'save' = 'select';
+  private viewMode: '3d' | '2d' = '3d';
+  private cameraPreset: 'angle' | 'top' | 'front' | 'back' | 'left' | 'right' = 'angle';
+  private readonly angleViewPosition = new THREE.Vector3(18, 17, 27);
+  private readonly angleViewTarget = new THREE.Vector3(6, 1, 7);
+  private floorIndex = -1;
+  private template: 'mansion' | 'blank' = new URLSearchParams(location.search).get('template') === 'blank' ? 'blank' : 'mansion';
+  private currentSlotId: string | null = null;
+  private readonly originalVisibility = new Map<THREE.Object3D, boolean>();
+  private readonly originalSystemVisibility = new Map<THREE.Object3D, boolean>();
+  private readonly topCutawayVisibility = new Map<THREE.Object3D, boolean>();
+  private readonly topCutawayBounds = new THREE.Box3();
+  private haloElement!: HTMLElement;
+  private readonly haloBounds = new THREE.Box3();
+  private readonly haloCorner = new THREE.Vector3();
+
+  constructor(private readonly game: Game) {
+    const canvas = game.renderer.webgl.domElement;
+    this.camera.position.set(18, 17, 27);
+    this.orbit = new OrbitControls(this.camera, canvas);
+    this.orbit.target.set(6, 1, 7);
+    this.orbit.enableDamping = true;
+    this.orbit.minDistance = 2;
+    this.orbit.maxDistance = 90;
+    this.orbit.enabled = false;
+    this.orbit.update();
+    this.topCamera.position.set(8, 24, 8);
+    this.topCamera.up.set(0, 0, -1);
+    this.topOrbit = new OrbitControls(this.topCamera, canvas);
+    this.topOrbit.target.set(8, 0, 8);
+    this.topOrbit.enableRotate = false;
+    this.topOrbit.touches.ONE = THREE.TOUCH.PAN;
+    this.topOrbit.mouseButtons.LEFT = THREE.MOUSE.PAN;
+    this.topOrbit.enableDamping = true;
+    this.topOrbit.minZoom = .35;
+    this.topOrbit.maxZoom = 8;
+    this.topOrbit.enabled = false;
+    this.topOrbit.update();
+    this.gizmo = new TransformControls(this.camera, canvas);
+    this.gizmo.setSize(.8);
+    this.gizmo.addEventListener('dragging-changed', event => { this.orbit.enabled = this.active && !event.value; });
+    this.gizmo.addEventListener('objectChange', () => { if (this.gizmo.object === this.selectionPivot) this.applyPivotDelta(); this.refreshFields(); });
+    this.gizmo.addEventListener('mouseUp', () => { this.snapWallEnds(); this.refreshFields(); this.recordHistory(); });
+    this.gizmo.getHelper().visible = false;
+    game.renderer.scene.add(this.gizmo.getHelper());
+    this.selectionPivot.name = 'Editor selection centre';
+    game.renderer.scene.add(this.selectionPivot);
+    this.playerStart.copy(game.renderer.camera.position);
+    this.playerStartYaw = game.player.yaw;
+    this.apprenticeStart.copy(game.apprentice.camera.position);
+    for (let index = 1; index <= 5; index++) { this.apprenticeStarts.set(index, game.apprentice.editorStart(index)); this.apprenticeStartYaws.set(index, game.apprentice.editorStartYaw(index)); }
+    for (const [mesh, color, name] of [
+      [this.playerMarker, 0xffcf43, 'Player start'],
+      [this.apprenticeMarker, 0x59d7e5, 'Apprentice start'],
+    ] as const) {
+      mesh.name = name;
+      mesh.material.color.setHex(color);
+      const direction = new THREE.Mesh(new THREE.ConeGeometry(.11, .26, 3), new THREE.MeshBasicMaterial({ color, depthTest: false }));
+      direction.name = `${name} facing direction`;
+      direction.rotation.x = -Math.PI / 2;
+      direction.position.set(0, -.2, -.3);
+      mesh.add(direction);
+      mesh.position.y = -100;
+      mesh.renderOrder = 999;
+      game.renderer.scene.add(mesh);
+    }
+    this.panel.id = 'level-editor';
+    this.panel.hidden = true;
+    this.panel.setAttribute('role', 'dialog');
+    this.panel.setAttribute('aria-label', 'Level Editor');
+    this.panel.innerHTML = `<header><div><small>WIRE THE HOUSE · LIVE SITE</small><h2>LEVEL EDITOR</h2></div><div class="level-editor__header-actions"><button id="level-settings" type="button" aria-label="Editor navigation settings">⚙</button><button id="level-close" type="button" aria-label="Close level editor">✕</button></div></header>
+      <div id="level-settings-panel" hidden><label for="level-nav-mode">EDITOR NAVIGATION</label><select id="level-nav-mode"><option value="bottom">Bottom navigation</option><option value="wheel">Wheel navigation</option></select></div>
+      <button id="level-view-trigger" type="button" aria-expanded="false" aria-controls="level-view-panel">▤ VIEW · ALL</button><div id="level-view-panel" hidden><div class="level-view__modes"><button type="button" data-level-view="3d">◈ ANGLE</button><button type="button" data-level-view="2d">▤ TOP</button></div><label for="level-floor">VISIBLE FLOOR</label><select id="level-floor"><option value="-1">All floors · 3D only</option><option value="-2" disabled>B2 · not built yet</option><option value="-3" disabled>B1 · not built yet</option><option value="0">G-0 · ground</option><option value="1">L1 · first</option><option value="2">L2 · second</option><option value="3">L3 · third</option><option value="4">L4 · fourth</option></select><small>Only the selected level is drawn. Drag empty space to pan in top view; pinch to zoom.</small><button id="level-view-close" type="button">⌄ CLOSE VIEW</button></div>
+      <div class="level-editor__bar"><button id="level-translate" type="button">MOVE</button><button id="level-rotate" type="button">ROTATE</button><button id="level-scale" type="button">SCALE</button><label><input id="level-snap" type="checkbox" checked> SNAP</label><select id="level-grid" aria-label="Snap spacing"><option value="0.1">10 cm</option><option value="0.25" selected>25 cm</option><option value="0.5">50 cm</option><option value="1">1 m</option></select><button id="level-save" type="button">SAVE</button><button id="level-export" type="button">EXPORT</button></div>
+      <aside><label for="level-search">SITE ELEMENTS</label><input id="level-search" type="search" placeholder="Search structures…"><div id="level-list"></div><div class="level-editor__add"><button id="level-add-brick" type="button">+ BRICK WALL</button><button id="level-add-concrete" type="button">+ CONCRETE WALL</button><button id="level-add-floor" type="button">+ FLOOR SLAB</button><button id="level-add-stair" type="button">+ STAIRS</button></div><div class="level-editor__starts"><button id="level-player" type="button">PLAYER START</button><select id="level-apprentice-index" aria-label="Apprentice number"><option value="1">APPRENTICE 1</option><option value="2">APPRENTICE 2</option><option value="3">APPRENTICE 3</option><option value="4">APPRENTICE 4</option><option value="5">APPRENTICE 5</option></select><button id="level-apprentice" type="button">EDIT START</button></div></aside>
+      <section class="level-editor__inspector"><b id="level-name">Select an element</b><p id="level-kind">Tap a structure in the scene or list.</p><div class="level-editor__history"><button id="level-undo" type="button">UNDO</button><button id="level-redo" type="button">REDO</button></div><div class="level-editor__fields"><label>X <input data-axis="x" type="number" step="0.01"></label><label>Y <input data-axis="y" type="number" step="0.01"></label><label>Z <input data-axis="z" type="number" step="0.01"></label><label>WIDTH m <input data-size="x" type="number" min="0.2" step="0.01"></label><label>HEIGHT m <input data-size="y" type="number" min="0.2" step="0.01"></label><label>DEPTH m <input data-size="z" type="number" min="0.05" step="0.01"></label><label>YAW ° <input id="level-yaw" type="number" step="1"></label></div><button id="level-delete" type="button">DELETE ADDED ELEMENT</button><p id="level-status" role="status"></p></section>
+      <section class="level-editor__save"><b>SAVE LEVEL</b><p>Basic stays unchanged. Save your work as a separate named level.</p><label for="level-slot-name">LEVEL NAME</label><input id="level-slot-name" type="text" maxlength="48" value="My Level"><button id="level-save-mobile" type="button">SAVE LEVEL</button><button id="level-save-as" type="button">SAVE AS NEW COPY</button><button id="level-export-mobile" type="button">EXPORT JSON</button><p id="level-save-status" role="status"></p></section>
+      <div id="level-halo" hidden><span id="level-halo-badge">SELECTED</span><button id="level-halo-handle" type="button" aria-label="Drag selected element with current edit tool"><span aria-hidden="true">✥</span></button></div>
+      <nav class="level-editor__bottom-nav" aria-label="Level editor navigation"><button id="level-dock-toggle" type="button" aria-label="Hide editor navigation" aria-expanded="true"><span aria-hidden="true">⌄</span></button><button data-editor-tab="select" type="button">VIEW</button><button data-editor-tab="build" type="button">BUILD</button><button data-editor-tab="transform" type="button">EDIT</button><button data-editor-tab="starts" type="button">SCENE</button><button data-editor-tab="save" type="button">SAVE</button></nav>
+      <nav class="level-editor__wheel" aria-label="Level editor wheel"><div class="level-editor__wheel-ring"><button data-editor-tab="select" type="button">SELECT</button><button data-editor-tab="build" type="button">BUILD</button><button data-editor-tab="transform" type="button">EDIT</button><button data-editor-tab="starts" type="button">STARTS</button><button data-editor-tab="save" type="button">SAVE</button></div><button id="level-wheel-toggle" type="button" aria-label="Open editor wheel" aria-expanded="false">◎</button></nav>`;
+    this.haloElement = this.el('#level-halo');
+    this.decorateControls();
+    game.hud.shell.append(this.panel);
+    this.bind();
+    this.setToolMode('translate');
+    this.setCameraMode('orbit');
+    this.setFieldsMode('position');
+    let savedMode = 'bottom';
+    try { savedMode = localStorage.getItem('wirehouse:level-editor-nav') ?? 'bottom'; } catch { /* Private browsing can deny storage. */ }
+    this.setNavMode(savedMode === 'wheel' ? 'wheel' : 'bottom');
+    this.setTab('select', false);
+    this.setViewMode('2d');
+    if (this.template === 'blank') {
+      this.playerStart.set(8, this.game.player.eyeHeight, 5);
+      this.game.renderer.camera.position.copy(this.playerStart);
+    }
+    this.setTemplateMode(this.template);
+    this.updateStarts();
+    this.recordHistory();
+  }
+
+  private el<T extends HTMLElement = HTMLElement>(selector: string): T { return this.panel.querySelector<T>(selector)!; }
+  private decorateControls(): void {
+    this.el('.level-editor__header-actions').insertAdjacentHTML('afterbegin', '<button id="level-camera" type="button" aria-label="Switch to camera pan" title="Switch to camera pan"></button>');
+    const paths: Record<string, string> = {
+      select: '<path d="M4 3v17l5-5 3.5 6 2-1-3.5-6 7-.5z"/>',
+      build: '<path d="M3 8h18M3 16h18M8 3v18M16 3v18"/><path d="M3 3h18v18H3z"/>',
+      transform: '<path d="M12 2v20M2 12h20M9 5l3-3 3 3M9 19l3 3 3-3M5 9l-3 3 3 3M19 9l3 3-3 3"/>',
+      starts: '<path d="M12 22s7-7.2 7-12a7 7 0 1 0-14 0c0 4.8 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/>',
+      save: '<path d="M4 3h13l3 3v15H4zM7 3v7h10V3M7 21v-7h10v7"/>',
+      brick: '<path d="M3 5h18v14H3zM3 12h18M8 5v7M16 5v7M12 12v7"/>',
+      concrete: '<path d="m12 2 9 5-9 5-9-5 9-5zM3 7v10l9 5 9-5V7M12 12v10"/>',
+      floor: '<path d="m3 8 9-5 9 5-9 5-9-5zM3 13l9 5 9-5M3 18l9 5 9-5"/>',
+      stair: '<path d="M2 20h5v-5h5v-5h5V5h5"/>',
+      rotate: '<path d="M20 11a8 8 0 1 1-2.3-5.7M20 4v5h-5"/>',
+      scale: '<path d="M4 20 20 4M13 4h7v7M4 13v7h7"/>',
+      undo: '<path d="M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-2"/>',
+      redo: '<path d="m15 14 5-5-5-5M20 9H10a6 6 0 0 0 0 12h2"/>',
+      export: '<path d="M12 3v13m-4-4 4 4 4-4M4 17v4h16v-4"/>',
+      settings: '<circle cx="12" cy="12" r="3"/><path d="M10 2h4l.5 2.3 2 .8 2-1.2 2.8 2.8-1.2 2 .8 2L23 11v4l-2.3.5-.8 2 1.2 2-2.8 2.8-2-1.2-2 .8L14 24h-4l-.5-2.3-2-.8-2 1.2-2.8-2.8 1.2-2-.8-2L1 15v-4l2.3-.5.8-2-1.2-2L5.7 3.7l2 1.2 2-.8z"/>',
+      close: '<path d="M4 4 20 20M20 4 4 20"/>',
+      pan: '<path d="M12 2v20M2 12h20M9 5l3-3 3 3M9 19l3 3 3-3M5 9l-3 3 3 3M19 9l3 3-3 3"/>',
+    };
+    const icon = (name: string): string => `<svg class="level-editor__icon" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name]}</svg>`;
+    const controls: Record<string, string> = {
+      '[data-editor-tab="select"]': 'select', '[data-editor-tab="build"]': 'build', '[data-editor-tab="transform"]': 'transform',
+      '[data-editor-tab="starts"]': 'starts', '[data-editor-tab="save"]': 'save',
+      '#level-add-brick': 'brick', '#level-add-concrete': 'concrete', '#level-add-floor': 'floor', '#level-add-stair': 'stair',
+      '#level-translate': 'transform', '#level-rotate': 'rotate', '#level-scale': 'scale',
+      '#level-player': 'starts', '#level-apprentice': 'starts', '#level-save': 'save', '#level-save-mobile': 'save',
+      '#level-export': 'export', '#level-export-mobile': 'export', '#level-undo': 'undo', '#level-redo': 'redo',
+      '#level-settings': 'settings', '#level-close': 'close',
+      '#level-camera': 'pan',
+    };
+    for (const [selector, name] of Object.entries(controls)) this.panel.querySelectorAll<HTMLButtonElement>(selector).forEach(button => {
+      if (selector === '#level-settings' || selector === '#level-close') button.textContent = '';
+      button.classList.add('level-editor__icon-button');
+      button.insertAdjacentHTML('afterbegin', icon(name));
+    });
+    this.panel.querySelector('header h2')?.insertAdjacentHTML('afterend', '<span class="level-editor__scene"><span></span>MANSION · CONSTRUCTION</span>');
+    this.panel.querySelector('aside>label')?.insertAdjacentHTML('beforeend', '<small id="level-count"></small>');
+    this.el('#level-search').insertAdjacentHTML('afterend', '<select id="level-filter" aria-label="Filter site elements"><option value="all">All structures</option><option value="brick-wall">Brick walls</option><option value="concrete-wall">Concrete walls</option><option value="floor">Floor slabs</option><option value="stair">Stairs</option></select>');
+    this.el('#level-filter').insertAdjacentHTML('afterend', '<div id="level-selection-actions"><button id="level-multi-toggle" type="button" aria-pressed="false">MULTI SELECT</button><button id="level-create-group" type="button" disabled>GROUP ITEMS</button></div><div id="level-group-list" aria-label="Saved editor groups"></div>');
+    this.el('aside').insertAdjacentHTML('afterbegin', '<div id="level-view-quick"><div class="level-view__modes"><button type="button" data-level-view="3d">◈ ANGLE</button><button type="button" data-level-view="2d">▤ TOP</button></div><label for="level-floor-quick">VISIBLE FLOOR</label><select id="level-floor-quick" aria-label="Visible floor"><option value="-1">All floors · 3D only</option><option value="0">G-0 · ground</option><option value="1">L1 · first</option><option value="2">L2 · second</option><option value="3">L3 · third</option><option value="4">L4 · fourth</option></select><button id="level-camera-mobile" type="button" aria-pressed="false">◎ ORBIT CAMERA</button></div><button id="level-browser-toggle" type="button" aria-expanded="false">BROWSE ELEMENTS <span>⌃</span></button>');
+    const sidePresets = '<div class="level-view__sides" aria-label="3D side view presets"><button type="button" data-camera-preset="front">↑ FRONT</button><button type="button" data-camera-preset="back">↓ BACK</button><button type="button" data-camera-preset="left">← LEFT</button><button type="button" data-camera-preset="right">→ RIGHT</button></div>';
+    this.el('#level-view-quick .level-view__modes').insertAdjacentHTML('afterend', sidePresets);
+    this.el('#level-view-panel .level-view__modes').insertAdjacentHTML('afterend', sidePresets);
+    this.el('.level-editor__add').insertAdjacentHTML('beforebegin', '<div class="level-editor__build-heading"><strong>▥ BUILD ASSETS</strong><span>STRUCTURE · SNAP 25 cm</span></div>');
+    this.el('.level-editor__starts').insertAdjacentHTML('afterend', '<div class="level-editor__scene-actions"><button id="level-scene-settings" type="button">⚙ SETTINGS</button><button id="level-scene-exit" type="button">✕ EXIT EDITOR</button></div>');
+    this.el('.level-editor__bar').insertAdjacentHTML('beforeend', '<button id="level-details-toggle" type="button" aria-expanded="false">POSITION / SIZE</button>');
+    this.el('#level-name').insertAdjacentHTML('afterend', '<button id="level-details-close" type="button" aria-label="Close editor details">✕</button>');
+    this.el('#level-kind').insertAdjacentHTML('afterend', '<button id="level-focus" type="button">FOCUS IN SCENE</button>');
+    this.el('#level-focus').insertAdjacentHTML('afterend', '<div id="level-group-edit" hidden><label for="level-group-name">GROUP NAME</label><input id="level-group-name" type="text" maxlength="48"><button id="level-ungroup" type="button">UNGROUP</button></div>');
+    this.el('.level-editor__bar').insertAdjacentHTML('beforeend', '<small id="level-touch-help"></small>');
+    this.el('.level-editor__fields').insertAdjacentHTML('beforebegin', '<div id="level-fields-tabs"><button type="button" data-fields-tab="position">POSITION</button><button type="button" data-fields-tab="size">DIMENSIONS</button></div>');
+    this.el<HTMLButtonElement>('#level-focus').disabled = true;
+    this.el<HTMLButtonElement>('#level-delete').disabled = true;
+  }
+  private status(message: string): void { this.el('#level-status').textContent = message; this.el('#level-save-status').textContent = message; }
+  private bind(): void {
+    this.el('#level-close').addEventListener('click', () => this.close());
+    this.el('#level-view-trigger').addEventListener('click', () => {
+      const panel = this.el('#level-view-panel');
+      panel.hidden = !panel.hidden;
+      this.el('#level-view-trigger').setAttribute('aria-expanded', String(!panel.hidden));
+    });
+    this.el('#level-view-close').addEventListener('click', () => {
+      this.el('#level-view-panel').hidden = true;
+      this.el('#level-view-trigger').setAttribute('aria-expanded', 'false');
+    });
+    this.panel.querySelectorAll<HTMLButtonElement>('[data-level-view]').forEach(button => button.addEventListener('click', () => this.setViewMode(button.dataset.levelView === '2d' ? '2d' : '3d')));
+    this.panel.querySelectorAll<HTMLButtonElement>('[data-camera-preset]').forEach(button => button.addEventListener('click', () => this.setSidePreset(button.dataset.cameraPreset as 'front' | 'back' | 'left' | 'right')));
+    this.el<HTMLSelectElement>('#level-floor').addEventListener('change', event => this.setFloorIndex(Number((event.target as HTMLSelectElement).value)));
+    this.el<HTMLSelectElement>('#level-floor-quick').addEventListener('change', event => this.setFloorIndex(Number((event.target as HTMLSelectElement).value)));
+    this.el('#level-undo').addEventListener('click', () => this.moveHistory(-1));
+    this.el('#level-redo').addEventListener('click', () => this.moveHistory(1));
+    this.el('#level-settings').addEventListener('click', () => { this.el('#level-settings-panel').hidden = !this.el('#level-settings-panel').hidden; });
+    this.el('#level-scene-settings').addEventListener('click', () => this.el('#level-settings').click());
+    this.el('#level-scene-exit').addEventListener('click', () => this.close());
+    this.el<HTMLSelectElement>('#level-nav-mode').addEventListener('change', event => this.setNavMode((event.target as HTMLSelectElement).value === 'wheel' ? 'wheel' : 'bottom'));
+    this.panel.querySelectorAll<HTMLButtonElement>('[data-editor-tab]').forEach(button => button.addEventListener('click', () => {
+      const tab = button.dataset.editorTab as typeof this.tab;
+      this.setTab(tab, tab !== this.tab || !this.panel.classList.contains('sheet-open'));
+      this.panel.classList.remove('wheel-open');
+      this.el('#level-wheel-toggle').setAttribute('aria-expanded', 'false');
+    }));
+    this.el('#level-dock-toggle').addEventListener('click', () => {
+      const collapsed = this.panel.classList.toggle('dock-collapsed');
+      if (collapsed) this.panel.classList.remove('sheet-open', 'details-open', 'browser-open');
+      this.el('#level-settings-panel').hidden = true;
+      const toggle = this.el('#level-dock-toggle');
+      toggle.setAttribute('aria-expanded', String(!collapsed));
+      toggle.setAttribute('aria-label', collapsed ? 'Open editor navigation' : 'Hide editor navigation');
+      toggle.querySelector('span')!.textContent = collapsed ? '⌃' : '⌄';
+    });
+    this.el('#level-wheel-toggle').addEventListener('click', () => {
+      const open = this.panel.classList.toggle('wheel-open');
+      this.el('#level-wheel-toggle').setAttribute('aria-expanded', String(open));
+    });
+    const haloHandle = this.el<HTMLButtonElement>('#level-halo-handle');
+    haloHandle.addEventListener('pointerdown', event => {
+      const object = this.gizmo.object;
+      if (!this.active || !object) return;
+      this.pointerRay(event);
+      this.touchPlane.setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 1, 0), object.position);
+      const hit = this.raycaster.ray.intersectPlane(this.touchPlane, new THREE.Vector3());
+      this.touchDrag = { pointerId: event.pointerId, mode: this.gizmo.mode as 'translate' | 'rotate' | 'scale',
+        x: event.clientX, y: event.clientY, position: object.position.clone(), rotationY: object.rotation.y,
+        scale: object.scale.clone(), planeHit: hit?.clone() ?? null };
+      this.orbit.enabled = this.topOrbit.enabled = false;
+      this.gizmo.enabled = false;
+      haloHandle.setPointerCapture(event.pointerId);
+      event.preventDefault();
+    });
+    haloHandle.addEventListener('pointermove', event => this.updateTouchDrag(event));
+    haloHandle.addEventListener('pointerup', event => { this.endTouchDrag(event); });
+    haloHandle.addEventListener('pointercancel', event => { this.endTouchDrag(event); });
+    this.el('#level-save-mobile').addEventListener('click', () => this.el('#level-save').click());
+    this.el('#level-save-as').addEventListener('click', () => void this.save(true));
+    this.el('#level-export-mobile').addEventListener('click', () => this.el('#level-export').click());
+    this.el('#level-translate').addEventListener('click', () => this.setToolMode('translate'));
+    this.el('#level-rotate').addEventListener('click', () => this.setToolMode('rotate'));
+    this.el('#level-scale').addEventListener('click', () => this.setToolMode('scale'));
+    this.el('#level-save').addEventListener('click', () => void this.save());
+    this.el('#level-export').addEventListener('click', () => this.export());
+    this.el('#level-search').addEventListener('input', () => this.refreshList());
+    this.el('#level-filter').addEventListener('change', () => this.refreshList());
+    this.el('#level-multi-toggle').addEventListener('click', () => this.setMultiMode(!this.multiMode));
+    this.el('#level-create-group').addEventListener('click', () => this.createGroup());
+    this.el('#level-group-name').addEventListener('change', () => this.renameGroup());
+    this.el('#level-ungroup').addEventListener('click', () => this.ungroup());
+    this.el('#level-focus').addEventListener('click', () => this.focusSelection());
+    this.el('#level-camera').addEventListener('click', () => this.setCameraMode(this.cameraMode === 'orbit' ? 'pan' : 'orbit'));
+    this.el('#level-camera-mobile').addEventListener('click', () => this.setCameraMode(this.cameraMode === 'orbit' ? 'pan' : 'orbit'));
+    this.el('#level-details-toggle').addEventListener('click', () => this.setDetailsOpen(true));
+    this.el('#level-details-close').addEventListener('click', () => this.setDetailsOpen(false));
+    this.el('#level-browser-toggle').addEventListener('click', () => {
+      const open = this.panel.classList.toggle('browser-open');
+      this.el('#level-browser-toggle').setAttribute('aria-expanded', String(open));
+    });
+    this.panel.querySelectorAll<HTMLButtonElement>('[data-fields-tab]').forEach(button => button.addEventListener('click', () => this.setFieldsMode(button.dataset.fieldsTab === 'size' ? 'size' : 'position')));
+    this.el('#level-add-brick').addEventListener('click', () => this.addWall('brick-wall'));
+    this.el('#level-add-concrete').addEventListener('click', () => this.addWall('concrete-wall'));
+    this.el('#level-add-floor').addEventListener('click', () => this.addSurface('floor'));
+    this.el('#level-add-stair').addEventListener('click', () => this.addSurface('stair'));
+    this.el('#level-player').addEventListener('click', () => this.selectMarker('player'));
+    this.el('#level-apprentice').addEventListener('click', () => this.selectMarker('apprentice'));
+    this.el<HTMLSelectElement>('#level-apprentice-index').addEventListener('change', event => {
+      this.apprenticeIndex = Number((event.target as HTMLSelectElement).value);
+      if (this.markerSelection === 'apprentice') this.selectMarker('apprentice');
+    });
+    this.el('#level-delete').addEventListener('click', () => this.deleteSelected());
+    this.el('#level-snap').addEventListener('change', () => this.setSnap());
+    this.el('#level-grid').addEventListener('change', () => this.setSnap());
+    this.panel.querySelectorAll<HTMLInputElement>('[data-axis],[data-size],#level-yaw').forEach(input => input.addEventListener('change', () => this.applyFields()));
+    const canvas = this.game.renderer.webgl.domElement;
+    canvas.addEventListener('pointerdown', event => {
+      if (event.pointerType === 'touch' && !event.isPrimary && this.touchDrag) {
+        // The first touch may land on a selected wall. Hand control to OrbitControls
+        // when a second finger arrives, so pinch remains possible over that wall.
+        this.touchDrag = null;
+        this.gizmo.enabled = true;
+        this.orbit.enabled = this.active;
+        this.topOrbit.enabled = false;
+        return;
+      }
+      this.beginTouchDrag(event);
+    }, true);
+    canvas.addEventListener('pointerdown', event => { if (this.active) this.down = { x: event.clientX, y: event.clientY }; });
+    document.addEventListener('pointermove', event => {
+      if (!this.touchDrag || this.touchDrag.pointerId !== event.pointerId) return;
+      this.orbit.enabled = this.topOrbit.enabled = false;
+      this.updateTouchDrag(event);
+      event.stopImmediatePropagation();
+    }, true);
+    document.addEventListener('pointerup', event => this.endTouchDrag(event), true);
+    document.addEventListener('pointercancel', event => this.endTouchDrag(event), true);
+    canvas.addEventListener('pointercancel', event => this.endTouchDrag(event));
+    canvas.addEventListener('pointerup', event => {
+      if (this.endTouchDrag(event)) return;
+      if (!this.active || !this.down || Math.hypot(event.clientX - this.down.x, event.clientY - this.down.y) > 6) return;
+      this.down = null;
+      if (this.gizmo.dragging) return;
+      const rect = canvas.getBoundingClientRect();
+      this.pointer.set((event.clientX - rect.left) / rect.width * 2 - 1, -(event.clientY - rect.top) / rect.height * 2 + 1);
+      this.raycaster.setFromCamera(this.pointer, this.camera);
+      const wing = this.game.room.mansionWing;
+      if (!wing) return;
+      const hits = this.raycaster.intersectObjects(this.editables().filter(object => object.visible), true);
+      for (const hit of hits) {
+        let object: THREE.Object3D | null = hit.object;
+        while (object && object.parent !== wing) object = object.parent;
+        if (object instanceof THREE.Group && (wing.editableWalls.get(object.name) === object || wing.editableSurfaces.get(object.name) === object)) { this.selectWall(object, event.ctrlKey || event.shiftKey); return; }
+      }
+    });
+    addEventListener('keydown', event => {
+      if (!this.active) return;
+      if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); this.close(); }
+      if (event.target instanceof Element && event.target.closest('input,select')) event.stopImmediatePropagation();
+    }, true);
+    addEventListener('resize', () => this.resize());
+  }
+
+  private setTab(tab: typeof this.tab, open = true): void {
+    this.tab = tab;
+    this.panel.dataset.tab = tab;
+    this.panel.classList.toggle('sheet-open', open);
+    if (tab !== 'transform') this.setDetailsOpen(false);
+    this.panel.querySelectorAll<HTMLButtonElement>('[data-editor-tab]').forEach(button => button.setAttribute('aria-current', String(button.dataset.editorTab === tab)));
+  }
+  private setDetailsOpen(open: boolean): void {
+    this.panel.classList.toggle('details-open', open);
+    this.el('#level-details-toggle').setAttribute('aria-expanded', String(open));
+  }
+  private setToolMode(mode: 'translate' | 'rotate' | 'scale'): void {
+    this.gizmo.setMode(mode);
+    this.el('#level-halo-handle').setAttribute('aria-label', `Drag selected element to ${mode === 'translate' ? 'move' : mode === 'rotate' ? 'rotate' : 'resize'}`);
+    for (const [id, value] of [['#level-translate', 'translate'], ['#level-rotate', 'rotate'], ['#level-scale', 'scale']] as const)
+      this.el<HTMLButtonElement>(id).setAttribute('aria-pressed', String(value === mode));
+    this.el('#level-touch-help').textContent = mode === 'translate'
+      ? 'Drag element · empty space orbits · pinch zooms'
+      : mode === 'rotate' ? 'Drag element left or right to rotate'
+        : 'Drag element up or down to resize';
+  }
+  private setCameraMode(mode: 'orbit' | 'pan'): void {
+    this.cameraMode = mode;
+    this.orbit.touches.ONE = mode === 'pan' ? THREE.TOUCH.PAN : THREE.TOUCH.ROTATE;
+    this.orbit.mouseButtons.LEFT = mode === 'pan' ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE;
+    const button = this.el<HTMLButtonElement>('#level-camera');
+    button.setAttribute('aria-pressed', String(mode === 'pan'));
+    button.setAttribute('aria-label', mode === 'pan' ? 'Camera pan active; switch to orbit' : 'Camera orbit active; switch to pan');
+    button.title = mode === 'pan' ? 'PAN camera · tap for ORBIT' : 'ORBIT camera · tap for PAN';
+    const mobileButton = this.el<HTMLButtonElement>('#level-camera-mobile');
+    mobileButton.setAttribute('aria-pressed', String(mode === 'pan'));
+    mobileButton.textContent = mode === 'pan' ? '✥ PAN CAMERA' : '◎ ORBIT CAMERA';
+  }
+  private setFieldsMode(mode: 'position' | 'size'): void {
+    this.panel.dataset.fieldsMode = mode;
+    this.panel.querySelectorAll<HTMLButtonElement>('[data-fields-tab]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.fieldsTab === mode)));
+  }
+  private pointerRay(event: PointerEvent): void {
+    const rect = this.game.renderer.webgl.domElement.getBoundingClientRect();
+    this.pointer.set((event.clientX - rect.left) / rect.width * 2 - 1, -(event.clientY - rect.top) / rect.height * 2 + 1);
+    this.raycaster.setFromCamera(this.pointer, this.camera);
+  }
+  private beginTouchDrag(event: PointerEvent): boolean {
+    if (event.pointerType !== 'touch' || !event.isPrimary || !this.active || this.tab !== 'transform') return false;
+    const object = this.selectedObjects.size > 1 ? this.selectionPivot : this.selected ?? (this.markerSelection === 'player' ? this.playerMarker : this.markerSelection === 'apprentice' ? this.apprenticeMarker : null);
+    if (!object) return false;
+    this.pointerRay(event);
+    const targets = this.selectedObjects.size > 1 ? [...this.selectedObjects] : [object];
+    if (!this.raycaster.intersectObjects(targets, true).length) return false;
+    this.touchPlane.setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 1, 0), object.position);
+    const hit = this.raycaster.ray.intersectPlane(this.touchPlane, new THREE.Vector3());
+    this.touchDrag = { pointerId: event.pointerId, mode: this.gizmo.mode as 'translate' | 'rotate' | 'scale',
+      x: event.clientX, y: event.clientY, position: object.position.clone(), rotationY: object.rotation.y,
+      scale: object.scale.clone(), planeHit: hit?.clone() ?? null };
+    this.gizmo.enabled = false;
+    this.down = null;
+    event.preventDefault();
+    return true;
+  }
+  private updateTouchDrag(event: PointerEvent): void {
+    const drag = this.touchDrag;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const object = this.selectedObjects.size > 1 ? this.selectionPivot : this.selected ?? (this.markerSelection === 'player' ? this.playerMarker : this.apprenticeMarker);
+    if (!object) return;
+    if (drag.mode === 'translate') {
+      this.pointerRay(event);
+      const hit = this.raycaster.ray.intersectPlane(this.touchPlane, new THREE.Vector3());
+      if (hit && drag.planeHit) {
+        object.position.x = drag.position.x + hit.x - drag.planeHit.x;
+        object.position.z = drag.position.z + hit.z - drag.planeHit.z;
+      } else {
+        // A screen-space halo can sit above the horizon, where its ray never meets the floor.
+        // Preserve a predictable horizontal drag in that case instead of leaving MOVE inert.
+        const camera = this.camera;
+        const distance = Math.max(1, camera.position.distanceTo(object.position));
+        const metresPerPixel = 2 * distance * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) / Math.max(1, this.panel.clientHeight);
+        const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
+        const forward = camera.getWorldDirection(new THREE.Vector3()).setY(0).normalize();
+        const dx = (event.clientX - drag.x) * metresPerPixel;
+        const dz = -(event.clientY - drag.y) * metresPerPixel;
+        object.position.x = drag.position.x + right.x * dx + forward.x * dz;
+        object.position.z = drag.position.z + right.z * dx + forward.z * dz;
+      }
+    } else if (drag.mode === 'rotate') {
+      const angle = drag.rotationY + (event.clientX - drag.x) * .012;
+      object.rotation.y = this.el<HTMLInputElement>('#level-snap').checked ? Math.round(angle / (Math.PI / 12)) * (Math.PI / 12) : angle;
+    } else if (drag.mode === 'scale') {
+      const factor = THREE.MathUtils.clamp(Math.exp((drag.y - event.clientY) / 170), .25, 4);
+      object.scale.copy(drag.scale).multiplyScalar(factor);
+    }
+    if (object === this.selectionPivot) this.applyPivotDelta();
+    this.refreshFields();
+    event.preventDefault();
+  }
+  private endTouchDrag(event: PointerEvent): boolean {
+    if (!this.touchDrag || this.touchDrag.pointerId !== event.pointerId) return false;
+    const drag = this.touchDrag;
+    this.touchDrag = null;
+    this.orbit.enabled = this.active;
+    this.topOrbit.enabled = false;
+    this.gizmo.enabled = true;
+    if (drag.mode === 'translate') {
+      const object = this.selectedObjects.size > 1 ? this.selectionPivot : this.selected ?? (this.markerSelection === 'player' ? this.playerMarker : this.apprenticeMarker);
+      if (object && this.el<HTMLInputElement>('#level-snap').checked) {
+        const step = Number(this.el<HTMLSelectElement>('#level-grid').value);
+        object.position.x = Math.round(object.position.x / step) * step;
+        object.position.z = Math.round(object.position.z / step) * step;
+      }
+      if (object === this.selectionPivot) this.applyPivotDelta();
+      else this.snapWallEnds();
+    }
+    this.refreshFields();
+    this.recordHistory();
+    return true;
+  }
+  private recordHistory(): void {
+    const document = this.document();
+    if (this.historyIndex >= 0 && JSON.stringify(this.history[this.historyIndex]) === JSON.stringify(document)) return;
+    this.history = this.history.slice(0, this.historyIndex + 1);
+    this.history.push(document);
+    if (this.history.length > 100) this.history.shift();
+    this.historyIndex = this.history.length - 1;
+    this.updateHistoryButtons();
+  }
+  private moveHistory(direction: -1 | 1): void {
+    const next = this.historyIndex + direction;
+    if (next < 0 || next >= this.history.length) return;
+    const detailsOpen = this.panel.classList.contains('details-open');
+    this.historyIndex = next;
+    this.applyDocument(this.history[next]);
+    this.applyFloorVisibility();
+    this.setSelection([...this.selectedObjects].filter(item => this.editables().includes(item)), this.activeGroupId && this.groups.has(this.activeGroupId) ? this.activeGroupId : null);
+    if (detailsOpen) this.setDetailsOpen(true);
+    this.updateHistoryButtons();
+    this.status('Unsaved editor change. SAVE to keep this version.');
+  }
+  private updateHistoryButtons(): void {
+    this.el<HTMLButtonElement>('#level-undo').disabled = this.historyIndex <= 0;
+    this.el<HTMLButtonElement>('#level-redo').disabled = this.historyIndex >= this.history.length - 1;
+  }
+  private setNavMode(mode: 'bottom' | 'wheel'): void {
+    this.panel.dataset.navMode = mode;
+    this.el<HTMLSelectElement>('#level-nav-mode').value = mode;
+    this.panel.classList.remove('wheel-open');
+    try { localStorage.setItem('wirehouse:level-editor-nav', mode); } catch { /* Navigation remains usable in memory. */ }
+  }
+
+  private setViewMode(mode: '3d' | '2d'): void {
+    const previous = this.viewMode;
+    if (previous === '3d' && mode === '2d' && this.cameraPreset === 'angle') {
+      this.angleViewPosition.copy(this.camera.position);
+      this.angleViewTarget.copy(this.orbit.target);
+    }
+    this.viewMode = mode;
+    if (mode === '2d' && this.floorIndex < 0) this.setFloorIndex(0);
+    this.panel.dataset.view = mode;
+    this.orbit.enabled = this.active;
+    this.topOrbit.enabled = false;
+    this.gizmo.camera = this.camera;
+    if (this.active) this.game.renderer.viewCamera = this.camera;
+    this.resize();
+    if (mode === '2d') this.frameTopFloor();
+    else {
+      const floorOffset = this.floorIndex >= 0 ? this.floorIndex * 3.3 - this.angleViewTarget.y + 1.5 : 0;
+      this.camera.position.copy(this.angleViewPosition).add(new THREE.Vector3(0, floorOffset, 0));
+      this.orbit.target.copy(this.angleViewTarget).add(new THREE.Vector3(0, floorOffset, 0));
+      this.orbit.update();
+    }
+    this.cameraPreset = mode === '2d' ? 'top' : 'angle';
+    this.applyFloorVisibility();
+    this.syncPresetButtons();
+    this.updateViewLabel();
+  }
+
+  private setSidePreset(preset: 'front' | 'back' | 'left' | 'right'): void {
+    this.setViewMode('3d');
+    const bounds = new THREE.Box3();
+    const part = new THREE.Box3();
+    const wing = this.game.room.mansionWing;
+    if (wing) for (const object of wing.children) {
+      if (!object.visible || object === wing.surroundings) continue;
+      part.setFromObject(object);
+      if (!part.isEmpty()) bounds.union(part);
+    }
+    const centre = bounds.isEmpty() ? this.orbit.target.clone() : bounds.getCenter(new THREE.Vector3());
+    const targetY = this.floorIndex < 0 ? centre.y : this.floorIndex * 3.3 + 1.5;
+    const distance = THREE.MathUtils.clamp(Math.max(20, this.camera.position.distanceTo(this.orbit.target)), 20, 88);
+    this.orbit.target.set(centre.x, targetY, centre.z);
+    const direction = preset === 'front' ? new THREE.Vector3(0, 0, 1)
+      : preset === 'back' ? new THREE.Vector3(0, 0, -1)
+        : preset === 'left' ? new THREE.Vector3(-1, 0, 0) : new THREE.Vector3(1, 0, 0);
+    this.camera.position.copy(this.orbit.target).addScaledVector(direction, distance);
+    this.orbit.update();
+    this.cameraPreset = preset;
+    this.syncPresetButtons();
+    this.updateViewLabel();
+  }
+
+  private syncPresetButtons(): void {
+    this.panel.querySelectorAll<HTMLButtonElement>('[data-level-view]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.levelView === (this.cameraPreset === 'top' ? '2d' : '3d') && (this.cameraPreset === 'top' || this.cameraPreset === 'angle'))));
+    this.panel.querySelectorAll<HTMLButtonElement>('[data-camera-preset]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.cameraPreset === this.cameraPreset)));
+  }
+
+  private setFloorIndex(index: number): void {
+    if (!Number.isInteger(index) || index < -1 || index > 4) return;
+    if (this.viewMode === '2d' && index === -1) index = 0;
+    const oldY = this.orbit.target.y;
+    this.floorIndex = index;
+    if (index >= 0) {
+      const base = index * 3.3;
+      this.camera.position.y += base + 1.5 - oldY;
+      this.orbit.target.y = base + 1.5;
+      this.orbit.update();
+    }
+    this.applyFloorVisibility();
+    if (this.viewMode === '2d') this.frameTopFloor();
+    this.el<HTMLSelectElement>('#level-floor').value = String(index);
+    this.el<HTMLSelectElement>('#level-floor-quick').value = String(index);
+    this.updateViewLabel();
+    if (this.selectedObjects.size && [...this.selectedObjects].some(object => !object.visible)) this.setSelection([]);
+    this.refreshList();
+  }
+
+  private updateViewLabel(): void {
+    const label = this.floorIndex < 0 ? 'ALL' : this.floorIndex === 0 ? 'G-0' : `L${this.floorIndex}`;
+    this.el('#level-view-trigger').textContent = `▤ ${this.cameraPreset.toUpperCase()} · ${label}`;
+  }
+
+  private applyFloorVisibility(): void {
+    const room = this.game.room;
+    const wing = room.mansionWing;
+    if (!wing) return;
+    this.restoreTopCutaway();
+    for (const object of [...room.children, ...wing.children]) {
+      if (!this.originalVisibility.has(object)) this.originalVisibility.set(object, object.visible);
+      object.visible = this.originalVisibility.get(object)!;
+    }
+    if (this.floorIndex < 0) { this.applyTemplateVisibility(); return; }
+    for (const object of room.children) {
+      if (object !== wing && object !== room.exterior) object.visible = false;
+    }
+    if (this.floorIndex === 0) for (const object of room.children) object.visible = this.originalVisibility.get(object) ?? object.visible;
+    const bounds = new THREE.Box3();
+    for (const object of wing.children) {
+      if (object === wing.surroundings) continue;
+      if (object === wing.courtyard) { object.visible = this.floorIndex === 0; continue; }
+      bounds.setFromObject(object);
+      if (bounds.isEmpty()) continue;
+      const level = Math.floor((bounds.min.y + .3) / 3.3);
+      object.visible = (this.originalVisibility.get(object) ?? true) && level === this.floorIndex;
+    }
+    this.applyTemplateVisibility();
+    this.applyTopCutaway();
+  }
+
+  private applyTopCutaway(): void {
+    if (this.viewMode !== '2d' || this.floorIndex < 0) return;
+    const wing = this.game.room.mansionWing;
+    if (!wing) return;
+    const cutHeight = this.floorIndex * 3.3 + 2.35;
+    wing.traverse(object => {
+      if (!(object instanceof THREE.Mesh) || !object.visible) return;
+      this.topCutawayBounds.setFromObject(object);
+      if (this.topCutawayBounds.isEmpty() || this.topCutawayBounds.min.y < cutHeight) return;
+      this.topCutawayVisibility.set(object, object.visible);
+      object.visible = false;
+    });
+  }
+
+  private restoreTopCutaway(): void {
+    for (const [object, visible] of this.topCutawayVisibility) object.visible = visible;
+    this.topCutawayVisibility.clear();
+  }
+
+  private setTemplateMode(template: 'mansion' | 'blank'): void {
+    this.template = template;
+    this.game.room.mansionWing?.setEmptyTemplate(template === 'blank');
+    this.game.player.setEmptySite(template === 'blank');
+    for (const object of this.game.renderer.scene.children) {
+      if (!originalSiteSystems.has(object.name)) continue;
+      if (!this.originalSystemVisibility.has(object)) this.originalSystemVisibility.set(object, object.visible);
+      object.visible = template === 'blank' ? false : this.originalSystemVisibility.get(object)!;
+    }
+    this.applyFloorVisibility();
+  }
+
+  private applyTemplateVisibility(): void {
+    if (this.template !== 'blank') return;
+    const wing = this.game.room.mansionWing;
+    if (!wing) return;
+    for (const object of this.game.room.children) if (object !== wing) object.visible = false;
+    for (const object of wing.children) if (object !== wing.surroundings && !this.added.has(object.name)) object.visible = false;
+  }
+
+  /** Keep the chosen floor in the usable viewport when switching levels. Pan and pinch can still adjust it. */
+  private frameTopFloor(): void {
+    const wing = this.game.room.mansionWing;
+    if (!wing || this.floorIndex < 0) return;
+    const bounds = new THREE.Box3();
+    const part = new THREE.Box3();
+    for (const object of wing.children) {
+      if (!object.visible || object === wing.surroundings) continue;
+      part.setFromObject(object);
+      if (!part.isEmpty() && Number.isFinite(part.min.x) && Number.isFinite(part.max.z)) bounds.union(part);
+    }
+    if (bounds.isEmpty()) {
+      if (this.template !== 'blank') return;
+      bounds.set(new THREE.Vector3(-3.5, 0, -6), new THREE.Vector3(26.5, 0, 22));
+    }
+    const centre = bounds.getCenter(new THREE.Vector3());
+    const size = bounds.getSize(new THREE.Vector3());
+    const canvas = this.game.renderer.webgl.domElement;
+    const aspect = Math.max(.1, canvas.clientWidth / Math.max(1, canvas.clientHeight));
+    const halfFov = THREE.MathUtils.degToRad(this.camera.fov / 2);
+    const distance = THREE.MathUtils.clamp(Math.max(
+      size.x / (2 * Math.tan(halfFov) * aspect * .82),
+      size.z / (2 * Math.tan(halfFov) * .72),
+      8,
+    ), 8, 88);
+    this.orbit.target.set(centre.x, this.floorIndex * 3.3, centre.z);
+    // TOP is a straight-down preset for the same live perspective camera.
+    // OrbitControls stays enabled so a drag can tilt this view immediately.
+    this.camera.position.set(centre.x, this.floorIndex * 3.3 + distance, centre.z);
+    this.orbit.update();
+  }
+
+  private restoreVisibility(): void {
+    this.restoreTopCutaway();
+    for (const [object, visible] of this.originalVisibility) object.visible = visible;
+    this.originalVisibility.clear();
+    this.applyTemplateVisibility();
+  }
+
+  async open(): Promise<void> {
+    if (this.active || !this.game.room.mansionWing) return;
+    await this.game.renderer.waitForFrame();
+    if (document.pointerLockElement) await document.exitPointerLock();
+    this.game.input.resetTransientInput();
+    this.game.mortar.cancel();
+    this.active = true;
+    this.panel.hidden = false;
+    this.game.hud.shell.classList.add('level-editor-open');
+    this.game.renderer.viewCamera = this.camera;
+    this.orbit.enabled = true;
+    this.topOrbit.enabled = false;
+    this.applyFloorVisibility();
+    this.gizmo.getHelper().visible = this.nativeGizmoVisible();
+    this.syncHighlights(this.selectedObjects);
+    this.playerMarker.visible = this.apprenticeMarker.visible = true;
+    this.resize();
+    this.refreshList();
+    this.status('Edit structures live. SAVE writes browser and local project; EXPORT downloads JSON.');
+  }
+
+  close(): void {
+    if (!this.active) return;
+    this.active = false;
+    this.panel.hidden = true;
+    this.orbit.enabled = false;
+    this.topOrbit.enabled = false;
+    this.restoreVisibility();
+    this.touchDrag = null;
+    this.gizmo.enabled = true;
+    this.gizmo.detach();
+    this.syncHighlights([]);
+    this.gizmo.getHelper().visible = false;
+    this.haloElement.hidden = true;
+    this.playerMarker.visible = this.apprenticeMarker.visible = this.active;
+    this.game.renderer.viewCamera = null;
+    this.game.hud.shell.classList.remove('level-editor-open');
+    this.game.input.resetTransientInput();
+    if (!this.game.started) this.game.hud.shell.querySelector('#start-screen')?.classList.remove('hidden');
+  }
+
+  private nativeGizmoVisible(): boolean { return this.active && Boolean(this.gizmo.object) && !matchMedia('(max-width: 1100px)').matches; }
+  private updateHalo(): void {
+    if (!matchMedia('(max-width: 1100px)').matches || this.panel.classList.contains('dock-collapsed') || !this.gizmo.object) { this.haloElement.hidden = true; return; }
+    this.haloBounds.makeEmpty();
+    if (this.selectedObjects.size > 1) for (const item of this.selectedObjects) this.haloBounds.expandByObject(item);
+    else this.haloBounds.setFromObject(this.gizmo.object);
+    if (this.haloBounds.isEmpty()) { this.haloElement.hidden = true; return; }
+    const camera = this.camera;
+    camera.updateMatrixWorld();
+    const canvas = this.game.renderer.webgl.domElement.getBoundingClientRect();
+    const panel = this.panel.getBoundingClientRect();
+    let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity, visible = false;
+    for (const x of [this.haloBounds.min.x, this.haloBounds.max.x])
+      for (const y of [this.haloBounds.min.y, this.haloBounds.max.y])
+        for (const z of [this.haloBounds.min.z, this.haloBounds.max.z]) {
+          const projected = this.haloCorner.set(x, y, z).project(camera);
+          if (projected.z < -1 || projected.z > 1) continue;
+          const sx = canvas.left - panel.left + (projected.x + 1) * canvas.width / 2;
+          const sy = canvas.top - panel.top + (1 - projected.y) * canvas.height / 2;
+          left = Math.min(left, sx); right = Math.max(right, sx);
+          top = Math.min(top, sy); bottom = Math.max(bottom, sy);
+          visible = true;
+        }
+    if (!visible || right < 0 || left > panel.width || bottom < 0 || top > panel.height) { this.haloElement.hidden = true; return; }
+    const sheetHeight = this.panel.classList.contains('sheet-open') ? Math.min(panel.height * .46, 390) + 78 : 80;
+    const maxY = Math.max(90, panel.height - sheetHeight - 82);
+    const x = right + 94 < panel.width ? right + 18 : left - 92;
+    const y = bottom + 96 < panel.height - sheetHeight ? bottom + 16 : top - 95;
+    const haloX = THREE.MathUtils.clamp(x, 8, Math.max(8, panel.width - 82));
+    this.haloElement.style.left = `${haloX}px`;
+    this.haloElement.classList.toggle('halo-right', haloX > panel.width - 180);
+    this.haloElement.style.top = `${THREE.MathUtils.clamp(y, 90, maxY)}px`;
+    this.haloElement.hidden = false;
+  }
+  update(): void {
+    if (!this.active) return;
+    this.orbit.update();
+    if (this.viewMode === '2d') {
+      const height = this.floorIndex * 3.3;
+      const drift = this.orbit.target.y - height;
+      if (Math.abs(drift) > 1e-5) {
+        this.orbit.target.y = height;
+        this.camera.position.y -= drift;
+        this.camera.lookAt(this.orbit.target);
+        this.camera.updateMatrixWorld();
+      }
+    }
+    this.updateHalo();
+  }
+  private resize(): void {
+    const canvas = this.game.renderer.webgl.domElement;
+    this.camera.aspect = Math.max(.1, canvas.clientWidth / Math.max(1, canvas.clientHeight));
+    this.camera.updateProjectionMatrix();
+    const aspect = Math.max(.1, canvas.clientWidth / Math.max(1, canvas.clientHeight));
+    this.topCamera.left = -16 * aspect;
+    this.topCamera.right = 16 * aspect;
+    this.topCamera.top = 16;
+    this.topCamera.bottom = -16;
+    this.topCamera.updateProjectionMatrix();
+    this.gizmo.setSize(canvas.clientWidth <= 700 ? 1.25 : canvas.clientWidth <= 1100 ? 1.05 : .8);
+  }
+  private setSnap(): void {
+    const step = this.el<HTMLInputElement>('#level-snap').checked ? Number(this.el<HTMLSelectElement>('#level-grid').value) : null;
+    this.gizmo.setTranslationSnap(step);
+    this.gizmo.setRotationSnap(step === null ? null : Math.PI / 12);
+    this.gizmo.setScaleSnap(step);
+  }
+  private snapWallEnds(): void {
+    if (!this.selected || !this.game.room.mansionWing?.editableWalls.has(this.selected.name) ||
+      !this.el<HTMLInputElement>('#level-snap').checked || this.gizmo.mode !== 'translate') return;
+    const endpoints = (wall: THREE.Group): THREE.Vector3[] => {
+      const distance = (wall.userData.length as number) / 2;
+      const alongX = wall.userData.alongX as boolean;
+      wall.updateWorldMatrix(true, false);
+      return [-1, 1].map(sign => wall.localToWorld(new THREE.Vector3(alongX ? sign * distance : 0, 0, alongX ? 0 : sign * distance)));
+    };
+    const source = endpoints(this.selected);
+    let best = .38, offset: THREE.Vector3 | null = null;
+    for (const wall of this.game.room.mansionWing.editableWalls.values()) {
+      if (wall === this.selected) continue;
+      for (const from of source) for (const to of endpoints(wall)) {
+        if (Math.abs(from.y - to.y) > .3) continue;
+        const distance = Math.hypot(from.x - to.x, from.z - to.z);
+        if (distance < best) { best = distance; offset = to.clone().sub(from); }
+      }
+    }
+    if (offset) {
+      this.selected.position.x += offset.x;
+      this.selected.position.z += offset.z;
+      this.status('Wall endpoint snapped to neighboring wall.');
+    }
+  }
+  private editables(): THREE.Group[] {
+    const wing = this.game.room.mansionWing;
+    return wing ? [...wing.editableWalls.values(), ...wing.editableSurfaces.values()] : [];
+  }
+  private syncHighlights(targets: Iterable<THREE.Group>): void {
+    const wanted = new Set(targets);
+    for (const [object, overlay] of this.highlights) if (!wanted.has(object)) {
+      overlay.removeFromParent();
+      overlay.traverse(node => {
+        if (node instanceof THREE.Sprite) {
+          const material = node.material as THREE.SpriteMaterial;
+          material.map?.dispose();
+          material.dispose();
+        } else if (node instanceof THREE.Mesh || node instanceof THREE.LineSegments || node instanceof THREE.Points) {
+          node.geometry.dispose();
+          (node.material as THREE.Material).dispose();
+        }
+      });
+      this.highlights.delete(object);
+    }
+    let badgeIndex = 0;
+    for (const object of wanted) {
+      const offset = badgeIndex++ % 3;
+      if (this.highlights.has(object)) continue;
+      const kind = object.userData.levelEditorKind as WallKind | SurfaceKind;
+      const length = object.userData.length as number;
+      const depth = kind === 'floor' || kind === 'stair' ? object.userData.depth as number : .27;
+      const size = kind === 'floor' ? new THREE.Vector3(length, .2, depth)
+        : kind === 'stair' ? new THREE.Vector3(length, 1.7, depth)
+          : new THREE.Vector3(object.userData.alongX ? length : .27, 3.03, object.userData.alongX ? .27 : length);
+      const overlay = new THREE.Group();
+      overlay.name = 'Selected element highlight';
+      overlay.userData.levelEditorHighlight = true;
+      overlay.position.y = kind === 'floor' ? -.09 : kind === 'stair' ? .825 : 1.5;
+      const bounds = new THREE.BoxGeometry(size.x, size.y, size.z);
+      const edgeShape = new THREE.EdgesGeometry(bounds);
+      const edges = new THREE.LineSegments(edgeShape,
+        new THREE.LineBasicMaterial({ color: 0x63efff, depthTest: false, depthWrite: false }));
+      const corners: number[] = [];
+      for (const x of [-1, 1]) for (const y of [-1, 1]) for (const z of [-1, 1])
+        corners.push(x * size.x / 2, y * size.y / 2, z * size.z / 2);
+      const pointGeometry = new THREE.BufferGeometry();
+      pointGeometry.setAttribute('position', new THREE.Float32BufferAttribute(corners, 3));
+      const cornerPoints = new THREE.Points(pointGeometry,
+        new THREE.PointsMaterial({ color: 0x8cfcff, size: 7, sizeAttenuation: false, depthTest: false, depthWrite: false }));
+      bounds.dispose();
+      edges.renderOrder = cornerPoints.renderOrder = 950;
+      edges.raycast = cornerPoints.raycast = () => undefined;
+      overlay.add(edges, cornerPoints);
+      if (!matchMedia('(max-width: 1100px)').matches) {
+        const badgeCanvas = document.createElement('canvas');
+        badgeCanvas.width = 384; badgeCanvas.height = 96;
+        const ctx = badgeCanvas.getContext('2d')!;
+        ctx.fillStyle = '#102930'; ctx.strokeStyle = '#63efff'; ctx.lineWidth = 5;
+        ctx.beginPath(); ctx.roundRect(5, 5, 374, 86, 18); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#63efff'; ctx.beginPath(); ctx.arc(49, 48, 25, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#102930'; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        ctx.beginPath(); ctx.moveTo(37, 48); ctx.lineTo(46, 57); ctx.lineTo(62, 38); ctx.stroke();
+        ctx.fillStyle = '#edfdff'; ctx.font = 'bold 36px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('SELECTED', 225, 49);
+        const badge = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(badgeCanvas), depthTest: false, depthWrite: false, transparent: true }));
+        badge.name = 'Selected element label';
+        badge.position.y = size.y / 2 + .44 + offset * .72;
+        badge.scale.set(2.25, .57, 1);
+        badge.renderOrder = 960;
+        badge.raycast = () => undefined;
+        overlay.add(badge);
+      }
+      object.add(overlay);
+      this.highlights.set(object, overlay);
+    }
+  }
+  private displayName(object: THREE.Group): string {
+    const match = /^Editor (brick-wall|concrete-wall|floor|stair) ([0-9a-f-]{36})$/i.exec(object.name);
+    if (!match) return object.name;
+    const label: Record<string, string> = { 'brick-wall': 'Brick wall', 'concrete-wall': 'Concrete wall', floor: 'Floor slab', stair: 'Stairs' };
+    return `${label[match[1]]} · ${match[2].slice(0, 4).toUpperCase()}`;
+  }
+  private refreshList(): void {
+    const wing = this.game.room.mansionWing;
+    if (!wing) return;
+    const search = this.el<HTMLInputElement>('#level-search').value.toLowerCase();
+    const filter = this.el<HTMLSelectElement>('#level-filter').value;
+    const list = this.el('#level-list');
+    list.replaceChildren();
+    let shown = 0;
+    for (const wall of this.editables()) {
+      if (this.floorIndex >= 0 && !wall.visible) continue;
+      if (!wall.name.toLowerCase().includes(search)) continue;
+      if (filter !== 'all' && wall.userData.levelEditorKind !== filter) continue;
+      shown += 1;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = this.displayName(wall);
+      button.classList.toggle('selected', this.selectedObjects.has(wall));
+      button.addEventListener('click', event => this.selectWall(wall, event.ctrlKey || event.shiftKey));
+      list.append(button);
+    }
+    this.el('#level-count').textContent = `${shown} elements`;
+    this.el<HTMLButtonElement>('#level-create-group').disabled = this.selectedObjects.size < 2;
+  }
+  private setMultiMode(enabled: boolean): void {
+    this.multiMode = enabled;
+    const button = this.el<HTMLButtonElement>('#level-multi-toggle');
+    button.setAttribute('aria-pressed', String(enabled));
+    button.textContent = enabled ? `SELECTING · ${this.selectedObjects.size}` : 'MULTI SELECT';
+    if (enabled) this.setTab('select');
+    else if (this.selectedObjects.size) this.setTab('transform');
+    this.refreshList();
+  }
+  private membersOf(group: GroupRecord): THREE.Group[] {
+    const wing = this.game.room.mansionWing;
+    return group.members.map(id => wing?.editableWalls.get(id) ?? wing?.editableSurfaces.get(id)).filter((item): item is THREE.Group => item instanceof THREE.Group && (this.floorIndex < 0 || item.visible));
+  }
+  private refreshGroupsList(): void {
+    const list = this.el('#level-group-list');
+    list.replaceChildren();
+    for (const group of this.groups.values()) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = `${group.name} · ${group.members.length}`;
+      button.classList.toggle('selected', this.activeGroupId === group.id);
+      button.addEventListener('click', () => this.setSelection(this.membersOf(group), group.id, false));
+      list.append(button);
+    }
+  }
+  private setSelection(objects: Iterable<THREE.Group>, groupId: string | null = null, stayOnSelect = false): void {
+    this.setDetailsOpen(false);
+    const valid = new Set(this.editables().filter(object => this.floorIndex < 0 || object.visible));
+    this.selectedObjects.clear();
+    for (const object of objects) if (valid.has(object)) this.selectedObjects.add(object);
+    this.activeGroupId = groupId && this.groups.has(groupId) ? groupId : null;
+    this.markerSelection = null;
+    this.panel.classList.remove('marker-selected');
+    const members = [...this.selectedObjects];
+    this.selected = members.length === 1 ? members[0] : null;
+    this.panel.classList.toggle('multi-selected', members.length > 1);
+    if (members.length === 1) this.gizmo.attach(members[0]);
+    else if (members.length > 1) {
+      const centre = new THREE.Vector3();
+      for (const item of members) centre.add(item.getWorldPosition(new THREE.Vector3()));
+      this.selectionPivot.position.copy(centre.divideScalar(members.length));
+      this.selectionPivot.rotation.set(0, 0, 0);
+      this.selectionPivot.scale.set(1, 1, 1);
+      this.selectionPivot.updateMatrixWorld(true);
+      this.pivotMatrix.copy(this.selectionPivot.matrixWorld);
+      this.gizmo.attach(this.selectionPivot);
+    } else this.gizmo.detach();
+    this.gizmo.getHelper().visible = this.nativeGizmoVisible();
+    this.syncHighlights(members);
+    this.setFieldsMode('position');
+    this.setSnap();
+    this.refreshFields();
+    this.refreshList();
+    this.refreshGroupsList();
+    this.setMultiMode(this.multiMode);
+    if (!stayOnSelect && !this.multiMode && members.length) this.setTab('transform');
+  }
+  private applyPivotDelta(): void {
+    if (this.selectedObjects.size < 2) return;
+    this.selectionPivot.updateMatrixWorld(true);
+    const delta = this.selectionPivot.matrixWorld.clone().multiply(this.pivotMatrix.clone().invert());
+    for (const object of this.selectedObjects) {
+      object.updateWorldMatrix(true, false);
+      const parentInverse = object.parent!.matrixWorld.clone().invert();
+      parentInverse.multiply(delta).multiply(object.matrixWorld).decompose(object.position, object.quaternion, object.scale);
+    }
+    this.pivotMatrix.copy(this.selectionPivot.matrixWorld);
+  }
+  private createGroup(): void {
+    if (this.selectedObjects.size < 2) return;
+    const members = [...this.selectedObjects].map(item => item.name);
+    for (const [id, group] of this.groups) {
+      group.members = group.members.filter(member => !members.includes(member));
+      if (group.members.length < 2) this.groups.delete(id);
+    }
+    const group: GroupRecord = { id: crypto.randomUUID(), name: `Group ${this.groups.size + 1}`, members };
+    this.groups.set(group.id, group);
+    this.multiMode = false;
+    this.setSelection(this.membersOf(group), group.id);
+    this.status(`${group.name} contains ${group.members.length} elements. Move, rotate or scale them together.`);
+    this.recordHistory();
+  }
+  private renameGroup(): void {
+    const group = this.activeGroupId ? this.groups.get(this.activeGroupId) : null;
+    if (!group) return;
+    const name = this.el<HTMLInputElement>('#level-group-name').value.trim();
+    if (!name) return;
+    group.name = name;
+    this.refreshGroupsList();
+    this.refreshFields();
+    this.recordHistory();
+  }
+  private ungroup(): void {
+    if (!this.activeGroupId || !this.groups.delete(this.activeGroupId)) return;
+    this.activeGroupId = null;
+    this.refreshGroupsList();
+    this.refreshFields();
+    this.recordHistory();
+  }
+  private focusSelection(): void {
+    const object = this.selectedObjects.size > 1 ? this.selectionPivot : this.selected ?? (this.markerSelection === 'player' ? this.playerMarker : this.markerSelection === 'apprentice' ? this.apprenticeMarker : null);
+    if (!object) return;
+    const target = new THREE.Vector3();
+    const members = [...this.selectedObjects];
+    if (members.length) {
+      for (const member of members) {
+        const centre = member.getWorldPosition(new THREE.Vector3());
+        const kind = member.userData.levelEditorKind as WallKind | SurfaceKind;
+        centre.y += (kind === 'floor' ? .1 : kind === 'stair' ? .8 : 1.5) * member.scale.y;
+        target.add(centre);
+      }
+      target.divideScalar(members.length);
+    } else target.copy(object.getWorldPosition(new THREE.Vector3()));
+    const direction = this.camera.position.clone().sub(this.orbit.target).setY(0).normalize();
+    if (direction.lengthSq() < .001) direction.set(1, 0, 1).normalize();
+    const spread = members.reduce((largest, member) => Math.max(largest, member.getWorldPosition(new THREE.Vector3()).distanceTo(target)), 0);
+    const distance = THREE.MathUtils.clamp(14 + spread * 2, 14, 28);
+    const selectedNames = new Set(members.map(member => member.name));
+    const obstacles = this.game.room.mansionWing?.obstaclesAt(target.y).filter(obstacle => !selectedNames.has(obstacle.id)) ?? [];
+    const crosses = (eye: THREE.Vector3, obstacle: typeof obstacles[number]): boolean => {
+      let enter = 0, leave = 1;
+      for (const [axis, min, max] of [['x', obstacle.minX - .12, obstacle.maxX + .12], ['z', obstacle.minZ - .12, obstacle.maxZ + .12]] as const) {
+        const step = eye[axis] - target[axis];
+        if (Math.abs(step) < 1e-6) { if (target[axis] < min || target[axis] > max) return false; }
+        else {
+          const a = (min - target[axis]) / step, b = (max - target[axis]) / step;
+          enter = Math.max(enter, Math.min(a, b));
+          leave = Math.min(leave, Math.max(a, b));
+          if (enter > leave) return false;
+        }
+      }
+      return leave > .06 && enter < .98;
+    };
+    let best = target.clone().addScaledVector(direction, distance).add(new THREE.Vector3(0, 1.2, 0));
+    let bestScore = Infinity;
+    for (const angle of [0, Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2, 3 * Math.PI / 4, -3 * Math.PI / 4, Math.PI]) {
+      const candidate = target.clone().addScaledVector(direction.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), angle), distance).add(new THREE.Vector3(0, 1.2, 0));
+      const score = obstacles.reduce((count, obstacle) => count + (crosses(candidate, obstacle) ? 1 : 0), 0) * 100 + Math.abs(angle);
+      if (score < bestScore) { best = candidate; bestScore = score; }
+    }
+    this.camera.position.copy(best);
+    this.orbit.target.copy(target);
+    this.orbit.update();
+  }
+  private selectWall(wall: THREE.Group, additive = false): void {
+    if (this.multiMode || additive) {
+      const next = new Set(this.selectedObjects);
+      if (next.has(wall)) next.delete(wall); else next.add(wall);
+      this.setSelection(next, null, this.multiMode);
+      return;
+    }
+    const group = [...this.groups.values()].find(entry => entry.members.includes(wall.name));
+    this.setSelection(group ? this.membersOf(group) : [wall], group?.id ?? null);
+  }
+  private selectMarker(which: 'player' | 'apprentice'): void {
+    this.selected = null;
+    this.selectedObjects.clear();
+    this.activeGroupId = null;
+    this.multiMode = false;
+    this.panel.classList.remove('multi-selected');
+    this.markerSelection = which;
+    this.panel.classList.add('marker-selected');
+    this.syncHighlights([]);
+    if (which === 'apprentice') {
+      this.apprenticeMarker.position.copy(this.apprenticeStarts.get(this.apprenticeIndex)!).add(new THREE.Vector3(0, -.3, 0));
+      this.apprenticeMarker.rotation.y = this.apprenticeStartYaws.get(this.apprenticeIndex)!;
+    }
+    this.gizmo.attach(which === 'player' ? this.playerMarker : this.apprenticeMarker);
+    this.gizmo.getHelper().visible = this.nativeGizmoVisible();
+    this.setToolMode('translate');
+    this.setFieldsMode('position');
+    this.setSnap();
+    this.refreshFields();
+    this.refreshList();
+    this.refreshGroupsList();
+    this.setTab('transform');
+  }
+  private refreshFields(): void {
+    const object = this.selectedObjects.size > 1 ? this.selectionPivot : this.selected ?? (this.markerSelection === 'player' ? this.playerMarker : this.markerSelection === 'apprentice' ? this.apprenticeMarker : null);
+    this.el<HTMLButtonElement>('#level-focus').disabled = !object;
+    this.el<HTMLButtonElement>('[data-fields-tab="size"]').disabled = Boolean(this.markerSelection) || this.selectedObjects.size > 1;
+    const group = this.activeGroupId ? this.groups.get(this.activeGroupId) : null;
+    this.el('#level-group-edit').hidden = !group;
+    if (group && document.activeElement !== this.el('#level-group-name')) this.el<HTMLInputElement>('#level-group-name').value = group.name;
+    if (!object) { this.el('#level-name').textContent = 'Select an element'; this.el('#level-kind').textContent = 'Tap a structure in the scene or list.'; this.el<HTMLButtonElement>('#level-delete').disabled = true; this.haloElement.hidden = true; return; }
+    this.el('#level-name').textContent = group ? group.name : this.selectedObjects.size > 1 ? `${this.selectedObjects.size} elements selected` : this.markerSelection === 'apprentice' ? `Apprentice ${this.apprenticeIndex} start` : this.selected ? this.displayName(this.selected) : object.name;
+    this.el('#level-halo-badge').textContent = `✓ ${this.el('#level-name').textContent}`;
+    this.el('#level-kind').textContent = this.selectedObjects.size > 1 ? group ? `${this.selectedObjects.size} grouped elements · move, rotate or scale together` : 'Move, rotate or scale together · GROUP ITEMS to save selection' : this.markerSelection ? 'Spawn position · metres' : `${this.selected!.userData.levelEditorKind === 'stair' ? 'STAIRS' : this.selected!.userData.levelEditorKind === 'floor' ? 'FLOOR SLAB' : this.selected!.userData.levelEditorKind === 'brick-wall' ? 'BRICK WALL' : 'CONCRETE WALL'} · live geometry`;
+    const base = this.baseSize();
+    for (const axis of ['x', 'y', 'z'] as const) {
+      this.el<HTMLInputElement>(`[data-axis="${axis}"]`).value = object.position[axis].toFixed(2);
+      this.el<HTMLInputElement>(`[data-size="${axis}"]`).value = this.selectedObjects.size > 1 ? '' : (object.scale[axis] * base[['x', 'y', 'z'].indexOf(axis)]).toFixed(2);
+    }
+    this.el<HTMLInputElement>('#level-yaw').value = THREE.MathUtils.radToDeg(object.rotation.y).toFixed(0);
+    this.el<HTMLButtonElement>('#level-delete').disabled = !this.selected || !this.added.has(this.selected.name);
+    if (this.markerSelection) {
+      if (this.markerSelection === 'player') {
+        this.playerStart.copy(object.position).add(new THREE.Vector3(0, .3, 0));
+        this.playerStartYaw = object.rotation.y;
+        this.game.renderer.camera.position.copy(this.playerStart);
+        this.game.player.yaw = this.playerStartYaw;
+        this.game.renderer.camera.rotation.y = this.playerStartYaw;
+      } else {
+        const start = object.position.clone().add(new THREE.Vector3(0, .3, 0));
+        this.apprenticeStarts.set(this.apprenticeIndex, start);
+        this.apprenticeStartYaws.set(this.apprenticeIndex, object.rotation.y);
+        this.game.apprentice.setEditorStart(this.apprenticeIndex, start, object.rotation.y);
+        if (this.apprenticeIndex === 1) this.apprenticeStart.copy(start);
+      }
+    }
+  }
+  private applyFields(): void {
+    const object = this.selectedObjects.size > 1 ? this.selectionPivot : this.selected ?? (this.markerSelection === 'player' ? this.playerMarker : this.markerSelection === 'apprentice' ? this.apprenticeMarker : null);
+    if (!object) return;
+    const base = this.baseSize();
+    for (const axis of ['x', 'y', 'z'] as const) {
+      const value = Number(this.el<HTMLInputElement>(`[data-axis="${axis}"]`).value);
+      const size = Number(this.el<HTMLInputElement>(`[data-size="${axis}"]`).value);
+      if (Number.isFinite(value)) object.position[axis] = value;
+      if (this.selected && Number.isFinite(size) && size > 0) object.scale[axis] = size / base[['x', 'y', 'z'].indexOf(axis)];
+    }
+    const yaw = Number(this.el<HTMLInputElement>('#level-yaw').value);
+    if (Number.isFinite(yaw)) object.rotation.y = THREE.MathUtils.degToRad(yaw);
+    if (object === this.selectionPivot) this.applyPivotDelta();
+    this.refreshFields();
+    this.recordHistory();
+  }
+  private baseSize(): [number, number, number] {
+    if (!this.selected) return [1, 1, 1];
+    const kind = this.selected.userData.levelEditorKind;
+    return [this.selected.userData.length as number, kind === 'floor' ? .18 : kind === 'stair' ? 1.65 : 3,
+      kind === 'floor' || kind === 'stair' ? this.selected.userData.depth as number : .24];
+  }
+  private addWall(kind: WallKind): void {
+    const wing = this.game.room.mansionWing;
+    if (!wing) return;
+    const id = crypto.randomUUID();
+    const wall = wing.addEditorWall(id, kind);
+    wall.position.set(Math.round(this.orbit.target.x * 4) / 4, Math.max(0, this.floorIndex) * 3.3, Math.round(this.orbit.target.z * 4) / 4);
+    this.added.add(wall.name);
+    this.multiMode = false;
+    this.selectWall(wall);
+    this.status('Wall added. Position, dimensions and collision update live; SAVE to keep it.');
+    this.recordHistory();
+  }
+  private addSurface(kind: SurfaceKind): void {
+    const wing = this.game.room.mansionWing;
+    if (!wing) return;
+    const id = crypto.randomUUID();
+    const surface = wing.addEditorSurface(id, kind);
+    surface.position.set(Math.round(this.orbit.target.x * 4) / 4, this.floorIndex < 0 && kind === 'floor' ? 3.3 : Math.max(0, this.floorIndex) * 3.3, Math.round(this.orbit.target.z * 4) / 4);
+    this.added.add(surface.name);
+    this.multiMode = false;
+    this.selectWall(surface);
+    this.status(`${kind === 'floor' ? 'Floor slab' : 'Stairs'} added. Traverse height updates live; SAVE to keep it.`);
+    this.recordHistory();
+  }
+  private deleteSelected(): void {
+    if (!this.selected || !this.added.has(this.selected.name)) return;
+    if (this.game.room.mansionWing!.editableWalls.has(this.selected.name)) this.game.room.mansionWing!.removeEditorWall(this.selected);
+    else this.game.room.mansionWing!.removeEditorSurface(this.selected);
+    this.added.delete(this.selected.name);
+    for (const [id, group] of this.groups) { group.members = group.members.filter(name => name !== this.selected?.name); if (group.members.length < 2) this.groups.delete(id); }
+    this.setSelection([]);
+    this.recordHistory();
+  }
+  private updateStarts(): void {
+    this.playerMarker.position.copy(this.playerStart).add(new THREE.Vector3(0, -.3, 0));
+    this.playerMarker.rotation.y = this.playerStartYaw;
+    this.apprenticeMarker.position.copy(this.apprenticeStarts.get(this.apprenticeIndex)!).add(new THREE.Vector3(0, -.3, 0));
+    this.apprenticeMarker.rotation.y = this.apprenticeStartYaws.get(this.apprenticeIndex)!;
+    this.playerMarker.visible = this.apprenticeMarker.visible = this.active;
+  }
+  private document(): LevelDocument {
+    const walls: WallRecord[] = [];
+    for (const wall of this.game.room.mansionWing?.editableWalls.values() ?? []) walls.push({
+      id: wall.name, kind: wall.userData.levelEditorKind as WallKind,
+      length: wall.userData.length as number,
+      position: wall.position.toArray() as [number, number, number],
+      rotationY: wall.rotation.y,
+      scale: wall.scale.toArray() as [number, number, number],
+    });
+    const surfaces: SurfaceRecord[] = [];
+    for (const surface of this.game.room.mansionWing?.editableSurfaces.values() ?? []) surfaces.push({
+      id: surface.name, kind: surface.userData.levelEditorKind as SurfaceKind,
+      width: surface.userData.length as number, depth: surface.userData.depth as number,
+      position: surface.position.toArray() as [number, number, number],
+      rotationY: surface.rotation.y,
+      scale: surface.scale.toArray() as [number, number, number],
+    });
+    return { version: 1, template: this.template, walls, surfaces, groups: [...this.groups.values()].map(group => ({ ...group, members: [...group.members] })), playerStart: this.playerStart.toArray() as [number, number, number], playerStartYaw: this.playerStartYaw, apprenticeStart: this.apprenticeStart.toArray() as [number, number, number],
+      apprenticeStarts: Array.from({ length: 5 }, (_, offset) => this.apprenticeStarts.get(offset + 1)!.toArray() as [number, number, number]),
+      apprenticeStartYaws: Array.from({ length: 5 }, (_, offset) => this.apprenticeStartYaws.get(offset + 1)!) };
+  }
+  private async save(asCopy = false): Promise<void> {
+    const document: LevelDocument = { ...this.document(), name: this.el<HTMLInputElement>('#level-slot-name').value.trim().slice(0, 48) || 'My Level' };
+    const name = document.name!;
+    const id = asCopy || !this.currentSlotId ? crypto.randomUUID() : this.currentSlotId;
+    const slot: LevelSlot = { id, name, updatedAt: new Date().toISOString(), template: this.template };
+    try {
+      const slots = listLevelSlots().filter(item => item.id !== id);
+      localStorage.setItem(slotKey(id), JSON.stringify(document));
+      localStorage.setItem(SLOTS_KEY, JSON.stringify([slot, ...slots]));
+      this.currentSlotId = id;
+      const url = new URL(location.href);
+      url.searchParams.set('level', id);
+      url.searchParams.delete('template');
+      history.replaceState(null, '', url);
+      const current = globalThis.document.querySelector('#start-level-current');
+      if (current) current.textContent = `SAVED · ${name}`;
+    } catch (error) { this.status(`Save failed: ${String(error)}`); return; }
+    try {
+      const response = await fetch(`/__wire-house-mansion-level?slot=${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(document) });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      this.status(`${name} saved separately. Basic stays unchanged.`);
+    } catch {
+      this.status(`${name} saved in this browser. EXPORT downloads portable JSON; project-file save requires the local preview.`);
+    }
+  }
+  private export(): void {
+    const file = new Blob([`${JSON.stringify(this.document(), null, 2)}\n`], { type: 'application/json' });
+    const url = URL.createObjectURL(file);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'wire-the-house-mansion-level.json';
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    this.status('Level JSON exported.');
+  }
+  async restoreSelected(): Promise<boolean> {
+    const id = new URLSearchParams(location.search).get('level');
+    if (!id || (id !== 'legacy' && !validSlotId(id))) return false;
+    try {
+      let raw = id === 'legacy' ? null : localStorage.getItem(slotKey(id));
+      if (!raw) {
+        const response = await fetch(id === 'legacy' ? '/__wire-house-mansion-level' : `/__wire-house-mansion-level?slot=${id}`, { cache: 'no-store' });
+        if (!response.ok || response.status === 204) return false;
+        raw = await response.text();
+      }
+      const saved = JSON.parse(raw) as LevelDocument;
+      this.applyDocument(saved);
+      this.currentSlotId = id === 'legacy' ? null : id;
+      const slot = listLevelSlots().find(item => item.id === id);
+      this.el<HTMLInputElement>('#level-slot-name').value = slot?.name ?? saved.name ?? (id === 'legacy' ? 'Previous project save' : 'Saved Level');
+      this.updateStarts();
+      this.history = [this.document()];
+      this.historyIndex = 0;
+      this.updateHistoryButtons();
+      return true;
+    } catch (error) { console.warn('Saved level could not be restored', error); return false; }
+  }
+  private applyDocument(parsed: unknown): void {
+      if (!parsed || typeof parsed !== 'object') return;
+      const data = parsed as Partial<LevelDocument>;
+      if (data.version !== 1 || !Array.isArray(data.walls)) return;
+      this.setTemplateMode(data.template === 'blank' ? 'blank' : 'mansion');
+      const wing = this.game.room.mansionWing;
+      if (!wing) return;
+      const names = new Set([...data.walls.map(wall => wall?.id), ...(data.surfaces ?? []).map(surface => surface?.id)]);
+      for (const name of this.added) if (!names.has(name)) {
+        const wall = wing.editableWalls.get(name);
+        const surface = wing.editableSurfaces.get(name);
+        if (wall) wing.removeEditorWall(wall);
+        if (surface) wing.removeEditorSurface(surface);
+        this.added.delete(name);
+      }
+      for (const record of data.surfaces ?? []) {
+        if (typeof record?.id !== 'string' || !finiteTriplet(record.position) || !finiteTriplet(record.scale) ||
+          !Number.isFinite(record.rotationY) || !Number.isFinite(record.width) || !Number.isFinite(record.depth) ||
+          record.width < .2 || record.depth < .2 || !['floor', 'stair'].includes(record.kind)) continue;
+        let surface = wing.editableSurfaces.get(record.id);
+        if (!surface && record.id.startsWith(`Editor ${record.kind} `)) {
+          const id = record.id.slice(`Editor ${record.kind} `.length);
+          if (!/^[0-9a-f-]{36}$/i.test(id)) continue;
+          surface = wing.addEditorSurface(id, record.kind, record.width, record.depth);
+          this.added.add(surface.name);
+        }
+        if (!surface) continue;
+        surface.position.fromArray(record.position);
+        surface.rotation.y = record.rotationY;
+        surface.scale.fromArray(record.scale);
+      }
+      for (const record of data.walls) {
+        if (typeof record?.id !== 'string' || !finiteTriplet(record.position) || !finiteTriplet(record.scale) ||
+          !Number.isFinite(record.rotationY) || !Number.isFinite(record.length) || record.length < .2 ||
+          !['brick-wall', 'concrete-wall'].includes(record.kind)) continue;
+        let wall = wing.editableWalls.get(record.id);
+        if (!wall && record.id.startsWith('Editor ')) {
+          const id = record.id.slice(`Editor ${record.kind} `.length);
+          if (!/^[0-9a-f-]{36}$/i.test(id)) continue;
+          wall = wing.addEditorWall(id, record.kind, record.length);
+          this.added.add(wall.name);
+        }
+        if (!wall) continue;
+        wall.position.fromArray(record.position);
+        wall.rotation.y = record.rotationY;
+        wall.scale.fromArray(record.scale);
+      }
+      this.groups.clear();
+      if (Array.isArray(data.groups)) for (const group of data.groups) {
+        if (typeof group?.id !== 'string' || typeof group.name !== 'string' || !Array.isArray(group.members)) continue;
+        const members = [...new Set(group.members.filter(id => typeof id === 'string' && (wing.editableWalls.has(id) || wing.editableSurfaces.has(id))))];
+        if (members.length >= 2) this.groups.set(group.id, { id: group.id, name: group.name.slice(0, 48), members });
+      }
+      if (this.activeGroupId && !this.groups.has(this.activeGroupId)) this.activeGroupId = null;
+      if (this.active) this.setSelection([...this.selectedObjects].filter(item => this.editables().includes(item)), this.activeGroupId, this.multiMode);
+      else { this.refreshList(); this.refreshGroupsList(); }
+      if (finiteTriplet(data.playerStart)) { this.playerStart.fromArray(data.playerStart); this.game.renderer.camera.position.copy(this.playerStart); }
+      if (typeof data.playerStartYaw === 'number' && Number.isFinite(data.playerStartYaw)) {
+        this.playerStartYaw = data.playerStartYaw;
+        this.game.player.yaw = data.playerStartYaw;
+        this.game.renderer.camera.rotation.y = data.playerStartYaw;
+      }
+      if (Array.isArray(data.apprenticeStarts)) {
+        for (let offset = 0; offset < Math.min(5, data.apprenticeStarts.length); offset++) {
+          const value = data.apprenticeStarts[offset];
+          if (!finiteTriplet(value)) continue;
+          const start = new THREE.Vector3().fromArray(value);
+          this.apprenticeStarts.set(offset + 1, start);
+          const yaw = typeof data.apprenticeStartYaws?.[offset] === 'number' && Number.isFinite(data.apprenticeStartYaws[offset]) ? data.apprenticeStartYaws[offset] : 0;
+          this.apprenticeStartYaws.set(offset + 1, yaw);
+          this.game.apprentice.setEditorStart(offset + 1, start, yaw);
+        }
+        this.apprenticeStart.copy(this.apprenticeStarts.get(1)!);
+      } else if (finiteTriplet(data.apprenticeStart)) {
+        this.apprenticeStart.fromArray(data.apprenticeStart);
+        this.apprenticeStarts.set(1, this.apprenticeStart.clone());
+        this.game.apprentice.setEditorStart(1, this.apprenticeStart);
+      }
+      this.updateStarts();
+      this.applyFloorVisibility();
+  }
+}

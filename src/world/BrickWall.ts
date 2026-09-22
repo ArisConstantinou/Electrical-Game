@@ -90,6 +90,12 @@ export class BrickWall extends THREE.Group {
   private lastResult: ReturnType<MasonryVolume['impact']> | null = null;
   private lastCoverage = new Map<string, {revision:number; value:number}>();
 
+  setStudioEntityId(id: string): void {
+    this.userData.studioEntityId = id;
+    this.pristine.userData.studioEntityId = `${id}:permanent-field`;
+    for (const [key, chunk] of this.chunks) chunk.userData.studioEntityId = `${id}:patch:${key}`;
+  }
+
   constructor(_definitions: InstallationDefinition[], options: MasonryVolumeOptions = {}) {
     super();
     this.volume = new MasonryVolume(options);
@@ -259,7 +265,7 @@ export class BrickWall extends THREE.Group {
     const geometry=this.geometry(data), previous=this.chunks.get(key);
     if(previous) {previous.geometry.dispose();previous.geometry=geometry;return;}
     const chunk=new THREE.Mesh(geometry,wallMaterial);
-    chunk.name=`Fractured masonry patch ${key}`;chunk.userData.studioEntityId=`world:brick-wall:patch:${key}`;
+    chunk.name=`Fractured masonry patch ${key}`;chunk.userData.studioEntityId=`${this.userData.studioEntityId}:patch:${key}`;
     chunk.castShadow=chunk.receiveShadow=true;this.chunks.set(key,chunk);this.add(chunk);
     const range=this.pristineRanges.get(key);
     if(range) {
