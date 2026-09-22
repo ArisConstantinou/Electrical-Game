@@ -1,0 +1,27 @@
+{
+  "url": "http://127.0.0.1:5365/Electrical-Game/?renderer=webgl",
+  "device": "390x844 DPR3 Chrome mobile emulation on Windows host",
+  "errors": [],
+  "idle": {
+    "frames": 89,
+    "fps": 60.86718643190097,
+    "p95Ms": 19,
+    "maxMs": 22.19999998807907,
+    "drawCalls": 502,
+    "sandUpdateMeanMs": 0.002197801411806882,
+    "sandUpdateWorstMs": 0.09999996423721313
+  },
+  "shoveling": {
+    "frames": 207,
+    "fps": 60.344576275917746,
+    "p95Ms": 19.19999998807907,
+    "maxMs": 25.5,
+    "drawCalls": 507.8695652173913,
+    "sandUpdateMeanMs": 0.1347826085804741,
+    "sandUpdateWorstMs": 1.300000011920929
+  },
+  "sandRemainingKg": 597.76,
+  "surfaceKg": 597.7600009774898,
+  "activeGrainsPeak": 72,
+  "renderError": ""
+}

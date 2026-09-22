@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 const SAND_COLUMNS = 65;
 const SAND_ROWS = 57;
+const SURFACE_GRAINS = 72;
 
 const settleHeights = (heights: Float32Array, columns: number, rows: number,
   dx: number, dz: number, maxSlope: number, passes: number): void => {
@@ -40,12 +41,13 @@ export class SandPileSimulation extends THREE.Mesh {
   private readonly disturbance = new Float32Array(this.columns * this.rows);
   private readonly positions: THREE.BufferAttribute;
   private readonly colors: THREE.BufferAttribute;
-  private readonly grainPositions = new Float32Array(36 * 3);
-  private readonly grainVelocity = new Float32Array(36 * 3);
-  private readonly grainLife = new Float32Array(36);
+  private readonly grainPositions = new Float32Array(SURFACE_GRAINS * 3);
+  private readonly grainVelocity = new Float32Array(SURFACE_GRAINS * 3);
+  private readonly grainLife = new Float32Array(SURFACE_GRAINS);
   private readonly grains: THREE.Points;
   private footprint: THREE.Box3 | null = null;
   private pendingSettle = 0;
+  private disturbedSurface = false;
   private scoopNumber = 0;
   private remainingMassKg: number;
   lastScoop: { x: number; z: number; kg: number; beforeKg: number; afterKg: number } | null = null;
@@ -98,7 +100,7 @@ export class SandPileSimulation extends THREE.Mesh {
     this.castShadow = this.receiveShadow = true;
     const grainsGeometry = new THREE.BufferGeometry();
     grainsGeometry.setAttribute('position', new THREE.BufferAttribute(this.grainPositions, 3).setUsage(THREE.DynamicDrawUsage));
-    this.grains = new THREE.Points(grainsGeometry, new THREE.PointsMaterial({ color: 0xbfa87b, size: .018, sizeAttenuation: true, transparent: true, opacity: .9, depthWrite: false }));
+    this.grains = new THREE.Points(grainsGeometry, new THREE.PointsMaterial({ color: 0xa9926d, size: .011, sizeAttenuation: true, transparent: true, opacity: .92, depthWrite: false }));
     this.grains.name = 'Loose surface grains from the shovel cut';
     this.grains.visible = false;
     this.grains.frustumCulled = false;
@@ -180,6 +182,7 @@ export class SandPileSimulation extends THREE.Mesh {
     if (volume > 1e-7) { this.heights.set(originalHeights); this.disturbance.set(originalDisturbance); return false; }
     this.remainingMassKg -= kg;
     this.pendingSettle = 22;
+    this.disturbedSurface = true;
     this.lastScoop = { x, z, kg, beforeKg, afterKg: this.volumeM3 * this.bulkDensityKgM3 };
     this.spawnGrains(x, z);
     this.refreshGeometry();
@@ -187,18 +190,37 @@ export class SandPileSimulation extends THREE.Mesh {
   }
 
   update(dt: number): void {
+    let colorChanged = false;
+    if (this.disturbedSurface) {
+      const fade = Math.exp(-Math.min(.05, Math.max(0, dt)) * 2.2);
+      let remaining = false;
+      for (let i = 0; i < this.disturbance.length; i++) {
+        const value = this.disturbance[i] * fade;
+        this.disturbance[i] = value > .003 ? value : 0;
+        if (this.disturbance[i] > 0) remaining = true;
+      }
+      this.disturbedSurface = remaining;
+      colorChanged = true;
+    }
     if (this.pendingSettle > 0) {
       this.relax(2); this.pendingSettle--; this.refreshGeometry();
-    }
+    } else if (colorChanged) this.refreshColors();
     let active = false;
     for (let i = 0; i < this.grainLife.length; i++) {
       if (this.grainLife[i] <= 0) continue;
       this.grainLife[i] = Math.max(0, this.grainLife[i] - dt);
       const offset = i * 3;
-      this.grainVelocity[offset + 1] -= 4.6 * dt;
+      this.grainVelocity[offset + 1] -= 7.2 * dt;
       for (let axis = 0; axis < 3; axis++) this.grainPositions[offset + axis] += this.grainVelocity[offset + axis] * dt;
       const ground = this.heightAt(this.grainPositions[offset], this.grainPositions[offset + 2]);
-      if (this.grainPositions[offset + 1] <= ground) this.grainLife[i] = 0;
+      if (this.grainPositions[offset + 1] <= ground) {
+        if (this.grainVelocity[offset + 1] < -.18 && this.grainLife[i] > .08) {
+          this.grainPositions[offset + 1] = ground + .001;
+          this.grainVelocity[offset] *= .5;
+          this.grainVelocity[offset + 1] *= -.18;
+          this.grainVelocity[offset + 2] *= .5;
+        } else this.grainLife[i] = 0;
+      }
       if (this.grainLife[i] <= 0) this.grainPositions[offset + 1] = -10;
       else active = true;
     }
@@ -211,15 +233,19 @@ export class SandPileSimulation extends THREE.Mesh {
   }
 
   private refreshGeometry(): void {
+    for (let i = 0; i < this.heights.length; i++) this.positions.setY(i, this.heights[i] - .004);
+    this.refreshColors();
+    this.positions.needsUpdate = true;
+    this.geometry.computeVertexNormals(); this.geometry.computeBoundingBox(); this.geometry.computeBoundingSphere();
+    this.rebuildFootprint();
+  }
+
+  private refreshColors(): void {
     for (let i = 0; i < this.heights.length; i++) {
-      this.positions.setY(i, this.heights[i] - .004);
       const shade = (.965 + Math.sin(i * 17.13) * .023) * (1 - .24 * this.disturbance[i]);
       this.colors.setXYZ(i, shade, shade, shade);
     }
-    this.positions.needsUpdate = true;
     this.colors.needsUpdate = true;
-    this.geometry.computeVertexNormals(); this.geometry.computeBoundingBox(); this.geometry.computeBoundingSphere();
-    this.rebuildFootprint();
   }
 
   private rebuildFootprint(): void {
@@ -239,10 +265,12 @@ export class SandPileSimulation extends THREE.Mesh {
     this.scoopNumber++;
     for (let i = 0; i < this.grainLife.length; i++) {
       const angle = i * 2.399963 + this.scoopNumber * .75;
-      const radius = .025 + (i % 6) * .012, at = i * 3;
-      this.grainPositions.set([x + Math.cos(angle) * radius, this.heightAt(x, z) + .012 + (i % 5) * .008, z + Math.sin(angle) * radius], at);
-      this.grainVelocity.set([Math.cos(angle) * (.08 + i % 4 * .025), .20 + (i % 5) * .055, Math.sin(angle) * (.08 + i % 3 * .03)], at);
-      this.grainLife[i] = .3 + (i % 4) * .08;
+      const radius = .035 + (i % 8) * .012, at = i * 3;
+      const px = x + Math.cos(angle) * radius, pz = z + Math.sin(angle) * radius;
+      this.grainPositions.set([px, this.heightAt(px, pz) + .006 + (i % 4) * .004, pz], at);
+      const inward = .045 + (i % 5) * .014;
+      this.grainVelocity.set([-Math.cos(angle) * inward, .055 + (i % 4) * .024, -Math.sin(angle) * inward], at);
+      this.grainLife[i] = .22 + (i % 4) * .045;
     }
     this.grains.geometry.getAttribute('position').needsUpdate = true;
     this.grains.visible = true;

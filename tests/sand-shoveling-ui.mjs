@@ -12,6 +12,8 @@ try {
   for (const layout of [
     { name: 'desktop', width: 1366, height: 768, touch: false },
     { name: 'portrait', width: 390, height: 844, touch: true },
+    { name: 'landscape', width: 844, height: 390, touch: true },
+    { name: 'tablet-portrait', width: 820, height: 1180, touch: true },
   ]) {
     const context = await browser.newContext({ viewport: { width: layout.width, height: layout.height }, isMobile: layout.touch, hasTouch: layout.touch });
     await blockPointerLock(context);
@@ -28,7 +30,7 @@ try {
       const game = window.__wireTheHouse, mixing = game.mixing, sand = mixing.models.sand, camera = game.renderer.camera;
       window.__sandUpdateMs = [];
       const update = sand.update.bind(sand);
-      sand.update = dt => { const active = sand.telemetry.pendingSettle > 0, start = performance.now(); update(dt); if (active) window.__sandUpdateMs.push(performance.now() - start); };
+      sand.update = dt => { const active = sand.telemetry.pendingSettle > 0 || sand.disturbedSurface, start = performance.now(); update(dt); if (active) window.__sandUpdateMs.push(performance.now() - start); };
       mixing.setActive(true); mixing.chooseTool('shovel');
       const centre = sand.getWorldPosition(camera.position.clone());
       camera.position.set(centre.x, game.player.eyeHeight, centre.z - 1.17);
@@ -37,12 +39,23 @@ try {
       return { kg: mixing.batch.getState().sandRemainingKg, height: sand.heightAt(-.25, 0) };
     });
     await step(3);
+    const assertReceiptClearOfStance = async phase => {
+      if (layout.name !== 'landscape') return;
+      const receipt = await page.locator('#mixing-receipt').boundingBox();
+      const stand = await page.locator('#mobile-stand').boundingBox();
+      const crouch = await page.locator('#mobile-crouch').boundingBox();
+      const overlaps = (a, b) => a && b && a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+      assert(!overlaps(receipt, stand) && !overlaps(receipt, crouch), `${phase}: mixing receipt must not cover mobile stance controls`);
+    };
+    await assertReceiptClearOfStance('empty bucket');
     const target = await page.evaluate(() => window.__wireTheHouse.mixing.aimedObject()?.kind);
     assert.equal(target, 'sand', `${layout.name}: crosshair selects the visible sand, not a hidden prop`);
     await page.screenshot({ path: `${out}/${layout.name}-before.png` });
     const started = await page.evaluate(() => window.__wireTheHouse.mixing.handleInteractionRequest(true, true));
     assert.equal(started, true);
-    await step(35);
+    await step(28);
+    await page.screenshot({ path: `${out}/${layout.name}-fresh-cut.png` });
+    await step(7);
     const carrying = await page.evaluate(() => {
       const mixing = window.__wireTheHouse.mixing, sand = mixing.models.sand;
       return { activity: mixing.telemetry.activity, held: mixing.batch.getState().heldShovel?.kg ?? 0, cut: sand.telemetry.lastScoop,
@@ -53,6 +66,7 @@ try {
     assert(carrying.cut && Math.abs(carrying.cut.kg - carrying.held) < 1e-6, `${layout.name}: visual cut matches held mass`);
     await page.screenshot({ path: `${out}/${layout.name}-carrying.png` });
     await step(35);
+    await assertReceiptClearOfStance('held shovel load');
     const stream = await page.evaluate(() => {
       const mixing = window.__wireTheHouse.mixing;
       return { visible: mixing.pouring.visible, kind: mixing.pouringKind, grains: mixing.pouring.geometry.getAttribute('position').count };
@@ -74,6 +88,7 @@ try {
     });
     await step(1);
     await step(40);
+    await assertReceiptClearOfStance('deposited sand');
     const after = await page.evaluate(() => {
       const mixing = window.__wireTheHouse.mixing, sand = mixing.models.sand;
       const samples = window.__sandUpdateMs;

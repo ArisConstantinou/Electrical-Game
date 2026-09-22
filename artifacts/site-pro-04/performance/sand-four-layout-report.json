@@ -1,0 +1,187 @@
+{
+  "url": "http://127.0.0.1:5365/Electrical-Game/?renderer=webgl",
+  "cases": [
+    {
+      "layout": "desktop",
+      "before": {
+        "kg": 600,
+        "height": 0.36298228587423054
+      },
+      "carrying": {
+        "activity": "sand",
+        "held": 2.2399999999999998,
+        "cut": {
+          "x": -0.23979655432762792,
+          "z": -0.04775212574671572,
+          "kg": 2.2399999999999998,
+          "beforeKg": 600.0000002123338,
+          "afterKg": 597.7600004793626
+        },
+        "visibleLoad": true
+      },
+      "after": {
+        "sourceKg": 597.76,
+        "surfaceKg": 597.7600009774898,
+        "centreHeight": 0.3395540969712394,
+        "pitHeight": 0.33470935581655914,
+        "batchScoops": 1,
+        "settling": {
+          "frames": 85,
+          "meanMs": 0.31529411287868725,
+          "worstMs": 3
+        },
+        "renderError": ""
+      },
+      "repeated": {
+        "sourceKg": 586.56,
+        "surfaceKg": 586.5600038814281,
+        "cutX": -0.25547423712023587,
+        "cutZ": 0.025619429722688825,
+        "pitHeight": 0.263723509761587,
+        "batchScoops": 6
+      },
+      "external": {
+        "took": true,
+        "sourceKg": 584.3199999999999,
+        "surfaceKg": 584.3200034200881
+      }
+    },
+    {
+      "layout": "portrait",
+      "before": {
+        "kg": 600,
+        "height": 0.36298228587423054
+      },
+      "carrying": {
+        "activity": "sand",
+        "held": 2.2399999999999998,
+        "cut": {
+          "x": -0.23979655432762792,
+          "z": -0.04775212574671439,
+          "kg": 2.2399999999999998,
+          "beforeKg": 600.0000002123338,
+          "afterKg": 597.7600004793626
+        },
+        "visibleLoad": true
+      },
+      "after": {
+        "sourceKg": 597.76,
+        "surfaceKg": 597.7600009774898,
+        "centreHeight": 0.3395540969712394,
+        "pitHeight": 0.33470935581655936,
+        "batchScoops": 1,
+        "settling": {
+          "frames": 85,
+          "meanMs": 0.2776470562990974,
+          "worstMs": 1.4000000357627869
+        },
+        "renderError": ""
+      },
+      "repeated": {
+        "sourceKg": 586.56,
+        "surfaceKg": 586.5600038814281,
+        "cutX": -0.25547423712023587,
+        "cutZ": 0.025619429722691045,
+        "pitHeight": 0.26372350976158704,
+        "batchScoops": 6
+      },
+      "external": {
+        "took": true,
+        "sourceKg": 584.3199999999999,
+        "surfaceKg": 584.3200034200881
+      }
+    },
+    {
+      "layout": "landscape",
+      "before": {
+        "kg": 600,
+        "height": 0.36298228587423054
+      },
+      "carrying": {
+        "activity": "sand",
+        "held": 2.2399999999999998,
+        "cut": {
+          "x": -0.23979655432762792,
+          "z": -0.04775212574671439,
+          "kg": 2.2399999999999998,
+          "beforeKg": 600.0000002123338,
+          "afterKg": 597.7600004793626
+        },
+        "visibleLoad": true
+      },
+      "after": {
+        "sourceKg": 597.76,
+        "surfaceKg": 597.7600009774898,
+        "centreHeight": 0.3395540969712394,
+        "pitHeight": 0.33470935581655936,
+        "batchScoops": 1,
+        "settling": {
+          "frames": 85,
+          "meanMs": 0.28470588081023274,
+          "worstMs": 1.5999999642372131
+        },
+        "renderError": ""
+      },
+      "repeated": {
+        "sourceKg": 586.56,
+        "surfaceKg": 586.5600038814281,
+        "cutX": -0.25547423712023587,
+        "cutZ": 0.025619429722691045,
+        "pitHeight": 0.26372350976158704,
+        "batchScoops": 6
+      },
+      "external": {
+        "took": true,
+        "sourceKg": 584.3199999999999,
+        "surfaceKg": 584.3200034200881
+      }
+    },
+    {
+      "layout": "tablet-portrait",
+      "before": {
+        "kg": 600,
+        "height": 0.36298228587423054
+      },
+      "carrying": {
+        "activity": "sand",
+        "held": 2.2399999999999998,
+        "cut": {
+          "x": -0.23979655432762792,
+          "z": -0.04775212574671439,
+          "kg": 2.2399999999999998,
+          "beforeKg": 600.0000002123338,
+          "afterKg": 597.7600004793626
+        },
+        "visibleLoad": true
+      },
+      "after": {
+        "sourceKg": 597.76,
+        "surfaceKg": 597.7600009774898,
+        "centreHeight": 0.3395540969712394,
+        "pitHeight": 0.33470935581655936,
+        "batchScoops": 1,
+        "settling": {
+          "frames": 85,
+          "meanMs": 0.3164705858511083,
+          "worstMs": 1.800000011920929
+        },
+        "renderError": ""
+      },
+      "repeated": {
+        "sourceKg": 586.56,
+        "surfaceKg": 586.5600038814281,
+        "cutX": -0.25547423712023587,
+        "cutZ": 0.025619429722691045,
+        "pitHeight": 0.26372350976158704,
+        "batchScoops": 6
+      },
+      "external": {
+        "took": true,
+        "sourceKg": 584.3199999999999,
+        "surfaceKg": 584.3200034200881
+      }
+    }
+  ],
+  "errors": [],
+  "passed": true
+}

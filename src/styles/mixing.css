@@ -19,6 +19,7 @@
   .mixing-motor-active #mixing-receipt p{position:absolute;width:1px;height:1px;min-height:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 }
 @media(max-height:540px){#mixing-receipt{left:10px;top:64px;width:285px;padding:7px 10px}#mixing-receipt p{min-height:0}#mixing-receipt dl{margin:4px 0}}
+@media(max-height:540px) and (min-width:700px){#mixing-receipt{width:min(470px,calc(100% - 330px))}#mixing-receipt dt{font-size:12px}#mixing-receipt dd{margin-top:1px;font-size:14px}#mixing-receipt dl{gap:8px;margin:3px 0}}
 #mixing-panel{display:none!important}
 #mixing-panel[hidden],#mixing-world-prompt[hidden],#mixing-finish[hidden]{display:none!important}
 #mixing-panel>b{font-size:14px;letter-spacing:.08em;color:#edc77d}
