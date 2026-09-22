@@ -12,6 +12,7 @@ Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web gam
 
 - Reproduced the long-standing full `mobile-aligned-controls.mjs` failure at `Touch enters wheelbarrow`. The camera really targeted the cart, but startup had placed the apprentice in `point` mode, which owns USE and intentionally prevents station interaction. The test now exits that mode explicitly for its manual-cart scenario and asserts the cart is directly targeted before tapping INTERACT. No gameplay or target-selection code was altered to make the test pass.
 - The complete six-layout test now passes: phone portrait/landscape, small phone portrait/landscape and tablet portrait/landscape. It verifies simultaneous MOVE+AIM+held USE with real player movement and yaw, cancel/release state, cart entry, steering, fast hold and release. Browser errors: none. `artifacts/site-pro-04/performance/mobile-aligned-six-layouts.json` and representative screenshots preserve the evidence. This is desktop-host Chrome touch emulation, not a physical iPhone or tablet benchmark.
+- Added two further reviewable concept perspectives, `ground-corridor-concept.png` and `basement-garage-concept.png`, so the user can judge the first-person circulation, kitchen/workshop connection and B1 ramp before choosing the mansion massing. These are generated visual references, not runtime captures or construction documents; they are not yet built into the game.
 
 ## 2026-09-21 · Site Pro 04 implementation (in progress)
 

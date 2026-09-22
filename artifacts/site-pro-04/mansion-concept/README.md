@@ -6,6 +6,8 @@ Status: visual and plan concept for review; the mansion geometry is **not yet bu
 
 - `exterior-concept.png`: AI-generated massing/material concept, not a screenshot or measured plan.
 - `section-concept.png`: AI-generated cutaway explaining program and construction character, not a measured plan.
+- `ground-corridor-concept.png`: AI-generated eye-level view from the future ground circulation spine toward the open courtyard, kitchen rough-ins and stair/lift core. The actual current game room is not yet connected to this space.
+- `basement-garage-concept.png`: AI-generated eye-level B1 garage/workshop and ramp study with stairs toward B2. Vehicles, lighting and equipment are visual scale cues, not shipped game assets.
 - `ground-floor.svg` / `.png`: original dimensioned concept zoning for a 30 × 28 m ground floor and 10 × 10 m open courtyard; the existing 7.6 × 7.2 m room remains in its current world position.
 - `building-section.svg` / `.png`: original vertical program at B2, B1, G, L1, L2 and L3 with indicative elevations.
 - `electrical-workroom.svg` / `.png`: original front-wall elevation using actual game installation point data: A at x=−1.72 m, B at x=0 m, C at x=+1.65 m; A/B bottom edge 0.30 m and C bottom edge 1.20 m. Dashed PVC routes are explicitly proposed and do not claim an installed or energized circuit.
