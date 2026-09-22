@@ -1,5 +1,27 @@
 import * as THREE from 'three';
 
+const SAND_COLUMNS = 65;
+const SAND_ROWS = 57;
+
+const settleHeights = (heights: Float32Array, columns: number, rows: number,
+  dx: number, dz: number, maxSlope: number, passes: number): void => {
+  const limitX = maxSlope * dx, limitZ = maxSlope * dz;
+  const flow = (a: number, b: number, limit: number): void => {
+    const difference = heights[a] - heights[b];
+    if (Math.abs(difference) <= limit) return;
+    const from = difference > 0 ? a : b, to = difference > 0 ? b : a;
+    const transfer = Math.min(heights[from], (Math.abs(difference) - limit) * .5);
+    heights[from] -= transfer; heights[to] += transfer;
+  };
+  for (let pass = 0; pass < passes; pass++) {
+    for (let row = 0; row < rows; row++) for (let col = 0; col < columns; col++) {
+      const i = row * columns + col;
+      if (col + 1 < columns) flow(i, i + 1, limitX);
+      if (row + 1 < rows) flow(i, i + columns, limitZ);
+    }
+  }
+};
+
 /** Conserved bulk sand volume with a local scoop and surface-only avalanches.
  * One height per grid cell replaces per-grain collision for the buried mass;
  * a small set of ballistic surface grains shows the short-lived disturbance.
@@ -8,8 +30,8 @@ export class SandPileSimulation extends THREE.Mesh {
   readonly initialMassKg: number;
   readonly bulkDensityKgM3 = 1600;
   readonly maxSlope = Math.tan(35 * Math.PI / 180);
-  readonly columns = 49;
-  readonly rows = 43;
+  readonly columns = SAND_COLUMNS;
+  readonly rows = SAND_ROWS;
   readonly width = 2.24;
   readonly depth = 1.88;
   readonly dx = this.width / (this.columns - 1);
@@ -30,30 +52,37 @@ export class SandPileSimulation extends THREE.Mesh {
 
   constructor(material: THREE.Material, initialMassKg = 600) {
     const geometry = new THREE.BufferGeometry();
-    const positions = new Float32Array(49 * 43 * 3), uvs = new Float32Array(49 * 43 * 2);
-    const colors = new Float32Array(49 * 43 * 3), indices: number[] = [];
-    const heights = new Float32Array(49 * 43);
-    for (let row = 0; row < 43; row++) for (let col = 0; col < 49; col++) {
-      const i = row * 49 + col, x = (col / 48 - .5) * 2.24, z = (row / 42 - .5) * 1.88;
+    const positions = new Float32Array(SAND_COLUMNS * SAND_ROWS * 3), uvs = new Float32Array(SAND_COLUMNS * SAND_ROWS * 2);
+    const colors = new Float32Array(SAND_COLUMNS * SAND_ROWS * 3), indices: number[] = [];
+    const heights = new Float32Array(SAND_COLUMNS * SAND_ROWS);
+    for (let row = 0; row < SAND_ROWS; row++) for (let col = 0; col < SAND_COLUMNS; col++) {
+      const i = row * SAND_COLUMNS + col, x = (col / (SAND_COLUMNS - 1) - .5) * 2.24;
+      const z = (row / (SAND_ROWS - 1) - .5) * 1.88;
       const angle = Math.atan2(z + .07, x - .055);
       const radial = Math.hypot((x - .055) / .92, (z + .07) / .79);
       const edge = 1 + .045 * Math.sin(angle * 3 + .4) + .025 * Math.cos(angle * 7);
       const primary = .53 * Math.max(0, 1 - radial / edge);
       const secondary = .075 * Math.max(0, 1 - Math.hypot((x + .27) / .48, (z - .13) / .38));
-      heights[i] = Math.max(0, primary + secondary);
+      const bulk = primary + secondary;
+      const roughness = .009 * Math.sin(x * 16.7 + z * 5.1) * Math.cos(z * 14.3 - x * 3.7)
+        + .003 * Math.sin(x * 47.1 - z * 32.9) * Math.sin(z * 43.7 + x * 24.3);
+      heights[i] = Math.max(0, bulk + Math.min(1, bulk / .075) * roughness);
       positions[i * 3] = x; positions[i * 3 + 2] = z;
-      uvs[i * 2] = .5 + x / 2.5; uvs[i * 2 + 1] = .5 + z / 2.5;
+      uvs[i * 2] = .5 + x / 1.3; uvs[i * 2 + 1] = .5 + z / 1.3;
       const shade = .965 + Math.sin(i * 17.13) * .023;
       colors.set([shade, shade, shade], i * 3);
-      if (row < 42 && col < 48) {
-        const a = i, b = a + 49;
+      if (row < SAND_ROWS - 1 && col < SAND_COLUMNS - 1) {
+        const a = i, b = a + SAND_COLUMNS;
         indices.push(a, b, a + 1, a + 1, b, b + 1);
       }
     }
-    const cellArea = 2.24 / 48 * 1.88 / 42;
+    const cellArea = 2.24 / (SAND_COLUMNS - 1) * 1.88 / (SAND_ROWS - 1);
     const volume = heights.reduce((sum, height) => sum + height * cellArea, 0);
     const multiplier = initialMassKg / (1600 * volume);
-    for (let i = 0; i < heights.length; i++) positions[i * 3 + 1] = heights[i] * multiplier - .004;
+    for (let i = 0; i < heights.length; i++) heights[i] *= multiplier;
+    settleHeights(heights, SAND_COLUMNS, SAND_ROWS, 2.24 / (SAND_COLUMNS - 1),
+      1.88 / (SAND_ROWS - 1), Math.tan(35 * Math.PI / 180), 18);
+    for (let i = 0; i < heights.length; i++) positions[i * 3 + 1] = heights[i] - .004;
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3).setUsage(THREE.DynamicDrawUsage));
     geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
@@ -61,7 +90,7 @@ export class SandPileSimulation extends THREE.Mesh {
     super(geometry, material);
     this.positions = geometry.getAttribute('position') as THREE.BufferAttribute;
     this.colors = geometry.getAttribute('color') as THREE.BufferAttribute;
-    for (let i = 0; i < heights.length; i++) this.heights[i] = heights[i] * multiplier;
+    this.heights.set(heights);
     this.initialMassKg = initialMassKg;
     this.remainingMassKg = initialMassKg;
     this.name = 'mixing-large-sand-mound';
@@ -178,22 +207,7 @@ export class SandPileSimulation extends THREE.Mesh {
   }
 
   private relax(passes: number): void {
-    const limitX = this.maxSlope * this.dx, limitZ = this.maxSlope * this.dz;
-    for (let pass = 0; pass < passes; pass++) {
-      for (let row = 0; row < this.rows; row++) for (let col = 0; col < this.columns; col++) {
-        const i = row * this.columns + col;
-        if (col + 1 < this.columns) this.flow(i, i + 1, limitX);
-        if (row + 1 < this.rows) this.flow(i, i + this.columns, limitZ);
-      }
-    }
-  }
-
-  private flow(a: number, b: number, limit: number): void {
-    const difference = this.heights[a] - this.heights[b];
-    if (Math.abs(difference) <= limit) return;
-    const from = difference > 0 ? a : b, to = difference > 0 ? b : a;
-    const transfer = Math.min(this.heights[from], (Math.abs(difference) - limit) * .5);
-    this.heights[from] -= transfer; this.heights[to] += transfer;
+    settleHeights(this.heights, this.columns, this.rows, this.dx, this.dz, this.maxSlope, passes);
   }
 
   private refreshGeometry(): void {

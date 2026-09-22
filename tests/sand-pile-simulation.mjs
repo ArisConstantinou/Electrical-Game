@@ -1,12 +1,25 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'vite';
 
+const maximumSurfaceSlope = pile => {
+  const position = pile.geometry.getAttribute('position');
+  let steepest = 0;
+  for (let row = 0; row < pile.rows; row++) for (let col = 0; col < pile.columns; col++) {
+    const i = row * pile.columns + col;
+    if (col + 1 < pile.columns) steepest = Math.max(steepest, Math.abs(position.getY(i) - position.getY(i + 1)) / pile.dx);
+    if (row + 1 < pile.rows) steepest = Math.max(steepest, Math.abs(position.getY(i) - position.getY(i + pile.columns)) / pile.dz);
+  }
+  return steepest;
+};
+
 const vite = await createServer({ server: { middlewareMode: true, hmr: false }, optimizeDeps: { noDiscovery: true, include: [] }, appType: 'custom', logLevel: 'error' });
 try {
   const THREE = await vite.ssrLoadModule('/node_modules/three/build/three.module.js');
   const { SandPileSimulation } = await vite.ssrLoadModule('/src/world/SandPileSimulation.ts');
   const pile = new SandPileSimulation(new THREE.MeshStandardMaterial(), 600);
   assert(Math.abs(pile.telemetry.surfaceKg - 600) < .02, 'Initial surface volume corresponds to 600 kg of dry bulk sand');
+  const initialSlope = maximumSurfaceSlope(pile);
+  assert(initialSlope < pile.maxSlope + .04, `The textured initial deposit remains near dry sand repose: ${initialSlope}`);
   const left = pile.heightAt(-.30, 0), right = pile.heightAt(.30, 0);
   assert(pile.scoop(-.30, 0, 2.24), 'A shovel removes one 1.4 L load');
   assert(pile.heightAt(-.30, 0) < left - .004, 'The blade cuts a visible local depression');
@@ -16,13 +29,7 @@ try {
   assert.equal(pile.telemetry.remainingKg, 597.76);
   assert(pile.heightAt(-.30, 0) < left, 'The excavated area remains locally depleted after the surface flows');
   const firstPitM = left - pile.heightAt(-.30, 0);
-  const settled = pile.geometry.getAttribute('position');
-  let steepest = 0;
-  for (let row = 0; row < pile.rows; row++) for (let col = 0; col < pile.columns; col++) {
-    const i = row * pile.columns + col;
-    if (col + 1 < pile.columns) steepest = Math.max(steepest, Math.abs(settled.getY(i) - settled.getY(i + 1)) / pile.dx);
-    if (row + 1 < pile.rows) steepest = Math.max(steepest, Math.abs(settled.getY(i) - settled.getY(i + pile.columns)) / pile.dz);
-  }
+  const steepest = maximumSurfaceSlope(pile);
   assert(steepest < pile.maxSlope + .04, `A settled cut cannot keep an implausibly steep dry-sand face: ${steepest}`);
   for (let i = 0; i < 10; i++) { assert(pile.scoop(.28, .09, 2.24)); for (let n = 0; n < 25; n++) pile.update(1 / 60); }
   assert(Math.abs(pile.telemetry.surfaceKg - (600 - 11 * 2.24)) < .06, 'Repeated shoveling preserves the bulk balance');
