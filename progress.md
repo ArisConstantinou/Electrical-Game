@@ -1,5 +1,13 @@
 Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web game named WIRE THE HOUSE, based on real Cyprus residential first-fix practices, editable in Web Game Studio, playable on desktop/mobile, deployed to arisconstantinou/Electrical-Game via GitHub Pages, and ending at FIRST FIX COMPLETE without cable pulling.
 
+## 2026-09-22 · Site Pro 04 mansion ground garage preview
+
+- Protected default room and port 5365 remain unchanged. Work is in `codex/site-pro-04-mansion`; the last pushed upper-level/exterior milestone is `f446505`. This new garage work is preview-only and has not been published to `main`.
+- Replaced the solid foyer south partition with a supported 1.9 m rough opening. A walkable corridor bends into an empty cast-slab ground vehicle bay with a separate unfinished workshop zone, street-facing opening without door/shutter, staged clay pallet, and real body obstacles. The flat garage ceiling was replaced with a cast slab plus clay infill and flush ribs. A `garage=off` preview switch retains the former wall for same-camera before/after review.
+- The first mobile test revealed that a floor resolver treated the ground space under L1 as L1-only; adding the ground candidate fixed the real walk route without changing upper-floor elevations. Room → garage → workshop → foyer passed in Chrome mobile portrait/landscape, tablet portrait and desktop emulation. Mobile portrait and desktop also hit the workshop partition instead of passing through it. Same-camera `garage=off`/on mobile before/after screenshots passed. No physical phone proof.
+- The 390×844 DPR3 Windows Chrome WebGL profile after garage addition: released room 492 calls / p95 17.8 ms; preview foyer 758 calls / p95 18.0 ms; garage 576 calls / p95 18.1 ms; workshop 611 calls / p95 18.4 ms. These short samples are not physical iPhone performance evidence. Build and final regressions remain to be rerun after the last edits.
+- Remaining: reconcile the temporary garage bay with the concept drawing's farther-east 8 × 10 m private garage as the full 30 × 28 m shell is built; B1/B2 stairs, ramp and spaces; lift core; kitchens/bedrooms; material realism; complete terrace edge safety, upper-floor simultaneous touch and physical-phone/performance QA. Do not promote this preview as a finished mansion.
+
 ## 2026-09-22 · Mansion concept and apprentice drawings (in progress)
 
 - New first priority from user: show concept images of a larger Cypriot mansion under construction, actual game-world floor/section/electrical drawings, and make the drawings viewable when aiming at the apprentice. The mansion 3D geometry still requires concept selection before construction. Working assumption: ground + three upper levels, B1+B2, 30 × 28 m, open 10 × 10 m courtyard.

@@ -37,7 +37,15 @@ export class MansionGroundWing extends THREE.Group {
     this.addCourtyardWindowBand(12, 14);
     this.wall('Courtyard north fired-clay enclosure', 9, 16, 18, 16);
     this.wall('Courtyard south fired-clay enclosure', 9, 6, 18, 6);
-    this.wall('Foyer south fired-clay partition', 1.35, 7.65, 9, 7.65);
+    // The isolated garage-off view retains the original foyer wall for a
+    // same-camera construction comparison; ordinary preview keeps the route.
+    if (new URLSearchParams(location.search).get('garage') === 'off') {
+      this.wall('Foyer south fired-clay partition', 1.35, 7.65, 9, 7.65);
+    } else {
+      this.wall('Foyer south masonry west of garage passage', 1.35, 7.65, 6.55, 7.65);
+      this.wall('Foyer south masonry east of garage passage', 8.45, 7.65, 9, 7.65);
+      this.addGroundGarage();
+    }
     this.courtyard = new MansionCourtyard(oliveSource);
     this.add(this.courtyard);
     this.obstacles.push(...this.courtyard.obstacles);
@@ -89,6 +97,7 @@ export class MansionGroundWing extends THREE.Group {
     if (x >= 6.5 && x <= 8.5 && z >= 4.5 && z < 8) return closest([0, 3.3, 6.6, 9.9, 13.2]);
     if (x >= 6.5 && x <= 12.5 && z >= 0 && z < 4.5) {
       const heights = [3.3, 6.6, 9.9];
+      if (x >= 9) heights.unshift(0);
       if (x >= 7 && x <= 11.14 && z >= .5) heights.push(13.2);
       return closest(heights);
     }
@@ -98,6 +107,92 @@ export class MansionGroundWing extends THREE.Group {
   obstaclesAt(floorY: number): PlayerObstacle[] {
     return this.obstacles.filter(obstacle =>
       floorY >= (obstacle.minFloorY ?? -Infinity) - .16 && floorY <= (obstacle.maxFloorY ?? Infinity) + .16);
+  }
+
+  private addGroundGarage(): void {
+    const concrete = siteMaterial('floor', 0xcac2b6, 2.5, 2.5);
+    const slab = (name: string, x: number, y: number, z: number, w: number, d: number): void => {
+      const mesh = new THREE.Mesh(new RoundedBoxGeometry(w, .18, d, 2, .01), concrete);
+      mesh.name = name;
+      mesh.position.set(x, y, z);
+      mesh.castShadow = y > 0;
+      mesh.receiveShadow = true;
+      this.add(mesh);
+    };
+    // The corridor leaves the foyer through a framed rough opening. The L1
+    // corridor slab already roofs most of this connection, so only its east
+    // strip and the exposed garage bays need new overhead concrete.
+    slab('Garage passage unfinished ground slab', 7.75, -.09, 6.075, 2.5, 3.15);
+    slab('Garage passage east roof strip', 8.75, 3.21, 6.075, .5, 3.15);
+    slab('Ground private garage and client workshop concrete slab', 13.5, -.09, 1.25, 9, 9.5);
+    for (const [x, z, w, d] of [
+      [10.75, -1.75, 3.5, 3.5], [10.75, 5.25, 3.5, 1.5], [15.25, 1.25, 5.5, 9.5],
+    ]) {
+      slab('Continuous cast garage roof panel around existing L1 floor', x, 3.21, z, w, d);
+      const soffit = createClaySoffitPreview(w, d, 2.94);
+      soffit.name = 'Clay infill and flush joists bearing into garage roof slab';
+      soffit.position.set(x, 0, z);
+      this.add(soffit);
+    }
+    const sharedSoffit = createClaySoffitPreview(3.5, 4.5, 2.91);
+    sharedSoffit.name = 'Clay infill under existing L1 structural floor above garage';
+    sharedSoffit.position.set(10.75, 0, 2.25);
+    this.add(sharedSoffit);
+    this.wall('Garage passage west fired-clay partition', 6.5, 4.5, 6.5, 7.65);
+    this.wall('Garage passage south fired-clay return', 6.5, 4.5, 9, 4.5);
+    this.wall('Garage passage east fired-clay return', 9, 5.75, 9, 7.65);
+    this.wall('Garage west fired-clay perimeter before passage', 9, -3.5, 9, 4.25);
+    this.wall('Garage east fired-clay perimeter', 18, -3.5, 18, 6);
+    this.wall('Street-facing garage masonry west pier', 9, -3.5, 11, -3.5);
+    this.wall('Street-facing garage masonry east pier', 16, -3.5, 18, -3.5);
+    this.wall('Garage workshop rough partition south pier', 15.5, -3.5, 15.5, -.75);
+    this.wall('Garage workshop rough partition north pier', 15.5, 1.25, 15.5, 6);
+    const frame = siteMaterial('concrete', 0xc9c1b4, .3, .5);
+    const column = new RoundedBoxGeometry(.3, 3.12, .3, 2, .008);
+    for (const [x, z, label] of [
+      [6.55, 7.65, 'foyer-to-garage west jamb'], [8.45, 7.65, 'foyer-to-garage east jamb'],
+      [9, 4.25, 'garage passage lower jamb'], [9, 5.75, 'garage passage upper jamb'],
+      [11, -3.5, 'garage street aperture west pier'], [16, -3.5, 'garage street aperture east pier'],
+    ] as const) {
+      const pier = new THREE.Mesh(column, frame);
+      pier.name = `Cast ${label}, ready for a later door but currently open`;
+      pier.position.set(x, 1.56, z);
+      pier.castShadow = pier.receiveShadow = true;
+      this.add(pier);
+    }
+    for (const [x, z, w, d, label] of [
+      [7.5, 7.65, 2.2, .32, 'foyer-to-garage doorless passage'],
+      [9, 5, .32, 1.8, 'garage passage'],
+      [13.5, -3.5, 5.2, .36, 'unfitted vehicle bay'],
+      [15.5, .25, .32, 2.2, 'workshop passage'],
+    ] as const) {
+      const head = new THREE.Mesh(new RoundedBoxGeometry(w, .29, d, 2, .008), frame);
+      head.name = `Structural lintel above ${label}; no installed door or shutter`;
+      head.position.set(x, 2.95, z);
+      head.castShadow = head.receiveShadow = true;
+      this.add(head);
+    }
+    // Staged materials make the construction use legible while leaving the
+    // whole vehicle bay empty. Each pile has a matching body obstacle.
+    const pallet = new THREE.Mesh(new RoundedBoxGeometry(1.35, .13, .9, 2, .006),
+      siteMaterial('concrete', 0x9c8970, .5, .5));
+    pallet.name = 'Raised pallet under staged unfitted masonry supplies';
+    pallet.position.set(11.1, .08, -1.85);
+    pallet.castShadow = pallet.receiveShadow = true;
+    this.add(pallet);
+    const blocks = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1),
+      siteMaterial('clay', 0xb56843, .5, .5), 24);
+    blocks.name = 'Separate stacked clay units awaiting garage partition work';
+    const matrix = new THREE.Matrix4();
+    for (let row = 0; row < 3; row++) for (let col = 0; col < 8; col++) {
+      const index = row * 8 + col;
+      blocks.setMatrixAt(index, matrix.compose(new THREE.Vector3(10.58 + (col % 4) * .32, .24 + row * .13,
+        -2.12 + Math.floor(col / 4) * .37), new THREE.Quaternion(), new THREE.Vector3(.3, .12, .35)));
+    }
+    blocks.castShadow = blocks.receiveShadow = true;
+    blocks.computeBoundingSphere();
+    this.add(blocks);
+    this.obstacles.push({ id: 'Staged garage masonry pallet', minX: 10.35, maxX: 11.85, minZ: -2.4, maxZ: -1.35 });
   }
 
   private slab(name: string, width: number, depth: number, x: number, z: number, stairVoid = false): void {

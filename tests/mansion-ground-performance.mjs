@@ -13,6 +13,8 @@ try {
     { name: 'released-room', suffix: '', x: .45, z: 2.7, yaw: Math.PI },
     { name: 'preview-same-room-pose', suffix: '&mansion=preview', x: .45, z: 2.7, yaw: Math.PI },
     { name: 'preview-new-foyer', suffix: '&mansion=preview', x: 3.1, z: 9.4, yaw: -Math.PI / 2 },
+    { name: 'preview-ground-garage', suffix: '&mansion=preview', x: 11.05, z: 5.03, yaw: 0 },
+    { name: 'preview-ground-workshop', suffix: '&mansion=preview', x: 16.4, z: .18, yaw: Math.PI },
     { name: 'preview-stair-flight', suffix: '&mansion=preview', x: 5.5, z: 9.4, floorY: .9, yaw: Math.PI },
     { name: 'preview-first-floor-room', suffix: '&mansion=preview', x: 7.5, z: 3.7, floorY: 3.3, yaw: 0 },
     { name: 'preview-courtyard', suffix: '&mansion=preview', x: 10.2, z: 13.8, yaw: -.9 },

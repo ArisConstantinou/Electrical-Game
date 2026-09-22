@@ -1,0 +1,28 @@
+{
+  "views": [
+    {
+      "mode": "before",
+      "garage": false,
+      "camera": [
+        7.5,
+        1.65,
+        7.85
+      ],
+      "yaw": 0,
+      "pitch": -0.06
+    },
+    {
+      "mode": "after",
+      "garage": true,
+      "camera": [
+        7.5,
+        1.65,
+        7.85
+      ],
+      "yaw": 0,
+      "pitch": -0.06
+    }
+  ],
+  "errors": [],
+  "note": "Same camera and viewport in Chrome mobile emulation; not a physical iPhone."
+}
