@@ -313,22 +313,42 @@ export class MortarField {
    * washing through its neck releases the entire detached coherent piece.
    * Sub-isosurface tails belong only to an adjacent visible component. */
   releaseUnsupported(solid:(point:THREE.Vector3)=>boolean):{mass:number;point:THREE.Vector3} {
-    const visited=new Set<string>(),supported=new Set<string>(),q=new THREE.Vector3(),h=this.spacing;
-    for(const [key,node] of this.nodes){if(node.value<LEVEL||visited.has(key))continue;
-      const members:Node[]=[node];visited.add(key);let anchored=false;
+    const center=new THREE.Vector3();
+    if(!this.nodes.size)return{mass:0,point:center};
+    // Each impact used to allocate 27 coordinate strings per wet node while
+    // traversing connected mortar. Dense numeric IDs are local to this query;
+    // the authoritative sparse field and its saved string keys are unchanged.
+    let minX=Infinity,minY=Infinity,minZ=Infinity,maxX=-Infinity,maxY=-Infinity,maxZ=-Infinity;
+    for(const node of this.nodes.values()){
+      minX=Math.min(minX,node.x);minY=Math.min(minY,node.y);minZ=Math.min(minZ,node.z);
+      maxX=Math.max(maxX,node.x);maxY=Math.max(maxY,node.y);maxZ=Math.max(maxZ,node.z);
+    }
+    const sizeX=maxX-minX+3,sizeY=maxY-minY+3,sizeZ=maxZ-minZ+3;
+    const packed=Number.isSafeInteger(sizeX*sizeY*sizeZ);
+    const strideY=sizeZ,strideX=sizeY*sizeZ;
+    const id=packed
+      ? (x:number,y:number,z:number):number|string=>(x-minX+1)*strideX+(y-minY+1)*strideY+z-minZ+1
+      : (x:number,y:number,z:number):number|string=>this.key(x,y,z);
+    const lookup:Map<number|string,Node>=packed?new Map<number|string,Node>():this.nodes;
+    if(packed)for(const node of this.nodes.values())lookup.set(id(node.x,node.y,node.z),node);
+    const visited=new Set<number|string>(),supported=new Set<number|string>(),q=new THREE.Vector3(),h=this.spacing;
+    for(const node of this.nodes.values()){
+      const first=id(node.x,node.y,node.z);
+      if(node.value<LEVEL||visited.has(first))continue;
+      const members:Node[]=[node];visited.add(first);let anchored=false;
       for(let i=0;i<members.length;i++){
         const n=members[i];
         if(!anchored)for(const [dx,dy,dz] of [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]])if(solid(q.set((n.x+dx*1.6)*h,(n.y+dy*1.6)*h,(n.z+dz*1.6)*h))){anchored=true;break;}
         for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++)for(let dz=-1;dz<=1;dz++){
-          const k=this.key(n.x+dx,n.y+dy,n.z+dz),other=this.nodes.get(k);if(!visited.has(k)&&other&&other.value>=LEVEL){visited.add(k);members.push(other);}
+          const k=id(n.x+dx,n.y+dy,n.z+dz),other=lookup.get(k);if(!visited.has(k)&&other&&other.value>=LEVEL){visited.add(k);members.push(other);}
         }
       }
-      if(anchored)for(const member of members)supported.add(this.key(member.x,member.y,member.z));
+      if(anchored)for(const member of members)supported.add(id(member.x,member.y,member.z));
     }
-    let mass=0;const center=new THREE.Vector3();
-    for(const [key,node] of [...this.nodes]){
-      let keep=supported.has(key);
-      if(!keep&&node.value<LEVEL)for(let dx=-1;dx<=1&&!keep;dx++)for(let dy=-1;dy<=1&&!keep;dy++)for(let dz=-1;dz<=1;dz++)if(supported.has(this.key(node.x+dx,node.y+dy,node.z+dz))){keep=true;break;}
+    let mass=0;
+    for(const node of [...this.nodes.values()]){
+      let keep=supported.has(id(node.x,node.y,node.z));
+      if(!keep&&node.value<LEVEL)for(let dx=-1;dx<=1&&!keep;dx++)for(let dy=-1;dy<=1&&!keep;dy++)for(let dz=-1;dz<=1;dz++)if(supported.has(id(node.x+dx,node.y+dy,node.z+dz))){keep=true;break;}
       if(!keep){const kg=node.value*this.nodeMass;mass+=kg;center.addScaledVector(q.set(node.x*h,node.y*h,node.z*h),kg);this.set(node.x,node.y,node.z,0,node.age);}
     }
     if(mass>0){center.multiplyScalar(1/mass);this.revision++;}return{mass,point:center};
