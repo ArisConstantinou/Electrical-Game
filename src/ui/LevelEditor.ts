@@ -577,6 +577,7 @@ export class LevelEditor {
   }
   private beginTouchDrag(event: PointerEvent): boolean {
     if (event.pointerType !== 'touch' || !event.isPrimary || !this.active || this.tab !== 'transform') return false;
+    if ([...this.selectedObjects].some(item => item.userData.levelEditorLocked)) return false;
     const object = this.gizmo.object === this.selectionPivot ? this.selectionPivot : this.selected ?? (this.markerSelection === 'player' ? this.playerMarker : this.markerSelection === 'apprentice' ? this.apprenticeMarker : null);
     if (!object) return false;
     this.pointerRay(event);
@@ -595,6 +596,7 @@ export class LevelEditor {
   private updateTouchDrag(event: PointerEvent): void {
     const drag = this.touchDrag;
     if (!drag || drag.pointerId !== event.pointerId) return;
+    if ([...this.selectedObjects].some(item => item.userData.levelEditorLocked)) return;
     const object = this.gizmo.object === this.selectionPivot ? this.selectionPivot : this.selected ?? (this.markerSelection === 'player' ? this.playerMarker : this.apprenticeMarker);
     if (!object) return;
     if (drag.mode === 'translate') {
@@ -1127,7 +1129,13 @@ export class LevelEditor {
   private nativeGizmoVisible(): boolean { return this.active && Boolean(this.gizmo.object) && !matchMedia('(max-width: 1100px)').matches; }
   private enableEditorRaycasts(): void {
     for (const asset of this.game.room.mansionWing?.editableAssets.values() ?? []) asset.traverse(node => {
-      if (!(node instanceof THREE.Mesh) || !Object.hasOwn(node, 'raycast') || this.editorRaycasts.has(node)) return;
+      if (!(node instanceof THREE.Mesh) || this.editorRaycasts.has(node)) return;
+      if (!(node.geometry instanceof THREE.BufferGeometry)) {
+        this.editorRaycasts.set(node, node.raycast);
+        node.raycast = () => undefined;
+        return;
+      }
+      if (!Object.hasOwn(node, 'raycast')) return;
       this.editorRaycasts.set(node, node.raycast);
       node.raycast = node instanceof THREE.InstancedMesh ? THREE.InstancedMesh.prototype.raycast : THREE.Mesh.prototype.raycast;
     });
@@ -1427,7 +1435,9 @@ export class LevelEditor {
     this.selectionAnchor = this.selected && hitPoint && size && this.usesSurfaceAnchor(size) ? hitPoint.clone() : null;
     this.selectionAnchorLocal = this.selectionAnchor && this.selected ? this.selected.worldToLocal(this.selectionAnchor.clone()) : null;
     this.panel.classList.toggle('multi-selected', members.length > 1);
-    if (members.length === 1 && !this.selectionAnchor) this.gizmo.attach(members[0]);
+    const locked = members.some(object => object.userData.levelEditorLocked);
+    if (locked) this.gizmo.detach();
+    else if (members.length === 1 && !this.selectionAnchor) this.gizmo.attach(members[0]);
     else if (members.length > 1 || this.selectionAnchor) {
       const centre = new THREE.Vector3();
       for (const item of members) centre.add(item.getWorldPosition(new THREE.Vector3()));
@@ -1451,6 +1461,7 @@ export class LevelEditor {
   }
   private applyPivotDelta(): void {
     if (this.selectedObjects.size < 1) return;
+    if ([...this.selectedObjects].some(item => item.userData.levelEditorLocked)) return;
     this.selectionPivot.updateMatrixWorld(true);
     const delta = this.selectionPivot.matrixWorld.clone().multiply(this.pivotMatrix.clone().invert());
     for (const object of this.selectedObjects) {
@@ -1590,6 +1601,9 @@ export class LevelEditor {
   private refreshFields(): void {
     this.syncSelectionAnchorFromObject();
     const object = this.selectedObjects.size > 1 ? this.selectionPivot : this.selected ?? (this.markerSelection === 'player' ? this.playerMarker : this.markerSelection === 'apprentice' ? this.apprenticeMarker : null);
+    const locked = [...this.selectedObjects].some(item => item.userData.levelEditorLocked);
+    this.panel.querySelectorAll<HTMLInputElement>('[data-axis],[data-size],#level-yaw').forEach(field => { field.disabled = locked; });
+    for (const id of ['#level-translate', '#level-rotate', '#level-scale']) this.el<HTMLButtonElement>(id).disabled = locked;
     const wallSelected = Boolean(this.selected && this.selectedObjects.size === 1 && this.game.room.mansionWing?.editableWalls.has(this.selected.name));
     this.panel.classList.toggle('wall-selected', wallSelected);
     this.el('#level-wall-tools').hidden = !wallSelected;
@@ -1602,7 +1616,7 @@ export class LevelEditor {
     if (group && document.activeElement !== this.el('#level-group-name')) this.el<HTMLInputElement>('#level-group-name').value = group.name;
     if (!object) { this.el('#level-name').textContent = 'Select an element'; this.el('#level-kind').textContent = 'Tap a structure in the scene or list.'; this.el<HTMLButtonElement>('#level-delete').disabled = true; this.haloElement.hidden = true; return; }
     this.el('#level-name').textContent = group ? group.name : this.selectedObjects.size > 1 ? `${this.selectedObjects.size} elements selected` : this.markerSelection === 'apprentice' ? `Apprentice ${this.apprenticeIndex} start` : this.selected ? this.displayName(this.selected) : object.name;
-    this.el('#level-kind').textContent = this.selectedObjects.size > 1 ? group ? `${this.selectedObjects.size} grouped elements · move, rotate or scale together` : 'Move, rotate or scale together · GROUP ITEMS to save selection' : this.markerSelection ? 'Spawn position · metres' : `${this.selected!.userData.levelEditorKind === 'asset' ? 'SITE ASSET' : this.selected!.userData.levelEditorKind === 'stair' ? 'STAIRS' : this.selected!.userData.levelEditorKind === 'floor' ? 'FLOOR SLAB' : this.selected!.userData.levelEditorKind === 'brick-wall' ? 'BRICK WALL' : 'CONCRETE WALL'} · live geometry`;
+    this.el('#level-kind').textContent = locked ? 'RUNTIME-LINKED · Selection only until gameplay collision is connected' : this.selectedObjects.size > 1 ? group ? `${this.selectedObjects.size} grouped elements · move, rotate or scale together` : 'Move, rotate or scale together · GROUP ITEMS to save selection' : this.markerSelection ? 'Spawn position · metres' : `${this.selected!.userData.levelEditorKind === 'asset' ? 'SITE ASSET' : this.selected!.userData.levelEditorKind === 'stair' ? 'STAIRS' : this.selected!.userData.levelEditorKind === 'floor' ? 'FLOOR SLAB' : this.selected!.userData.levelEditorKind === 'brick-wall' ? 'BRICK WALL' : 'CONCRETE WALL'} · live geometry`;
     const base = this.baseSize();
     for (const axis of ['x', 'y', 'z'] as const) {
       this.el<HTMLInputElement>(`[data-axis="${axis}"]`).value = object.position[axis].toFixed(2);
@@ -1627,6 +1641,7 @@ export class LevelEditor {
     }
   }
   private applyFields(): void {
+    if ([...this.selectedObjects].some(item => item.userData.levelEditorLocked)) return;
     const object = this.selectedObjects.size > 1 ? this.selectionPivot : this.selected ?? (this.markerSelection === 'player' ? this.playerMarker : this.markerSelection === 'apprentice' ? this.apprenticeMarker : null);
     if (!object) return;
     const base = this.baseSize();

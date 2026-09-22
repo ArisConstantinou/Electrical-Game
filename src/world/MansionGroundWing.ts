@@ -8,6 +8,7 @@ import { curvedWallGeometry, type CurvedWallShape } from './CurvedWallGeometry';
 import { createClaySoffitPreview } from './ClaySoffitPreview';
 import { MansionCourtyard } from './MansionCourtyard';
 import { MansionSurroundings } from './MansionSurroundings';
+import { BrickWall } from './BrickWall';
 
 /** First traversable part of the approved ground plan, kept out of the released room. */
 export class MansionGroundWing extends THREE.Group {
@@ -104,7 +105,7 @@ export class MansionGroundWing extends THREE.Group {
     for (const { parent, object } of authored) {
       if (object === this.courtyard || object === this.surroundings ||
         this.editableWalls.get(object.name) === object || this.editableSurfaces.get(object.name) === object) continue;
-      if (!(object instanceof THREE.Mesh || object instanceof THREE.Group)) continue;
+      if (!(object instanceof THREE.Mesh || object instanceof THREE.Group || object instanceof THREE.LOD)) continue;
       bounds.setFromObject(object);
       if (bounds.isEmpty() || !Number.isFinite(bounds.min.x) || !Number.isFinite(bounds.max.y)) continue;
       const count = (occurrences.get(object.name) ?? 0) + 1;
@@ -166,6 +167,55 @@ export class MansionGroundWing extends THREE.Group {
       pivot.attach(object);
       this.editableAssets.set(id, pivot);
       if (object === floor) this.originalRoomFloor = pivot;
+    }
+  }
+
+  /** Expose the remaining visible room and exterior geometry in the same
+   * selection registry. Live construction walls remain locked until their
+   * gameplay/physics coordinates can move with their render geometry. */
+  registerOriginalRoomAssets(room: THREE.Group, exterior: THREE.Group, lockedObjects: THREE.Object3D[]): void {
+    const locked = new Set(lockedObjects);
+    const occurrences = new Map<string, number>();
+    const sources = [
+      ...[...room.children].filter(object => object !== this && object !== exterior)
+        .map(object => ({ object, parent: room, prefix: 'room-part' })),
+      ...[...exterior.children].filter(object => !/sky gradient/i.test(object.name))
+        .map(object => ({ object, parent: exterior, prefix: 'outside-part' })),
+    ];
+    for (const { object, parent, prefix } of sources) {
+      if (this.editableAssets.get(object.name) === object ||
+        !(object instanceof THREE.Mesh || object instanceof THREE.Group || object instanceof THREE.LOD)) continue;
+      const bounds = new THREE.Box3();
+      if (object instanceof BrickWall) {
+        const { width, height, depth, frontZ } = object.volume;
+        object.updateWorldMatrix(true, false);
+        bounds.set(
+          new THREE.Vector3(-width / 2, 0, frontZ - depth),
+          new THREE.Vector3(width / 2, height, frontZ),
+        ).applyMatrix4(object.matrixWorld);
+      } else {
+        try { bounds.setFromObject(object); }
+        catch { continue; } // Some live meshes are not BufferGeometry.
+      }
+      if (bounds.isEmpty() || !Number.isFinite(bounds.min.x) || !Number.isFinite(bounds.max.y)) continue;
+      const count = (occurrences.get(`${prefix}:${object.name}`) ?? 0) + 1;
+      occurrences.set(`${prefix}:${object.name}`, count);
+      const slug = object.name.toLowerCase().replaceAll(/[^a-z0-9]+/g, '-').replaceAll(/^-|-$/g, '') || 'unnamed';
+      const id = `${prefix}:${slug}:${count}`;
+      const centre = bounds.getCenter(new THREE.Vector3());
+      const size = bounds.getSize(new THREE.Vector3());
+      const pivot = new THREE.Group();
+      pivot.name = id;
+      pivot.userData.levelEditorKind = 'asset';
+      pivot.userData.levelEditorLabel = `${object.name || 'Site part'}${count > 1 ? ` · ${count}` : ''}`;
+      pivot.userData.levelEditorLocked = locked.has(object) || /first-fix supplies at the site perimeter/i.test(object.name);
+      pivot.userData.levelEditorGround = /\b(?:ground|terrain|soil)\b/i.test(object.name);
+      pivot.userData.baseSize = [Math.max(size.x, .01), Math.max(size.y, .01), Math.max(size.z, .01)];
+      pivot.userData.studioEntityId = `mansion:${id}`;
+      parent.add(pivot);
+      pivot.position.copy(parent.worldToLocal(centre.clone()));
+      pivot.attach(object);
+      this.editableAssets.set(id, pivot);
     }
   }
 

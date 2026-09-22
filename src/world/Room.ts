@@ -205,6 +205,7 @@ export class Room extends THREE.Group {
     rubble.computeBoundingSphere();
     this.add(rubble);
     this.mansionWing?.registerOriginalRoomSurfaces(floor, ceiling);
+    this.mansionWing?.registerOriginalRoomAssets(this, this.exterior, [this.brickWall, ...this.referenceWalls]);
     addLighting(scene);
   }
 
