@@ -68,7 +68,12 @@ export class Room extends THREE.Group {
       if (ny > .5) ceilingUVs.setXY(i, x / 2, z / 2);
       else ceilingUVs.setXY(i, .37 + (y + GAME_CONFIG.room.height + .08) / 2, (nx > .5 ? z : x) / 2);
     }
-    const ceiling = new THREE.Mesh(ceilingGeometry, siteMaterial('concrete', 0xe6e2dc));
+    const ceilingMaterial = siteMaterial('concrete', 0xe6e2dc);
+    // A small warm floor bounce reaches the underside of the slab. Keep the
+    // photographed shutter marks but avoid a near-black roof over warm clay.
+    ceilingMaterial.emissive.set(0x827366);
+    ceilingMaterial.emissiveIntensity = .28;
+    const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
     ceiling.position.y = GAME_CONFIG.room.height + 0.08;
     ceiling.name = 'Concrete slab ceiling';
     ceiling.userData.studioEntityId = 'world:ceiling';
@@ -140,6 +145,7 @@ export class Room extends THREE.Group {
     this.addRearWall();
     // The slab bears over the wall heads and columns. Exposed brick meets its
     // soffit directly, with no decorative inner downstand or shadow band.
+    this.addWallHeadContact();
     this.addFloorReturns();
     this.addContactPatina();
     this.addSiteSupplies();
@@ -318,6 +324,88 @@ export class Room extends THREE.Group {
     cuts.computeBoundingSphere();
     this.add(cuts);
 
+  }
+
+  private addWallHeadContact(): void {
+    // A thin packed head joint feathers cement dust over the top clay course.
+    // The treatment follows the actual brick faces; it is visual only and
+    // leaves the hollow masonry, roof slab and work raycasts untouched.
+    const canvas = document.createElement('canvas');
+    canvas.width = 256; canvas.height = 64;
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    const pixels = context.createImageData(canvas.width, canvas.height);
+    for (let y = 0; y < canvas.height; y++) for (let x = 0; x < canvas.width; x++) {
+      const rise = y / (canvas.height - 1);
+      const speckle = Math.sin(x * 13.73 + y * 8.31) * Math.sin(x * 3.61 - y * 18.17);
+      const edge = Math.sin(x * .14) * .08 + Math.sin(x * .49) * .035;
+      const coverage = THREE.MathUtils.smoothstep(rise + edge, .23, .94);
+      const alpha = coverage * (.23 + Math.max(0, speckle) * .13);
+      const index = (y * canvas.width + x) * 4;
+      pixels.data[index] = 148;
+      pixels.data[index + 1] = 139;
+      pixels.data[index + 2] = 123;
+      pixels.data[index + 3] = Math.round(alpha * 255);
+    }
+    context.putImageData(pixels, 0, 0);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.wrapS = THREE.RepeatWrapping;
+    const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1 });
+    const positions: number[] = [], uvs: number[] = [], indices: number[] = [];
+    const quad = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, d: THREE.Vector3) => {
+      const start = positions.length / 3, length = a.distanceTo(b);
+      positions.push(...a.toArray(), ...b.toArray(), ...c.toArray(), ...d.toArray());
+      uvs.push(0, 0, length / 1.4, 0, 0, 1, length / 1.4, 1);
+      indices.push(start, start + 1, start + 2, start + 1, start + 3, start + 2);
+    };
+    const headY = GAME_CONFIG.room.height, wallFootY = headY - .085;
+    const head = (a: THREE.Vector3, b: THREE.Vector3) => {
+      quad(a.clone().setY(wallFootY), b.clone().setY(wallFootY), a.clone().setY(headY), b.clone().setY(headY));
+    };
+    head(new THREE.Vector3(-3, 0, GAME_CONFIG.room.wallFrontZ + .005), new THREE.Vector3(3, 0, GAME_CONFIG.room.wallFrontZ + .005));
+    head(new THREE.Vector3(-3.77, 0, 3.575), new THREE.Vector3(3.77, 0, 3.575));
+    head(new THREE.Vector3(-3.772, 0, -3.57), new THREE.Vector3(-3.772, 0, 3.57));
+    head(new THREE.Vector3(3.772, 0, -3.57), new THREE.Vector3(3.772, 0, 3.57));
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geometry.setIndex(indices); geometry.computeVertexNormals();
+    const contact = new THREE.Mesh(geometry, material);
+    contact.name = 'Fine wall head mortar dust against slab soffit';
+    contact.userData.studioEntityId = 'world:wall-head-contact';
+    contact.raycast = () => undefined;
+    this.add(contact);
+
+    const bedPositions: number[] = [], bedUvs: number[] = [], bedIndices: number[] = [];
+    const beds = [
+      [new THREE.Vector3(-3, 0, GAME_CONFIG.room.wallFrontZ + .007), new THREE.Vector3(3, 0, GAME_CONFIG.room.wallFrontZ + .007)],
+      [new THREE.Vector3(-3.77, 0, 3.573), new THREE.Vector3(3.77, 0, 3.573)],
+      [new THREE.Vector3(-3.77, 0, -3.57), new THREE.Vector3(-3.77, 0, 3.57)],
+      [new THREE.Vector3(3.77, 0, -3.57), new THREE.Vector3(3.77, 0, 3.57)],
+    ];
+    for (const [edge, [from, to]] of beds.entries()) {
+      const length = from.distanceTo(to), steps = Math.ceil(length / .12);
+      const start = bedPositions.length / 3;
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps, point = from.clone().lerp(to, t);
+        const uneven = .0025 * Math.sin(i * 2.37 + edge * 1.7) + .0013 * Math.sin(i * 5.19 - edge);
+        bedPositions.push(point.x, headY - .010 + uneven, point.z, point.x, headY + .001, point.z);
+        bedUvs.push(t * length, 0, t * length, 1);
+        if (i < steps) {
+          const a = start + i * 2;
+          bedIndices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+        }
+      }
+    }
+    const bedGeometry = new THREE.BufferGeometry();
+    bedGeometry.setAttribute('position', new THREE.Float32BufferAttribute(bedPositions, 3));
+    bedGeometry.setAttribute('uv', new THREE.Float32BufferAttribute(bedUvs, 2));
+    bedGeometry.setIndex(bedIndices); bedGeometry.computeVertexNormals();
+    const bed = new THREE.Mesh(bedGeometry, matteMaterial(0x9a9285));
+    bed.name = 'Irregular packed mortar at brick wall heads';
+    bed.raycast = () => undefined;
+    this.add(bed);
   }
 
   private addFloorReturns(): void {
