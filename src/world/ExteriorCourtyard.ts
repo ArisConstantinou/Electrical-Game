@@ -258,8 +258,6 @@ export class ExteriorCourtyard extends THREE.Group {
       farBlock(concrete, -.84, .875, z, 1.55, .09, .98);
       farBlock(concrete, -.84, 2.145, z, 1.55, .09, .98);
     }
-    farBlock(concrete, -1.20, 2.52, 0, 3.50, .17, 6.55);
-    farBlock(terracotta, .10, 2.65, 0, .68, .12, 6.72);
     for (const [material, shapes] of farShapes) {
       const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), material, shapes.length);
       mesh.name = `Batched far-residence ${material.name || material.type} structure`;
@@ -270,6 +268,20 @@ export class ExteriorCourtyard extends THREE.Group {
       mesh.castShadow = true; mesh.receiveShadow = true;
       mesh.raycast = () => undefined; mesh.computeBoundingSphere(); farHouse.add(mesh);
     }
+    // Keep the roof as its own structural unit so the Level Editor can move
+    // it without also moving the residence's walls and interior rooms.
+    const residenceRoof = new THREE.Group();
+    residenceRoof.name = 'Residence roof slab and parapet';
+    residenceRoof.userData.studioEntityId = 'outside:residence-roof';
+    const roofSlab = new THREE.Mesh(new THREE.BoxGeometry(3.50, .17, 6.55), concrete);
+    roofSlab.name = 'Separate unfinished residence roof slab';
+    roofSlab.position.set(-1.20, 2.52, 0);
+    const parapet = new THREE.Mesh(new THREE.BoxGeometry(.68, .12, 6.72), terracotta);
+    parapet.name = 'Roof-edge fired-clay parapet course';
+    parapet.position.set(.10, 2.65, 0);
+    for (const part of [roofSlab, parapet]) part.castShadow = part.receiveShadow = true;
+    residenceRoof.add(roofSlab, parapet);
+    farHouse.add(residenceRoof);
     const drain = new THREE.Mesh(new THREE.CylinderGeometry(.037, .037, 2.65, 8), steel);
     drain.name = 'Rainwater downpipe with wall offset'; drain.position.set(.23, 1.325, 2.88);
     drain.castShadow = true; drain.raycast = () => undefined; farHouse.add(drain);

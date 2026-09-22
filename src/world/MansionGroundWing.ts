@@ -176,11 +176,14 @@ export class MansionGroundWing extends THREE.Group {
   registerOriginalRoomAssets(room: THREE.Group, exterior: THREE.Group, lockedObjects: THREE.Object3D[]): void {
     const locked = new Set(lockedObjects);
     const occurrences = new Map<string, number>();
+    const residenceRoof = exterior.getObjectByName('Residence roof slab and parapet');
     const sources = [
       ...[...room.children].filter(object => object !== this && object !== exterior)
         .map(object => ({ object, parent: room, prefix: 'room-part' })),
       ...[...exterior.children].filter(object => !/sky gradient/i.test(object.name))
         .map(object => ({ object, parent: exterior, prefix: 'outside-part' })),
+      ...(residenceRoof instanceof THREE.Group && residenceRoof.parent instanceof THREE.Group
+        ? [{ object: residenceRoof, parent: residenceRoof.parent, prefix: 'outside-part' }] : []),
     ];
     for (const { object, parent, prefix } of sources) {
       if (this.editableAssets.get(object.name) === object ||
