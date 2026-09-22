@@ -115,7 +115,7 @@ export class MansionGroundWing extends THREE.Group {
       const pivot = new THREE.Group();
       pivot.name = id;
       pivot.userData.levelEditorKind = 'asset';
-      pivot.userData.levelEditorGround = /\b(?:ground|terrain|soil)\b/i.test(object.name);
+      pivot.userData.levelEditorGround = /\b(?:ground|terrain|soil|floor)\b/i.test(object.name);
       pivot.userData.levelEditorLabel = `${object.name}${count > 1 ? ` · ${count}` : ''}`;
       bounds.getSize(size);
       pivot.userData.baseSize = [Math.max(size.x, .01), Math.max(size.y, .01), Math.max(size.z, .01)];
@@ -212,7 +212,7 @@ export class MansionGroundWing extends THREE.Group {
       pivot.userData.levelEditorKind = 'asset';
       pivot.userData.levelEditorLabel = `${object.name || 'Site part'}${count > 1 ? ` · ${count}` : ''}`;
       pivot.userData.levelEditorLocked = locked.has(object) || /first-fix supplies at the site perimeter/i.test(object.name);
-      pivot.userData.levelEditorGround = /\b(?:ground|terrain|soil)\b/i.test(object.name);
+      pivot.userData.levelEditorGround = /\b(?:ground|terrain|soil|floor)\b/i.test(object.name);
       pivot.userData.baseSize = [Math.max(size.x, .01), Math.max(size.y, .01), Math.max(size.z, .01)];
       pivot.userData.studioEntityId = `mansion:${id}`;
       parent.add(pivot);

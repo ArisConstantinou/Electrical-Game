@@ -521,7 +521,8 @@ export class LevelEditor {
         if (this.wallPathActive) this.setWallPathActive(false);
         // Ground fills most top-down pixels. Tap away to clear an existing
         // selection; tap the same surface again to select and edit it.
-        if (object.userData.levelEditorGround && !this.multiMode && this.selectedObjects.size && !this.selectedObjects.has(object)) {
+        if ((object.userData.levelEditorGround || object.userData.levelEditorKind === 'floor') &&
+          !this.multiMode && this.selectedObjects.size && !this.selectedObjects.has(object)) {
           this.setSelection([]);
           this.status('Selection cleared. Tap the floor or terrain again to edit it.');
           return;
