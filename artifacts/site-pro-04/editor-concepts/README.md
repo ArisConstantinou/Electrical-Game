@@ -2,6 +2,12 @@
 
 These are selection concepts, not a shipped editor. Each set has a 3D image, a live-rendered top view marked 2D, and a 3D image with the floor viewer open. The world backgrounds were captured from the Electrical-Game renderer; the editor controls and gizmos are design mockups. The top view capture temporarily hid overhead meshes for clarity. Actual per-floor visibility, orthographic projection, picking, save, and transform behavior still require implementation and runtime tests.
 
+Decision: the user selected **gizmo 02, Orbit Halo**. The surrounding UI layout remains undecided; the five images show five different UI directions, and the chosen gizmo can be combined with the eventual UI choice. Do not implement a full visual layout based solely on the gizmo selection.
+
+Placement refinement: the halo's touch controls belong just outside the lower edge of the selected wall in screen space, linked to a small pivot marker. The object surface must stay readable. On a small or clipped selection the control can flip to another free edge. The transform pivot and the visible touch controls are separate concepts: moving the touch UI alone must not silently change the rotate/scale origin. Multi-selection uses one deliberate group pivot. [Unreal's coordinate-space guide](https://dev.epicgames.com/documentation/unreal-engine/coordinate-system-and-spaces-in-unreal-engine) places the standard gizmo at the actor pivot, which can be moved; [its predefined shape tool](https://dev.epicgames.com/documentation/unreal-engine/predefined-shapes-in-unreal-engine) permits base, center or top pivots. Unreal therefore does not impose a universal lower-edge gizmo. The lower external touch control is our mobile-specific design decision.
+
+For the five UI layouts shown as images in one mobile-friendly page, open [UI-GALLERY.md](UI-GALLERY.md).
+
 The design target is one selectable floor at a time: B2, B1, ground, and floors 01–04 (five above-ground levels including ground). In 3D, isolate the selected floor while allowing a temporary context overlay if wanted later. In 2D, show the same textured world from directly above, with only the selected floor visible and fully editable. The 2D view is **not** a blueprint substitute. Tapping the compact floor chip opens the selector; closing it restores the scene. This may reduce rendered geometry, but performance improvement is unmeasured until implementation.
 
 | Direction | Gizmo and edit affordance | Navigation |
