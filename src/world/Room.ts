@@ -336,7 +336,7 @@ export class Room extends THREE.Group {
     if (!context) return;
     const pixels = context.createImageData(canvas.width, canvas.height);
     for (let y = 0; y < canvas.height; y++) for (let x = 0; x < canvas.width; x++) {
-      const rise = y / (canvas.height - 1);
+      const rise = 1 - y / (canvas.height - 1);
       const speckle = Math.sin(x * 13.73 + y * 8.31) * Math.sin(x * 3.61 - y * 18.17);
       const edge = Math.sin(x * .14) * .08 + Math.sin(x * .49) * .035;
       const coverage = THREE.MathUtils.smoothstep(rise + edge, .23, .94);
