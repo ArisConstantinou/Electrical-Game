@@ -23,3 +23,8 @@ masonryFaceMaterial.colorNode = mix(photographed, clayInterior, siteClayReady.mu
 export const claySoffitFaceMaterial = new MeshStandardNodeMaterial({ roughness: 1 });
 claySoffitFaceMaterial.name = 'Photographed fired-clay ceiling infill';
 claySoffitFaceMaterial.colorNode = photographed;
+// The overhead face misses the warm bounce reaching the adjacent clay wall.
+// Keep the photographed variation while bringing the two faces into the same
+// apparent material family at their structural junction.
+claySoffitFaceMaterial.emissive.set(0x8b5740);
+claySoffitFaceMaterial.emissiveIntensity = .12;
