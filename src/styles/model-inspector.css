@@ -1,6 +1,9 @@
 @import './trials-model-viewer.css';
 /* Layout and interaction vocabulary adapted from Trials src/ui/ModelViewer.ts. */
-#model-inspector-open{position:absolute;right:80px;top:80px;pointer-events:auto;padding:10px 16px;background:#252e31;color:#fff;border:1px solid #d7b884;border-radius:6px;font-size:14px;font-weight:700;z-index:8}
+#settings-panel #model-inspector-open{position:relative;inset:auto;z-index:auto;width:100%;min-height:50px;margin:0 0 9px;padding:0 12px;display:flex;align-items:center;gap:10px;pointer-events:auto;border:1px solid #829a90;border-radius:8px;background:#263b35;color:#f9f7e9;font:800 14px/1 Bahnschrift,Arial,sans-serif;letter-spacing:.025em;text-align:left;cursor:pointer;touch-action:manipulation}
+#settings-panel #model-inspector-open svg{width:23px;height:23px;flex:none;fill:none;stroke:#ffda28;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#settings-panel #model-inspector-open .model-settings-chevron{margin-left:auto;font:400 26px/1 Arial,sans-serif;color:#ffda28}
+#settings-panel #model-inspector-open:hover,#settings-panel #model-inspector-open:focus-visible{border-color:#ffda28;background:#334940}
 .model-open{visibility:hidden!important}
 #model-inspector{pointer-events:none}#model-inspector header,#model-inspector nav,#model-inspector footer,#model-orbit{pointer-events:auto}
 #model-inspector[hidden],#model-inspector [hidden]{display:none!important}
@@ -17,14 +20,10 @@
 #model-stats{display:block;text-align:center;font-size:12px;color:#546773;margin-top:4px}#model-live-prompt:empty{display:none}
 .front-body-view #reticle,.front-body-view #interaction-prompt{visibility:hidden}#body-view-banner{position:absolute;top:85px;left:50%;transform:translateX(-50%);padding:8px 14px;background:#182125e8;color:#fff;font-size:14px;pointer-events:auto;border:1px solid #d7b884;border-radius:5px;z-index:8}
 #model-aim-marker{position:absolute;pointer-events:none;font:24px monospace;color:#ffcf86;text-shadow:0 1px 2px #000}
-@media(max-width:700px){#model-inspector .model-viewer__subjects button{min-width:0;flex:1;padding:10px 6px}#model-inspector .model-viewer__forms{flex-wrap:wrap;padding:0 8px 8px}#character-poses,#model-live-controls{gap:5px}#character-poses label{display:none}#model-speed{width:65px}#model-inspector select{max-width:150px}#model-inspector .model-viewer__footer p{font-size:12px;margin:5px 0 0}#model-inspector-open{right:65px;top:70px}#body-view-banner{top:120px;width:max-content;max-width:90%}#model-drive:not([hidden]){bottom:145px;left:10px;right:10px}.model-caption span{display:none}}
+@media(max-width:700px){#model-inspector .model-viewer__subjects button{min-width:0;flex:1;padding:10px 6px}#model-inspector .model-viewer__forms{flex-wrap:wrap;padding:0 8px 8px}#character-poses,#model-live-controls{gap:5px}#character-poses label{display:none}#model-speed{width:65px}#model-inspector select{max-width:150px}#model-inspector .model-viewer__footer p{font-size:12px;margin:5px 0 0}#body-view-banner{top:120px;width:max-content;max-width:90%}#model-drive:not([hidden]){bottom:145px;left:10px;right:10px}.model-caption span{display:none}}
 @media(max-height:500px){#model-inspector .model-viewer__subjects{left:24%;right:60px}#model-inspector .model-viewer__subjects button{padding:6px;min-height:36px;min-width:95px}#model-inspector .model-viewer__footer{min-height:54px}#model-drive:not([hidden]){bottom:60px}.model-caption{top:4px}.model-caption span,#model-stats{display:none}#model-inspector .model-viewer__forms{padding-bottom:4px}#model-inspector .model-viewer__forms button,#model-inspector select{min-height:34px;padding:6px}}
 .model-open #game-stage{visibility:visible!important}
 .front-body-view #body-view-banner{top:auto;bottom:16px}
 .front-body-view .controls-guide{display:none}
 .front-body-view #desktop-key-guide{display:none}
 #model-drive:not([hidden]){bottom:calc(100% + 12px)}
-#game-shell:has(#start-screen:not(.hidden)) #model-inspector-open{display:none}
-/* Keep the viewer reachable beside the mobile work cards, not behind them. */
-@media(pointer:coarse){#model-inspector-open{top:186px;right:max(10px,env(safe-area-inset-right));width:54px;min-height:44px;padding:5px;font-size:12px;line-height:16px}}
-@media(pointer:coarse) and (max-height:520px){#model-inspector-open{top:62px;width:80px}}

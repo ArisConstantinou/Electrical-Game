@@ -46,8 +46,13 @@ export class ModelInspector {
     this.scene.add(new THREE.HemisphereLight(0xf0f5ff,0x716456,2.4));
     const key=new THREE.DirectionalLight(0xffffff,3.2);key.position.set(-3,5,-4);this.scene.add(key);
     const fill=new THREE.DirectionalLight(0xb6d5ff,1.4);fill.position.set(3,2,3);this.scene.add(fill);
-    this.openButton.id='model-inspector-open';this.openButton.textContent='3D MODELS';this.openButton.type='button';
-    this.openButton.addEventListener('click',()=>void this.open());game.hud.shell.append(this.openButton);
+    this.openButton.id='model-inspector-open';this.openButton.type='button';
+    this.openButton.setAttribute('aria-label','Open 3D models');
+    this.openButton.innerHTML='<svg viewBox="0 0 32 32" aria-hidden="true"><path d="m16 3 12 7v12l-12 7L4 22V10zM4 10l12 7 12-7M16 17v12"/></svg><span>3D MODELS</span><span class="model-settings-chevron" aria-hidden="true">›</span>';
+    this.openButton.addEventListener('click',()=>{if(game.hud.shell.classList.contains('settings-open'))game.hud.shell.querySelector<HTMLButtonElement>('#settings-toggle')?.click();void this.open();});
+    const settingsPanel=game.hud.shell.querySelector('#settings-panel');
+    if(!settingsPanel)throw new Error('Model Inspector requires the game settings panel');
+    settingsPanel.querySelector('header')?.after(this.openButton);
     this.panel.id='model-inspector';this.panel.hidden=true;this.panel.setAttribute('role','dialog');this.panel.setAttribute('aria-modal','true');this.panel.setAttribute('aria-label','3D models');
     this.panel.className='model-viewer';
     this.panel.innerHTML=`<header class="model-viewer__header"><div><span>MODEL INSPECTOR</span><h2>3D MODELS</h2></div><button id="model-close" type="button" aria-label="Close 3D models">✕</button></header>
@@ -106,7 +111,8 @@ export class ModelInspector {
   }
   close():void{
     this.setLive(false);this.active=false;this.panel.hidden=true;this.controls.enabled=false;this.game.input.resetTransientInput();
-    this.game.hud.shell.classList.remove('model-open');this.game.renderer.modelScene=null;this.game.renderer.modelViewport=null;this.game.renderer.viewCamera=null;this.openButton.focus();
+    this.game.hud.shell.classList.remove('model-open');this.game.renderer.modelScene=null;this.game.renderer.modelViewport=null;this.game.renderer.viewCamera=null;
+    this.game.hud.shell.querySelector<HTMLButtonElement>('#settings-toggle')?.focus();
   }
   private buildLibrary():void{
     this.entries=[{id:'character',label:'Χαρακτήρας · ζωντανές στάσεις',path:'CHARACTER'}];
