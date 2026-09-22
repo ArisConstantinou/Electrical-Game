@@ -1,0 +1,27 @@
+{
+  "method": "390x844 touch Chromium WebGL desktop-host diagnostic, real RAF, 193 rendered frames per phase, level tool, rotating camera, no physical phone claim",
+  "before": {
+    "frames": 193,
+    "fps": 60.02923703728307,
+    "frameP95Ms": 18.399999976158142,
+    "gameStepMsPerFrame": 12.769948190975683,
+    "bodyUpdateMsPerFrame": 5.2906735752530665,
+    "referenceGraspMsPerFrame": 5.139896373365827,
+    "clearanceMsPerFrame": 4.935751295460321,
+    "clearanceCalls": 42460,
+    "drawCalls": 550.3212435233161,
+    "renderError": ""
+  },
+  "after": {
+    "frames": 193,
+    "fps": 60.102142501468755,
+    "frameP95Ms": 18.200000047683716,
+    "gameStepMsPerFrame": 7.97823834357484,
+    "bodyUpdateMsPerFrame": 0.41968912225930805,
+    "referenceGraspMsPerFrame": 0.2870466310743223,
+    "clearanceMsPerFrame": 0.11917098723544976,
+    "clearanceCalls": 42495,
+    "drawCalls": 550.1709844559585,
+    "renderError": ""
+  }
+}

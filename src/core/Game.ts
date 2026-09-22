@@ -446,10 +446,10 @@ export class Game {
     const clearPipeLayout=this.pvc.focused&&['spreading','marking','fastener-marking','pipe-install-ready'].includes(this.pvc.phase)&&!this.workerBody.overview;
     if(!clearPipeLayout&&(this.selectedTool!=='hose'||mixingOwnedInput||pvcOwnedInput)){
       const poseBody=()=>this.workerBody.update(dt,this.renderer.camera,bodyPlayer,this.fpsRig,this.selectedTool,this.input.actionHeld,mixingOwnedInput||this.pvc.blocksWork,this.pvc.blocksWork?this.pvc.anatomicalGrips():this.mixing.anatomicalGrips(),this.workSurfaces.frontForBounds);
-      // The two-handed box solver tests hundreds of candidate poses. Installed
-      // casings and mortar stay fixed for this synchronous solve, so reuse their
-      // bounds without changing any of the contact or collision decisions.
-      if(this.selectedTool==='fitting'&&!mixingOwnedInput&&!pvcOwnedInput)this.workSurfaces.withSnapshot(poseBody);
+      // Box and level grips test hundreds of candidate poses. Installed
+      // casings and mortar stay fixed for this synchronous solve, so reuse
+      // their bounds without changing contact or collision decisions.
+      if((this.selectedTool==='fitting'||this.selectedTool==='level')&&!mixingOwnedInput&&!pvcOwnedInput)this.workSurfaces.withSnapshot(poseBody);
       else poseBody();
     }
     this.mixing.useAnatomicalBody(this.workerBody.loaded);

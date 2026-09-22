@@ -24,7 +24,7 @@ try{
    for(const [object,prefix,names] of [[g.room.brickWall,'wall',['strikeContact','flushGeometry','clearPaint','dispatchMeshes']],[g.room.brickWall.volume,'volume',['impact','aggregateFragments','exportMeshJob','processPendingSupport']],[g.mortar,'mortar',['refreshOpeningGeometry','updateStages','syncFieldGeometry']],[g.mortar.field,'field',['tick','releaseUnsupported','remesh']]])for(const name of names)wrap(object,name,prefix+'.'+name);
   }
   if(location.search.includes('bodyDiagnostic')){
-   for(const name of ['fitThumb','fitFinger','pinchBox','poseBoxGrasps','wrapGrip','limb','posePipeGrip','boxViewportCorrection','boxObstacleCorrection','clampBoxComposition'])wrap(g.workerBody,name,'body.'+name);
+   for(const name of ['fitThumb','fitFinger','pinchBox','poseBoxGrasps','poseReferenceGrasps','wrapGrip','limb','posePipeGrip','boxViewportCorrection','boxObstacleCorrection','clampBoxComposition'])wrap(g.workerBody,name,'body.'+name);
    wrap(g.workSurfaces,'frontForBounds','clearance.frontForBounds');
    for(const name of ['boxGraspScreenObstacles','boxGraspViewCorners','clampFittingZones'])wrap(g.fpsRig,name,'rig.'+name);
    const finger=g.workerBody.fitFinger;
@@ -39,7 +39,7 @@ try{
  });
  const cdp=await context.newCDPSession(page);
  const only=process.argv.find(value=>value.startsWith('--only='))?.slice('--only='.length);
- const stages=(url.includes('bodyDiagnostic')?[['spray',false,true],['hose',true,true],['fitting',false,true]]:[['spray',false,true],['hammer',true,true],['trowel',false,true],['hose',true,true],['fitting',false,true],['level',false,true],['spring',false,true],['cutter',false,true]]).filter(([tool])=>!only||tool===only);
+ const stages=(url.includes('bodyDiagnostic')?[['spray',false,true],['hose',true,true],['fitting',false,true],['level',false,true]]:[['spray',false,true],['hammer',true,true],['trowel',false,true],['hose',true,true],['fitting',false,true],['level',false,true],['spring',false,true],['cutter',false,true]]).filter(([tool])=>!only||tool===only);
  for(const [tool,held,rotate] of stages){
   await page.evaluate(tool=>window.dispatchEvent(new CustomEvent('wirehouse:select-tool',{detail:tool})),tool);
   await page.waitForFunction(tool=>window.__wireTheHouse.selectedTool===tool,tool);
