@@ -234,7 +234,7 @@ export class Room extends THREE.Group {
     }
     // One shared eased clay shape gives each physical unit a narrow broken
     // silhouette at the mortar joint without adding a draw call per brick.
-    const geometry = new RoundedBoxGeometry(1, 1, 1, 2, .035);
+    const geometry = new RoundedBoxGeometry(1, 1, 1, 1, .035);
     const patchRects = new Float32Array(pieces.length * 4);
     geometry.setAttribute('brickPatch', new THREE.InstancedBufferAttribute(patchRects, 4));
     const bricks = new THREE.InstancedMesh(geometry, masonryFaceMaterial, pieces.length);
@@ -306,7 +306,7 @@ export class Room extends THREE.Group {
       lintel.castShadow = lintel.receiveShadow = true;
       rearGroup.add(lintel);
     } else backing('Solid rear masonry backing', 0, GAME_CONFIG.room.height / 2, GAME_CONFIG.room.width, GAME_CONFIG.room.height);
-    const geometry = new RoundedBoxGeometry(1, 1, 1, 2, .035);
+    const geometry = new RoundedBoxGeometry(1, 1, 1, 1, .035);
     const instancesPerUnit = this.mansionPreview ? 2 : 1;
     const patchRects = new Float32Array(columns * rows * instancesPerUnit * 4);
     geometry.setAttribute('brickPatch', new THREE.InstancedBufferAttribute(patchRects, 4));
