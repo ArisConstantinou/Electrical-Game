@@ -8,6 +8,7 @@ import { addLighting } from './Lighting';
 import { matteMaterial, siteMaterial, siteProScreedMaterial } from './SiteMaterials';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { ExteriorCourtyard } from './ExteriorCourtyard';
+import { createClaySoffitPreview } from './ClaySoffitPreview';
 
 /** Constant-time hit on a raised clay face; backing remains hittable in joints. */
 const setBrickFaceRaycast = (
@@ -88,6 +89,9 @@ export class Room extends THREE.Group {
     ceiling.userData.studioEntityId = 'world:ceiling';
     ceiling.receiveShadow = true;
     this.add(ceiling);
+    if (new URLSearchParams(location.search).get('ceiling') === 'clay-ribbed') {
+      this.add(createClaySoffitPreview(GAME_CONFIG.room.width, GAME_CONFIG.room.depth, GAME_CONFIG.room.height));
+    }
 
     // Mortar backing stays solid for contact and measurement. Individually
     // raised clay courses on all side-wall segments match the primary wall.
