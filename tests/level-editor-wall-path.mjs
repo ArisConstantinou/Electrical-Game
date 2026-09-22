@@ -30,6 +30,10 @@ try {
     return { name: wall.name, scale: wall.scale.toArray(), hitWidth: hit.maxX - hit.minX, count: window.__wireTheHouse.room.mansionWing.editableWalls.size };
   });
   const endHandle = page.locator('[data-wall-end="1"]');
+  assert.equal(await endHandle.isVisible(), false, 'Wall endpoints stay out of the scene until Continue is enabled');
+  await page.locator('#level-wall-tools-toggle').tap();
+  await page.locator('#level-wall-continue').tap();
+  await page.locator('#level-details-close').tap();
   await endHandle.waitFor({ state: 'visible' });
   const box = await endHandle.boundingBox();
   assert(box);
@@ -46,9 +50,6 @@ try {
   assert(stretched.scale[0] > initial.scale[0] + .1, `Endpoint drag must extend geometry: ${JSON.stringify({ initial, stretched })}`);
   assert(stretched.hitWidth > initial.hitWidth + .2, 'Endpoint drag must extend collision with the wall');
 
-  await page.locator('#level-wall-tools-toggle').tap();
-  await page.locator('#level-wall-continue').tap();
-  await page.locator('#level-details-close').tap();
   const target = await page.evaluate(() => {
     const editor = window.__wireTheHouse.levelEditor;
     const wall = editor.gizmo.object;

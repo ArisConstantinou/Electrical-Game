@@ -15,6 +15,7 @@ export class MansionGroundWing extends THREE.Group {
   readonly editableWalls = new Map<string, THREE.Group>();
   readonly editableSurfaces = new Map<string, THREE.Group>();
   readonly editableAssets = new Map<string, THREE.Group>();
+  private originalRoomFloor: THREE.Group | null = null;
   private readonly editableWallColliders = new Map<THREE.Group, { obstacle: PlayerObstacle; matrix: THREE.Matrix4 }>();
   private readonly editableAssetColliders = new Map<THREE.Group, { obstacle: PlayerObstacle; matrix: THREE.Matrix4 }>();
   private readonly corner = new THREE.Vector3();
@@ -86,8 +87,8 @@ export class MansionGroundWing extends THREE.Group {
     this.registerAuthoredAssets();
   }
 
-  /** Give every authored wing part a stable, centred edit pivot. Keep the
-   * courtyard/terrain systems separate: they own animation and LOD state. */
+  /** Give authored site parts stable edit pivots without detaching the
+   * courtyard/terrain systems from their animation and LOD owners. */
   private registerAuthoredAssets(): void {
     const occurrences = new Map<string, number>();
     const pickGeometry = new THREE.BoxGeometry(1, 1, 1);
@@ -95,7 +96,12 @@ export class MansionGroundWing extends THREE.Group {
     const bounds = new THREE.Box3();
     const centre = new THREE.Vector3();
     const size = new THREE.Vector3();
-    for (const object of [...this.children]) {
+    const authored = [
+      ...[...this.children].map(object => ({ parent: this as THREE.Group, object })),
+      ...[...this.courtyard.children].map(object => ({ parent: this.courtyard as THREE.Group, object })),
+      ...[...this.surroundings.children].map(object => ({ parent: this.surroundings as THREE.Group, object })),
+    ];
+    for (const { parent, object } of authored) {
       if (object === this.courtyard || object === this.surroundings ||
         this.editableWalls.get(object.name) === object || this.editableSurfaces.get(object.name) === object) continue;
       if (!(object instanceof THREE.Mesh || object instanceof THREE.Group)) continue;
@@ -108,13 +114,14 @@ export class MansionGroundWing extends THREE.Group {
       const pivot = new THREE.Group();
       pivot.name = id;
       pivot.userData.levelEditorKind = 'asset';
+      pivot.userData.levelEditorGround = /\b(?:ground|terrain|soil)\b/i.test(object.name);
       pivot.userData.levelEditorLabel = `${object.name}${count > 1 ? ` · ${count}` : ''}`;
       bounds.getSize(size);
       pivot.userData.baseSize = [Math.max(size.x, .01), Math.max(size.y, .01), Math.max(size.z, .01)];
       pivot.userData.studioEntityId = `mansion:${id}`;
       bounds.getCenter(centre);
-      this.add(pivot);
-      pivot.position.copy(centre);
+      parent.add(pivot);
+      pivot.position.copy(parent.worldToLocal(centre.clone()));
       pivot.attach(object);
       // A single box around a spread-out beam network would intercept taps
       // on every item inside it. Use a proxy only for compact parts whose
@@ -138,6 +145,30 @@ export class MansionGroundWing extends THREE.Group {
     }
   }
 
+  /** The original work room belongs to Room rather than this wing, but its
+   * floor and ceiling are still construction surfaces in the same level. */
+  registerOriginalRoomSurfaces(floor: THREE.Mesh, ceiling: THREE.Mesh): void {
+    for (const object of [floor, ceiling]) {
+      const bounds = new THREE.Box3().setFromObject(object);
+      const centre = bounds.getCenter(new THREE.Vector3());
+      const size = bounds.getSize(new THREE.Vector3());
+      const parent = object.parent!;
+      const pivot = new THREE.Group();
+      const id = `room-asset:${object === floor ? 'floor' : 'ceiling'}:1`;
+      pivot.name = id;
+      pivot.userData.levelEditorKind = 'asset';
+      pivot.userData.levelEditorGround = object === floor;
+      pivot.userData.levelEditorLabel = object.name;
+      pivot.userData.baseSize = [size.x, size.y, size.z];
+      pivot.userData.studioEntityId = `mansion:${id}`;
+      parent.add(pivot);
+      pivot.position.copy(parent.worldToLocal(centre.clone()));
+      pivot.attach(object);
+      this.editableAssets.set(id, pivot);
+      if (object === floor) this.originalRoomFloor = pivot;
+    }
+  }
+
   update(dt: number): void { this.courtyard.update(dt); this.surroundings.update(dt); }
 
   setEmptyTemplate(enabled: boolean): void { this.emptyTemplate = enabled; }
@@ -146,6 +177,14 @@ export class MansionGroundWing extends THREE.Group {
     const placed = this.editorSurfaceHeight(x, z, currentFloor);
     if (placed !== null) return placed;
     if (this.emptyTemplate) return 0;
+    if (this.originalRoomFloor && Math.abs(currentFloor) < .5) {
+      const floor = this.originalRoomFloor;
+      floor.updateWorldMatrix(true, false);
+      this.corner.set(x, 0, z).applyMatrix4(this.inverseSurfaceMatrix.copy(floor.matrixWorld).invert());
+      const [width, thickness, depth] = floor.userData.baseSize as number[];
+      if (Math.abs(this.corner.x) <= width / 2 && Math.abs(this.corner.z) <= depth / 2)
+        return floor.localToWorld(this.corner.set(0, thickness / 2, 0)).y;
+    }
     const closest = (heights: number[]): number => heights.reduce((best, height) =>
       Math.abs(height - currentFloor) < Math.abs(best - currentFloor) ? height : best);
     const onFirst = x >= 4.8 && x <= 6.2 && z >= 8 && z < 11.08;

@@ -103,6 +103,8 @@ export class LevelEditor {
   private readonly selectedObjects = new Set<THREE.Group>();
   private readonly selectionPivot = new THREE.Group();
   private readonly pivotMatrix = new THREE.Matrix4();
+  private selectionAnchor: THREE.Vector3 | null = null;
+  private selectionAnchorLocal: THREE.Vector3 | null = null;
   private readonly groups = new Map<string, GroupRecord>();
   private multiMode = false;
   private activeGroupId: string | null = null;
@@ -119,6 +121,7 @@ export class LevelEditor {
   private readonly raycaster = new THREE.Raycaster();
   private readonly pointer = new THREE.Vector2();
   private readonly highlights = new Map<THREE.Group, THREE.Group>();
+  private readonly editorRaycasts = new Map<THREE.Mesh, THREE.Object3D['raycast']>();
   private cameraMode: 'orbit' | 'pan' = 'orbit';
   private readonly touchPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0));
   private touchDrag: { pointerId: number; mode: 'translate' | 'rotate' | 'scale'; x: number; y: number; position: THREE.Vector3; rotationY: number; scale: THREE.Vector3; planeHit: THREE.Vector3 | null } | null = null;
@@ -146,6 +149,7 @@ export class LevelEditor {
   private haloElement!: HTMLElement;
   private readonly haloBounds = new THREE.Box3();
   private readonly haloCorner = new THREE.Vector3();
+  private readonly gizmoBounds = new THREE.Box3();
 
   constructor(private readonly game: Game) {
     const canvas = game.renderer.webgl.domElement;
@@ -170,7 +174,7 @@ export class LevelEditor {
     this.topOrbit.enabled = false;
     this.topOrbit.update();
     this.gizmo = new TransformControls(this.camera, canvas);
-    this.gizmo.setSize(.8);
+    this.gizmo.setSize(.34);
     this.gizmo.addEventListener('dragging-changed', event => { this.orbit.enabled = this.active && !event.value; });
     this.gizmo.addEventListener('objectChange', () => { if (this.gizmo.object === this.selectionPivot) this.applyPivotDelta(); this.refreshFields(); });
     this.gizmo.addEventListener('mouseUp', () => { this.snapWallEnds(); this.refreshFields(); this.recordHistory(); });
@@ -208,7 +212,7 @@ export class LevelEditor {
       <aside><label for="level-search">SITE ELEMENTS</label><input id="level-search" type="search" placeholder="Search structures…"><div id="level-list"></div><div class="level-editor__add"><button id="level-add-brick" type="button">+ BRICK WALL</button><button id="level-add-concrete" type="button">+ CONCRETE WALL</button><button id="level-add-floor" type="button">+ FLOOR SLAB</button><button id="level-add-stair" type="button">+ STAIRS</button></div><div class="level-editor__starts"><button id="level-player" type="button">PLAYER START</button><select id="level-apprentice-index" aria-label="Apprentice number"><option value="1">APPRENTICE 1</option><option value="2">APPRENTICE 2</option><option value="3">APPRENTICE 3</option><option value="4">APPRENTICE 4</option><option value="5">APPRENTICE 5</option></select><button id="level-apprentice" type="button">EDIT START</button></div></aside>
       <section class="level-editor__inspector"><b id="level-name">Select an element</b><p id="level-kind">Tap a structure in the scene or list.</p><div class="level-editor__history"><button id="level-undo" type="button">UNDO</button><button id="level-redo" type="button">REDO</button></div><div class="level-editor__fields"><label>X <input data-axis="x" type="number" step="0.01"></label><label>Y <input data-axis="y" type="number" step="0.01"></label><label>Z <input data-axis="z" type="number" step="0.01"></label><label>WIDTH m <input data-size="x" type="number" min="0.2" step="0.01"></label><label>HEIGHT m <input data-size="y" type="number" min="0.2" step="0.01"></label><label>DEPTH m <input data-size="z" type="number" min="0.05" step="0.01"></label><label>YAW ° <input id="level-yaw" type="number" step="1"></label></div><button id="level-delete" type="button">DELETE ADDED ELEMENT</button><p id="level-status" role="status"></p></section>
       <section class="level-editor__save"><b>SAVE LEVEL</b><p>Basic stays unchanged. Save your work as a separate named level.</p><label for="level-slot-name">LEVEL NAME</label><input id="level-slot-name" type="text" maxlength="48" value="My Level"><button id="level-save-mobile" type="button">SAVE LEVEL</button><button id="level-save-as" type="button">SAVE AS NEW COPY</button><button id="level-export-mobile" type="button">EXPORT JSON</button><p id="level-save-status" role="status"></p></section>
-      <div id="level-halo" hidden><span id="level-halo-badge">SELECTED</span><button id="level-halo-handle" type="button" aria-label="Drag selected element with current edit tool"><span aria-hidden="true">✥</span></button></div>
+      <div id="level-halo" hidden><button id="level-halo-handle" type="button" aria-label="Drag element with current edit tool"><span aria-hidden="true">✥</span></button></div>
       <nav class="level-editor__bottom-nav" aria-label="Level editor navigation"><button id="level-dock-toggle" type="button" aria-label="Hide editor navigation" aria-expanded="true"><span aria-hidden="true">⌄</span></button><button data-editor-tab="select" type="button">VIEW</button><button data-editor-tab="build" type="button">BUILD</button><button data-editor-tab="transform" type="button">EDIT</button><button data-editor-tab="starts" type="button">SCENE</button><button data-editor-tab="save" type="button">SAVE</button></nav>
       <nav class="level-editor__wheel" aria-label="Level editor wheel"><div class="level-editor__wheel-ring"><button data-editor-tab="select" type="button">SELECT</button><button data-editor-tab="build" type="button">BUILD</button><button data-editor-tab="transform" type="button">EDIT</button><button data-editor-tab="starts" type="button">STARTS</button><button data-editor-tab="save" type="button">SAVE</button></div><button id="level-wheel-toggle" type="button" aria-label="Open editor wheel" aria-expanded="false">◎</button></nav>`;
     this.haloElement = this.el('#level-halo');
@@ -503,18 +507,23 @@ export class LevelEditor {
       this.raycaster.setFromCamera(this.pointer, this.camera);
       const wing = this.game.room.mansionWing;
       if (!wing) return;
-      const hits = this.raycaster.intersectObjects(this.editables().filter(object => object.visible), true);
+      const hits = this.raycaster.intersectObjects(this.editables().filter(object => this.isSelectableVisible(object)), true);
       for (const hit of hits) {
         let object: THREE.Object3D | null = hit.object;
-        while (object && object.parent !== wing) object = object.parent;
+        while (object && object !== wing &&
+          wing.editableWalls.get(object.name) !== object &&
+          wing.editableSurfaces.get(object.name) !== object &&
+          wing.editableAssets.get(object.name) !== object) object = object.parent;
         if (!(object instanceof THREE.Group) ||
           (wing.editableWalls.get(object.name) !== object && wing.editableSurfaces.get(object.name) !== object && wing.editableAssets.get(object.name) !== object)) continue;
+        if (this.wallPathActive && object.userData.levelEditorGround) continue;
         if (this.wallPathActive && object === this.selected) break;
         if (this.wallPathActive) this.setWallPathActive(false);
-        this.selectWall(object, event.ctrlKey || event.shiftKey);
+        this.selectWall(object, event.ctrlKey || event.shiftKey, hit.point);
         return;
       }
       if (this.wallPathActive) this.extendWallAtPointer(event);
+      else this.setSelection([]);
     });
     addEventListener('keydown', event => {
       if (!this.active) return;
@@ -537,7 +546,7 @@ export class LevelEditor {
   }
   private setToolMode(mode: 'translate' | 'rotate' | 'scale'): void {
     this.gizmo.setMode(mode);
-    this.el('#level-halo-handle').setAttribute('aria-label', `Drag selected element to ${mode === 'translate' ? 'move' : mode === 'rotate' ? 'rotate' : 'resize'}`);
+    this.el('#level-halo-handle').setAttribute('aria-label', `Drag element to ${mode === 'translate' ? 'move' : mode === 'rotate' ? 'rotate' : 'resize'}`);
     for (const [id, value] of [['#level-translate', 'translate'], ['#level-rotate', 'rotate'], ['#level-scale', 'scale']] as const)
       this.el<HTMLButtonElement>(id).setAttribute('aria-pressed', String(value === mode));
     this.el('#level-touch-help').textContent = mode === 'translate'
@@ -568,10 +577,10 @@ export class LevelEditor {
   }
   private beginTouchDrag(event: PointerEvent): boolean {
     if (event.pointerType !== 'touch' || !event.isPrimary || !this.active || this.tab !== 'transform') return false;
-    const object = this.selectedObjects.size > 1 ? this.selectionPivot : this.selected ?? (this.markerSelection === 'player' ? this.playerMarker : this.markerSelection === 'apprentice' ? this.apprenticeMarker : null);
+    const object = this.gizmo.object === this.selectionPivot ? this.selectionPivot : this.selected ?? (this.markerSelection === 'player' ? this.playerMarker : this.markerSelection === 'apprentice' ? this.apprenticeMarker : null);
     if (!object) return false;
     this.pointerRay(event);
-    const targets = this.selectedObjects.size > 1 ? [...this.selectedObjects] : [object];
+    const targets = this.selectedObjects.size ? [...this.selectedObjects] : [object];
     if (!this.raycaster.intersectObjects(targets, true).length) return false;
     this.touchPlane.setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 1, 0), object.position);
     const hit = this.raycaster.ray.intersectPlane(this.touchPlane, new THREE.Vector3());
@@ -586,7 +595,7 @@ export class LevelEditor {
   private updateTouchDrag(event: PointerEvent): void {
     const drag = this.touchDrag;
     if (!drag || drag.pointerId !== event.pointerId) return;
-    const object = this.selectedObjects.size > 1 ? this.selectionPivot : this.selected ?? (this.markerSelection === 'player' ? this.playerMarker : this.apprenticeMarker);
+    const object = this.gizmo.object === this.selectionPivot ? this.selectionPivot : this.selected ?? (this.markerSelection === 'player' ? this.playerMarker : this.apprenticeMarker);
     if (!object) return;
     if (drag.mode === 'translate') {
       this.pointerRay(event);
@@ -626,7 +635,7 @@ export class LevelEditor {
     this.topOrbit.enabled = false;
     this.gizmo.enabled = true;
     if (drag.mode === 'translate') {
-      const object = this.selectedObjects.size > 1 ? this.selectionPivot : this.selected ?? (this.markerSelection === 'player' ? this.playerMarker : this.apprenticeMarker);
+      const object = this.gizmo.object === this.selectionPivot ? this.selectionPivot : this.selected ?? (this.markerSelection === 'player' ? this.playerMarker : this.apprenticeMarker);
       if (object && this.el<HTMLInputElement>('#level-snap').checked) {
         const step = Number(this.el<HTMLSelectElement>('#level-grid').value);
         object.position.x = Math.round(object.position.x / step) * step;
@@ -954,7 +963,7 @@ export class LevelEditor {
     this.el<HTMLSelectElement>('#level-floor').value = String(index);
     this.el<HTMLSelectElement>('#level-floor-quick').value = String(index);
     this.updateViewLabel();
-    if (this.selectedObjects.size && [...this.selectedObjects].some(object => !object.visible)) this.setSelection([]);
+    if (this.selectedObjects.size && [...this.selectedObjects].some(object => !this.isSelectableVisible(object))) this.setSelection([]);
     this.refreshList();
   }
 
@@ -1081,6 +1090,7 @@ export class LevelEditor {
     this.orbit.enabled = true;
     this.topOrbit.enabled = false;
     this.applyFloorVisibility();
+    this.enableEditorRaycasts();
     this.gizmo.getHelper().visible = this.nativeGizmoVisible();
     this.syncHighlights(this.selectedObjects);
     this.playerMarker.visible = this.apprenticeMarker.visible = true;
@@ -1098,6 +1108,7 @@ export class LevelEditor {
     this.orbit.enabled = false;
     this.topOrbit.enabled = false;
     this.restoreVisibility();
+    this.restoreEditorRaycasts();
     this.touchDrag = null;
     this.gizmo.enabled = true;
     this.gizmo.detach();
@@ -1114,10 +1125,22 @@ export class LevelEditor {
   }
 
   private nativeGizmoVisible(): boolean { return this.active && Boolean(this.gizmo.object) && !matchMedia('(max-width: 1100px)').matches; }
+  private enableEditorRaycasts(): void {
+    for (const asset of this.game.room.mansionWing?.editableAssets.values() ?? []) asset.traverse(node => {
+      if (!(node instanceof THREE.Mesh) || !Object.hasOwn(node, 'raycast') || this.editorRaycasts.has(node)) return;
+      this.editorRaycasts.set(node, node.raycast);
+      node.raycast = node instanceof THREE.InstancedMesh ? THREE.InstancedMesh.prototype.raycast : THREE.Mesh.prototype.raycast;
+    });
+  }
+  private restoreEditorRaycasts(): void {
+    for (const [node, raycast] of this.editorRaycasts) node.raycast = raycast;
+    this.editorRaycasts.clear();
+  }
   private updateHalo(): void {
     if (!matchMedia('(max-width: 1100px)').matches || this.panel.classList.contains('dock-collapsed') || !this.gizmo.object) { this.haloElement.hidden = true; return; }
     this.haloBounds.makeEmpty();
-    if (this.selectedObjects.size > 1) for (const item of this.selectedObjects) this.haloBounds.expandByObject(item);
+    if (this.selectionAnchor && this.selectedObjects.size === 1) this.haloBounds.setFromCenterAndSize(this.selectionAnchor, new THREE.Vector3(.7, .7, .7));
+    else if (this.selectedObjects.size > 1) for (const item of this.selectedObjects) this.haloBounds.expandByObject(item);
     else this.haloBounds.setFromObject(this.gizmo.object);
     if (this.haloBounds.isEmpty()) { this.haloElement.hidden = true; return; }
     const camera = this.camera;
@@ -1138,10 +1161,10 @@ export class LevelEditor {
         }
     if (!visible || right < 0 || left > panel.width || bottom < 0 || top > panel.height) { this.haloElement.hidden = true; return; }
     const sheetHeight = this.panel.classList.contains('sheet-open') ? Math.min(panel.height * .46, 390) + 78 : 80;
-    const maxY = Math.max(90, panel.height - sheetHeight - 82);
-    const x = right + 94 < panel.width ? right + 18 : left - 92;
-    const y = bottom + 96 < panel.height - sheetHeight ? bottom + 16 : top - 95;
-    const haloX = THREE.MathUtils.clamp(x, 8, Math.max(8, panel.width - 82));
+    const maxY = Math.max(90, panel.height - sheetHeight - 52);
+    const x = right + 58 < panel.width ? right + 8 : left - 56;
+    const y = bottom + 58 < panel.height - sheetHeight ? bottom + 8 : top - 56;
+    const haloX = THREE.MathUtils.clamp(x, 8, Math.max(8, panel.width - 52));
     this.haloElement.style.left = `${haloX}px`;
     this.haloElement.classList.toggle('halo-right', haloX > panel.width - 180);
     this.haloElement.style.top = `${THREE.MathUtils.clamp(y, 90, maxY)}px`;
@@ -1150,7 +1173,7 @@ export class LevelEditor {
   private updateWallEndpointHandles(): void {
     const container = this.el('#level-wall-endpoints');
     const wall = this.selected;
-    if (!wall || this.gizmo.mode !== 'translate' || this.selectedObjects.size !== 1 || !this.game.room.mansionWing?.editableWalls.has(wall.name)) { container.hidden = true; return; }
+    if (!this.wallPathActive || !wall || this.gizmo.mode !== 'translate' || this.selectedObjects.size !== 1 || !this.game.room.mansionWing?.editableWalls.has(wall.name)) { container.hidden = true; return; }
     const canvas = this.game.renderer.webgl.domElement.getBoundingClientRect();
     const panel = this.panel.getBoundingClientRect();
     const endpoints = this.wallEndpoints(wall);
@@ -1186,8 +1209,38 @@ export class LevelEditor {
         this.camera.updateMatrixWorld();
       }
     }
+    this.updateGizmoSize();
+    this.updateSelectionMarker();
     this.updateHalo();
     this.updateWallEndpointHandles();
+  }
+  private updateGizmoSize(): void {
+    const object = this.selectedObjects.size > 1 ? this.selectionPivot : this.selected;
+    if (!object || !this.nativeGizmoVisible()) return;
+    this.gizmoBounds.setFromObject(object);
+    if (this.gizmoBounds.isEmpty()) return;
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const x of [this.gizmoBounds.min.x, this.gizmoBounds.max.x])
+      for (const y of [this.gizmoBounds.min.y, this.gizmoBounds.max.y])
+        for (const z of [this.gizmoBounds.min.z, this.gizmoBounds.max.z]) {
+          const point = this.haloCorner.set(x, y, z).project(this.camera);
+          if (point.z < -1 || point.z > 1) continue;
+          minX = Math.min(minX, point.x); maxX = Math.max(maxX, point.x);
+          minY = Math.min(minY, point.y); maxY = Math.max(maxY, point.y);
+        }
+    if (!Number.isFinite(minX)) return;
+    const canvas = this.game.renderer.webgl.domElement;
+    const span = Math.max((maxX - minX) * canvas.clientWidth / 2, (maxY - minY) * canvas.clientHeight / 2);
+    this.gizmo.setSize(THREE.MathUtils.clamp(span / 420, .12, .34));
+  }
+  private updateSelectionMarker(): void {
+    if (!this.selectionAnchor || !this.selected) return;
+    const marker = this.highlights.get(this.selected)?.getObjectByName('Large-surface selection outline');
+    if (!(marker instanceof THREE.Mesh)) return;
+    const distance = this.camera.position.distanceTo(this.selectionAnchor);
+    const radius = 52 * distance * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) /
+      Math.max(1, this.game.renderer.webgl.domElement.clientHeight);
+    marker.scale.setScalar(THREE.MathUtils.clamp(radius, .08, .75));
   }
   private resize(): void {
     const canvas = this.game.renderer.webgl.domElement;
@@ -1236,6 +1289,15 @@ export class LevelEditor {
     const wing = this.game.room.mansionWing;
     return wing ? [...wing.editableWalls.values(), ...wing.editableSurfaces.values(), ...wing.editableAssets.values()] : [];
   }
+  private usesSurfaceAnchor(size: number[]): boolean {
+    return Math.max(...size) > 25 || (size[1] < 1 && Math.max(size[0], size[2]) > 6);
+  }
+  private isSelectableVisible(object: THREE.Object3D): boolean {
+    const wing = this.game.room.mansionWing;
+    for (let current: THREE.Object3D | null = object; current && current !== wing; current = current.parent)
+      if (!current.visible) return false;
+    return true;
+  }
   private syncHighlights(targets: Iterable<THREE.Group>): void {
     const wanted = new Set(targets);
     for (const [object, overlay] of this.highlights) if (!wanted.has(object)) {
@@ -1252,9 +1314,7 @@ export class LevelEditor {
       });
       this.highlights.delete(object);
     }
-    let badgeIndex = 0;
     for (const object of wanted) {
-      const offset = badgeIndex++ % 3;
       if (this.highlights.has(object)) continue;
       const kind = object.userData.levelEditorKind as WallKind | SurfaceKind | 'asset';
       const length = object.userData.length as number;
@@ -1281,26 +1341,19 @@ export class LevelEditor {
       bounds.dispose();
       edges.renderOrder = cornerPoints.renderOrder = 950;
       edges.raycast = cornerPoints.raycast = () => undefined;
-      overlay.add(edges, cornerPoints);
-      if (!matchMedia('(max-width: 1100px)').matches) {
-        const badgeCanvas = document.createElement('canvas');
-        badgeCanvas.width = 384; badgeCanvas.height = 96;
-        const ctx = badgeCanvas.getContext('2d')!;
-        ctx.fillStyle = '#102930'; ctx.strokeStyle = '#63efff'; ctx.lineWidth = 5;
-        ctx.beginPath(); ctx.roundRect(5, 5, 374, 86, 18); ctx.fill(); ctx.stroke();
-        ctx.fillStyle = '#63efff'; ctx.beginPath(); ctx.arc(49, 48, 25, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = '#102930'; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-        ctx.beginPath(); ctx.moveTo(37, 48); ctx.lineTo(46, 57); ctx.lineTo(62, 38); ctx.stroke();
-        ctx.fillStyle = '#edfdff'; ctx.font = 'bold 36px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText('SELECTED', 225, 49);
-        const badge = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(badgeCanvas), depthTest: false, depthWrite: false, transparent: true }));
-        badge.name = 'Selected element label';
-        badge.position.set(size.x / 2 + .4, size.y / 2 + .72 + offset * .42, 0);
-        badge.scale.set(1.3, .33, 1);
-        badge.renderOrder = 960;
-        badge.raycast = () => undefined;
-        overlay.add(badge);
+      if (kind === 'asset' && this.usesSurfaceAnchor([size.x, size.y, size.z]) && this.selectionAnchor) {
+        const marker = new THREE.Mesh(new THREE.RingGeometry(.8, 1, 48),
+          new THREE.MeshBasicMaterial({ color: 0x63efff, side: THREE.DoubleSide, transparent: true, opacity: .9, depthTest: false, depthWrite: false }));
+        marker.name = 'Large-surface selection outline';
+        marker.rotation.x = -Math.PI / 2;
+        marker.position.copy(object.worldToLocal(this.selectionAnchor.clone())).sub(overlay.position);
+        marker.position.y += .02;
+        marker.scale.setScalar(.2);
+        marker.renderOrder = 951;
+        marker.raycast = () => undefined;
+        overlay.add(marker);
       }
+      overlay.add(edges, cornerPoints);
       object.add(overlay);
       this.highlights.set(object, overlay);
     }
@@ -1321,7 +1374,7 @@ export class LevelEditor {
     list.replaceChildren();
     let shown = 0;
     for (const wall of this.editables()) {
-      if (this.floorIndex >= 0 && !wall.visible) continue;
+      if (!this.isSelectableVisible(wall)) continue;
       if (!wall.name.toLowerCase().includes(search)) continue;
       if (filter !== 'all' && wall.userData.levelEditorKind !== filter) continue;
       shown += 1;
@@ -1346,7 +1399,7 @@ export class LevelEditor {
   }
   private membersOf(group: GroupRecord): THREE.Group[] {
     const wing = this.game.room.mansionWing;
-    return group.members.map(id => wing?.editableWalls.get(id) ?? wing?.editableSurfaces.get(id) ?? wing?.editableAssets.get(id)).filter((item): item is THREE.Group => item instanceof THREE.Group && (this.floorIndex < 0 || item.visible));
+    return group.members.map(id => wing?.editableWalls.get(id) ?? wing?.editableSurfaces.get(id) ?? wing?.editableAssets.get(id)).filter((item): item is THREE.Group => item instanceof THREE.Group && this.isSelectableVisible(item));
   }
   private refreshGroupsList(): void {
     const list = this.el('#level-group-list');
@@ -1360,9 +1413,9 @@ export class LevelEditor {
       list.append(button);
     }
   }
-  private setSelection(objects: Iterable<THREE.Group>, groupId: string | null = null, stayOnSelect = false): void {
+  private setSelection(objects: Iterable<THREE.Group>, groupId: string | null = null, stayOnSelect = false, hitPoint?: THREE.Vector3): void {
     this.setDetailsOpen(false);
-    const valid = new Set(this.editables().filter(object => this.floorIndex < 0 || object.visible));
+    const valid = new Set(this.editables().filter(object => this.isSelectableVisible(object)));
     this.selectedObjects.clear();
     for (const object of objects) if (valid.has(object)) this.selectedObjects.add(object);
     this.activeGroupId = groupId && this.groups.has(groupId) ? groupId : null;
@@ -1370,12 +1423,15 @@ export class LevelEditor {
     this.panel.classList.remove('marker-selected');
     const members = [...this.selectedObjects];
     this.selected = members.length === 1 ? members[0] : null;
+    const size = this.selected?.userData.baseSize as number[] | undefined;
+    this.selectionAnchor = this.selected && hitPoint && size && this.usesSurfaceAnchor(size) ? hitPoint.clone() : null;
+    this.selectionAnchorLocal = this.selectionAnchor && this.selected ? this.selected.worldToLocal(this.selectionAnchor.clone()) : null;
     this.panel.classList.toggle('multi-selected', members.length > 1);
-    if (members.length === 1) this.gizmo.attach(members[0]);
-    else if (members.length > 1) {
+    if (members.length === 1 && !this.selectionAnchor) this.gizmo.attach(members[0]);
+    else if (members.length > 1 || this.selectionAnchor) {
       const centre = new THREE.Vector3();
       for (const item of members) centre.add(item.getWorldPosition(new THREE.Vector3()));
-      this.selectionPivot.position.copy(centre.divideScalar(members.length));
+      this.selectionPivot.position.copy(this.selectionAnchor ?? centre.divideScalar(members.length));
       this.selectionPivot.rotation.set(0, 0, 0);
       this.selectionPivot.scale.set(1, 1, 1);
       this.selectionPivot.updateMatrixWorld(true);
@@ -1383,6 +1439,7 @@ export class LevelEditor {
       this.gizmo.attach(this.selectionPivot);
     } else this.gizmo.detach();
     this.gizmo.getHelper().visible = this.nativeGizmoVisible();
+    if (this.selectionAnchor) this.syncHighlights([]);
     this.syncHighlights(members);
     this.setFieldsMode('position');
     this.setSnap();
@@ -1393,7 +1450,7 @@ export class LevelEditor {
     if (!stayOnSelect && !this.multiMode && members.length) this.setTab('transform');
   }
   private applyPivotDelta(): void {
-    if (this.selectedObjects.size < 2) return;
+    if (this.selectedObjects.size < 1) return;
     this.selectionPivot.updateMatrixWorld(true);
     const delta = this.selectionPivot.matrixWorld.clone().multiply(this.pivotMatrix.clone().invert());
     for (const object of this.selectedObjects) {
@@ -1402,6 +1459,7 @@ export class LevelEditor {
       parentInverse.multiply(delta).multiply(object.matrixWorld).decompose(object.position, object.quaternion, object.scale);
     }
     this.pivotMatrix.copy(this.selectionPivot.matrixWorld);
+    if (this.selectionAnchor) this.selectionAnchor.copy(this.selectionPivot.position);
   }
   private createGroup(): void {
     if (this.selectedObjects.size < 2) return;
@@ -1441,9 +1499,9 @@ export class LevelEditor {
     const members = [...this.selectedObjects];
     if (members.length) {
       for (const member of members) {
-        const centre = member.getWorldPosition(new THREE.Vector3());
+        const centre = this.selectionAnchor && members.length === 1 ? this.selectionAnchor.clone() : member.getWorldPosition(new THREE.Vector3());
         const kind = member.userData.levelEditorKind as WallKind | SurfaceKind;
-        centre.y += (kind === 'floor' ? .1 : kind === 'stair' ? .8 : 1.5) * member.scale.y;
+        if (!this.selectionAnchor) centre.y += (kind === 'floor' ? .1 : kind === 'stair' ? .8 : 1.5) * member.scale.y;
         target.add(centre);
       }
       target.divideScalar(members.length);
@@ -1496,7 +1554,7 @@ export class LevelEditor {
     this.orbit.target.copy(target);
     this.orbit.update();
   }
-  private selectWall(wall: THREE.Group, additive = false): void {
+  private selectWall(wall: THREE.Group, additive = false, hitPoint?: THREE.Vector3): void {
     if (this.multiMode || additive) {
       const next = new Set(this.selectedObjects);
       if (next.has(wall)) next.delete(wall); else next.add(wall);
@@ -1504,7 +1562,7 @@ export class LevelEditor {
       return;
     }
     const group = [...this.groups.values()].find(entry => entry.members.includes(wall.name));
-    this.setSelection(group ? this.membersOf(group) : [wall], group?.id ?? null);
+    this.setSelection(group ? this.membersOf(group) : [wall], group?.id ?? null, false, hitPoint);
   }
   private selectMarker(which: 'player' | 'apprentice'): void {
     this.selected = null;
@@ -1530,6 +1588,7 @@ export class LevelEditor {
     this.setTab('transform');
   }
   private refreshFields(): void {
+    this.syncSelectionAnchorFromObject();
     const object = this.selectedObjects.size > 1 ? this.selectionPivot : this.selected ?? (this.markerSelection === 'player' ? this.playerMarker : this.markerSelection === 'apprentice' ? this.apprenticeMarker : null);
     const wallSelected = Boolean(this.selected && this.selectedObjects.size === 1 && this.game.room.mansionWing?.editableWalls.has(this.selected.name));
     this.panel.classList.toggle('wall-selected', wallSelected);
@@ -1543,7 +1602,6 @@ export class LevelEditor {
     if (group && document.activeElement !== this.el('#level-group-name')) this.el<HTMLInputElement>('#level-group-name').value = group.name;
     if (!object) { this.el('#level-name').textContent = 'Select an element'; this.el('#level-kind').textContent = 'Tap a structure in the scene or list.'; this.el<HTMLButtonElement>('#level-delete').disabled = true; this.haloElement.hidden = true; return; }
     this.el('#level-name').textContent = group ? group.name : this.selectedObjects.size > 1 ? `${this.selectedObjects.size} elements selected` : this.markerSelection === 'apprentice' ? `Apprentice ${this.apprenticeIndex} start` : this.selected ? this.displayName(this.selected) : object.name;
-    this.el('#level-halo-badge').textContent = `✓ ${this.el('#level-name').textContent}`;
     this.el('#level-kind').textContent = this.selectedObjects.size > 1 ? group ? `${this.selectedObjects.size} grouped elements · move, rotate or scale together` : 'Move, rotate or scale together · GROUP ITEMS to save selection' : this.markerSelection ? 'Spawn position · metres' : `${this.selected!.userData.levelEditorKind === 'asset' ? 'SITE ASSET' : this.selected!.userData.levelEditorKind === 'stair' ? 'STAIRS' : this.selected!.userData.levelEditorKind === 'floor' ? 'FLOOR SLAB' : this.selected!.userData.levelEditorKind === 'brick-wall' ? 'BRICK WALL' : 'CONCRETE WALL'} · live geometry`;
     const base = this.baseSize();
     for (const axis of ['x', 'y', 'z'] as const) {
@@ -1583,6 +1641,13 @@ export class LevelEditor {
     if (object === this.selectionPivot) this.applyPivotDelta();
     this.refreshFields();
     this.recordHistory();
+  }
+  private syncSelectionAnchorFromObject(): void {
+    if (!this.selectionAnchorLocal || !this.selected || this.gizmo.object !== this.selectionPivot) return;
+    this.selectionPivot.position.copy(this.selected.localToWorld(this.selectionAnchorLocal.clone()));
+    this.selectionAnchor?.copy(this.selectionPivot.position);
+    this.selectionPivot.updateMatrixWorld(true);
+    this.pivotMatrix.copy(this.selectionPivot.matrixWorld);
   }
   private baseSize(): [number, number, number] {
     if (!this.selected) return [1, 1, 1];

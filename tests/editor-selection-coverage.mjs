@@ -24,7 +24,7 @@ try {
       : [...wing.editableAssets.values()].find(child => child.userData.levelEditorLabel === name);
     if (!target) throw new Error(`Missing ${category}: ${name}`);
     const center = target.getWorldPosition(new target.position.constructor());
-    editor.camera.position.copy(center).add(category === 'wall' ? new center.constructor(5, 2, -3) : new center.constructor(0, 6, 4));
+    editor.camera.position.copy(center).add(category === 'wall' ? new center.constructor(-3, 1, -7) : new center.constructor(0, 1.2, 1.4));
     editor.orbit.target.copy(center);
     editor.camera.lookAt(center);
     editor.orbit.update();
@@ -35,7 +35,7 @@ try {
     const rect = await page.locator('#game-canvas').boundingBox();
     assert(rect);
     await page.mouse.click(rect.x + rect.width / 2, rect.y + rect.height / 2);
-    return page.evaluate(() => window.__wireTheHouse.levelEditor.gizmo.object?.name ?? null);
+    return page.evaluate(() => window.__wireTheHouse.levelEditor.selected?.name ?? window.__wireTheHouse.levelEditor.gizmo.object?.name ?? null);
   };
   const wall = await aimAt('Courtyard east solid pier C', 'wall');
   await page.waitForTimeout(100);
@@ -47,8 +47,10 @@ try {
   await page.waitForTimeout(100);
   const switchedWall = await clickCenter();
   const pathSwitch = await page.evaluate(() => ({ pathActive: window.__wireTheHouse.levelEditor.wallPathActive,
-    walls: window.__wireTheHouse.room.mansionWing.editableWalls.size }));
-  assert.equal(switchedWall, otherWall.target, 'A click on another wall must select it even while Continue is active');
+    walls: window.__wireTheHouse.room.mansionWing.editableWalls.size,
+    isWall: window.__wireTheHouse.room.mansionWing.editableWalls.has(window.__wireTheHouse.levelEditor.gizmo.object?.name) }));
+  assert.notEqual(switchedWall, wall.target, 'A click away from the wall must switch selection during Continue');
+  assert(pathSwitch.isWall, 'The frontmost clicked wall must be selected');
   assert.equal(pathSwitch.pathActive, false, 'Changing selection must leave wall continuation');
   assert.equal(pathSwitch.walls, wallsBeforeSwitch, 'Selecting another wall must not create an accidental section');
   const column = await aimAt('Separate stacked clay units awaiting garage partition work', 'asset');
@@ -65,7 +67,7 @@ try {
   console.log(JSON.stringify({ wall, wallSelection, column, columnSelection, inventory, errors }, null, 2));
   assert.deepEqual(errors, []);
   assert.equal(columnSelection, column.target, 'Visible site asset must select by canvas click');
-  assert(inventory.assets > 150 && inventory.unregistered.every(item => /courtyard|terrain/.test(item.name.toLowerCase())));
+  assert(inventory.assets > 175 && inventory.unregistered.every(item => /courtyard|terrain/.test(item.name.toLowerCase())));
   const before = await page.evaluate(id => window.__wireTheHouse.room.mansionWing.editableAssets.get(id).position.x, column.target);
   const hitBefore = await page.evaluate(id => window.__wireTheHouse.room.mansionWing.obstaclesAt(0).find(item => item.id === id)?.minX, column.target);
   assert(Number.isFinite(hitBefore), 'The staged masonry must have a player obstacle');
@@ -90,6 +92,84 @@ try {
     return { x: item.position.x, yaw: item.rotation.y };
   }, column.target);
   assert(Math.abs(restored.x - changed.x) < .001 && Math.abs(restored.yaw - changed.yaw) < .001);
+  let roomFloorAfter = null;
+  for (const [label, point, height, file] of [
+    ['Rough unfinished concrete floor', [2.5, 0, 2.5], 1.5, 'room-floor-selected.png'],
+    ['Concrete slab ceiling', [0, 3.4, 0], 7, 'room-ceiling-selected.png'],
+  ]) {
+    await page.evaluate(({ point, height }) => {
+      const editor = window.__wireTheHouse.levelEditor;
+      editor.orbit.target.set(...point);
+      editor.camera.position.set(point[0], point[1] + height, point[2] + .01);
+      editor.camera.lookAt(editor.orbit.target);
+      editor.orbit.update();
+    }, { point, height });
+    await page.waitForTimeout(80);
+    const picked = await clickCenter();
+    const pickedLabel = await page.evaluate(id => window.__wireTheHouse.room.mansionWing.editableAssets.get(id)?.userData.levelEditorLabel, picked);
+    assert.equal(pickedLabel, label, `Original room surface must select on canvas: ${label}; got ${pickedLabel}`);
+    await page.screenshot({ path: fileURLToPath(new URL(file, output)) });
+    if (label === 'Rough unfinished concrete floor') {
+      const floorBefore = await page.evaluate(() => ({
+        pivotY: window.__wireTheHouse.levelEditor.selected.position.y,
+        walkY: window.__wireTheHouse.room.mansionWing.surfaceHeight(2.5, 2.5, 0),
+      }));
+      await page.locator('[data-axis="y"]').fill(String(floorBefore.pivotY + .12));
+      await page.locator('[data-axis="y"]').dispatchEvent('change');
+      roomFloorAfter = await page.evaluate(() => window.__wireTheHouse.room.mansionWing.surfaceHeight(2.5, 2.5, 0));
+      assert(Math.abs(roomFloorAfter - floorBefore.walkY - .12) < .011, 'Original room floor collision height must follow its visual edit');
+    }
+  }
+  const siteParts = [
+    ['Ground foyer slab', [3.8, 0, 10.1], 1.5],
+    ['Nine-by-ten-metre open ground within courtyard and shaded veranda zone', [16, 0, 8], 9],
+    ['Rising subdivided ground and distant ridge beyond the construction site', [22, 0, -10], 12],
+  ];
+  for (const [label, point, height] of siteParts) {
+    await page.evaluate(({ point, height }) => {
+      const editor = window.__wireTheHouse.levelEditor;
+      editor.orbit.target.set(...point);
+      editor.camera.position.set(point[0], point[1] + height, point[2] + .01);
+      editor.camera.lookAt(editor.orbit.target);
+      editor.orbit.update();
+    }, { point, height });
+    await page.waitForTimeout(80);
+    const picked = await clickCenter();
+    const pickedLabel = await page.evaluate(id => window.__wireTheHouse.room.mansionWing.editableAssets.get(id)?.userData.levelEditorLabel, picked);
+    assert.equal(pickedLabel, label, `Click must select visible floor or terrain: ${label}; got ${pickedLabel}`);
+    await page.screenshot({ path: fileURLToPath(new URL(label === siteParts[2][0] ? 'terrain-selected.png' : label === siteParts[1][0] ? 'courtyard-selected.png' : 'floor-selected.png', output)) });
+  }
+  const terrainBefore = await page.evaluate(() => ({
+    id: window.__wireTheHouse.levelEditor.selected.name,
+    x: window.__wireTheHouse.levelEditor.selected.position.x,
+    handleX: window.__wireTheHouse.levelEditor.gizmo.object.position.x,
+  }));
+  await page.locator('[data-axis="x"]').fill(String(terrainBefore.x + .5));
+  await page.locator('[data-axis="x"]').dispatchEvent('change');
+  const terrainAfter = await page.evaluate(() => ({
+    x: window.__wireTheHouse.levelEditor.selected.position.x,
+    handleX: window.__wireTheHouse.levelEditor.gizmo.object.position.x,
+  }));
+  assert(Math.abs(terrainAfter.x - terrainBefore.x - .5) < .001, 'Terrain must move through live editor dimensions');
+  assert(Math.abs(terrainAfter.handleX - terrainBefore.handleX - .5) < .001, 'The terrain gizmo must follow the moved edit point');
+  await page.evaluate(() => {
+    const editor = window.__wireTheHouse.levelEditor;
+    editor.orbit.target.set(20, 25, -10);
+    editor.camera.position.set(20, 15, 0);
+    editor.camera.lookAt(editor.orbit.target);
+    editor.orbit.update();
+  });
+  await page.waitForTimeout(80);
+  assert.equal(await clickCenter(), null, 'Clicking empty sky must clear selection');
+  assert.equal(await page.evaluate(() => window.__wireTheHouse.levelEditor.highlights.size), 0, 'Deselect must remove the highlight');
+  assert.equal(await page.locator('#level-halo-badge').count(), 0, 'No floating selected label may obscure the scene');
+  await page.locator('#level-save').click();
+  await page.reload();
+  await page.waitForFunction(() => window.__wireTheHouse?.levelEditor?.active, null, { timeout: 120000 });
+  const terrainRestored = await page.evaluate(id => window.__wireTheHouse.room.mansionWing.editableAssets.get(id).position.x, terrainBefore.id);
+  assert(Math.abs(terrainRestored - terrainAfter.x) < .011, `Terrain translation must survive save and reload at the UI's centimetre precision: ${JSON.stringify({ terrainBefore, terrainAfter, terrainRestored })}`);
+  const roomFloorRestored = await page.evaluate(() => window.__wireTheHouse.room.mansionWing.surfaceHeight(2.5, 2.5, 0));
+  assert(Math.abs(roomFloorRestored - roomFloorAfter) < .011, 'Edited room floor height must survive save and reload');
   const mobileContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   await blockPointerLock(mobileContext);
   const mobilePage = await mobileContext.newPage();
@@ -99,7 +179,7 @@ try {
   await mobilePage.evaluate(id => {
     const editor = window.__wireTheHouse.levelEditor;
     const center = window.__wireTheHouse.room.mansionWing.editableAssets.get(id).getWorldPosition(editor.orbit.target);
-    editor.camera.position.copy(center).add(new center.constructor(0, 6, 4));
+    editor.camera.position.copy(center).add(new center.constructor(0, 1.2, 1.4));
     editor.orbit.target.copy(center);
     editor.orbit.update();
   }, column.target);
@@ -110,9 +190,43 @@ try {
   const mobileSelected = await mobilePage.evaluate(() => window.__wireTheHouse.levelEditor.gizmo.object?.name ?? null);
   assert.equal(mobileSelected, column.target, 'Portrait touch must select the same visible site asset');
   await mobilePage.screenshot({ path: fileURLToPath(new URL('mobile-asset-selected.png', output)) });
+  await mobilePage.evaluate(() => {
+    const editor = window.__wireTheHouse.levelEditor;
+    editor.orbit.target.set(22, 0, -10);
+    editor.camera.position.set(22, 12, -9.99);
+    editor.camera.lookAt(editor.orbit.target);
+    editor.orbit.update();
+  });
+  await mobilePage.waitForTimeout(100);
+  await mobilePage.touchscreen.tap(mobileRect.x + mobileRect.width / 2, mobileRect.y + mobileRect.height / 2);
+  const mobileTerrain = await mobilePage.evaluate(() => ({
+    label: window.__wireTheHouse.levelEditor.selected?.userData.levelEditorLabel,
+    anchor: window.__wireTheHouse.levelEditor.gizmo.object?.name,
+  }));
+  assert.equal(mobileTerrain.label, siteParts[2][0], 'Portrait touch must select the actual terrain');
+  assert.equal(mobileTerrain.anchor, 'Editor selection centre', 'Large terrain must keep its transform handle at the tap');
+  await mobilePage.screenshot({ path: fileURLToPath(new URL('mobile-terrain-selected.png', output)) });
+  const mobileTerrainBefore = await mobilePage.evaluate(() => ({
+    x: window.__wireTheHouse.levelEditor.selected.position.x,
+    handleX: window.__wireTheHouse.levelEditor.gizmo.object.position.x,
+  }));
+  const halo = await mobilePage.locator('#level-halo-handle').boundingBox();
+  assert(halo);
+  await mobilePage.mouse.move(halo.x + halo.width / 2, halo.y + halo.height / 2);
+  await mobilePage.mouse.down();
+  await mobilePage.mouse.move(halo.x + halo.width / 2 + 40, halo.y + halo.height / 2, { steps: 5 });
+  await mobilePage.mouse.up();
+  const mobileTerrainAfter = await mobilePage.evaluate(() => ({
+    x: window.__wireTheHouse.levelEditor.selected.position.x,
+    handleX: window.__wireTheHouse.levelEditor.gizmo.object.position.x,
+  }));
+  const surfaceDelta = mobileTerrainAfter.x - mobileTerrainBefore.x;
+  const handleDelta = mobileTerrainAfter.handleX - mobileTerrainBefore.handleX;
+  assert(Math.abs(surfaceDelta) > .1 && Math.abs(surfaceDelta) < 3, `Mobile terrain drag must move smoothly, without a pivot jump: ${JSON.stringify({ mobileTerrainBefore, mobileTerrainAfter })}`);
+  assert(Math.abs(surfaceDelta - handleDelta) < .02, 'The mobile handle must follow the moved terrain');
   await mobileContext.close();
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ assetMoveSaveReload: true, mobileSelected, before, changed, restored }));
+  console.log(JSON.stringify({ assetMoveSaveReload: true, terrainMoveSaveReload: true, mobileTerrainDrag: surfaceDelta, mobileSelected, mobileTerrain, before, changed, restored }));
 } finally {
   await browser.close();
   if (slotId) await rm(new URL(`../.studio/levels/${slotId}.json`, import.meta.url), { force: true });

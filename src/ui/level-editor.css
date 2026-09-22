@@ -330,12 +330,9 @@
   #level-editor.sheet-open[data-tab=starts] .level-editor__scene-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px}
   #level-editor .level-editor__scene-actions button{min-height:44px;font-size:12px;font-weight:800}
   #level-editor #level-settings-panel{top:auto;right:8px;bottom:calc(max(8px,env(safe-area-inset-bottom)) + 72px);min-width:185px}
-  #level-editor #level-halo{display:block;position:absolute;z-index:5;width:78px;height:78px;pointer-events:none;filter:drop-shadow(0 7px 12px #071418b8)}
-  #level-editor #level-halo::before{content:'';position:absolute;left:-42px;top:-20px;width:62px;border-top:2px dashed #97eeed;transform:rotate(41deg);transform-origin:right center;opacity:.9}
-  #level-editor #level-halo-badge{position:absolute;left:0;bottom:89px;max-width:175px;padding:7px 10px;border:1px solid #79e2e5;border-radius:9px;background:#153b43f3;color:#ecfeff;font-size:11px;font-weight:850;letter-spacing:.035em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  #level-editor #level-halo.halo-right #level-halo-badge{left:auto;right:0}
-  #level-editor #level-halo-handle{display:grid;place-items:center;width:76px;height:76px;min-height:76px;padding:0;border:5px solid #b8e4ff;border-right-color:#e9a965;border-bottom-color:#e9a965;border-radius:50%;background:radial-gradient(circle at center,#20343a 0 26px,#263c43 27px 100%);box-shadow:inset 0 0 0 4px #19292e,0 0 0 5px #0f28338a;color:#edfaf7;font-size:27px;touch-action:none;pointer-events:auto;user-select:none}
-#level-editor #level-halo-handle span{display:grid;place-items:center;width:38px;height:38px;border:2px solid #c4ebf6;border-radius:50%;background:#172c32}
+  #level-editor #level-halo{display:block;position:absolute;z-index:5;width:48px;height:48px;pointer-events:none;filter:drop-shadow(0 4px 8px #071418b8)}
+  #level-editor #level-halo-handle{display:grid;place-items:center;width:48px;height:48px;min-height:48px;padding:0;border:3px solid #b8e4ff;border-right-color:#e9a965;border-bottom-color:#e9a965;border-radius:50%;background:#20343a;box-shadow:inset 0 0 0 2px #19292e,0 0 0 2px #0f28338a;color:#edfaf7;font-size:19px;touch-action:none;pointer-events:auto;user-select:none}
+#level-editor #level-halo-handle span{display:grid;place-items:center;width:27px;height:27px;border:1px solid #c4ebf6;border-radius:50%;background:#172c32}
 }
 
 /* Advanced wall-path editing stays contextual: no permanent panel covers the scene. */
@@ -357,7 +354,7 @@
 #level-editor[data-nav-mode=wheel] .level-editor__wheel{z-index:12}
 #level-wall-endpoints{position:absolute;inset:0;z-index:4;pointer-events:none}
 #level-wall-endpoints[hidden]{display:none!important}
-#level-editor.details-open #level-wall-endpoints,#level-editor.wall-path-active #level-wall-endpoints{display:none!important}
+#level-editor.details-open #level-wall-endpoints{display:none!important}
 #level-wall-endpoints button{position:absolute;display:grid;place-items:center;width:46px;height:46px;min-height:46px;transform:translate(-50%,-50%);padding:0;border:3px solid #dffeff;border-radius:50%;background:#127980ee;color:#fff;font:900 12px/1 system-ui;box-shadow:0 0 0 5px #12363db8,0 8px 19px #0009;pointer-events:auto;touch-action:none;user-select:none}
 #level-wall-endpoints button[aria-pressed=true]{background:#b46b2f;border-color:#ffe0a5;box-shadow:0 0 0 5px #4d2d19bd,0 8px 19px #0009}
 #level-editor.wall-path-active #game-canvas{cursor:crosshair}
