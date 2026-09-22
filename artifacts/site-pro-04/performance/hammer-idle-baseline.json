@@ -1,0 +1,295 @@
+{
+  "url": "http://127.0.0.1:5365/Electrical-Game/?renderer=webgl&wallDiagnostic=1",
+  "method": "Real RAF, 390x844 touch Chromium with device scale 3. Public tool-selection event and native held USE; controlled sinusoidal camera rotation. Inclusive CPU timings overlap. Emulation, not physical iPhone FPS.",
+  "stages": [
+    {
+      "tool": "hammer",
+      "held": true,
+      "rotate": true,
+      "selectedTool": "hammer",
+      "fps": 58.63111769382279,
+      "renderedFrames": 190,
+      "p95Ms": 20.700000047683716,
+      "frames": 190,
+      "drawCalls": 772.4947368421052,
+      "methods": {
+        "player.update": {
+          "calls": 190,
+          "msPerFrame": 0.1310526258067081,
+          "worst": 0.30000001192092896
+        },
+        "pvc.handleInput": {
+          "calls": 190,
+          "msPerFrame": 0.001052631516205637,
+          "worst": 0.10000002384185791
+        },
+        "mixing.update": {
+          "calls": 190,
+          "msPerFrame": 0.41578948027209234,
+          "worst": 1.4000000357627869
+        },
+        "mortar.refreshOpeningGeometry": {
+          "calls": 190,
+          "msPerFrame": 0.04578947048438223,
+          "worst": 0.19999998807907104
+        },
+        "field.tick": {
+          "calls": 190,
+          "msPerFrame": 0.08263157731608341,
+          "worst": 0.20000004768371582
+        },
+        "mortar.update": {
+          "calls": 190,
+          "msPerFrame": 0.2247368392191435,
+          "worst": 1.399999976158142
+        },
+        "box.update": {
+          "calls": 190,
+          "msPerFrame": 0.1321052632833782,
+          "worst": 1.300000011920929
+        },
+        "water.update": {
+          "calls": 190,
+          "msPerFrame": 0.008421053070771067,
+          "worst": 0.10000002384185791
+        },
+        "mortar.preview": {
+          "calls": 190,
+          "msPerFrame": 0.0005263159149571469,
+          "worst": 0.10000002384185791
+        },
+        "wall.processPendingSupport": {
+          "calls": 190,
+          "msPerFrame": 0.002105263346119931,
+          "worst": 0.10000002384185791
+        },
+        "debris.overlapsWall": {
+          "calls": 17976,
+          "msPerFrame": 0.21684210425929018,
+          "worst": 0.6000000238418579
+        },
+        "debris.hasWallSupport": {
+          "calls": 2549,
+          "msPerFrame": 0.019473683206658616,
+          "worst": 0.19999998807907104
+        },
+        "debris.supportContact": {
+          "calls": 1391,
+          "msPerFrame": 0.026842105702350013,
+          "worst": 0.19999998807907104
+        },
+        "debris.update": {
+          "calls": 190,
+          "msPerFrame": 0.3136842109655079,
+          "worst": 1.399999976158142
+        },
+        "rig.update": {
+          "calls": 190,
+          "msPerFrame": 0.014210526253047742,
+          "worst": 0.10000002384185791
+        },
+        "rig.poseArms": {
+          "calls": 242,
+          "msPerFrame": 0.02368421052631579,
+          "worst": 0.10000002384185791
+        },
+        "rig.contact": {
+          "calls": 242,
+          "msPerFrame": 0.5215789465527786,
+          "worst": 1
+        },
+        "fit.update": {
+          "calls": 190,
+          "msPerFrame": 0.0026315792610770777,
+          "worst": 0.10000002384185791
+        },
+        "hud.update": {
+          "calls": 190,
+          "msPerFrame": 0.0021052636598285876,
+          "worst": 0.10000002384185791
+        },
+        "hud.updateMobileUseStatus": {
+          "calls": 190,
+          "msPerFrame": 0.005263157581028186,
+          "worst": 0.10000002384185791
+        },
+        "hud.updateMortar": {
+          "calls": 190,
+          "msPerFrame": 0.0005263159149571469,
+          "worst": 0.10000002384185791
+        },
+        "hud.updateWaterGun": {
+          "calls": 190,
+          "msPerFrame": 0.0021052627187026175,
+          "worst": 0.10000002384185791
+        },
+        "mixing.present": {
+          "calls": 190,
+          "msPerFrame": 0.21684210676895946,
+          "worst": 0.6000000238418579
+        },
+        "pvc.present": {
+          "calls": 190,
+          "msPerFrame": 0.26210526259321915,
+          "worst": 0.5999999642372131
+        },
+        "body.update": {
+          "calls": 190,
+          "msPerFrame": 0.8621052622795105,
+          "worst": 1.399999976158142
+        },
+        "apprentice.update": {
+          "calls": 190,
+          "msPerFrame": 0.02368421209485907,
+          "worst": 0.19999998807907104
+        },
+        "apprentice.presentPlayer": {
+          "calls": 190,
+          "msPerFrame": 0.002105263346119931,
+          "worst": 0.10000002384185791
+        },
+        "mortar.flushWetGeometry": {
+          "calls": 190,
+          "msPerFrame": 0.002631578947368421,
+          "worst": 0.10000002384185791
+        },
+        "render.render": {
+          "calls": 190,
+          "msPerFrame": 6.19578947550372,
+          "worst": 11.100000023841858
+        },
+        "hud.updateWorkReticle": {
+          "calls": 190,
+          "msPerFrame": 0.014210526880465056,
+          "worst": 0.10000002384185791
+        },
+        "game.step": {
+          "calls": 190,
+          "msPerFrame": 10.894736839909303,
+          "worst": 39.69999998807907
+        },
+        "volume.exportMeshJob": {
+          "calls": 17,
+          "msPerFrame": 0.23894736860927782,
+          "worst": 3.099999964237213
+        },
+        "wall.dispatchMeshes": {
+          "calls": 23,
+          "msPerFrame": 0.24315789498780904,
+          "worst": 5.600000023841858
+        },
+        "game.performAction": {
+          "calls": 34,
+          "msPerFrame": 0.7863157902893267,
+          "worst": 27.899999976158142
+        },
+        "mortar.updateStages": {
+          "calls": 8,
+          "msPerFrame": 0.0005263156012484902,
+          "worst": 0.09999996423721313
+        },
+        "volume.detachIslands": {
+          "calls": 5,
+          "msPerFrame": 0.06315789442313345,
+          "worst": 2.699999988079071
+        },
+        "volume.exposeCavities": {
+          "calls": 5,
+          "msPerFrame": 0.0231578949250673,
+          "worst": 2.300000011920929
+        },
+        "volume.aggregateFragments": {
+          "calls": 6,
+          "msPerFrame": 0.09684210513767443,
+          "worst": 5.5
+        },
+        "volume.impact": {
+          "calls": 6,
+          "msPerFrame": 0.26368421065179926,
+          "worst": 13.300000011920929
+        },
+        "wall.flushGeometry": {
+          "calls": 6,
+          "msPerFrame": 0.12526315827118722,
+          "worst": 5.600000023841858
+        },
+        "wall.clearPaint": {
+          "calls": 6,
+          "msPerFrame": 0,
+          "worst": 0
+        },
+        "wall.strikeContact": {
+          "calls": 6,
+          "msPerFrame": 0.3889473689229865,
+          "worst": 18.400000035762787
+        },
+        "wall.removeAtAim": {
+          "calls": 6,
+          "msPerFrame": 0.4026315789473684,
+          "worst": 19
+        },
+        "debris.spawnDebris": {
+          "calls": 8,
+          "msPerFrame": 0.09578947330776014,
+          "worst": 4.800000011920929
+        },
+        "field.releaseUnsupported": {
+          "calls": 5,
+          "msPerFrame": 0.0268421050749327,
+          "worst": 1.100000023841858
+        }
+      },
+      "fingerTargets": {},
+      "impacts": 15,
+      "removedCm3": 20065.75304347824,
+      "fragments": 55,
+      "wallGeometry": {
+        "model": "sparse-3d-brittle-masonry",
+        "trimming": null,
+        "pendingSupportJobs": 0,
+        "volumeBytes": 1036800,
+        "pendingMeshes": 3,
+        "workerMeshing": true,
+        "lastWorkerMs": 4.900000035762787,
+        "peakGeometryLatencyMs": 114.19999998807907,
+        "workerError": "",
+        "impactCount": 15,
+        "removedNodes": 39990,
+        "removedVolumeCm3": 20065.75304347824,
+        "maximumDepthMm": 90.87956256548857,
+        "damagedChunks": 61,
+        "surfaceTriangles": 375444,
+        "geometryBytes": 40547952,
+        "deformedWallCells": 0,
+        "lastCalculationMs": 9,
+        "peakCalculationMs": 28.30000001192093,
+        "lastMeshMs": 5.199999988079071,
+        "peakMeshMs": 7,
+        "lastImpact": {
+          "removedNodes": 509,
+          "removedByMaterial": {
+            "clay": 509
+          },
+          "stats": {
+            "milliseconds": 9,
+            "affectedNodes": 1693,
+            "weakenedNodes": 1692,
+            "connectivityVisited": 2030,
+            "detachedNodes": 508,
+            "activeChunks": 36
+          }
+        },
+        "fractureSegments": 0,
+        "fractureRendering": "removed-material-surfaces",
+        "openedFissureNodes": 0
+      },
+      "mortarFieldNodes": 6287,
+      "pixelRatio": 1.75,
+      "waterLitres": 0,
+      "renderer": null,
+      "renderError": "",
+      "pointerLock": false
+    }
+  ],
+  "errors": []
+}
