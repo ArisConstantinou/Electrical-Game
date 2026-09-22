@@ -91,7 +91,7 @@ export class Room extends THREE.Group {
 
     // Mortar backing stays solid for contact and measurement. Individually
     // raised clay courses on all side-wall segments match the primary wall.
-    const sideMaterial = matteMaterial(0x918a81);
+    const sideMaterial = matteMaterial(0x746d64);
     sideMaterial.userData.referenceLaserReceiver=true;
     const sideGeometry = new THREE.BoxGeometry(0.22, GAME_CONFIG.room.height, GAME_CONFIG.room.depth);
     for (const [name, x] of [['Left concrete wall', -GAME_CONFIG.room.width / 2 - 0.11], ['Right concrete wall', GAME_CONFIG.room.width / 2 + 0.11]] as const) {
@@ -216,7 +216,9 @@ export class Room extends THREE.Group {
       add(middleBottom, middleTop, z0, Math.min(z1, 1.05));
       add(middleBottom, middleTop, Math.max(z0, 2.95), z1);
     }
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    // One shared eased clay shape gives each physical unit a narrow broken
+    // silhouette at the mortar joint without adding a draw call per brick.
+    const geometry = new RoundedBoxGeometry(1, 1, 1, 2, .035);
     const patchRects = new Float32Array(pieces.length * 4);
     geometry.setAttribute('brickPatch', new THREE.InstancedBufferAttribute(patchRects, 4));
     const bricks = new THREE.InstancedMesh(geometry, masonryFaceMaterial, pieces.length);
@@ -258,7 +260,7 @@ export class Room extends THREE.Group {
     rearGroup.userData.studioEntityId = 'world:rear-wall';
     const wall = new THREE.Mesh(
       new THREE.BoxGeometry(GAME_CONFIG.room.width, GAME_CONFIG.room.height, .16),
-      matteMaterial(0x918a81),
+      matteMaterial(0x746d64),
     );
     wall.name = 'Solid rear masonry backing';
     wall.userData.referenceLaserReceiver = true;
@@ -268,7 +270,7 @@ export class Room extends THREE.Group {
 
     const brickWidth = GAME_CONFIG.room.width / 21, course = GAME_CONFIG.room.height / 23, gap = .006;
     const columns = 22, rows = 23;
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const geometry = new RoundedBoxGeometry(1, 1, 1, 2, .035);
     const patchRects = new Float32Array(columns * rows * 4);
     geometry.setAttribute('brickPatch', new THREE.InstancedBufferAttribute(patchRects, 4));
     const bricks = new THREE.InstancedMesh(geometry, masonryFaceMaterial, columns * rows);

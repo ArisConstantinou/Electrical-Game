@@ -256,7 +256,9 @@ export class MasonryVolume {
       for (const offset of [[2, 0, 0], [-2, 0, 0], [0, 2, 0], [0, -2, 0], [0, 0, 2], [0, 0, -2]]) if (this.nodeAirExposed(x + offset[0], y + offset[1], z + offset[2])) open++;
       variation *= .52 + open * .07;
     }
-    if (material === MaterialId.Mortar) return [.235 * variation, .22 * variation, .195 * variation];
+    // Match the recessed, dusty grey mortar in the CC0 clay reference rather
+    // than a bright grid that reads as tile grout under strong site daylight.
+    if (material === MaterialId.Mortar) return [.165 * variation, .149 * variation, .132 * variation];
     if (material === MaterialId.Render) return [.46 * variation, .44 * variation, .37 * variation];
     if (material === MaterialId.Concrete) return [.33 * variation, .34 * variation, .33 * variation];
     return [.44 * variation, .17 * variation, .105 * variation];
