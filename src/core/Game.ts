@@ -267,11 +267,11 @@ export class Game {
       this.started = true;
       if(this.apprentice.count>=1){
         this.mixing.wheelbarrow.beginEmpty();
-        // Touch players now choose Coordinator explicitly from the bottom bar.
-        if(!matchMedia('(pointer:coarse)').matches)this.apprentice.command('point');
       }
-      else this.apprentice.command('cancel');
-      if (matchMedia('(any-pointer: fine)').matches) this.desktopControls.requestLock(false);
+      // Worker owns the camera at launch on every device. Coordinator is
+      // entered explicitly through its navigation control.
+      this.apprentice.command('cancel');
+      if (matchMedia('(any-pointer: fine)').matches && !this.apprentice.ownsInput) this.desktopControls.requestLock(false);
     });
     addEventListener('resize', this.renderer.resize);
     this.assets.markLoaded('procedural-core');
