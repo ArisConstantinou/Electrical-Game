@@ -4,6 +4,7 @@ and are licensed CC0: https://polyhaven.com/license
 - `concrete_floor-albedo-512.webp`: https://polyhaven.com/a/concrete_floor
 - `concrete_screed-albedo-512.webp`: tonal adaptation of https://polyhaven.com/a/concrete_floor for the unfinished screed; CC0 source retained in `concrete_floor-albedo-512.webp`.
 - `concrete-albedo-512.webp`: https://polyhaven.com/a/concrete
+- `concrete-normal-512.webp`: matching CC0 normal map from https://polyhaven.com/a/concrete, reduced to 512 px for the board-formed slab soffit.
 - `plastered_wall_03-albedo-512.webp`: https://polyhaven.com/a/plastered_wall_03
 - `rusty_metal_03-diff-1k.jpg`: https://polyhaven.com/a/rusty_metal_03
 - `gravelly_sand-albedo-512.webp`: https://polyhaven.com/a/gravelly_sand — 2.5 m-wide CC0 ground scan, also used on the modeled outdoor courtyard and planted verge at that physical scale.

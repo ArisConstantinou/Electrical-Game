@@ -77,6 +77,7 @@ try {
       assert.ok(state.controls['#site-pro-desktop-tools']?.visible, 'desktop hotbar unavailable');
       await page.locator('#site-pro-desktop-tools [data-tool="hammer"]').click();
       await page.waitForFunction(() => window.__wireTheHouse.selectedTool === 'hammer');
+      await page.waitForFunction(() => document.querySelector('#site-pro-desktop-tools [data-tool="hammer"]')?.getAttribute('aria-pressed') === 'true');
       assert.equal(await page.locator('#site-pro-desktop-tools [data-tool="hammer"]').getAttribute('class'), 'selected');
       await page.evaluate(() => window.__wireTheHouse.renderer.waitForFrame());
       await page.screenshot({ path: `${output}/${size.name}-hammer.png` });

@@ -58,7 +58,10 @@ export class Room extends THREE.Group {
     floor.receiveShadow = true;
     this.add(floor);
 
-    const ceilingGeometry = new RoundedBoxGeometry(GAME_CONFIG.room.width, 0.16, GAME_CONFIG.room.depth, 2, .012);
+    // The slab bears across the 22 cm side walls and the 16 cm rear wall.
+    // The former room-sized slab stopped at their inner faces, making its
+    // photographed underside read as a separate plane at the junction.
+    const ceilingGeometry = new RoundedBoxGeometry(GAME_CONFIG.room.width + .50, 0.16, GAME_CONFIG.room.depth + .20, 2, .012);
     const ceilingPositions = ceilingGeometry.getAttribute('position');
     const ceilingNormals = ceilingGeometry.getAttribute('normal');
     const ceilingUVs = ceilingGeometry.getAttribute('uv');
@@ -69,12 +72,18 @@ export class Room extends THREE.Group {
       else ceilingUVs.setXY(i, .37 + (y + GAME_CONFIG.room.height + .08) / 2, (nx > .5 ? z : x) / 2);
     }
     const ceilingMaterial = siteMaterial('concrete', 0xe6e2dc);
+    const ceilingNormal = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}assets/site-materials/concrete-normal-512.webp`);
+    ceilingNormal.name = 'Board-formed concrete normal 512 CC0';
+    ceilingNormal.wrapS = ceilingNormal.wrapT = THREE.RepeatWrapping;
+    ceilingNormal.anisotropy = 4;
+    ceilingMaterial.normalMap = ceilingNormal;
+    ceilingMaterial.normalScale.set(.38, .38);
     // A small warm floor bounce reaches the underside of the slab. Keep the
     // photographed shutter marks but avoid a near-black roof over warm clay.
     ceilingMaterial.emissive.set(0x827366);
     ceilingMaterial.emissiveIntensity = .28;
     const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
-    ceiling.position.y = GAME_CONFIG.room.height + 0.08;
+    ceiling.position.set(0, GAME_CONFIG.room.height + 0.08, .10);
     ceiling.name = 'Concrete slab ceiling';
     ceiling.userData.studioEntityId = 'world:ceiling';
     ceiling.receiveShadow = true;

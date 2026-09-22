@@ -115,6 +115,19 @@ try {
     assert(Math.abs(faceContacts.rightBrick.target?.[0] - 3.776) < .005,
       `${device.name}: right brick contact misses its visible face: ${JSON.stringify(faceContacts.rightBrick)}`);
     report.cases.push({ device: device.name, view: 'face-joint-and-opening-contact', state: faceContacts });
+    const slabBearing = await page.evaluate(() => {
+      const room = window.__wireTheHouse.room;
+      const ceiling = room.getObjectByName('Concrete slab ceiling');
+      if (!ceiling) return null;
+      ceiling.geometry.computeBoundingBox();
+      const world = ceiling.geometry.boundingBox.clone().applyMatrix4(ceiling.matrixWorld);
+      return { min: world.min.toArray(), max: world.max.toArray(), relief: Boolean(ceiling.material.normalMap?.image?.width) };
+    });
+    assert(slabBearing && slabBearing.min[0] < -4.03 && slabBearing.max[0] > 4.03 && slabBearing.max[2] > 3.77,
+      `${device.name}: concrete slab must bear across both side walls and the rear wall: ${JSON.stringify(slabBearing)}`);
+    assert(Math.abs(slabBearing.min[1] - 3) < .015 && slabBearing.relief,
+      `${device.name}: concrete soffit must contact the wall heads and load its relief map: ${JSON.stringify(slabBearing)}`);
+    report.cases.push({ device: device.name, view: 'structural-slab-bearing', state: slabBearing });
     const masonry = await page.evaluate(() => {
       const room = window.__wireTheHouse.room;
       const left = room.referenceWalls.find(wall => wall.name === 'Left concrete wall');
