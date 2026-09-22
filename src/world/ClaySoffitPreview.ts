@@ -29,7 +29,7 @@ export function createClaySoffitPreview(width: number, depth: number, height: nu
   for (let bay = 0; bay < bays; bay++) for (let row = 0; row < rows; row++) {
     const index = bay * rows + row;
     patches.set(brickFacePatch(row, bay, 4), index * 4);
-    position.set(-width / 2 + (bay + .5) * width / bays, height + .06, -depth / 2 + (row + .5) * depth / rows);
+    position.set(-width / 2 + (bay + .5) * width / bays, height + .09, -depth / 2 + (row + .5) * depth / rows);
     tiles.setMatrixAt(index, matrix.compose(position, rotation, scale));
   }
   tiles.computeBoundingSphere();
@@ -46,7 +46,7 @@ export function createClaySoffitPreview(width: number, depth: number, height: nu
   ribs.receiveShadow = true;
   ribs.raycast = () => undefined;
   for (let i = 0; i <= bays; i++) {
-    position.set(-width / 2 + i * width / bays, height + .06, 0);
+    position.set(-width / 2 + i * width / bays, height + .09, 0);
     ribs.setMatrixAt(i, matrix.makeTranslation(position.x, position.y, position.z));
   }
   ribs.computeBoundingSphere();
