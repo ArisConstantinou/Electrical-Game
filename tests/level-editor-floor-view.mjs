@@ -35,9 +35,9 @@ try {
   await page.locator('.level-editor__bottom-nav [data-editor-tab="select"]').tap();
   const cutaway = await page.evaluate(() => {
     const wing = window.__wireTheHouse.room.mansionWing;
-    const roof = wing.children.find(item => item.name === 'Clay infill under existing L1 structural floor above garage');
+    const roof = [...wing.editableAssets.values()].find(item => item.userData.levelEditorLabel === 'Clay infill under existing L1 structural floor above garage');
     const wall = wing.children.find(item => item.name === 'Garage east fired-clay perimeter');
-    return { roofHidden: roof?.children.filter(item => item.isMesh).every(item => !item.visible), wallVisible: wall?.visible };
+    return { roofHidden: roof && (!roof.visible || roof.children.filter(item => item.isMesh).every(item => !item.visible)), wallVisible: wall?.visible };
   });
   assert(cutaway.roofHidden && cutaway.wallVisible, '2D cutaway must expose the real ground-floor walls');
   await page.locator('#level-floor-quick').selectOption('1');

@@ -28,8 +28,9 @@ type SurfaceRecord = {
   rotationY: number;
   scale: [number, number, number];
 };
+type AssetRecord = { id: string; position: [number, number, number]; rotationY: number; scale: [number, number, number] };
 type GroupRecord = { id: string; name: string; members: string[] };
-type LevelDocument = { version: 1; name?: string; template?: 'mansion' | 'blank'; walls: WallRecord[]; surfaces: SurfaceRecord[]; groups?: GroupRecord[]; playerStart: [number, number, number]; playerStartYaw: number; apprenticeStart: [number, number, number]; apprenticeStarts: [number, number, number][]; apprenticeStartYaws: number[] };
+type LevelDocument = { version: 1; name?: string; template?: 'mansion' | 'blank'; walls: WallRecord[]; surfaces: SurfaceRecord[]; assets?: AssetRecord[]; groups?: GroupRecord[]; playerStart: [number, number, number]; playerStartYaw: number; apprenticeStart: [number, number, number]; apprenticeStarts: [number, number, number][]; apprenticeStartYaws: number[] };
 export type LevelSlot = { id: string; name: string; updatedAt: string; template: 'mansion' | 'blank' };
 const LEGACY_STORAGE_KEY = 'wirehouse:level-editor:mansion:v1';
 const MIGRATED_KEY = 'wirehouse:level-editor:legacy-imported:v1';
@@ -271,7 +272,7 @@ export class LevelEditor {
     });
     this.panel.querySelector('header h2')?.insertAdjacentHTML('afterend', '<span class="level-editor__scene"><span></span>MANSION · CONSTRUCTION</span>');
     this.panel.querySelector('aside>label')?.insertAdjacentHTML('beforeend', '<small id="level-count"></small>');
-    this.el('#level-search').insertAdjacentHTML('afterend', '<select id="level-filter" aria-label="Filter site elements"><option value="all">All structures</option><option value="brick-wall">Brick walls</option><option value="concrete-wall">Concrete walls</option><option value="floor">Floor slabs</option><option value="stair">Stairs</option></select>');
+    this.el('#level-search').insertAdjacentHTML('afterend', '<select id="level-filter" aria-label="Filter site elements"><option value="all">All structures and assets</option><option value="brick-wall">Brick walls</option><option value="concrete-wall">Concrete walls</option><option value="floor">Floor slabs</option><option value="stair">Stairs</option><option value="asset">Site assets</option></select>');
     this.el('#level-filter').insertAdjacentHTML('afterend', '<div id="level-selection-actions"><button id="level-multi-toggle" type="button" aria-pressed="false">MULTI SELECT</button><button id="level-create-group" type="button" disabled>GROUP ITEMS</button></div><div id="level-group-list" aria-label="Saved editor groups"></div>');
     this.el('aside').insertAdjacentHTML('afterbegin', '<div id="level-view-quick"><div class="level-view__modes"><button type="button" data-level-view="3d">◈ ANGLE</button><button type="button" data-level-view="2d">▤ TOP</button></div><label for="level-floor-quick">VISIBLE FLOOR</label><select id="level-floor-quick" aria-label="Visible floor"><option value="-1">All floors · 3D only</option><option value="0">G-0 · ground</option><option value="1">L1 · first</option><option value="2">L2 · second</option><option value="3">L3 · third</option><option value="4">L4 · fourth</option></select><button id="level-camera-mobile" type="button" aria-pressed="false">◎ ORBIT CAMERA</button></div><button id="level-browser-toggle" type="button" aria-expanded="false">BROWSE ELEMENTS <span>⌃</span></button>');
     const sidePresets = '<div class="level-view__sides" aria-label="3D side view presets"><button type="button" data-camera-preset="front">↑ FRONT</button><button type="button" data-camera-preset="back">↓ BACK</button><button type="button" data-camera-preset="left">← LEFT</button><button type="button" data-camera-preset="right">→ RIGHT</button></div>';
@@ -496,7 +497,6 @@ export class LevelEditor {
       if (this.endTouchDrag(event)) return;
       if (!this.active || !this.down || Math.hypot(event.clientX - this.down.x, event.clientY - this.down.y) > 6) return;
       this.down = null;
-      if (this.wallPathActive && this.extendWallAtPointer(event)) return;
       if (this.gizmo.dragging) return;
       const rect = canvas.getBoundingClientRect();
       this.pointer.set((event.clientX - rect.left) / rect.width * 2 - 1, -(event.clientY - rect.top) / rect.height * 2 + 1);
@@ -507,8 +507,14 @@ export class LevelEditor {
       for (const hit of hits) {
         let object: THREE.Object3D | null = hit.object;
         while (object && object.parent !== wing) object = object.parent;
-        if (object instanceof THREE.Group && (wing.editableWalls.get(object.name) === object || wing.editableSurfaces.get(object.name) === object)) { this.selectWall(object, event.ctrlKey || event.shiftKey); return; }
+        if (!(object instanceof THREE.Group) ||
+          (wing.editableWalls.get(object.name) !== object && wing.editableSurfaces.get(object.name) !== object && wing.editableAssets.get(object.name) !== object)) continue;
+        if (this.wallPathActive && object === this.selected) break;
+        if (this.wallPathActive) this.setWallPathActive(false);
+        this.selectWall(object, event.ctrlKey || event.shiftKey);
+        return;
       }
+      if (this.wallPathActive) this.extendWallAtPointer(event);
     });
     addEventListener('keydown', event => {
       if (!this.active) return;
@@ -1228,7 +1234,7 @@ export class LevelEditor {
   }
   private editables(): THREE.Group[] {
     const wing = this.game.room.mansionWing;
-    return wing ? [...wing.editableWalls.values(), ...wing.editableSurfaces.values()] : [];
+    return wing ? [...wing.editableWalls.values(), ...wing.editableSurfaces.values(), ...wing.editableAssets.values()] : [];
   }
   private syncHighlights(targets: Iterable<THREE.Group>): void {
     const wanted = new Set(targets);
@@ -1250,16 +1256,17 @@ export class LevelEditor {
     for (const object of wanted) {
       const offset = badgeIndex++ % 3;
       if (this.highlights.has(object)) continue;
-      const kind = object.userData.levelEditorKind as WallKind | SurfaceKind;
+      const kind = object.userData.levelEditorKind as WallKind | SurfaceKind | 'asset';
       const length = object.userData.length as number;
       const depth = kind === 'floor' || kind === 'stair' ? object.userData.depth as number : .27;
-      const size = kind === 'floor' ? new THREE.Vector3(length, .2, depth)
+      const size = kind === 'asset' ? new THREE.Vector3().fromArray(object.userData.baseSize as number[])
+        : kind === 'floor' ? new THREE.Vector3(length, .2, depth)
         : kind === 'stair' ? new THREE.Vector3(length, 1.7, depth)
           : new THREE.Vector3(object.userData.alongX ? length : .27, 3.03, object.userData.alongX ? .27 : length);
       const overlay = new THREE.Group();
       overlay.name = 'Selected element highlight';
       overlay.userData.levelEditorHighlight = true;
-      overlay.position.y = kind === 'floor' ? -.09 : kind === 'stair' ? .825 : 1.5;
+      overlay.position.y = kind === 'asset' ? 0 : kind === 'floor' ? -.09 : kind === 'stair' ? .825 : 1.5;
       const bounds = new THREE.BoxGeometry(size.x, size.y, size.z);
       const edgeShape = new THREE.EdgesGeometry(bounds);
       const edges = new THREE.LineSegments(edgeShape,
@@ -1288,8 +1295,8 @@ export class LevelEditor {
         ctx.fillText('SELECTED', 225, 49);
         const badge = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(badgeCanvas), depthTest: false, depthWrite: false, transparent: true }));
         badge.name = 'Selected element label';
-        badge.position.y = size.y / 2 + .44 + offset * .72;
-        badge.scale.set(2.25, .57, 1);
+        badge.position.set(size.x / 2 + .4, size.y / 2 + .72 + offset * .42, 0);
+        badge.scale.set(1.3, .33, 1);
         badge.renderOrder = 960;
         badge.raycast = () => undefined;
         overlay.add(badge);
@@ -1299,6 +1306,7 @@ export class LevelEditor {
     }
   }
   private displayName(object: THREE.Group): string {
+    if (object.userData.levelEditorKind === 'asset') return object.userData.levelEditorLabel as string;
     const match = /^Editor (brick-wall|concrete-wall|floor|stair) ([0-9a-f-]{36})$/i.exec(object.name);
     if (!match) return object.name;
     const label: Record<string, string> = { 'brick-wall': 'Brick wall', 'concrete-wall': 'Concrete wall', floor: 'Floor slab', stair: 'Stairs' };
@@ -1338,7 +1346,7 @@ export class LevelEditor {
   }
   private membersOf(group: GroupRecord): THREE.Group[] {
     const wing = this.game.room.mansionWing;
-    return group.members.map(id => wing?.editableWalls.get(id) ?? wing?.editableSurfaces.get(id)).filter((item): item is THREE.Group => item instanceof THREE.Group && (this.floorIndex < 0 || item.visible));
+    return group.members.map(id => wing?.editableWalls.get(id) ?? wing?.editableSurfaces.get(id) ?? wing?.editableAssets.get(id)).filter((item): item is THREE.Group => item instanceof THREE.Group && (this.floorIndex < 0 || item.visible));
   }
   private refreshGroupsList(): void {
     const list = this.el('#level-group-list');
@@ -1536,7 +1544,7 @@ export class LevelEditor {
     if (!object) { this.el('#level-name').textContent = 'Select an element'; this.el('#level-kind').textContent = 'Tap a structure in the scene or list.'; this.el<HTMLButtonElement>('#level-delete').disabled = true; this.haloElement.hidden = true; return; }
     this.el('#level-name').textContent = group ? group.name : this.selectedObjects.size > 1 ? `${this.selectedObjects.size} elements selected` : this.markerSelection === 'apprentice' ? `Apprentice ${this.apprenticeIndex} start` : this.selected ? this.displayName(this.selected) : object.name;
     this.el('#level-halo-badge').textContent = `✓ ${this.el('#level-name').textContent}`;
-    this.el('#level-kind').textContent = this.selectedObjects.size > 1 ? group ? `${this.selectedObjects.size} grouped elements · move, rotate or scale together` : 'Move, rotate or scale together · GROUP ITEMS to save selection' : this.markerSelection ? 'Spawn position · metres' : `${this.selected!.userData.levelEditorKind === 'stair' ? 'STAIRS' : this.selected!.userData.levelEditorKind === 'floor' ? 'FLOOR SLAB' : this.selected!.userData.levelEditorKind === 'brick-wall' ? 'BRICK WALL' : 'CONCRETE WALL'} · live geometry`;
+    this.el('#level-kind').textContent = this.selectedObjects.size > 1 ? group ? `${this.selectedObjects.size} grouped elements · move, rotate or scale together` : 'Move, rotate or scale together · GROUP ITEMS to save selection' : this.markerSelection ? 'Spawn position · metres' : `${this.selected!.userData.levelEditorKind === 'asset' ? 'SITE ASSET' : this.selected!.userData.levelEditorKind === 'stair' ? 'STAIRS' : this.selected!.userData.levelEditorKind === 'floor' ? 'FLOOR SLAB' : this.selected!.userData.levelEditorKind === 'brick-wall' ? 'BRICK WALL' : 'CONCRETE WALL'} · live geometry`;
     const base = this.baseSize();
     for (const axis of ['x', 'y', 'z'] as const) {
       this.el<HTMLInputElement>(`[data-axis="${axis}"]`).value = object.position[axis].toFixed(2);
@@ -1579,6 +1587,7 @@ export class LevelEditor {
   private baseSize(): [number, number, number] {
     if (!this.selected) return [1, 1, 1];
     const kind = this.selected.userData.levelEditorKind;
+    if (kind === 'asset') return this.selected.userData.baseSize as [number, number, number];
     return [this.selected.userData.length as number, kind === 'floor' ? .18 : kind === 'stair' ? 1.65 : 3,
       kind === 'floor' || kind === 'stair' ? this.selected.userData.depth as number : .24];
   }
@@ -1643,7 +1652,12 @@ export class LevelEditor {
       rotationY: surface.rotation.y,
       scale: surface.scale.toArray() as [number, number, number],
     });
-    return { version: 1, template: this.template, walls, surfaces, groups: [...this.groups.values()].map(group => ({ ...group, members: [...group.members] })), playerStart: this.playerStart.toArray() as [number, number, number], playerStartYaw: this.playerStartYaw, apprenticeStart: this.apprenticeStart.toArray() as [number, number, number],
+    const assets: AssetRecord[] = [];
+    for (const asset of this.game.room.mansionWing?.editableAssets.values() ?? []) assets.push({
+      id: asset.name, position: asset.position.toArray() as [number, number, number],
+      rotationY: asset.rotation.y, scale: asset.scale.toArray() as [number, number, number],
+    });
+    return { version: 1, template: this.template, walls, surfaces, assets, groups: [...this.groups.values()].map(group => ({ ...group, members: [...group.members] })), playerStart: this.playerStart.toArray() as [number, number, number], playerStartYaw: this.playerStartYaw, apprenticeStart: this.apprenticeStart.toArray() as [number, number, number],
       apprenticeStarts: Array.from({ length: 5 }, (_, offset) => this.apprenticeStarts.get(offset + 1)!.toArray() as [number, number, number]),
       apprenticeStartYaws: Array.from({ length: 5 }, (_, offset) => this.apprenticeStartYaws.get(offset + 1)!) };
   }
@@ -1663,6 +1677,7 @@ export class LevelEditor {
       history.replaceState(null, '', url);
       const current = globalThis.document.querySelector('#start-level-current');
       if (current) current.textContent = `SAVED · ${name}`;
+      window.dispatchEvent(new Event('wirehouse:level-saved'));
     } catch (error) { this.status(`Save failed: ${String(error)}`); return; }
     try {
       const response = await fetch(`/__wire-house-mansion-level?slot=${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(document) });
@@ -1735,6 +1750,15 @@ export class LevelEditor {
         surface.rotation.y = record.rotationY;
         surface.scale.fromArray(record.scale);
       }
+      for (const record of data.assets ?? []) {
+        if (typeof record?.id !== 'string' || !finiteTriplet(record.position) || !finiteTriplet(record.scale) ||
+          !Number.isFinite(record.rotationY) || record.scale.some(value => value <= 0)) continue;
+        const asset = wing.editableAssets.get(record.id);
+        if (!asset) continue;
+        asset.position.fromArray(record.position);
+        asset.rotation.y = record.rotationY;
+        asset.scale.fromArray(record.scale);
+      }
       for (const record of data.walls) {
         if (typeof record?.id !== 'string' || !finiteTriplet(record.position) || !finiteTriplet(record.scale) ||
           !Number.isFinite(record.rotationY) || !Number.isFinite(record.length) || record.length < .2 ||
@@ -1761,7 +1785,7 @@ export class LevelEditor {
       this.groups.clear();
       if (Array.isArray(data.groups)) for (const group of data.groups) {
         if (typeof group?.id !== 'string' || typeof group.name !== 'string' || !Array.isArray(group.members)) continue;
-        const members = [...new Set(group.members.filter(id => typeof id === 'string' && (wing.editableWalls.has(id) || wing.editableSurfaces.has(id))))];
+        const members = [...new Set(group.members.filter(id => typeof id === 'string' && (wing.editableWalls.has(id) || wing.editableSurfaces.has(id) || wing.editableAssets.has(id))))];
         if (members.length >= 2) this.groups.set(group.id, { id: group.id, name: group.name.slice(0, 48), members });
       }
       if (this.activeGroupId && !this.groups.has(this.activeGroupId)) this.activeGroupId = null;

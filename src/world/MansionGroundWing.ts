@@ -14,7 +14,9 @@ export class MansionGroundWing extends THREE.Group {
   readonly obstacles: PlayerObstacle[] = [];
   readonly editableWalls = new Map<string, THREE.Group>();
   readonly editableSurfaces = new Map<string, THREE.Group>();
+  readonly editableAssets = new Map<string, THREE.Group>();
   private readonly editableWallColliders = new Map<THREE.Group, { obstacle: PlayerObstacle; matrix: THREE.Matrix4 }>();
+  private readonly editableAssetColliders = new Map<THREE.Group, { obstacle: PlayerObstacle; matrix: THREE.Matrix4 }>();
   private readonly corner = new THREE.Vector3();
   private readonly inverseSurfaceMatrix = new THREE.Matrix4();
   private emptyTemplate = false;
@@ -81,6 +83,59 @@ export class MansionGroundWing extends THREE.Group {
     this.castFrame(-1.35, 15.5);
     this.castFrame(9, 15.5);
     this.addTemporarySafety();
+    this.registerAuthoredAssets();
+  }
+
+  /** Give every authored wing part a stable, centred edit pivot. Keep the
+   * courtyard/terrain systems separate: they own animation and LOD state. */
+  private registerAuthoredAssets(): void {
+    const occurrences = new Map<string, number>();
+    const pickGeometry = new THREE.BoxGeometry(1, 1, 1);
+    const pickMaterial = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide });
+    const bounds = new THREE.Box3();
+    const centre = new THREE.Vector3();
+    const size = new THREE.Vector3();
+    for (const object of [...this.children]) {
+      if (object === this.courtyard || object === this.surroundings ||
+        this.editableWalls.get(object.name) === object || this.editableSurfaces.get(object.name) === object) continue;
+      if (!(object instanceof THREE.Mesh || object instanceof THREE.Group)) continue;
+      bounds.setFromObject(object);
+      if (bounds.isEmpty() || !Number.isFinite(bounds.min.x) || !Number.isFinite(bounds.max.y)) continue;
+      const count = (occurrences.get(object.name) ?? 0) + 1;
+      occurrences.set(object.name, count);
+      const slug = object.name.toLowerCase().replaceAll(/[^a-z0-9]+/g, '-').replaceAll(/^-|-$/g, '') || 'unnamed';
+      const id = `site-asset:${slug}:${count}`;
+      const pivot = new THREE.Group();
+      pivot.name = id;
+      pivot.userData.levelEditorKind = 'asset';
+      pivot.userData.levelEditorLabel = `${object.name}${count > 1 ? ` · ${count}` : ''}`;
+      bounds.getSize(size);
+      pivot.userData.baseSize = [Math.max(size.x, .01), Math.max(size.y, .01), Math.max(size.z, .01)];
+      pivot.userData.studioEntityId = `mansion:${id}`;
+      bounds.getCenter(centre);
+      this.add(pivot);
+      pivot.position.copy(centre);
+      pivot.attach(object);
+      // A single box around a spread-out beam network would intercept taps
+      // on every item inside it. Use a proxy only for compact parts whose
+      // render meshes deliberately disable raycasts (e.g. instanced bricks).
+      if (object instanceof THREE.InstancedMesh &&
+        Math.max(size.x, size.y, size.z) <= 5.5 && size.x * size.y * size.z <= 50) {
+        const pickProxy = new THREE.Mesh(pickGeometry, pickMaterial);
+        pickProxy.name = 'Editor asset selection volume';
+        pickProxy.scale.set(Math.max(size.x, .05), Math.max(size.y, .05), Math.max(size.z, .05));
+        pickProxy.userData.levelEditorPickProxy = true;
+        pivot.add(pickProxy);
+      }
+      this.editableAssets.set(id, pivot);
+      if (object.name === 'Raised pallet under staged unfitted masonry supplies' ||
+        object.name === 'Separate stacked clay units awaiting garage partition work') {
+        const obstacle: PlayerObstacle = { id, minX: bounds.min.x, maxX: bounds.max.x,
+          minZ: bounds.min.z, maxZ: bounds.max.z, minFloorY: bounds.min.y - .2, maxFloorY: bounds.max.y };
+        this.obstacles.push(obstacle);
+        this.editableAssetColliders.set(pivot, { obstacle, matrix: new THREE.Matrix4().makeScale(0, 0, 0) });
+      }
+    }
   }
 
   update(dt: number): void { this.courtyard.update(dt); this.surroundings.update(dt); }
@@ -136,6 +191,16 @@ export class MansionGroundWing extends THREE.Group {
   }
 
   obstaclesAt(floorY: number): PlayerObstacle[] {
+    for (const [asset, entry] of this.editableAssetColliders) {
+      asset.updateWorldMatrix(true, true);
+      if (entry.matrix.equals(asset.matrixWorld)) continue;
+      entry.matrix.copy(asset.matrixWorld);
+      const bounds = new THREE.Box3().setFromObject(asset, true);
+      const obstacle = entry.obstacle;
+      obstacle.minX = bounds.min.x - .01; obstacle.maxX = bounds.max.x + .01;
+      obstacle.minZ = bounds.min.z - .01; obstacle.maxZ = bounds.max.z + .01;
+      obstacle.minFloorY = bounds.min.y - .2; obstacle.maxFloorY = bounds.max.y;
+    }
     for (const [wall, entry] of this.editableWallColliders) {
       const obstacle = entry.obstacle;
       wall.updateWorldMatrix(true, false);
@@ -374,7 +439,6 @@ export class MansionGroundWing extends THREE.Group {
     blocks.castShadow = blocks.receiveShadow = true;
     blocks.computeBoundingSphere();
     this.add(blocks);
-    this.obstacles.push({ id: 'Staged garage masonry pallet', minX: 10.35, maxX: 11.85, minZ: -2.4, maxZ: -1.35 });
   }
 
   private addGarageStructuralJunctions(): void {
