@@ -49,7 +49,18 @@ try {
       await page.locator('#level-dock-toggle').click();
       assert.equal(await page.locator('#level-dock-toggle').getAttribute('aria-expanded'), 'true');
       assert(await page.locator('.level-editor__bottom-nav [data-editor-tab="transform"]').isVisible());
+      const seam = await page.evaluate(() => {
+        const toggle = document.querySelector('#level-dock-toggle');
+        const handle = getComputedStyle(toggle, '::before');
+        const nav = getComputedStyle(document.querySelector('.level-editor__bottom-nav'));
+        return { sideBorder: handle.borderLeftWidth, handleColor: handle.backgroundColor, navColor: nav.backgroundColor };
+      });
+      assert.equal(seam.sideBorder, '0px', `${name}: handle must not leave lines inside navigation`);
+      assert.equal(seam.handleColor, 'rgb(255, 218, 40)', `${name}: Edit handle must merge into selected tab`);
+      assert.equal(seam.navColor, 'rgb(32, 60, 53)', `${name}: dock must not darken at handle overlap`);
       await page.screenshot({ path: fileURLToPath(new URL(`after-${name}-nav-only.png`, output)) });
+      await page.locator('.level-editor__bottom-nav [data-editor-tab="build"]').click();
+      assert(await page.locator('#level-editor').evaluate(el => el.dataset.tab === 'build' && el.classList.contains('sheet-open')));
     }
     await context.close();
   }
