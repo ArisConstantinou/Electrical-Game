@@ -1,5 +1,11 @@
 Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web game named WIRE THE HOUSE, based on real Cyprus residential first-fix practices, editable in Web Game Studio, playable on desktop/mobile, deployed to arisconstantinou/Electrical-Game via GitHub Pages, and ending at FIRST FIX COMPLETE without cable pulling.
 
+## 2026-09-23 · Distribution-board physical entries and visual hardware
+
+- In isolated `codex/db-hardware-visual`, replaced fake bottom entry discs with seven perforations, three open sleeves, pressed entry lips and cabinet-back supports. Fitted Inspector stage also has more modeled device faces and two-tone earth conductor marking; there is no circuit or gameplay installation.
+- The new geometry test fails on the old solid bottom and passes with real holes; TypeScript, Vite build, desktop/portrait/landscape Inspector captures and no browser errors passed. Headless 390×844 viewport p95 was 4.3 ms before/after while Inspector draw calls rose 20→24. See `docs/VISUAL_OVERHAUL.md` and `artifacts/db-hardware-visual/`.
+- Remaining: surface/detail fidelity to the photos, actual wall integration only when a compatible construction stage/location exists, phase-specific boxes, and the full visual goal across gameplay scenes and devices.
+
 ## 2026-09-23 · Integrated 5365 and next fired-clay variation
 
 - `codex/site-pro-visual-integration` at `9d262ec` combines the prior visual branch with the Site Pro release and serves the sole 5365 preview; browser room tour, mixer workflow and editor smoke passed on the merged build.

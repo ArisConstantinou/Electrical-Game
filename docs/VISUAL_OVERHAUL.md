@@ -323,6 +323,30 @@ device-specific details, convincing wire termination, enclosure deformation
 and wall integration. It must be refined before it is treated as a final
 visual model or added to gameplay.
 
+### Enclosure hardware refinement
+
+The next pass replaces the seven painted bottom discs with actual openings in
+the bottom return. Three openings have short hollow conduit sleeves and seven
+have pressed lips. Shallow back stiffeners, support posts and scored rear
+knockouts remain visible in the empty first-fix sample. The second-fix sample
+adds rounded device housings, recessed toggle wells and orange indicator
+strips; its earth runs are green with a narrow yellow marking and now pass
+through a lower cable channel toward the side bar. This is still an unrated
+visual sample, without circuit design or installation in the gameplay world.
+
+`tests/db-hardware-geometry.mjs` fails on the previous cabinet and passes on
+this one: the centre of an unused cable entry has no bottom-panel triangles,
+while the material between entries is solid. Matching full and close desktop
+captures plus portrait/landscape viewport screenshots are under
+`artifacts/db-hardware-visual/`. The Inspector displayed both stages with no
+browser errors or horizontal overflow. The fitted reference increased from 16
+to 20 rendered meshes and 13,204 to 25,696 triangles, all constructed only
+when the Inspector opens. A 99-interval 390×844 headless Chrome viewport
+comparison recorded 4.3 ms p95 both before and after, with 20 versus 24 draw
+calls; this is not a physical-mobile performance result. The model still lacks
+manufacturer-specific devices, true terminations, installed wall integration
+and the photographic surface quality shown in the user's reference.
+
 ## Current integration and remaining wall work
 
 Commit `9d262ec` combined the approved visual work with the Site Pro 04 release
