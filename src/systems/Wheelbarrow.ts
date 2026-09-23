@@ -88,6 +88,12 @@ export class Wheelbarrow {
     addEventListener('blur',()=>{if(this.driving)this.release();});
   }
   get busy():boolean{return this.driving||this.state==='righting';}
+  syncEditorPlacement():void{
+    if(this.busy)return;
+    this.yaw=this.model.group.rotation.y;
+    this.lastPosition.copy(this.model.group.position);
+    this.model.group.updateWorldMatrix(true,true);
+  }
   get floorKg():number{return this.parcels.filter(p=>p.settled).reduce((s,p)=>s+p.mass,0);}
   get airborneKg():number{return this.parcels.filter(p=>!p.settled).reduce((s,p)=>s+p.mass,0);}
   get recovering():boolean{return this.handAction!==null;}
@@ -157,7 +163,7 @@ export class Wheelbarrow {
         this.rollSpeed-=this.velocity.dot(right)*scale;this.pitchSpeed+=this.velocity.dot(forward)*scale;
         this.velocity.set(0,0,0);this.blocked=true;
       }
-      const travelled=root.position.clone().sub(this.lastPosition);this.wheelAngle+=travelled.length()*Math.sign(travelled.dot(forward)||travelled.dot(right))/.202;
+      const travelled=root.position.clone().sub(this.lastPosition);this.wheelAngle+=travelled.length()*Math.sign(travelled.dot(forward)||travelled.dot(right))/(.202*Math.max(.01,Math.abs(root.scale.y)));
     }else{this.velocity.multiplyScalar(Math.exp(-5*dt));if(this.state==='tipping'){this.lastPosition.copy(root.position);root.position.addScaledVector(this.velocity,dt);if(!this.positionAllowed()){root.position.copy(this.lastPosition);this.velocity.set(0,0,0);}}}
     const acceleration=this.velocity.clone().sub(oldVelocity).divideScalar(dt),ax=clamp(acceleration.dot(right)+turn*this.velocity.dot(forward),-24,24),az=clamp(acceleration.dot(forward),-24,24);
     if(this.state==='driving'||this.state==='parked'){
@@ -180,7 +186,7 @@ export class Wheelbarrow {
     }else if(this.state==='righting'){
       this.tipTime+=dt;const t=THREE.MathUtils.smoothstep(this.tipTime/1.15,0,1);this.pitch=this.recoveryStart.x*(1-t);this.roll=this.recoveryStart.y*(1-t);if(t===1){this.state='parked';this.pitchSpeed=this.rollSpeed=0;this.stability=this.tipExposure=0;}
     }
-    root.rotation.set(this.pitch,this.yaw,this.roll,'YXZ');let minY=Infinity;for(const p of this.support)minY=Math.min(minY,p.clone().applyQuaternion(root.quaternion).y);root.position.y=-minY+.002;root.updateWorldMatrix(true,true);
+    root.rotation.set(this.pitch,this.yaw,this.roll,'YXZ');let minY=Infinity;for(const p of this.support)minY=Math.min(minY,p.clone().multiply(root.scale).applyQuaternion(root.quaternion).y);root.position.y=-minY+.002;root.updateWorldMatrix(true,true);
     // Cohesive regions stick until their individual yield threshold is passed.
     const gravity=UP.clone().negate().applyQuaternion(root.quaternion.clone().invert()),vertical=Math.max(.25,-gravity.y);
     this.mortarSlump.update(dt,clamp(gravity.x/vertical-ax*.035-turn*.055,-1.6,1.6),clamp(gravity.z/vertical-az*.035,-1.6,1.6));
@@ -212,8 +218,9 @@ export class Wheelbarrow {
     const root=this.model.group,room=GAME_CONFIG.room,obstacles=this.game.mixing.collisionObstacles().filter(o=>o.id!=='wheelbarrow');
     // Cover the tray, wheel and handles with overlapping discs, not a huge
     // axis-aligned rectangle that jams diagonal steering in the work aisle.
-    for(const [z,r] of [[-.82,.23],[-.36,.34],[.1,.35],[.57,.17]] as const){
-      const p=new THREE.Vector3(0,0,z).applyAxisAngle(UP,this.yaw).add(root.position);
+    for(const [z,baseRadius] of [[-.82,.23],[-.36,.34],[.1,.35],[.57,.17]] as const){
+      const r=baseRadius*Math.max(Math.abs(root.scale.x),Math.abs(root.scale.z));
+      const p=new THREE.Vector3(0,0,z*root.scale.z).applyAxisAngle(UP,this.yaw).add(root.position);
       if(p.x-r< -room.width/2||p.x+r>room.width/2||p.z-r<room.wallFrontZ||p.z+r>room.depth/2)return false;
       for(const o of obstacles){const dx=p.x-clamp(p.x,o.minX,o.maxX),dz=p.z-clamp(p.z,o.minZ,o.maxZ);if(dx*dx+dz*dz<r*r)return false;}
     }return true;

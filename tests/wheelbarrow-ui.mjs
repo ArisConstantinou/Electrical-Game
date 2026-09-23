@@ -7,7 +7,7 @@ const browser=await chromium.launch({channel:'chrome',headless:true}),report={er
 try{
  const context=await browser.newContext({viewport:{width:1366,height:768}});await blockPointerLock(context);const page=await context.newPage();page.on('pageerror',e=>report.errors.push(e.message));await page.routeWebSocket('**',()=>{});
  await page.goto('http://127.0.0.1:5365/Electrical-Game/?renderer=webgl');await page.locator('#start-button').click({timeout:120000});await page.waitForFunction(()=>window.__wireTheHouse.workerBody.loaded);
- await page.evaluate(()=>{const g=window.__wireTheHouse;window.cartStep=g.step.bind(g);g.step=()=>{};const w=g.mixing.wheelbarrow;w.model.group.position.set(1.2,0,-.8);w.yaw=0;w.model.group.rotation.set(0,0,0);w.update(0);});
+ await page.evaluate(()=>{const g=window.__wireTheHouse;window.cartStep=g.step.bind(g);g.step=()=>{};const w=g.mixing.wheelbarrow;w.model.group.position.set(1.2,0,-.8);w.yaw=0;w.model.group.rotation.set(0,0,0);w.massKg=114;w.mortarSlump.reset(3185);w.update(0);});
  const step=async(n=2)=>page.evaluate(n=>{for(let i=0;i<n;i++)window.cartStep(1/60);},n);
  const state=()=>page.evaluate(()=>window.__wireTheHouse.mixing.wheelbarrow.telemetry);
  const key=async(code,n=2)=>{await page.keyboard.down(code);await step(n);await page.keyboard.up(code);await step(2);};

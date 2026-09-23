@@ -94,7 +94,7 @@ try {
   assert(Math.abs(restored.x - changed.x) < .001 && Math.abs(restored.yaw - changed.yaw) < .001);
   let roomFloorAfter = null;
   for (const [label, point, height, file] of [
-    ['Rough unfinished concrete floor', [2.5, 0, 2.5], 1.5, 'room-floor-selected.png'],
+    ['Rough unfinished concrete floor', [0, 0, -1.5], 1.5, 'room-floor-selected.png'],
     ['Concrete slab ceiling', [0, 3.4, 0], 7, 'room-ceiling-selected.png'],
   ]) {
     await page.evaluate(({ point, height }) => {

@@ -155,6 +155,10 @@ export class MixingStation {
     addEventListener('blur',()=>{this.stop();this.drum.running=false;});document.addEventListener('visibilitychange',()=>{if(document.hidden){this.stop();this.drum.running=false;}});
   }
   get blocksWork():boolean{return this.active||this.carrying||this.wheelbarrow.busy;}
+  syncEditorRestPositions():void{
+    this.mixerHome.copy(this.models.mixer.position);
+    this.mixerRotation.copy(this.models.mixer.rotation);
+  }
   private localBounds(root:THREE.Object3D):THREE.Box3{
     root.updateWorldMatrix(true,true);const inverse=root.matrixWorld.clone().invert(),bounds=new THREE.Box3(),point=new THREE.Vector3(),corner=new THREE.Vector3(),instance=new THREE.Matrix4(),world=new THREE.Matrix4();
     root.traverse(object=>{

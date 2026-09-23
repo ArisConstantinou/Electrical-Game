@@ -122,6 +122,7 @@ export class LevelEditor {
   private readonly pointer = new THREE.Vector2();
   private readonly highlights = new Map<THREE.Group, THREE.Group>();
   private readonly editorRaycasts = new Map<THREE.Mesh, THREE.Object3D['raycast']>();
+  private readonly siteEquipment: THREE.Group[] = [];
   private cameraMode: 'orbit' | 'pan' = 'orbit';
   private readonly touchPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0));
   private touchDrag: { pointerId: number; mode: 'translate' | 'rotate' | 'scale'; x: number; y: number; position: THREE.Vector3; rotationY: number; scale: THREE.Vector3; planeHit: THREE.Vector3 | null } | null = null;
@@ -176,12 +177,13 @@ export class LevelEditor {
     this.gizmo = new TransformControls(this.camera, canvas);
     this.gizmo.setSize(.34);
     this.gizmo.addEventListener('dragging-changed', event => { this.orbit.enabled = this.active && !event.value; });
-    this.gizmo.addEventListener('objectChange', () => { if (this.gizmo.object === this.selectionPivot) this.applyPivotDelta(); this.refreshFields(); });
+    this.gizmo.addEventListener('objectChange', () => { if (this.gizmo.object === this.selectionPivot) this.applyPivotDelta(); this.syncLiveEquipment(); this.refreshFields(); });
     this.gizmo.addEventListener('mouseUp', () => { this.snapWallEnds(); this.refreshFields(); this.recordHistory(); });
     this.gizmo.getHelper().visible = false;
     game.renderer.scene.add(this.gizmo.getHelper());
     this.selectionPivot.name = 'Editor selection centre';
     game.renderer.scene.add(this.selectionPivot);
+    this.registerSiteEquipment();
     this.playerStart.copy(game.renderer.camera.position);
     this.playerStartYaw = game.player.yaw;
     this.apprenticeStart.copy(game.apprentice.camera.position);
@@ -237,6 +239,25 @@ export class LevelEditor {
   }
 
   private el<T extends HTMLElement = HTMLElement>(selector: string): T { return this.panel.querySelector<T>(selector)!; }
+  private registerSiteEquipment(): void {
+    const wing = this.game.room.mansionWing;
+    if (!wing) return;
+    // These are the live gameplay objects, not visual clones. MixingStation
+    // derives its interaction targets and collision boxes from their matrices.
+    const equipment = [...this.game.mixing.models.group.children, this.game.mixing.wheelbarrow.model.group];
+    for (const object of equipment) {
+      if (!(object instanceof THREE.Group) || !object.name || wing.editableAssets.has(object.name)) continue;
+      const bounds = new THREE.Box3().setFromObject(object);
+      if (bounds.isEmpty() || !Number.isFinite(bounds.min.x)) continue;
+      const size = bounds.getSize(new THREE.Vector3());
+      object.userData.levelEditorKind = 'asset';
+      object.userData.levelEditorLabel = object.name.replaceAll('-', ' ');
+      object.userData.baseSize = [size.x, size.y, size.z].map((value, axis) =>
+        Math.max(value / Math.max(Math.abs(object.scale.getComponent(axis)), .001), .01));
+      wing.editableAssets.set(object.name, object);
+      this.siteEquipment.push(object);
+    }
+  }
   private decorateControls(): void {
     this.el('.level-editor__header-actions').insertAdjacentHTML('afterbegin', '<button id="level-camera" type="button" aria-label="Switch to camera pan" title="Switch to camera pan"></button>');
     const paths: Record<string, string> = {
@@ -634,6 +655,7 @@ export class LevelEditor {
       object.scale.copy(drag.scale).multiplyScalar(factor);
     }
     if (object === this.selectionPivot) this.applyPivotDelta();
+    this.syncLiveEquipment();
     this.refreshFields();
     event.preventDefault();
   }
@@ -862,6 +884,7 @@ export class LevelEditor {
     this.recordHistory();
   }
   private recordHistory(): void {
+    this.syncLiveEquipment();
     const document = this.document();
     if (this.historyIndex >= 0 && JSON.stringify(this.history[this.historyIndex]) === JSON.stringify(document)) return;
     this.history = this.history.slice(0, this.historyIndex + 1);
@@ -869,6 +892,10 @@ export class LevelEditor {
     if (this.history.length > 100) this.history.shift();
     this.historyIndex = this.history.length - 1;
     this.updateHistoryButtons();
+  }
+  private syncLiveEquipment(): void {
+    if (this.selectedObjects.has(this.game.mixing.wheelbarrow.model.group)) this.game.mixing.wheelbarrow.syncEditorPlacement();
+    if (this.selectedObjects.has(this.game.mixing.models.mixer)) this.game.mixing.syncEditorRestPositions();
   }
   private moveHistory(direction: -1 | 1): void {
     const next = this.historyIndex + direction;
@@ -990,6 +1017,10 @@ export class LevelEditor {
     for (const object of [...room.children, ...wing.children]) {
       if (!this.originalVisibility.has(object)) this.originalVisibility.set(object, object.visible);
       object.visible = this.originalVisibility.get(object)!;
+    }
+    for (const object of this.siteEquipment) {
+      if (!this.originalVisibility.has(object)) this.originalVisibility.set(object, object.visible);
+      object.visible = this.originalVisibility.get(object)! && this.floorIndex <= 0;
     }
     if (this.floorIndex < 0) { this.applyTemplateVisibility(); return; }
     for (const object of room.children) {
@@ -1638,7 +1669,7 @@ export class LevelEditor {
     const base = this.baseSize();
     for (const axis of ['x', 'y', 'z'] as const) {
       this.el<HTMLInputElement>(`[data-axis="${axis}"]`).value = object.position[axis].toFixed(2);
-      this.el<HTMLInputElement>(`[data-size="${axis}"]`).value = this.selectedObjects.size > 1 ? '' : (object.scale[axis] * base[['x', 'y', 'z'].indexOf(axis)]).toFixed(2);
+      this.el<HTMLInputElement>(`[data-size="${axis}"]`).value = this.selectedObjects.size > 1 ? '' : (Math.abs(object.scale[axis]) * base[['x', 'y', 'z'].indexOf(axis)]).toFixed(2);
     }
     this.el<HTMLInputElement>('#level-yaw').value = THREE.MathUtils.radToDeg(object.rotation.y).toFixed(0);
     this.el<HTMLButtonElement>('#level-delete').disabled = !this.selected || !this.added.has(this.selected.name);
@@ -1667,11 +1698,13 @@ export class LevelEditor {
       const value = Number(this.el<HTMLInputElement>(`[data-axis="${axis}"]`).value);
       const size = Number(this.el<HTMLInputElement>(`[data-size="${axis}"]`).value);
       if (Number.isFinite(value)) object.position[axis] = value;
-      if (this.selected && Number.isFinite(size) && size > 0) object.scale[axis] = size / base[['x', 'y', 'z'].indexOf(axis)];
+      if (this.selected && Number.isFinite(size) && size > 0)
+        object.scale[axis] = Math.sign(object.scale[axis] || 1) * size / base[['x', 'y', 'z'].indexOf(axis)];
     }
     const yaw = Number(this.el<HTMLInputElement>('#level-yaw').value);
     if (Number.isFinite(yaw)) object.rotation.y = THREE.MathUtils.degToRad(yaw);
     if (object === this.selectionPivot) this.applyPivotDelta();
+    this.syncLiveEquipment();
     this.refreshFields();
     this.recordHistory();
   }
@@ -1850,13 +1883,15 @@ export class LevelEditor {
       }
       for (const record of data.assets ?? []) {
         if (typeof record?.id !== 'string' || !finiteTriplet(record.position) || !finiteTriplet(record.scale) ||
-          !Number.isFinite(record.rotationY) || record.scale.some(value => value <= 0)) continue;
+          !Number.isFinite(record.rotationY) || record.scale.some(value => Math.abs(value) < .001)) continue;
         const asset = wing.editableAssets.get(record.id);
         if (!asset) continue;
         asset.position.fromArray(record.position);
         asset.rotation.y = record.rotationY;
         asset.scale.fromArray(record.scale);
       }
+      this.game.mixing.wheelbarrow.syncEditorPlacement();
+      this.game.mixing.syncEditorRestPositions();
       for (const record of data.walls) {
         if (typeof record?.id !== 'string' || !finiteTriplet(record.position) || !finiteTriplet(record.scale) ||
           !Number.isFinite(record.rotationY) || !Number.isFinite(record.length) || record.length < .2 ||
