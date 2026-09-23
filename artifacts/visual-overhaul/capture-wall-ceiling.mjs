@@ -11,6 +11,7 @@ const output = path.resolve('artifacts/visual-overhaul');
 const views = [
   { name: 'room-wall', mansion: false, x: 0, y: 1.65, z: -1.55, yaw: 0, pitch: 0 },
   { name: 'room-ceiling', mansion: false, x: 0, y: 1.65, z: -.4, yaw: 0, pitch: 1.18 },
+  { name: 'room-mixer', mansion: false, x: -.55, y: 1.44, z: .10, yaw: Math.PI, pitch: -.12 },
   { name: 'garage-ceiling', mansion: true, x: 13.5, y: 1.65, z: 1.25, yaw: 0, pitch: 1.2 },
   { name: 'upper-ceiling', mansion: true, x: 9.5, y: 4.9, z: 2.25, yaw: 0, pitch: 1.2 },
   { name: 'mansion-block-end', mansion: true, x: 16.7, y: 1.55, z: 8.7, yaw: -1.0, pitch: -.04 },

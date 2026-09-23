@@ -11,6 +11,10 @@ const paintedSteelScan = new THREE.TextureLoader().load(`${import.meta.env.BASE_
 paintedSteelScan.colorSpace = THREE.SRGBColorSpace;
 paintedSteelScan.wrapS = paintedSteelScan.wrapT = THREE.RepeatWrapping;
 paintedSteelScan.anisotropy = 4;
+const curedMortarScan = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}assets/site-materials/concrete-albedo-512.webp`);
+curedMortarScan.colorSpace = THREE.SRGBColorSpace;
+curedMortarScan.wrapS = curedMortarScan.wrapT = THREE.RepeatWrapping;
+curedMortarScan.anisotropy = 4;
 function wornPowderCoat(color:number, withVertexColor=false):MeshStandardNodeMaterial {
   const base = new THREE.Color(color);
   const material = new MeshStandardNodeMaterial({roughness:.76,metalness:.18});
@@ -62,6 +66,40 @@ function wheel(parent:THREE.Object3D,name:string,r:number,width:number,at:V,trea
     for(let i=0;i<42;i++)for(const s of [-1,1]){const angle=i/42*Math.PI*2;const q=new THREE.Quaternion().setFromEuler(new THREE.Euler(0,-angle,s*.40));transforms.push(new THREE.Matrix4().compose(new THREE.Vector3(Math.sin(angle)*r,s*width*.20,Math.cos(angle)*r),q,new THREE.Vector3(1,1,1)));}
     copies(g,`${name}-chevron-tread`,new THREE.BoxGeometry(.012,width*.48,.005),rubber,transforms);
   }
+}
+
+/** Cured mortar on the lower inside of a used drum, following its changing
+ * radius rather than floating flat decals over the opening. */
+function addMixerMortarWear(drum:THREE.Group):void {
+  const inside:[[number,number],...[number,number][]]=[
+    [-.27,.14],[-.242,.218],[-.192,.287],[-.12,.325],[-.059,.334],[.02,.334],[.119,.316],[.235,.288],[.353,.243],
+  ];
+  const radiusAt=(y:number):number=>{
+    for(let i=1;i<inside.length;i++)if(y<=inside[i][0]){
+      const [y0,r0]=inside[i-1],[y1,r1]=inside[i],t=(y-y0)/(y1-y0);
+      return THREE.MathUtils.lerp(r0,r1,t)-.003;
+    }
+    return inside.at(-1)![1]-.003;
+  };
+  const positions:number[]=[],uvs:number[]=[],indices:number[]=[],around=64,heightSteps=8;
+  for(let i=0;i<=around;i++){
+    const angle=i/around*Math.PI*2;
+    const irregularTop=.09+Math.sin(angle*3+.3)*.039+Math.sin(angle*7-1)*.021+Math.sin(angle*13)*.009;
+    for(let j=0;j<=heightSteps;j++){
+      const y=THREE.MathUtils.lerp(-.235,irregularTop,j/heightSteps),r=radiusAt(y);
+      positions.push(Math.cos(angle)*r,y,Math.sin(angle)*r);
+      uvs.push(i/around*2.5,(y+.27)/.64*1.6);
+      if(i<around&&j<heightSteps){const a=i*(heightSteps+1)+j,b=a+heightSteps+1;indices.push(a,a+1,b,a+1,b+1,b);}
+    }
+  }
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+  geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));
+  geometry.setIndex(indices);geometry.computeVertexNormals();
+  const material=new THREE.MeshStandardMaterial({map:curedMortarScan,color:0xb6aea3,roughness:1,metalness:0,transparent:true,opacity:.66,depthWrite:false,side:THREE.DoubleSide});
+  material.forceSinglePass=true;
+  const wear=mesh(drum,'irregular cured mortar film inside drum',geometry,material);
+  wear.castShadow=false;
 }
 
 // Rounded rectangular cross section, narrower at the pouring/front end.
@@ -150,6 +188,7 @@ export function createConcreteMixer():THREE.Group {
   for(let i=0;i<=64;i++)for(let j=0;j<profile.length;j++)colors.push(...new THREE.Color(j<=11?0xffffff:0x883f25).toArray());
   shell.geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
   shell.material=wornPowderCoat(0xd95622,true);
+  addMixerMortarWear(drum);
   torus(drum,'rolled-open-mouth',.247,.009,orange,[0,.367,0]);
   torus(drum,'welded-shell-seam',.348,.005,orange,[0,-.025,0]);
   lathe(drum,'cast-ring-gear-band',[[.341,-.105],[.358,-.105],[.358,-.063],[.344,-.063]],dark);

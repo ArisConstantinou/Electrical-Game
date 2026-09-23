@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
-import {mkdir, writeFile} from 'node:fs/promises';
+import {mkdir, readFile, writeFile} from 'node:fs/promises';
+import path from 'node:path';
 import {blockPointerLock} from './browser-safety.mjs';
 
 const url = process.argv.find(arg => /^https?:/.test(arg)) ?? 'http://127.0.0.1:5365/Electrical-Game/';
 const repro = process.argv.includes('--repro');
-const out = 'output/mixer-photo-workflow';
+const out = process.env.QA_MIXER_OUTPUT ?? 'output/mixer-photo-workflow';
+const isolatedRoot = process.env.QA_DIST_ROOT ? path.resolve(process.env.QA_DIST_ROOT) : null;
 await mkdir(out, {recursive:true});
 const report = {url, repro, mobileIsEmulation:true, cases:[], errors:[], passed:false};
 const browser = await chromium.launch({channel:'chrome', headless:true});
@@ -18,10 +20,20 @@ try {
     const context = await browser.newContext({viewport:{width:layout.width,height:layout.height}, isMobile:layout.mobile, hasTouch:layout.mobile});
     await blockPointerLock(context);
     const page = await context.newPage();
+    if (isolatedRoot) await page.route('http://127.0.0.1:5365/Electrical-Game/**', async route => {
+      const relative = decodeURIComponent(new URL(route.request().url()).pathname).slice('/Electrical-Game/'.length) || 'index.html';
+      const file = path.resolve(isolatedRoot, relative);
+      if (!file.startsWith(isolatedRoot + path.sep)) return route.abort();
+      try {
+        const extension = path.extname(file).toLowerCase();
+        await route.fulfill({ status: 200, body: await readFile(file), contentType: ({ '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webp': 'image/webp', '.jpg': 'image/jpeg', '.png': 'image/png', '.glb': 'model/gltf-binary', '.gltf': 'model/gltf+json', '.bin': 'application/octet-stream', '.svg': 'image/svg+xml' })[extension] || 'application/octet-stream' });
+      } catch { await route.fulfill({ status: 404, body: `Missing isolated asset: ${relative}` }); }
+    });
     page.on('pageerror', error => report.errors.push(`${layout.name}: ${error.message}`));
     page.on('console', message => { if (message.type() === 'error') report.errors.push(`${layout.name}: ${message.text()}`); });
     await page.goto(url);
     await page.waitForFunction(() => window.__wireTheHouse?.mixing, undefined, {timeout:120000});
+    await page.waitForFunction(() => !document.querySelector('#start-button')?.disabled, undefined, {timeout:120000});
     await page.locator('#start-button')[layout.mobile?'tap':'click']();
     await page.waitForTimeout(350);
     await page.evaluate(() => {
@@ -65,7 +77,7 @@ try {
     const cdp = layout.mobile ? await context.newCDPSession(page) : null;
     const useDown = async () => {
       if (layout.mobile) {
-        const box=await page.locator('#look-joystick').boundingBox();
+        const box=await page.locator('#site-pro-use').boundingBox();
         assert(box,'USE touch target is visible');
         await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{id:81,x:box.x+box.width/2,y:box.y+box.height/2}]});
       } else { await page.mouse.move(layout.width/2,layout.height*.42); await page.mouse.down(); }
