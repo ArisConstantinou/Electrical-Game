@@ -416,10 +416,12 @@ export class HUD {
     const workerHandle = document.createElement('button');
     workerHandle.id = 'worker-bar-handle'; workerHandle.type = 'button';
     workerHandle.setAttribute('aria-controls', 'mobile-tool-slider');
+    workerHandle.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 9 7 7 7-7"/></svg>';
     root.querySelector('#mobile-tool-slider')!.before(workerHandle);
     const inspectorHandle = document.createElement('button');
     inspectorHandle.id = 'inspector-bar-handle'; inspectorHandle.type = 'button';
     inspectorHandle.setAttribute('aria-controls', 'apprentice-controls');
+    inspectorHandle.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 9 7 7 7-7"/></svg>';
     root.querySelector('#mobile-tool-slider')!.after(inspectorHandle);
     this.shell.dataset.bottomRole='worker';
     this.shell.dataset.inspectorOpen='false';
@@ -427,7 +429,6 @@ export class HUD {
       this.shell.dataset.inspectorOpen=String(open);
       coordinatorToggle.setAttribute('aria-expanded',String(open));
       coordinatorToggle.setAttribute('aria-label',open?'Close inspector commands':'Open inspector commands');
-      inspectorHandle.textContent=open?'⌄':'⌃';
       inspectorHandle.setAttribute('aria-expanded',String(open));
       inspectorHandle.setAttribute('aria-label',open?'Hide inspector tools':'Show inspector tools');
       const inspectorPanel=this.shell.querySelector<HTMLElement>('#apprentice-controls');
@@ -462,7 +463,6 @@ export class HUD {
       toolsToggle.setAttribute('aria-expanded', String(open));
       toolsToggle.setAttribute('aria-label', open ? 'Close worker tools' : 'Open worker tools');
       toolsToggle.querySelector('span')!.textContent = 'WORKER';
-      workerHandle.textContent=open?'⌄':'⌃';
       workerHandle.setAttribute('aria-expanded',String(open));
       workerHandle.setAttribute('aria-label',open?'Hide worker tools':'Show worker tools');
     };

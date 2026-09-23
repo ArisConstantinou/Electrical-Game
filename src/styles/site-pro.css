@@ -404,9 +404,9 @@ html, body { background: #151a1d; }
     box-shadow:0 5px 14px #0008;
   }
   #mobile-top-rail::before {
-    content:''; position:absolute; inset:0 1px 1px;
+    content:''; position:absolute; inset:1px;
     background:linear-gradient(115deg,#1b3029f5,#192a25f5);
-    clip-path:polygon(0 0,100% 0,100% 75%,calc(100% - 14px) 100%,14px 100%,0 75%);
+    clip-path:polygon(0 0,100% 0,100% 75%,calc(100% - 13px) 100%,13px 100%,0 75%);
   }
   #mobile-top-rail::after {
     content:''; position:absolute; top:7px; bottom:8px; right:143px;
@@ -417,23 +417,23 @@ html, body { background: #151a1d; }
     clip-path:polygon(0 0,100% 0,100% 82%,calc(100% - 8px) 100%,8px 100%,0 82%);
   }
   #game-shell[data-tools-open="false"][data-inspector-open="false"] #mobile-top-rail::before {
-    clip-path:polygon(0 0,100% 0,100% 81%,calc(100% - 8px) 100%,8px 100%,0 81%);
+    clip-path:polygon(0 0,100% 0,100% 81%,calc(100% - 7px) 100%,7px 100%,0 81%);
   }
   #game-shell[data-tools-open="false"][data-inspector-open="false"] #mobile-top-rail::after {display:none;}
   #worker-bar-handle, #inspector-bar-handle {
     top:var(--top-rail-y); left:auto; right:var(--top-rail-edge);
-    width:33px; height:54px; border:0; border-left:1px solid #ffdc3277;
-    border-radius:0 0 5px 5px; background:transparent;
-    box-shadow:none; font-size:0;
+    width:33px; height:54px; border:0;
+    border-radius:0; background:transparent;
+    box-shadow:none;
   }
-  #worker-bar-handle::before, #inspector-bar-handle::before {
-    content:''; display:block; width:9px; height:9px;
-    border-right:2px solid #ffdf35; border-bottom:2px solid #ffdf35;
-    transform:translateY(-2px) rotate(45deg);
+  #worker-bar-handle svg, #inspector-bar-handle svg {
+    display:block; width:20px; height:20px;
+    fill:none; stroke:#ffdf35; stroke-width:2.5;
+    stroke-linecap:round; stroke-linejoin:round;
   }
-  #game-shell[data-tools-open="false"] #worker-bar-handle::before,
-  #game-shell[data-inspector-open="false"] #inspector-bar-handle::before {
-    transform:translateY(2px) rotate(225deg);
+  #game-shell[data-tools-open="false"] #worker-bar-handle svg,
+  #game-shell[data-inspector-open="false"] #inspector-bar-handle svg {
+    transform:rotate(180deg);
   }
   #worker-bar-handle:focus-visible, #inspector-bar-handle:focus-visible,
   #site-pro-tools:focus-visible, #site-pro-coordinator:focus-visible,
