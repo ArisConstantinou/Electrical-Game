@@ -63,13 +63,60 @@ function gripFrame(group:THREE.Group,direction:Point,rotation?:THREE.Quaternion)
   return group;
 }
 
+function sprayWrapMaterial(): THREE.MeshStandardMaterial {
+  if (typeof document === 'undefined') return mat(0x171d1d, .74);
+  const canvas = document.createElement('canvas');
+  canvas.width = 768; canvas.height = 512;
+  const ink = canvas.getContext('2d');
+  if (!ink) return mat(0x171d1d, .74);
+  ink.fillStyle = '#192120'; ink.fillRect(0, 0, 768, 512);
+  ink.fillStyle = '#e7bd37'; ink.fillRect(0, 0, 768, 41);
+  ink.fillStyle = '#121917'; ink.fillRect(0, 41, 768, 7);
+  ink.fillStyle = '#26322f'; ink.fillRect(200, 62, 368, 345);
+  ink.strokeStyle = '#aeb9aa'; ink.lineWidth = 2; ink.strokeRect(204, 66, 360, 337);
+  ink.fillStyle = '#e7bd37'; ink.fillRect(218, 76, 10, 319);
+  ink.textAlign = 'center'; ink.textBaseline = 'middle';
+  ink.fillStyle = '#f5f0db'; ink.font = '900 57px Arial'; ink.fillText('SITE MARK', 394, 146, 320);
+  ink.fillStyle = '#e7bd37'; ink.font = '900 60px Arial'; ink.fillText('LAYOUT', 394, 220, 310);
+  ink.font = '900 52px Arial'; ink.fillText('SPRAY', 394, 278, 310);
+  ink.strokeStyle = '#d9dfc9'; ink.lineWidth = 4;
+  ink.beginPath(); ink.arc(394, 345, 23, 0, Math.PI * 2); ink.stroke();
+  ink.beginPath(); ink.moveTo(394, 307); ink.lineTo(394, 383); ink.moveTo(356, 345); ink.lineTo(432, 345); ink.stroke();
+  ink.fillStyle = '#f5f0db'; ink.font = '700 20px Arial'; ink.fillText('MASONRY · FIRST FIX', 394, 391, 310);
+  ink.fillStyle = '#d0d7c9'; ink.font = '700 21px Arial';
+  ink.fillText('400 ml  /  FAST DRY', 101, 132, 170);
+  ink.fillText('SHAKE BEFORE USE', 101, 180, 170);
+  ink.fillText('KEEP UPRIGHT', 101, 218, 170);
+  ink.fillText('MARK · CHECK · BUILD', 668, 132, 170);
+  ink.fillText('OUTDOOR GRADE', 668, 180, 170);
+  ink.fillText('BATCH 04 / CY', 668, 218, 170);
+  ink.strokeStyle = '#8a998d'; ink.lineWidth = 1;
+  for (let line = 0; line < 7; line++) {
+    const y = 264 + line * 17;
+    ink.beginPath(); ink.moveTo(22, y); ink.lineTo(175 - line % 3 * 21, y); ink.stroke();
+    ink.beginPath(); ink.moveTo(593, y); ink.lineTo(744 - line % 4 * 17, y); ink.stroke();
+  }
+  // Restrained scuffs in the print are deterministic and stay on the label.
+  for (let mark = 0; mark < 105; mark++) {
+    const x = (mark * 349 + 37) % 768, y = (mark * 173 + 67) % 410;
+    ink.fillStyle = mark % 3 === 0 ? '#f4ead114' : '#0b100e1a';
+    ink.fillRect(x, y, 1 + mark % 3, 1 + mark % 2);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.name = 'Site Mark printed cylindrical label';
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  return new THREE.MeshStandardMaterial({ name: 'Printed worksite aerosol wrap', map: texture, roughness: .72, metalness: .03 });
+}
+
 function spray(): THREE.Group {
   const group = new THREE.Group(), can = new THREE.Group(); group.add(can); can.position.set(.16, -.08, -.03); can.rotation.z = -.14;
-  const aluminium = steel(), black = mat(0x171a18, .42), white = mat(0xe2e1d8, .38);
+  const aluminium = steel(), white = mat(0xe2e1d8, .38);
   // 400 ml-class rolled steel aerosol can, with a real domed valve shoulder.
   const profile = [[0, -.095], [.029, -.095], [.033, -.090], [.0335, -.082], [.0335, .078], [.032, .085], [.027, .092], [.018, .097], [.012, .097]].map(p => new THREE.Vector2(p[0], p[1]));
   part(can, new THREE.LatheGeometry(profile, 40), aluminium, [0, 0, 0], 'Rolled aerosol can and domed shoulder');
-  part(can, new THREE.CylinderGeometry(.0337, .0337, .158, 40, 1, true), black, [0, -.002, 0], 'Black wraparound paint label');
+  const wrap = part(can, new THREE.CylinderGeometry(.0337, .0337, .158, 40, 1, true), sprayWrapMaterial(), [0, -.002, 0], 'Printed cylindrical worksite label');
+  wrap.rotation.y = Math.PI; // Put the UV seam behind the can, away from the printed front.
   torus(can, .0314, .0019, aluminium, [0, -.092, 0], 'Rolled bottom seam', 'y');
   torus(can, .018, .0015, aluminium, [0, .094, 0], 'Valve mounting cup', 'y');
   const color = mat(0x168cdb, .42); color.name = 'Spray selected color';
@@ -78,8 +125,6 @@ function spray(): THREE.Group {
   part(actuator, extrude(roundedRectangle(.029, .019, .007), .026, .001), white, [0, 0, -.002], 'Broad finger press actuator');
   const aperture = part(actuator, new THREE.CylinderGeometry(.0023, .0023, .003, 14), mat(0x101816), [0, -.001, -.0175], 'Forward spray aperture'); aperture.rotation.x = Math.PI / 2;
   torus(actuator, .0042, .001, white, [0, -.001, -.018], 'Nozzle insert rim');
-  const brand = label('SITE MARK', 'SPRAY PAINT', .059, .036, '#ffffff', '#b32927'); if (brand) { brand.position.set(0, .044, .034); can.add(brand); }
-  const info = label('COLOR', '400 ml · MASONRY', .058, .044); if (info) { info.position.set(0, -.005, .034); can.add(info); }
   // Raised bead and metal base remain visible below the glove.
   const front = new THREE.Object3D(); front.name = 'spray-tip'; front.position.set(0, .103, -.020); can.add(front);
   return gripFrame(metadata(group, [.16070, -.07505, -.03], [.175, .021, -.050]),[0,1,0],can.quaternion.clone());

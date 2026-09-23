@@ -1,0 +1,80 @@
+[
+  {
+    "name": "desktop",
+    "viewport": {
+      "width": 1365,
+      "height": 768
+    },
+    "touch": false,
+    "state": {
+      "parts": 21,
+      "triangles": 9644,
+      "grip": [
+        0.1607,
+        -0.07505,
+        -0.03
+      ],
+      "tip": [
+        0.175,
+        0.021,
+        -0.05
+      ],
+      "wrap": true,
+      "wrapPixels": [
+        768,
+        512
+      ],
+      "flatLabels": 0,
+      "gripErrors": [
+        0
+      ],
+      "initialBand": 557006,
+      "changedBand": 15488296,
+      "band": true,
+      "actuator": true,
+      "medianMs": 16.700000000000728,
+      "p95Ms": 16.799999999999272,
+      "renderError": ""
+    },
+    "errors": []
+  },
+  {
+    "name": "portrait",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "touch": true,
+    "state": {
+      "parts": 21,
+      "triangles": 9644,
+      "grip": [
+        0.1607,
+        -0.07505,
+        -0.03
+      ],
+      "tip": [
+        0.175,
+        0.021,
+        -0.05
+      ],
+      "wrap": true,
+      "wrapPixels": [
+        768,
+        512
+      ],
+      "flatLabels": 0,
+      "gripErrors": [
+        0
+      ],
+      "initialBand": 557006,
+      "changedBand": 15488296,
+      "band": true,
+      "actuator": true,
+      "medianMs": 16.69999999999709,
+      "p95Ms": 16.799999999999272,
+      "renderError": ""
+    },
+    "errors": []
+  }
+]

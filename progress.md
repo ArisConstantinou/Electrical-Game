@@ -1433,3 +1433,8 @@ Original prompt for this task: Selecting BOX should show an initial box in the l
 
 - Replaced the retained olive's perfect dark concrete-textured disc with a shallow irregular ground basin using the courtyard's existing photographed gravel and continuous world-aligned UVs. The original walking surface and trunk collider remain unchanged; no new texture or draw call was added.
 - Isolated production build, TypeScript, same-camera desktop/portrait visual comparison, and the four-viewport courtyard route/return/wind/contact regression passed without page errors. The 90-frame headless Chrome intervals remained near 16.7–16.8 ms median/p95, which is not physical-phone evidence. Larger stones, excavation detail, full-mansion visual quality, and integration remain open.
+
+## 2026-09-23 · Full visual overhaul, spray-can printed wrap
+
+- A trial normal map on the destructible work wall passed rendering and actual angled masonry removal, but matched near-camera views changed only faintly, so the trial was removed. The work wall and its pre-existing uncommitted line-ending state were preserved.
+- Replaced the spray can's two hovering rectangular labels with one cylindrical printed wrap, keeping nozzle, selected-colour band, grip and tip locations. Same-camera desktop/portrait isolated-production captures passed without page or render errors; grip error remained zero, colour switching worked, and mesh parts fell 23→21. The 18-state worker/tool browser test passed. Headless Chrome 90-frame median/p95 remained about 16.7–16.8 ms. The broad tool visual smoke still fails on pre-existing fitting-tool grip assumptions and a hidden CSS label; the new spray model itself passed its focused checks. Final tool set, physical mobile and integration remain open.

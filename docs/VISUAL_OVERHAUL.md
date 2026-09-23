@@ -213,6 +213,26 @@ around the trunk. The surface still lacks larger stones, excavation marks and
 the richer environmental composition of the approved concept. The short Chrome
 frame samples remained near 16.7–16.8 ms; this is not physical-mobile proof.
 
+## Ninth isolated implementation: printed spray-can wrap
+
+The aerosol tool no longer has two flat label cards hovering in front of its
+curved body. A single 768×512 printed wrap follows the actual cylinder; its UV
+seam sits behind the can. The metal shoulder, nozzle, selected-colour band,
+actuator, grip and spray-tip anchors remain at their previous positions. The
+model has 21 mesh parts instead of 23, with four fewer triangles.
+
+`spray-wrap-{before,after}-{desktop,portrait}.png` are matching gameplay views
+from the isolated production build. The printed face is partly covered by the
+correct gripping glove in desktop play and outside the normal portrait field
+of view, as it was before this change. The capture script verifies the wrap,
+absence of flat label planes, selected-colour update, zero grip error, preserved
+tip/grip coordinates and no browser render errors. The isolated 18-state
+worker/tool browser test passed with the packaged build. The 90-frame desktop and
+portrait Chrome intervals remained near 16.7–16.8 ms. A broader tool visual
+smoke exposed existing fitting-tool assertions based on the old single-object
+grip and hidden CSS text; it cannot yet be used as an all-tools pass. This is a
+specific model improvement, not full tool/hand or physical-mobile acceptance.
+
 ## Integration boundary
 
 Do not promote this branch or replace the 5365 listener while the active
