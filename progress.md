@@ -1416,3 +1416,10 @@ Original prompt for this task: Selecting BOX should show an initial box in the l
 - Read-only mobile-view inventory found 81 visible PVC shadow casters, mostly the 20 individual original pipes. In an isolated checkout, each pipe now draws one shadow-only mesh while its visible tube and two open ends remain separate and pickable. Bundle spread, editor translation and depletion keep the shadow mesh aligned; the focused four-state test passed.
 - Same-camera 390×844 DPR3 Chrome WebGL stock-view A/B reduced mean draw calls exactly 787.96 → 747.96 across two runs. p95 intervals varied: baseline 76.8/72.0 ms versus candidate 69.7/70.9 ms. Side-by-side screenshots retained the same pipe and wall shadow appearance; this is a local emulation improvement, not proof that the iPhone lag is solved. PVC aiming and bend logic, TypeScript and production build passed.
 - The same change then passed on the sole live 5365 listener: nearby PVC aiming, cart regression, desktop/mobile editor selection, stock translation/rotation/save/reload, and apprentice consumption of all 20 lengths. The five existing saves remain present; the live checkout and build are clean.
+
+## 2026-09-23 · Level Editor history, shortcuts and camera orbit
+
+- Verified port 5365 serves `codex/site-pro-04-pages-release`; reused its listener. The main and wheelbarrow checkouts were left untouched.
+- The editor now opens in 3D ANGLE so left mouse drag orbits. TOP retains left drag pan. Added Ctrl+Z/Ctrl+Shift+Z/Ctrl+Y, Delete, internal Ctrl+C/V for selected walls, slabs and stairs, a 100-entry labeled history list, and selection restoration across undo/redo. Duplicates have new IDs and a 0.5 m offset per paste; authored/runtime-linked assets remain protected from duplication or deletion.
+- Focused desktop and mobile emulation, desktop save/reload/collision test, responsive editor dock test, TypeScript and Vite build passed. The bundled web-game client rendered the active editor without page errors. Screenshots: `artifacts/editor-shortcuts-camera/`.
+- Existing build warnings about cinematic image paths and large chunks remain. No physical phone or publish verification was attempted.

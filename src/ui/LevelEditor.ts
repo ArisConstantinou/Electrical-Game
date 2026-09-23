@@ -139,7 +139,11 @@ export class LevelEditor {
   private pinchZoom: { startSpan: number; startDistance: number; direction: THREE.Vector3 } | null = null;
   private down: { x: number; y: number } | null = null;
   private history: LevelDocument[] = [];
+  private historyLabels: string[] = [];
+  private historySelections: string[][] = [];
   private historyIndex = -1;
+  private copiedStructures: (WallRecord | SurfaceRecord)[] = [];
+  private pasteCount = 0;
   private tab: 'select' | 'build' | 'transform' | 'starts' | 'save' = 'select';
   private viewMode: '3d' | '2d' = '3d';
   private cameraPreset: 'angle' | 'top' | 'front' | 'back' | 'left' | 'right' = 'angle';
@@ -222,7 +226,7 @@ export class LevelEditor {
       <button id="level-view-trigger" type="button" aria-expanded="false" aria-controls="level-view-panel">▤ VIEW · ALL</button><div id="level-view-panel" hidden><div class="level-view__modes"><button type="button" data-level-view="3d">◈ ANGLE</button><button type="button" data-level-view="2d">▤ TOP</button></div><label for="level-floor">VISIBLE FLOOR</label><select id="level-floor"><option value="-1">All floors · 3D only</option><option value="6">B2 · services and stores</option><option value="5">B1 · garage and workshop</option><option value="0">G-0 · ground</option><option value="1">L1 · first</option><option value="2">L2 · second</option><option value="3">L3 · third</option><option value="4">L4 · fourth</option></select><small>Only the selected level is drawn. Drag empty space to pan in top view; pinch to zoom.</small><button id="level-view-close" type="button">⌄ CLOSE VIEW</button></div>
       <div class="level-editor__bar"><button id="level-translate" type="button">MOVE</button><button id="level-rotate" type="button">ROTATE</button><button id="level-scale" type="button">SCALE</button><label><input id="level-snap" type="checkbox" checked> SNAP</label><select id="level-grid" aria-label="Snap spacing"><option value="0.1">10 cm</option><option value="0.25" selected>25 cm</option><option value="0.5">50 cm</option><option value="1">1 m</option></select><button id="level-save" type="button">SAVE</button><button id="level-export" type="button">EXPORT</button></div>
       <aside><label for="level-search">SITE ELEMENTS</label><input id="level-search" type="search" placeholder="Search structures…"><div id="level-list"></div><div class="level-editor__add"><button id="level-add-brick" type="button">+ BRICK WALL</button><button id="level-add-concrete" type="button">+ CONCRETE WALL</button><button id="level-add-floor" type="button">+ FLOOR SLAB</button><button id="level-add-stair" type="button">+ STAIRS</button></div><div class="level-editor__starts"><button id="level-player" type="button">PLAYER START</button><select id="level-apprentice-index" aria-label="Apprentice number"><option value="1">APPRENTICE 1</option><option value="2">APPRENTICE 2</option><option value="3">APPRENTICE 3</option><option value="4">APPRENTICE 4</option><option value="5">APPRENTICE 5</option></select><button id="level-apprentice" type="button">EDIT START</button></div></aside>
-      <section class="level-editor__inspector"><b id="level-name">Select an element</b><p id="level-kind">Tap a structure in the scene or list.</p><div class="level-editor__history"><button id="level-undo" type="button">UNDO</button><button id="level-redo" type="button">REDO</button></div><div class="level-editor__fields"><label>X <input data-axis="x" type="number" step="0.01"></label><label>Y <input data-axis="y" type="number" step="0.01"></label><label>Z <input data-axis="z" type="number" step="0.01"></label><label>WIDTH m <input data-size="x" type="number" min="0.2" step="0.01"></label><label>HEIGHT m <input data-size="y" type="number" min="0.2" step="0.01"></label><label>DEPTH m <input data-size="z" type="number" min="0.05" step="0.01"></label><label>YAW ° <input id="level-yaw" type="number" step="1"></label></div><button id="level-delete" type="button">DELETE ADDED ELEMENT</button><p id="level-status" role="status"></p></section>
+      <section class="level-editor__inspector"><b id="level-name">Select an element</b><p id="level-kind">Tap a structure in the scene or list.</p><div class="level-editor__history"><button id="level-undo" type="button" title="Ctrl+Z">UNDO</button><button id="level-redo" type="button" title="Ctrl+Y / Ctrl+Shift+Z">REDO</button></div><details class="level-editor__history-log"><summary>HISTORY <span id="level-history-count"></span></summary><div id="level-history-list" aria-label="Editor history"></div></details><div class="level-editor__fields"><label>X <input data-axis="x" type="number" step="0.01"></label><label>Y <input data-axis="y" type="number" step="0.01"></label><label>Z <input data-axis="z" type="number" step="0.01"></label><label>WIDTH m <input data-size="x" type="number" min="0.2" step="0.01"></label><label>HEIGHT m <input data-size="y" type="number" min="0.2" step="0.01"></label><label>DEPTH m <input data-size="z" type="number" min="0.05" step="0.01"></label><label>YAW ° <input id="level-yaw" type="number" step="1"></label></div><div class="level-editor__object-actions"><button id="level-copy" type="button" title="Ctrl+C">COPY</button><button id="level-paste" type="button" title="Ctrl+V">PASTE</button><button id="level-delete" type="button" title="Delete / Backspace">DELETE</button></div><p id="level-status" role="status"></p></section>
       <section class="level-editor__save"><b>SAVE LEVEL</b><p>Basic stays unchanged. Save your work as a separate named level.</p><label for="level-slot-name">LEVEL NAME</label><input id="level-slot-name" type="text" maxlength="48" value="My Level"><button id="level-save-mobile" type="button">SAVE LEVEL</button><button id="level-save-as" type="button">SAVE AS NEW COPY</button><button id="level-export-mobile" type="button">EXPORT JSON</button><p id="level-save-status" role="status"></p></section>
       <div id="level-halo" hidden><button id="level-halo-handle" type="button" aria-label="Drag element with current edit tool"><span aria-hidden="true">✥</span></button></div>
       <nav class="level-editor__bottom-nav" aria-label="Level editor navigation"><button id="level-dock-toggle" type="button" aria-label="Hide editor navigation" aria-expanded="true"><span aria-hidden="true"></span></button><button data-editor-tab="select" type="button">VIEW</button><button data-editor-tab="build" type="button">BUILD</button><button data-editor-tab="transform" type="button">EDIT</button><button data-editor-tab="starts" type="button">SCENE</button><button data-editor-tab="save" type="button">SAVE</button></nav>
@@ -238,7 +242,7 @@ export class LevelEditor {
     try { savedMode = localStorage.getItem('wirehouse:level-editor-nav') ?? 'bottom'; } catch { /* Private browsing can deny storage. */ }
     this.setNavMode(savedMode === 'wheel' ? 'wheel' : 'bottom');
     this.setTab('select', false);
-    this.setViewMode('2d');
+    this.setViewMode('3d');
     if (this.template === 'blank') {
       this.playerStart.set(8, this.game.player.eyeHeight, 5);
       this.game.renderer.camera.position.copy(this.playerStart);
@@ -468,6 +472,8 @@ export class LevelEditor {
       if (this.markerSelection === 'apprentice') this.selectMarker('apprentice');
     });
     this.el('#level-delete').addEventListener('click', () => this.deleteSelected());
+    this.el('#level-copy').addEventListener('click', () => this.copySelected());
+    this.el('#level-paste').addEventListener('click', () => this.pasteCopied());
     this.el('#level-snap').addEventListener('change', () => this.setSnap());
     this.el('#level-grid').addEventListener('change', () => this.setSnap());
     this.panel.querySelectorAll<HTMLInputElement>('[data-axis],[data-size],#level-yaw').forEach(input => input.addEventListener('change', () => this.applyFields()));
@@ -608,7 +614,20 @@ export class LevelEditor {
     addEventListener('keydown', event => {
       if (!this.active) return;
       if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); this.close(); }
-      if (event.target instanceof Element && event.target.closest('input,select')) event.stopImmediatePropagation();
+      if (event.target instanceof Element && event.target.closest('input,select,textarea,[contenteditable="true"]')) {
+        event.stopImmediatePropagation();
+        return;
+      }
+      const command = event.ctrlKey || event.metaKey;
+      const key = event.key.toLowerCase();
+      if (command && key === 'z') { this.moveHistory(event.shiftKey ? 1 : -1); }
+      else if (command && key === 'y') { this.moveHistory(1); }
+      else if (command && key === 'c') { this.copySelected(); }
+      else if (command && key === 'v') { this.pasteCopied(); }
+      else if (!command && (event.key === 'Delete' || event.key === 'Backspace')) { this.deleteSelected(); }
+      else return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
     }, true);
     addEventListener('resize', () => this.resize());
   }
@@ -641,15 +660,18 @@ export class LevelEditor {
   }
   private setCameraMode(mode: 'orbit' | 'pan'): void {
     this.cameraMode = mode;
-    this.orbit.touches.ONE = mode === 'pan' ? THREE.TOUCH.PAN : THREE.TOUCH.ROTATE;
-    this.orbit.mouseButtons.LEFT = mode === 'pan' ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE;
+    const pan = this.viewMode === '2d' || mode === 'pan';
+    this.orbit.touches.ONE = pan ? THREE.TOUCH.PAN : THREE.TOUCH.ROTATE;
+    this.orbit.mouseButtons.LEFT = pan ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE;
     const button = this.el<HTMLButtonElement>('#level-camera');
+    button.disabled = this.viewMode === '2d';
     button.setAttribute('aria-pressed', String(mode === 'pan'));
     button.setAttribute('aria-label', mode === 'pan' ? 'Camera pan active; switch to orbit' : 'Camera orbit active; switch to pan');
-    button.title = mode === 'pan' ? 'PAN camera · tap for ORBIT' : 'ORBIT camera · tap for PAN';
+    button.title = this.viewMode === '2d' ? 'TOP pans · choose ANGLE for camera orbit' : mode === 'pan' ? 'PAN camera · tap for ORBIT' : 'ORBIT camera · tap for PAN';
     const mobileButton = this.el<HTMLButtonElement>('#level-camera-mobile');
+    mobileButton.disabled = this.viewMode === '2d';
     mobileButton.setAttribute('aria-pressed', String(mode === 'pan'));
-    mobileButton.textContent = mode === 'pan' ? '✥ PAN CAMERA' : '◎ ORBIT CAMERA';
+    mobileButton.textContent = this.viewMode === '2d' ? '✥ TOP · PAN' : mode === 'pan' ? '✥ PAN CAMERA' : '◎ ORBIT CAMERA';
   }
   private setFieldsMode(mode: 'position' | 'size'): void {
     this.panel.dataset.fieldsMode = mode;
@@ -942,14 +964,25 @@ export class LevelEditor {
     this.status(`Curved wall created as ${sections.length} independently editable sections · radius ${radius.toFixed(2)} m.`);
     this.recordHistory();
   }
-  private recordHistory(): void {
+  private recordHistory(label?: string): void {
     this.syncLiveEquipment();
     const document = this.document();
     if (this.historyIndex >= 0 && JSON.stringify(this.history[this.historyIndex]) === JSON.stringify(document)) return;
+    const previous = this.history[this.historyIndex];
+    if (!label && previous) {
+      const before = new Set([...previous.walls, ...previous.surfaces].map(item => item.id));
+      const after = new Set([...document.walls, ...document.surfaces].map(item => item.id));
+      label = [...after].some(id => !before.has(id)) ? 'Add element'
+        : [...before].some(id => !after.has(id)) ? 'Delete element' : 'Edit scene';
+    }
     this.invalidateEditorShadows();
     this.history = this.history.slice(0, this.historyIndex + 1);
+    this.historyLabels = this.historyLabels.slice(0, this.historyIndex + 1);
+    this.historySelections = this.historySelections.slice(0, this.historyIndex + 1);
     this.history.push(document);
-    if (this.history.length > 100) this.history.shift();
+    this.historyLabels.push(label ?? 'Initial state');
+    this.historySelections.push([...this.selectedObjects].map(item => item.name));
+    if (this.history.length > 100) { this.history.shift(); this.historyLabels.shift(); this.historySelections.shift(); }
     this.historyIndex = this.history.length - 1;
     this.updateHistoryButtons();
   }
@@ -959,12 +992,18 @@ export class LevelEditor {
   }
   private moveHistory(direction: -1 | 1): void {
     const next = this.historyIndex + direction;
+    this.moveHistoryTo(next);
+  }
+  private moveHistoryTo(next: number): void {
     if (next < 0 || next >= this.history.length) return;
     const detailsOpen = this.panel.classList.contains('details-open');
     this.historyIndex = next;
     this.applyDocument(this.history[next]);
     this.applyFloorVisibility();
-    this.setSelection([...this.selectedObjects].filter(item => this.editables().includes(item)), this.activeGroupId && this.groups.has(this.activeGroupId) ? this.activeGroupId : null);
+    const wing = this.game.room.mansionWing;
+    const selection = (this.historySelections[next] ?? []).map(name => wing?.editableWalls.get(name) ?? wing?.editableSurfaces.get(name) ?? wing?.editableAssets.get(name))
+      .filter((item): item is THREE.Group => item instanceof THREE.Group && this.isSelectableVisible(item));
+    this.setSelection(selection);
     if (detailsOpen) this.setDetailsOpen(true);
     this.updateHistoryButtons();
     this.status('Unsaved editor change. SAVE to keep this version.');
@@ -972,6 +1011,17 @@ export class LevelEditor {
   private updateHistoryButtons(): void {
     this.el<HTMLButtonElement>('#level-undo').disabled = this.historyIndex <= 0;
     this.el<HTMLButtonElement>('#level-redo').disabled = this.historyIndex >= this.history.length - 1;
+    this.el('#level-history-count').textContent = `${this.historyIndex + 1}/${this.history.length}`;
+    const list = this.el('#level-history-list');
+    list.replaceChildren();
+    this.historyLabels.forEach((label, index) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = `${index + 1}. ${label}`;
+      button.setAttribute('aria-current', String(index === this.historyIndex));
+      button.addEventListener('click', () => this.moveHistoryTo(index));
+      list.append(button);
+    });
   }
   private setNavMode(mode: 'bottom' | 'wheel'): void {
     this.panel.dataset.navMode = mode;
@@ -991,6 +1041,7 @@ export class LevelEditor {
       this.angleViewTarget.copy(this.orbit.target);
     }
     this.viewMode = mode;
+    this.setCameraMode(this.cameraMode);
     if (mode === '2d' && this.floorIndex < 0) this.setFloorIndex(0);
     this.panel.dataset.view = mode;
     // A straight-down camera needs a horizontal up axis. With world Y as up,
@@ -1808,6 +1859,10 @@ export class LevelEditor {
     if (wallSelected) this.el<HTMLSelectElement>('#level-wall-material').value = this.selected!.userData.levelEditorKind as WallKind;
     else if (this.wallPathActive) this.setWallPathActive(false);
     this.el<HTMLButtonElement>('#level-focus').disabled = !object;
+    this.el<HTMLButtonElement>('#level-copy').disabled = ![...this.selectedObjects].some(item =>
+      this.game.room.mansionWing?.editableWalls.has(item.name) || this.game.room.mansionWing?.editableSurfaces.has(item.name));
+    this.el<HTMLButtonElement>('#level-paste').disabled = this.copiedStructures.length === 0;
+    this.el<HTMLButtonElement>('#level-delete').disabled = ![...this.selectedObjects].some(item => this.added.has(item.name));
     this.el<HTMLButtonElement>('[data-fields-tab="size"]').disabled = Boolean(this.markerSelection) || this.selectedObjects.size > 1 || scaleLocked;
     const group = this.activeGroupId ? this.groups.get(this.activeGroupId) : null;
     this.el('#level-group-edit').hidden = !group;
@@ -1821,7 +1876,6 @@ export class LevelEditor {
       this.el<HTMLInputElement>(`[data-size="${axis}"]`).value = this.selectedObjects.size > 1 ? '' : (Math.abs(object.scale[axis]) * base[['x', 'y', 'z'].indexOf(axis)]).toFixed(2);
     }
     this.el<HTMLInputElement>('#level-yaw').value = THREE.MathUtils.radToDeg(object.rotation.y).toFixed(0);
-    this.el<HTMLButtonElement>('#level-delete').disabled = !this.selected || !this.added.has(this.selected.name);
     if (this.markerSelection) {
       if (this.markerSelection === 'player') {
         this.playerStart.copy(object.position).add(new THREE.Vector3(0, .3, 0));
@@ -1889,21 +1943,67 @@ export class LevelEditor {
     if (!wing) return;
     const id = crypto.randomUUID();
     const surface = wing.addEditorSurface(id, kind);
-    surface.position.set(Math.round(this.orbit.target.x * 4) / 4, this.floorIndex < 0 && kind === 'floor' ? 3.3 : this.floorIndex < 0 ? 0 : this.floorElevation(this.floorIndex), Math.round(this.orbit.target.z * 4) / 4);
+    surface.position.set(Math.round(this.orbit.target.x * 4) / 4, this.floorIndex < 0 ? 0 : this.floorElevation(this.floorIndex), Math.round(this.orbit.target.z * 4) / 4);
     this.added.add(surface.name);
     this.multiMode = false;
     this.selectWall(surface);
     this.status(`${kind === 'floor' ? 'Floor slab' : 'Stairs'} added. Traverse height updates live; SAVE to keep it.`);
     this.recordHistory();
   }
+  private copySelected(): void {
+    const snapshot = this.document();
+    const selected = new Set([...this.selectedObjects].map(item => item.name));
+    this.copiedStructures = [...snapshot.walls, ...snapshot.surfaces]
+      .filter(item => selected.has(item.id)).map(item => structuredClone(item));
+    this.pasteCount = 0;
+    this.el<HTMLButtonElement>('#level-paste').disabled = this.copiedStructures.length === 0;
+    this.status(this.copiedStructures.length
+      ? `${this.copiedStructures.length} structure${this.copiedStructures.length === 1 ? '' : 's'} copied. Ctrl+V places a new editable copy.`
+      : 'Select a wall, floor or stair to copy.');
+  }
+  private pasteCopied(): void {
+    const wing = this.game.room.mansionWing;
+    if (!wing || !this.copiedStructures.length) return;
+    const offset = ++this.pasteCount * .5;
+    const copies: THREE.Group[] = [];
+    for (const record of this.copiedStructures) {
+      const id = crypto.randomUUID();
+      let copy: THREE.Group;
+      if (record.kind === 'brick-wall' || record.kind === 'concrete-wall')
+        copy = wing.addEditorWall(id, record.kind, record.length);
+      else {
+        const surface = record as SurfaceRecord;
+        copy = wing.addEditorSurface(id, surface.kind, surface.width, surface.depth);
+      }
+      copy.position.fromArray(record.position).add(new THREE.Vector3(offset, 0, offset));
+      copy.rotation.y = record.rotationY;
+      copy.scale.fromArray(record.scale);
+      if ('curveShape' in record && validCurvedShape(record.curveShape)) {
+        const shape = structuredClone(record.curveShape);
+        copy.userData.curveShape = shape;
+        if (record.kind === 'concrete-wall') wing.applyEditorConcreteCurve(copy, shape);
+      }
+      this.added.add(copy.name);
+      copies.push(copy);
+    }
+    this.setSelection(copies);
+    this.recordHistory(`Duplicate ${copies.length} structure${copies.length === 1 ? '' : 's'}`);
+    this.status(`${copies.length} editable cop${copies.length === 1 ? 'y' : 'ies'} placed. SAVE to keep them.`);
+  }
   private deleteSelected(): void {
-    if (!this.selected || !this.added.has(this.selected.name)) return;
-    if (this.game.room.mansionWing!.editableWalls.has(this.selected.name)) this.game.room.mansionWing!.removeEditorWall(this.selected);
-    else this.game.room.mansionWing!.removeEditorSurface(this.selected);
-    this.added.delete(this.selected.name);
-    for (const [id, group] of this.groups) { group.members = group.members.filter(name => name !== this.selected?.name); if (group.members.length < 2) this.groups.delete(id); }
+    const wing = this.game.room.mansionWing;
+    if (!wing) return;
+    const removable = [...this.selectedObjects].filter(item => this.added.has(item.name));
+    if (!removable.length) return;
+    const names = new Set(removable.map(item => item.name));
+    for (const item of removable) {
+      if (wing.editableWalls.has(item.name)) wing.removeEditorWall(item);
+      else if (wing.editableSurfaces.has(item.name)) wing.removeEditorSurface(item);
+      this.added.delete(item.name);
+    }
+    for (const [id, group] of this.groups) { group.members = group.members.filter(name => !names.has(name)); if (group.members.length < 2) this.groups.delete(id); }
     this.setSelection([]);
-    this.recordHistory();
+    this.recordHistory(`Delete ${removable.length} structure${removable.length === 1 ? '' : 's'}`);
   }
   private updateStarts(): void {
     this.playerMarker.position.copy(this.playerStart).add(new THREE.Vector3(0, -.3, 0));
@@ -2002,6 +2102,8 @@ export class LevelEditor {
       this.el<HTMLInputElement>('#level-slot-name').value = slot?.name ?? saved.name ?? (id === 'legacy' ? 'Previous project save' : 'Saved Level');
       this.updateStarts();
       this.history = [this.document()];
+      this.historyLabels = ['Loaded level'];
+      this.historySelections = [[]];
       this.historyIndex = 0;
       this.updateHistoryButtons();
       return true;

@@ -33,11 +33,19 @@
 #level-editor .level-editor__inspector p{font-size:12px;color:#d6caba}
 #level-editor .level-editor__history{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0}
 #level-editor .level-editor__history button{min-height:44px}
+#level-editor .level-editor__history-log{margin:0 0 10px;border:1px solid #708083;border-radius:8px;padding:6px}
+#level-editor .level-editor__history-log summary{cursor:pointer;font-size:12px;font-weight:800}
+#level-editor .level-editor__history-log summary span{float:right}
+#level-history-list{display:grid;gap:4px;max-height:145px;overflow:auto;margin-top:6px}
+#level-editor #level-history-list button{text-align:left;min-height:32px;font-size:12px}
+#level-editor #level-history-list button[aria-current=true]{border-color:#ffd18b;background:#9a6234;color:#fff}
+#level-editor .level-editor__object-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin-top:10px}
+#level-editor .level-editor__object-actions button{min-width:0;font-size:11px;font-weight:800}
 #level-editor .level-editor__fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
 #level-editor .level-editor__fields label{font-size:11px;font-weight:700;color:#e7bb7c}
 #level-editor .level-editor__fields input{display:block;width:100%;min-width:0;min-height:38px;padding:6px;background:#f5f2eb;color:#1b2525;border:1px solid #89918f;border-radius:4px;font-size:14px}
 #level-editor.marker-selected .level-editor__fields label:has([data-size]){display:none}
-#level-delete{width:100%;margin-top:10px}
+#level-delete{width:100%;margin:0}
 #level-status{min-height:35px}
 #level-editor .level-editor__save,#level-editor .level-editor__bottom-nav,#level-editor .level-editor__wheel{display:none}
 #level-editor .level-editor__save{position:absolute}
@@ -174,13 +182,12 @@
 #level-fields-tabs{display:none}
 @media(max-width:1100px){
   #level-editor[data-tab=transform] .level-editor__inspector{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));align-content:start;gap:6px}
-  #level-editor .level-editor__inspector b,#level-editor .level-editor__inspector #level-kind,#level-editor #level-fields-tabs,#level-editor .level-editor__fields,#level-editor #level-delete,#level-editor #level-status{grid-column:1/-1}
+  #level-editor .level-editor__inspector b,#level-editor .level-editor__inspector #level-kind,#level-editor #level-fields-tabs,#level-editor .level-editor__fields,#level-editor .level-editor__history-log,#level-editor .level-editor__object-actions,#level-editor #level-status{grid-column:1/-1}
   #level-editor .level-editor__inspector #level-kind{margin:0}
   #level-editor .level-editor__inspector #level-focus{grid-column:1;margin:0;min-height:44px;font-size:0!important}
   #level-editor .level-editor__inspector #level-focus::after{content:'FOCUS';font-size:11px}
   #level-editor .level-editor__inspector .level-editor__history{grid-column:2/4;margin:0;gap:4px}
-  #level-editor[data-tab=transform] #level-delete{grid-column:4;grid-row:3;margin:0;min-height:44px;font-size:0!important}
-  #level-editor[data-tab=transform] #level-delete::after{content:'DELETE';font-size:11px}
+  #level-editor[data-tab=transform] .level-editor__object-actions{grid-column:1/-1;margin:0}
   #level-fields-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:#152328;padding:3px;border:1px solid #526568;border-radius:9px}
   #level-fields-tabs button{min-height:34px;border:0;background:transparent;font-size:11px;font-weight:800}
   #level-fields-tabs button[aria-pressed=true]{background:#9a6234;color:#fff5e6}
@@ -213,11 +220,14 @@
   #level-editor[data-tab=build] #level-selection-actions,#level-editor[data-tab=build] #level-group-list,#level-editor[data-tab=starts] #level-selection-actions,#level-editor[data-tab=starts] #level-group-list{display:none}
   #level-editor #level-group-edit{grid-column:1/-1}
   #level-editor .level-editor__history{order:1}
-  #level-editor #level-fields-tabs{order:2}
-  #level-editor .level-editor__fields{order:3}
-  #level-editor #level-group-edit{order:4}
-  #level-editor #level-status{order:5}
+  #level-editor .level-editor__history-log{order:2}
+  #level-editor .level-editor__object-actions{order:3}
+  #level-editor #level-fields-tabs{order:4}
+  #level-editor .level-editor__fields{order:5}
+  #level-editor #level-group-edit{order:6}
+  #level-editor #level-status{order:7}
   #level-editor .level-editor__inspector b{position:sticky;top:0;z-index:2;padding:5px 7px;background:#213238;border:1px solid #526f76;border-radius:7px}
+  #game-shell #level-editor .level-editor__inspector b{background:#f6f3e7;color:#1d342f;border-color:#81988c}
   #level-editor[data-tab=select] aside{height:min(42vh,380px)}
 }
 
