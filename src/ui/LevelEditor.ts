@@ -158,7 +158,7 @@ export class LevelEditor {
     this.orbit = new OrbitControls(this.camera, canvas);
     this.orbit.target.set(6, 1, 7);
     this.orbit.enableDamping = true;
-    this.orbit.minDistance = 2;
+    this.orbit.minDistance = .45;
     this.orbit.maxDistance = 90;
     this.orbit.enabled = false;
     this.orbit.update();
@@ -531,6 +531,8 @@ export class LevelEditor {
       if (!wing) return;
       const hits = this.raycaster.intersectObjects(this.editables().filter(object => this.isSelectableVisible(object)), true);
       for (const hit of hits) {
+        // Particle effects and hidden children can raycast despite drawing nothing.
+        if (hit.object instanceof THREE.Points || !this.isHitVisible(hit.object)) continue;
         let object: THREE.Object3D | null = hit.object;
         while (object && object !== wing &&
           wing.editableWalls.get(object.name) !== object &&
@@ -1353,6 +1355,11 @@ export class LevelEditor {
         hasVisibleGeometry = true;
     });
     return hasVisibleGeometry;
+  }
+  private isHitVisible(object: THREE.Object3D): boolean {
+    for (let current: THREE.Object3D | null = object; current; current = current.parent)
+      if (!current.visible) return false;
+    return true;
   }
   private syncHighlights(targets: Iterable<THREE.Group>): void {
     const wanted = new Set(targets);

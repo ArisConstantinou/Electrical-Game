@@ -177,9 +177,14 @@ export class MansionGroundWing extends THREE.Group {
     const locked = new Set(lockedObjects);
     const occurrences = new Map<string, number>();
     const residenceRoof = exterior.getObjectByName('Residence roof slab and parapet');
+    const supplies = room.getObjectByName('First-fix supplies at the site perimeter');
     const sources = [
-      ...[...room.children].filter(object => object !== this && object !== exterior)
+      ...[...room.children].filter(object => object !== this && object !== exterior && object !== supplies)
         .map(object => ({ object, parent: room, prefix: 'room-part' })),
+      // PVC Workshop hides this decorative duplicate; the live stock has its own editor actor.
+      ...(supplies instanceof THREE.Group
+        ? [...supplies.children].filter(object => object.userData.studioEntityId !== 'world:site-spare-pvc')
+          .map(object => ({ object, parent: supplies, prefix: 'room-supply' })) : []),
       ...[...exterior.children].filter(object => !/sky gradient/i.test(object.name))
         .map(object => ({ object, parent: exterior, prefix: 'outside-part' })),
       ...(residenceRoof instanceof THREE.Group && residenceRoof.parent instanceof THREE.Group
@@ -211,7 +216,7 @@ export class MansionGroundWing extends THREE.Group {
       pivot.name = id;
       pivot.userData.levelEditorKind = 'asset';
       pivot.userData.levelEditorLabel = `${object.name || 'Site part'}${count > 1 ? ` · ${count}` : ''}`;
-      pivot.userData.levelEditorLocked = locked.has(object) || /first-fix supplies at the site perimeter/i.test(object.name);
+      pivot.userData.levelEditorLocked = locked.has(object);
       pivot.userData.levelEditorGround = /\b(?:ground|terrain|soil|floor)\b/i.test(object.name);
       pivot.userData.baseSize = [Math.max(size.x, .01), Math.max(size.y, .01), Math.max(size.z, .01)];
       pivot.userData.studioEntityId = `mansion:${id}`;
