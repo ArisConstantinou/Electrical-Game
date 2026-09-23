@@ -1,28 +1,50 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
-/** Reusable fired-clay shapes for the occasional handling chip in laid walls.
- * The backing remains the actual wall collider; these cuts affect render only. */
-export function laidClayGeometry(kind: 'sound' | 'small-chip' | 'broken-corner'): THREE.BufferGeometry {
-  if (kind === 'sound') return new THREE.BoxGeometry(1, 1, 1);
-  // Extrude the trimmed outline through the block. The fifth side is the
-  // exposed clay break; moving box vertices would leave an open black slot.
+export type LaidClayWear = 'sound' | 'small-chip-a' | 'small-chip-b' | 'broken-corner';
+
+function chippedOutline(kind: Exclude<LaidClayWear, 'sound'>): THREE.Shape {
   const shape = new THREE.Shape();
-  if (kind === 'small-chip') {
-    shape.moveTo(-.5, -.5); shape.lineTo(.5, -.5);
-    shape.lineTo(.5, .46); shape.lineTo(.465, .5); shape.lineTo(-.5, .5);
-  } else {
-    shape.moveTo(-.45, -.5); shape.lineTo(.5, -.5);
-    shape.lineTo(.5, .5); shape.lineTo(-.5, .5); shape.lineTo(-.5, -.425);
-  }
+  // Handled clay breaks in short, uneven facets. The missing material stays
+  // within the outer skin; a real brick has more clay behind the chip.
+  const edge = kind === 'small-chip-a' ? [
+    [-.5,-.5],[.5,-.5],[.5,.414],[.477,.424],[.466,.455],[.435,.468],[.412,.5],[-.5,.5],
+  ] : kind === 'small-chip-b' ? [
+    [-.432,-.5],[.5,-.5],[.5,.5],[-.5,.5],[-.5,-.402],[-.475,-.416],[-.462,-.461],
+  ] : [
+    [-.5,-.5],[.5,-.5],[.5,.5],[-.36,.5],[-.391,.468],[-.408,.43],[-.445,.404],[-.465,.35],[-.5,.333],
+  ];
+  shape.moveTo(edge[0][0], edge[0][1]);
+  for (const [x, y] of edge.slice(1)) shape.lineTo(x, y);
   shape.closePath();
-  const geometry = new THREE.ExtrudeGeometry(shape, { depth: 1, bevelEnabled: false, steps: 1 });
-  geometry.translate(0, 0, -.5);
-  // ExtrudeGeometry assigns its side faces to material slot 1 by default.
-  // This instanced wall uses one clay material; leave no unbound grey slot.
+  return shape;
+}
+
+/** A shallow clay break with a solid clay core, shared by all wall instances.
+ * The wall collider and mortar remain independent of this render geometry. */
+export function laidClayGeometry(kind: LaidClayWear, alongX = true): THREE.BufferGeometry {
+  const core = new THREE.BoxGeometry(1, 1, kind === 'sound' ? 1 : .894).toNonIndexed();
+  if (kind === 'sound') {
+    if (!alongX) core.rotateY(Math.PI / 2);
+    return core;
+  }
+  const shape = chippedOutline(kind);
+  const front = new THREE.ExtrudeGeometry(shape, { depth: .052, bevelEnabled: false, steps: 1 });
+  front.translate(0, 0, .448);
+  // The opposite face has its own small break, offset from the near face.
+  const rear = new THREE.ExtrudeGeometry(shape, { depth: .052, bevelEnabled: false, steps: 1 });
+  rear.rotateZ(Math.PI);
+  rear.translate(0, 0, -.5);
+  for (const face of [front, rear]) {
+    const uv = face.getAttribute('uv');
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) + .5, uv.getY(i) + .5);
+    uv.needsUpdate = true;
+    face.clearGroups();
+  }
+  const geometry = mergeGeometries([core, front, rear], false);
+  core.dispose(); front.dispose(); rear.dispose();
+  if (!geometry) throw new Error('Could not merge chipped clay geometry');
   geometry.clearGroups();
-  geometry.addGroup(0, geometry.getAttribute('position').count, 0);
-  const uvs = geometry.getAttribute('uv');
-  for (let i = 0; i < uvs.count; i++) uvs.setXY(i, uvs.getX(i) + .5, uvs.getY(i) + .5);
-  uvs.needsUpdate = true;
+  if (!alongX) geometry.rotateY(Math.PI / 2);
   return geometry;
 }

@@ -714,11 +714,9 @@ export class MansionGroundWing extends THREE.Group {
     editable.add(backing);
     const pitch = .38, course = 3 / 23, gap = .006;
     const columns = Math.ceil(length / pitch) + 1, rows = 23;
-    const batches: { matrices: THREE.Matrix4[]; colors: THREE.Color[]; patches: number[] }[] = [
-      { matrices: [], colors: [], patches: [] },
-      { matrices: [], colors: [], patches: [] },
-      { matrices: [], colors: [], patches: [] },
-    ];
+    const wearTypes = ['sound', 'small-chip-a', 'small-chip-b', 'broken-corner'] as const;
+    const batches: { matrices: THREE.Matrix4[]; colors: THREE.Color[]; patches: number[] }[] =
+      wearTypes.map(() => ({ matrices: [], colors: [], patches: [] }));
     const matrix = new THREE.Matrix4(), quaternion = new THREE.Quaternion(), tint = new THREE.Color();
     const wallSeed = [...name].reduce((hash, char) => Math.imul(hash ^ char.charCodeAt(0), 16777619), 2166136261) >>> 0;
     for (let row = 0; row < rows; row++) for (let col = 0; col < columns; col++) {
@@ -740,7 +738,7 @@ export class MansionGroundWing extends THREE.Group {
       const position = new THREE.Vector3(alongX ? coordinate : relief, (bottom + top) / 2, alongX ? relief : coordinate);
       const size = new THREE.Vector3(alongX ? span : .24, span ? top - bottom : 0, alongX ? .24 : span);
       const wear = (Math.imul(row + 1, 2246822519) ^ Math.imul(col + 1, 3266489917) ^ wallSeed) >>> 0;
-      const variant = wear % 100 < 4 ? 2 : wear % 100 < 23 ? 1 : 0;
+      const variant = wear % 100 < 4 ? 3 : wear % 100 < 14 ? 2 : wear % 100 < 24 ? 1 : 0;
       const batch = batches[variant];
       batch.matrices.push(matrix.compose(position, quaternion, size).clone());
       const warmth = ((row * 19 + col * 31) % 13) / 12;
@@ -749,10 +747,10 @@ export class MansionGroundWing extends THREE.Group {
     }
     for (const [index, batch] of batches.entries()) {
       if (!batch.matrices.length) continue;
-      const geometry = laidClayGeometry(index === 0 ? 'sound' : index === 1 ? 'small-chip' : 'broken-corner');
+      const geometry = laidClayGeometry(wearTypes[index], alongX);
       geometry.setAttribute('brickPatch', new THREE.InstancedBufferAttribute(new Float32Array(batch.patches), 4));
       const bricks = new THREE.InstancedMesh(geometry, masonryFaceMaterial, batch.matrices.length);
-      bricks.name = `${name} · ${index === 0 ? 'sound clay units' : index === 1 ? 'lightly chipped units' : 'broken corners'}`;
+      bricks.name = `${name} · ${index === 0 ? 'sound clay units' : index === 1 ? 'lightly chipped units A' : index === 2 ? 'lightly chipped units B' : 'broken corners'}`;
       bricks.castShadow = bricks.receiveShadow = true;
       for (let i = 0; i < batch.matrices.length; i++) {
         bricks.setMatrixAt(i, batch.matrices[i]);

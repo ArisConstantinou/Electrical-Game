@@ -68,7 +68,7 @@ try {
       game.room.mansionWing?.traverse(object => {
         if (!object.isInstancedMesh) return;
         if (object.name.endsWith('sound clay units')) clayBatches.sound += object.count;
-        if (object.name.endsWith('lightly chipped units')) clayBatches.light += object.count;
+        if (object.name.includes('lightly chipped units')) clayBatches.light += object.count;
         if (object.name.endsWith('broken corners')) clayBatches.broken += object.count;
       });
       return { camera: game.player.camera.getWorldPosition(game.player.camera.position.clone()).toArray(), roofs,
@@ -92,7 +92,7 @@ try {
       } else assert(Math.abs(state.roomSlabY - 3.08) < .01);
     }
     let editorCycle = null;
-    if (variant === 'after' && view.name === 'garage-ceiling') {
+    if ((variant === 'after' || process.argv.includes('--editor-cycle')) && view.name === 'garage-ceiling') {
       editorCycle = await page.evaluate(async () => {
         const game = window.__wireTheHouse;
         const roof = game.room.mansionWing.getObjectByName('Continuous cast garage roof panel around existing L1 floor');
