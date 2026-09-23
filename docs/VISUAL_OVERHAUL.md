@@ -61,6 +61,28 @@ p95 33.4 ms; that run cannot establish physical-phone performance. The prop
 improves scene specificity but is not yet a final-quality workroom or proof of
 whole-game visual fidelity.
 
+## Second isolated implementation
+
+The held drill now loads the CC0 1K Poly Haven Drill 01 mesh and PBR textures as
+a visual shell. The original grip, trigger and spinning bit remain in place. The
+asset adds 2,926 triangles and about 501 KB of source files, replacing 49 visible
+procedural body parts when loaded. If loading fails, the old tool remains usable.
+The same-camera `artifacts/visual-overhaul/drill-before.png` and `drill-after.png`
+show the visual change. `drill-mobile-viewport.png` is a 390 × 844 emulation
+capture. In browser checks, the tool-tip world position was identical with the
+shell shown and hidden, the trigger and motor objects remained present, and no
+page errors appeared. A short 90-frame headless Chrome comparison again measured
+median 16.7 ms and p95 33.4 ms in both modes. This is not physical-phone proof.
+
+The existing photographed brick diffuse map now has its matching 1K OpenGL
+normal map on side, rear and ceiling clay courses. The shader samples the same
+mortar-free crop as its color map and uses restrained normal strength. The
+matching close-camera comparison is `brick-normal-before.png` and
+`brick-normal-after.png`. It adds surface relief under raking light, although
+the room still has much less geometry, natural wear and prop density than the
+approved concept. The main destructible work wall uses a separate shader and
+has not yet received this normal response.
+
 ## Integration boundary
 
 Do not promote this branch or replace the 5365 listener while the active
