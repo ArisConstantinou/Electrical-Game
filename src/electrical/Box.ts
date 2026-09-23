@@ -33,9 +33,27 @@ export class ElectricalBox extends THREE.Group {
     const rim = 0.006;
     const rimDepth = 0.006;
     const bodyDepth = this.depth - rimDepth;
-    const back = mesh(new THREE.BoxGeometry(this.width - wall * 2, this.height - wall * 2, wall), innerPlastic);
+    const entryXs = this.kind === '2G' ? [-this.width * .25, this.width * .25] : [0];
+    const backShape = new THREE.Shape();
+    const backHalfWidth = this.width / 2 - wall, backHalfHeight = this.height / 2 - wall;
+    backShape.moveTo(-backHalfWidth, -backHalfHeight);
+    backShape.lineTo(backHalfWidth, -backHalfHeight);
+    backShape.lineTo(backHalfWidth, backHalfHeight);
+    backShape.lineTo(-backHalfWidth, backHalfHeight);
+    backShape.closePath();
+    for (const x of entryXs) {
+      const opening = new THREE.Path();
+      opening.absarc(x, -this.height * .22, .0075, 0, Math.PI * 2, true);
+      backShape.holes.push(opening);
+    }
+    const backGeometry = new THREE.ExtrudeGeometry(backShape, { depth: wall, bevelEnabled: false, curveSegments: 20 });
+    backGeometry.translate(0, 0, -wall / 2);
+    backGeometry.clearGroups();
+    backGeometry.addGroup(0, backGeometry.getAttribute('position').count, 0);
+    const back = mesh(backGeometry, innerPlastic);
     back.position.z = -this.depth + wall / 2;
-    back.name = 'Box back wall';
+    back.name = 'Moulded box back with open cable entries';
+    back.userData.cableEntryCount = entryXs.length;
     this.add(back);
 
     const sideGeometry = new THREE.BoxGeometry(wall, this.height - wall * 2, bodyDepth);
@@ -65,7 +83,7 @@ export class ElectricalBox extends THREE.Group {
 
     const knockoutMaterial = new THREE.MeshStandardMaterial({ color: 0xb8b4a9, roughness: 0.88 });
     const knockoutGeometry = new THREE.TorusGeometry(0.009, 0.0015, 6, 16);
-    for (const x of this.kind === '2G' ? [-this.width * 0.25, this.width * 0.25] : [0]) {
+    for (const x of entryXs) {
       const knockout = mesh(knockoutGeometry, knockoutMaterial);
       knockout.position.set(x, -this.height * 0.22, -this.depth + wall + 0.0006);
       knockout.name = '20 mm knockout';

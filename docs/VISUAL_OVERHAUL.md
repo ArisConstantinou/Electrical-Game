@@ -270,9 +270,29 @@ visual or performance acceptance.
 The subsequent electrical references show recessed DB and switch/socket boxes
 at different build stages: molded mounting bosses, actual cable entries,
 fasteners, DIN rails, breaker rows, terminal bars, wire routing and surrounding
-plaster damage. Current 1G/2G models have only partial molded detail and
-decorative knockout rings, while no modeled DB exists yet. These remain
+plaster damage. At this stage the 1G/2G models had only partial molded detail
+and decorative knockout rings, while no modeled DB existed. These remain
 required visual and interaction slices rather than completed work.
+
+## Eleventh isolated implementation: molded cable entries in 1G/2G boxes
+
+The box back now has real circular openings within the established 74×74×37 mm
+and 134×74×37 mm casings: one in a 1G module, two in a 2G module. The existing
+rounded entry lips, screw bosses, front rim and fit envelope remain. The open
+back reveals the chased masonry at this first-fix stage; cables and finished
+faceplates are reserved for later stages shown in the user's references. Each
+back panel replaces one old mesh with one new mesh, with 176/340 triangles
+instead of the former 12 triangles and no added draw call per box.
+
+`box-B-after.png`/`box-C-after.png` and the corresponding `box-*-entry-after.png`
+show the same box inspection camera before/after; the held spray pose differs
+because the glove/tool source also changed between these captures. The new
+390×844 mobile Chrome viewport capture, real geometry raycast (the central
+entry is open while the surrounding shell remains solid), and box-fit preflight
+passed. The 90-frame headless Chrome sample had 16.7 ms median and 33.4 ms p95
+with the detail meshes both hidden and shown, but this was not a same-build
+before/after panel benchmark or a physical-device result. DB, wired box states,
+plaster transitions and final electrical finish remain open.
 
 ## Integration boundary
 

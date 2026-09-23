@@ -4,6 +4,7 @@ import { chromium } from 'playwright';
 
 const root = path.resolve('dist');
 const output = path.resolve('artifacts/visual-overhaul');
+const suffix = process.argv[2] ? `-${process.argv[2].replaceAll(/[^a-z0-9-]/gi, '')}` : '';
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const page = await browser.newPage({ viewport: { width: 1365, height: 768 }, deviceScaleFactor: 1 });
 const errors = [];
@@ -26,7 +27,7 @@ await page.route('http://127.0.0.1:5365/Electrical-Game/**', async route => {
 });
 try {
   await page.goto('http://127.0.0.1:5365/Electrical-Game/');
-  await page.locator('#start-button').click({ timeout: 30000 });
+  await page.locator('#start-button').click({ timeout: 120000 });
   await page.waitForTimeout(3500);
   // Asset inspection uses a fixed work camera; gameplay collision is checked
   // separately and the shared server state is never changed.
@@ -67,7 +68,7 @@ try {
         widthM: point.boxGroup.groupWidth, heightM: point.boxGroup.groupHeight };
     }, id);
     await page.waitForTimeout(600);
-    await page.screenshot({ path: path.join(output, `box-${id}-before.png`) });
+    await page.screenshot({ path: path.join(output, `box-${id}${suffix}-before.png`) });
     await page.evaluate(id => {
       const point = window.__wireTheHouse.mission.points.find(item => item.definition.id === id);
       point.boxGroup.traverse(object => {
@@ -75,7 +76,7 @@ try {
       });
     }, id);
     await page.waitForTimeout(500);
-    await page.screenshot({ path: path.join(output, `box-${id}-after.png`) });
+    await page.screenshot({ path: path.join(output, `box-${id}${suffix}-after.png`) });
     captures.push(state);
   }
   const timing = await page.evaluate(async () => {
@@ -105,7 +106,7 @@ try {
   });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForTimeout(450);
-  await page.screenshot({ path: path.join(output, 'box-C-mobile-viewport.png') });
+  await page.screenshot({ path: path.join(output, `box-C${suffix}-mobile-viewport.png`) });
   const held = await page.evaluate(() => {
     const game = window.__wireTheHouse;
     game.selectTool('fitting');
@@ -129,8 +130,8 @@ try {
     game.player.camera.rotation.set(game.player.pitch, 0, 0);
   });
   await page.waitForTimeout(800);
-  await page.screenshot({ path: path.join(output, 'box-C-gameplay-mobile.png') });
-  await fs.writeFile(path.join(output, 'box-detail-check.json'),
+  await page.screenshot({ path: path.join(output, `box-C${suffix}-gameplay-mobile.png`) });
+  await fs.writeFile(path.join(output, `box-detail-check${suffix}.json`),
     JSON.stringify({ captures, timing, held, errors }, null, 2));
   if (errors.length || captures.some(capture =>
     capture.details !== capture.boxes * 3 || !capture.detailBoundsInside) ||
