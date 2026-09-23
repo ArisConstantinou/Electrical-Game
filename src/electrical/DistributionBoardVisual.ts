@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
 // A visual reference for two construction states. Circuit ratings, connections
 // and protective-device selection are deliberately outside this model.
@@ -13,12 +14,16 @@ const steel = new THREE.MeshStandardMaterial({ color: 0x929b9c, metalness: .74, 
 const breaker = new THREE.MeshStandardMaterial({ color: 0xe4e5e1, roughness: .7 });
 const breakerShade = new THREE.MeshStandardMaterial({ color: 0xbec3c3, roughness: .8 });
 const blueToggle = new THREE.MeshStandardMaterial({ color: 0x326585, roughness: .55 });
+const leverRecess = new THREE.MeshStandardMaterial({ color: 0x929a9b, roughness: .86 });
+const indicator = new THREE.MeshStandardMaterial({ color: 0xbd773d, roughness: .72 });
+const conduit = new THREE.MeshStandardMaterial({ color: 0xe3e2d9, roughness: .82, side: THREE.DoubleSide });
 const voidMaterial = new THREE.MeshStandardMaterial({ color: 0x42474b, roughness: 1 });
 const copper = new THREE.MeshStandardMaterial({ color: 0xac8153, metalness: .64, roughness: .42 });
 const conductor = {
   line: new THREE.MeshStandardMaterial({ color: 0x735344, roughness: .76 }),
   neutral: new THREE.MeshStandardMaterial({ color: 0x315d91, roughness: .76 }),
-  earth: new THREE.MeshStandardMaterial({ color: 0xc6bb40, roughness: .76 }),
+  earth: new THREE.MeshStandardMaterial({ color: 0x328349, roughness: .76 }),
+  earthStripe: new THREE.MeshStandardMaterial({ color: 0xc6bb40, roughness: .76 }),
 };
 
 function part(parent: THREE.Group, name: string, geometry: THREE.BufferGeometry,
@@ -47,6 +52,59 @@ function lead(parent: THREE.Group, name: string, material: THREE.Material,
   points: [number, number, number][], radius = .0024): void {
   const curve = new THREE.CatmullRomCurve3(points.map(([x, y, z]) => new THREE.Vector3(x, y, z)));
   part(parent, name, new THREE.TubeGeometry(curve, 20, radius, 5, false), material, 0, 0, 0);
+}
+
+function bottomWithRealEntries(parent: THREE.Group): void {
+  // The cable mouths go through the bottom return, as in the site photo.
+  // They are holes in the panel geometry, never dark discs laid on its face.
+  const shape = new THREE.Shape();
+  shape.moveTo(-.305, -.0415);
+  shape.lineTo(.305, -.0415);
+  shape.lineTo(.305, .0415);
+  shape.lineTo(-.305, .0415);
+  shape.closePath();
+  for (let i = 0; i < 7; i++) {
+    const hole = new THREE.Path();
+    hole.absarc(-.225 + i * .075, 0, .017, 0, Math.PI * 2, true);
+    shape.holes.push(hole);
+  }
+  const returnPanel = part(parent, 'Perforated cabinet bottom return',
+    new THREE.ExtrudeGeometry(shape, { depth: .009, bevelEnabled: false, curveSegments: 20 }),
+    cabinet, 0, -.3865, -.039);
+  returnPanel.rotation.x = -Math.PI / 2;
+  for (let i = 0; i < 7; i++) {
+    const x = -.225 + i * .075;
+    const rim = part(parent, 'Pressed cable-entry lip',
+      new THREE.TorusGeometry(.017, .0015, 6, 20), steel, x, -.376, -.039);
+    rim.rotation.x = -Math.PI / 2;
+    if (![0, 2, 5].includes(i)) continue;
+    const sleeve = part(parent, 'Open first-fix conduit sleeve',
+      new THREE.CylinderGeometry(.0118, .0118, .051, 20, 1, true), conduit,
+      x, -.383, -.039);
+    sleeve.castShadow = false;
+    const mouth = part(parent, 'Conduit mouth with hollow centre',
+      new THREE.TorusGeometry(.0115, .0023, 6, 20), conduit, x, -.356, -.039);
+    mouth.rotation.x = -Math.PI / 2;
+  }
+}
+
+function pressedBackDetails(parent: THREE.Group): void {
+  // Shallow manufacturing features remain behind the rails and fit the empty
+  // first-fix enclosure too: folded stiffeners, standoffs and scored knockouts.
+  for (const x of [-.245, .245]) {
+    box(parent, 'Cabinet back pressed stiffener', .012, .68, .003, cabinet, x, 0, -.075);
+    for (const y of [-.30, .30]) {
+      round(parent, 'DIN support standoff', .0075, .005, steel, x, y, -.071);
+      round(parent, 'Support screw head', .003, .001, voidMaterial, x, y, -.067);
+    }
+  }
+  for (const y of [-.315, .315])
+    box(parent, 'Cabinet back folded stiffener', .50, .008, .003, cabinet, 0, y, -.075);
+  for (const x of [-.17, .0, .17]) {
+    const score = part(parent, 'Unpunched rear knockout score',
+      new THREE.TorusGeometry(.018, .0008, 5, 20), steel, x, .335, -.075);
+    score.castShadow = false;
+  }
 }
 
 function plasterReveal(parent: THREE.Group): void {
@@ -126,10 +184,13 @@ function breakerRow(parent: THREE.Group, y: number, count: number, startX: numbe
   for (let i = 0; i < count; i++) {
     const x = startX + i * moduleWidth;
     xValues.push(x);
-    box(parent, 'DIN mounted protective device casing', .0315, .073, .061, breaker, x, y, .006);
+    part(parent, 'DIN mounted protective device casing',
+      new RoundedBoxGeometry(.0315, .073, .061, 2, .0016), breaker, x, y, .006);
     box(parent, 'Lower terminal moulding', .030, .014, .004, breakerShade, x, y - .025, .039);
+    box(parent, 'Recessed lever well', .020, .019, .001, leverRecess, x, y - .008, .038);
     box(parent, 'Blue device lever', .017, .013, .009, blueToggle, x, y - .008, .043);
     box(parent, 'Lever hinge shadow', .020, .002, .001, voidMaterial, x, y - .015, .048);
+    box(parent, 'Warm lever status strip', .018, .0018, .001, indicator, x, y - .018, .047);
     round(parent, 'Upper terminal screw', .003, .002, steel, x, y + .028, .040);
     round(parent, 'Lower terminal screw', .003, .002, steel, x, y - .031, .040);
     box(parent, 'Unmarked device legend field', .024, .012, .0006, plaster, x, y + .010, .037);
@@ -177,17 +238,14 @@ export function createDistributionBoardVisual(stage: BoardVisualStage): THREE.Gr
 
   // Recessed enclosure and rail supports: the open front shows actual depth.
   box(root, 'Recessed cabinet back', .604, .764, .009, inner, 0, 0, -.082);
+  pressedBackDetails(root);
   for (const x of [-.302, .302]) box(root, 'Cabinet side return', .009, .764, .083, cabinet, x, 0, -.039);
-  for (const y of [-.382, .382]) box(root, 'Cabinet top or bottom return', .61, .009, .083, cabinet, 0, y, -.039);
+  box(root, 'Cabinet top return', .61, .009, .083, cabinet, 0, .382, -.039);
+  bottomWithRealEntries(root);
   for (const x of [-.30, .30]) box(root, 'Cabinet front lip', .014, .778, .004, cabinet, x, 0, .004);
   for (const y of [-.388, .388]) box(root, 'Cabinet front lip', .612, .014, .004, cabinet, 0, y, .004);
   for (const x of [-.275, .275]) for (const y of [-.35, .35]) {
     round(root, 'Cabinet fixing screw', .004, .002, steel, x, y, -.073);
-  }
-  for (let i = 0; i < 7; i++) {
-    const x = -.225 + i * .075;
-    round(root, 'Bottom conduit entry', .017, .001, voidMaterial, x, -.371, -.034);
-    round(root, 'Pressed conduit collar', .020, .002, steel, x, -.368, -.034);
   }
   if (stage === 'first-fix') {
     root.userData.circuitDesignAssigned = false;
@@ -221,8 +279,14 @@ export function createDistributionBoardVisual(stage: BoardVisualStage): THREE.Gr
   }
   for (let i = 0; i < 8; i++) {
     const x = -.19 + i * .055;
-    lead(root, 'Earth return to right terminal bar', conductor.earth,
-      [[x, -.35, -.019], [x + .02, -.30, -.010], [.235, -.25 + i * .025, .025], [.267, -.266 + i * .027, .049]], .0016);
+    const y = -.266 + i * .027;
+    const points: [number, number, number][] = [
+      [x, -.35, -.019], [x + .014, -.305, -.012], [.222, -.30 + i * .002, .002],
+      [.238, y, .024], [.267, y, .049],
+    ];
+    lead(root, 'Green earth conductor to side terminal bar', conductor.earth, points, .0018);
+    lead(root, 'Yellow marking along earth conductor', conductor.earthStripe,
+      points.map(([px, py, pz]) => [px, py, pz + .0015]), .0007);
   }
   root.userData.circuitDesignAssigned = false;
   batchStaticVisual(root);
