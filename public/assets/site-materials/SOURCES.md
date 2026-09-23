@@ -1,4 +1,4 @@
-The optimized 512 px albedo maps in this directory come from Poly Haven
+The photographed source assets in this directory come from Poly Haven
 and are licensed CC0: https://polyhaven.com/license
 
 - `concrete_floor-albedo-512.webp`: https://polyhaven.com/a/concrete_floor
@@ -12,6 +12,7 @@ and are licensed CC0: https://polyhaven.com/license
 - `gravelly_sand-albedo-512.webp`: https://polyhaven.com/a/gravelly_sand — 2.5 m-wide CC0 ground scan, also used on the modeled outdoor courtyard and planted verge at that physical scale.
 - `bark-willow-512.webp`: https://polyhaven.com/a/bark_willow_02 — CC0 willow-bark diffuse scan by Charlotte Baglioni, reduced from the official 1K JPG (MD5 `384e25dd87b6b606458c9aa5f84735aa`) to an 82 KB WebP. Adapted as weathered grey olive bark; it is not a species-specific olive scan.
 - `wooden_planks-albedo-512.webp` and `wooden_planks-normal-512.webp`: CC0 diffuse and OpenGL normal maps from https://polyhaven.com/a/wooden_planks, reduced from official 1K JPG files to 512 px WebP for the temporary electrician workbench.
+- `coral-stone-wall-diff-2k.webp`, `coral-stone-wall-normal-1k.webp` and `coral-stone-wall-height-1k.webp`: CC0 diffuse, OpenGL normal and displacement maps from https://polyhaven.com/a/coral_stone_wall, converted from the official 2K/1K files to WebP without painting new stones. Used on the 60 m photographed fieldstone boundary, whose front and rear are real displacement-mapped meshes; 3D cap stones and a structural core remain separate.
 - `../masonry/red-brick-polyhaven-1k.jpg`: https://polyhaven.com/a/red_brick — 1K diffuse map by Rob Tuytel, CC0. Interior and courtyard clay units sample deterministic, mortar-free portions of the photographed brick faces; physical game geometry supplies the joints.
 - `../masonry/red-brick-normal-1k.webp`: matching CC0 OpenGL normal from https://polyhaven.com/a/red_brick, encoded from the official 1K JPG as a 301 KB WebP. Each visible clay face samples the same mortar-free crop as its diffuse map.
 - `../masonry/brick-face-site.webp`: existing generated Site Pro clay-face study, not a scanned photograph. The shader samples only its clay interior and mixes it with the varied CC0 brick photographs; its baked lower mortar edge is excluded, so physical joints remain separate.

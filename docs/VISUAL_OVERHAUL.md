@@ -1,5 +1,27 @@
 # Electrical-Game visual overhaul
 
+## Fieldstone site boundary, 2026-09-24
+
+The long low boundary beside the mansion previously rendered as 240 identical
+dark rectangular stone boxes. The approved exterior concept instead shows
+light irregular Cypriot fieldstone. The replacement is a 60 m core with
+photographed CC0 stone on real front and rear displacement-mapped faces, a
+continuous stone crown and 108 varied solid coping stones. The source scan,
+normal and height map are recorded in `public/assets/site-materials/SOURCES.md`.
+The three optimized textures total about 1.27 MB on disk. The wall remains a
+single selectable Studio asset; the playable route and wall gameplay were not
+altered.
+
+Matching 1366×768 desktop and 390×844 Chrome portrait views, plus the raw
+comparison samples, are in `artifacts/limestone-boundary/`. The desktop camera changed from 154 draw
+calls and 685,231 triangles to 157 and 702,559; portrait changed from 96 and
+497,630 to 99 and 514,958. At the same camera the short 100-frame Chrome
+samples stayed at 16.7 ms median and 16.8 ms p95 before/after; these
+vsync-limited intervals do not prove unchanged GPU load or physical-phone
+performance. The darker rectangle and box repetition are visibly reduced, but
+the wider terrain, neighbouring structures and full approved concept remain
+unfinished.
+
 ## Human-laid brick face atlas across the playable site, 2026-09-23
 
 The main breakable wall, side/rear room courses, exterior masonry and mansion

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { siteMaterial } from './SiteMaterials';
+import { createFieldstoneBoundary } from './FieldstoneBoundary';
 
 /** Geometry beyond the open mansion terraces; no sky photograph or flat backdrop. */
 export class MansionSurroundings extends THREE.Group {
@@ -137,29 +138,7 @@ export class MansionSurroundings extends THREE.Group {
   }
 
   private addRetainingWall(): void {
-    const stone = siteMaterial('concrete', 0xa99f8a, 1.1, 2.1);
-    const backing = new THREE.Mesh(new THREE.BoxGeometry(.38, .86, 60), stone);
-    backing.name = 'Actual low field-boundary masonry beyond mansion';
-    backing.position.set(24.2, .36, 8);
-    backing.castShadow = backing.receiveShadow = true;
-    backing.raycast = () => undefined;
-    this.add(backing);
-    const units = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), stone, 240);
-    units.name = 'Irregular individual field-boundary stones';
-    const matrix = new THREE.Matrix4(), color = new THREE.Color();
-    for (let row = 0; row < 4; row++) for (let col = 0; col < 60; col++) {
-      const index = row * 60 + col;
-      const z = -21.5 + col * 1.0 + (row % 2) * .12;
-      const width = .84 + .12 * Math.sin(index * 1.93);
-      units.setMatrixAt(index, matrix.compose(new THREE.Vector3(23.94, .08 + row * .21, z),
-        new THREE.Quaternion(), new THREE.Vector3(.17, .19, width)));
-      const shade = .84 + ((index * .6180339) % 1) * .16;
-      units.setColorAt(index, color.setRGB(shade, shade * .98, shade * .94));
-    }
-    units.castShadow = units.receiveShadow = true;
-    units.raycast = () => undefined;
-    units.computeBoundingSphere();
-    this.add(units);
+    this.add(createFieldstoneBoundary());
   }
 
   private addOliveGrove(source: THREE.Object3D | null): void {

@@ -1,5 +1,11 @@
 Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web game named WIRE THE HOUSE, based on real Cyprus residential first-fix practices, editable in Web Game Studio, playable on desktop/mobile, deployed to arisconstantinou/Electrical-Game via GitHub Pages, and ending at FIRST FIX COMPLETE without cable pulling.
 
+## 2026-09-24 · Full visual goal: fieldstone perimeter slice
+
+- Isolated branch `codex/limestone-boundary` from integrated `383beff`. The sole 5365 listener was preserved for the same-camera baseline.
+- Replaced the dark repeated 60 m site-boundary boxes with CC0 scanned fieldstone on displaced front/rear geometry and individually varied cap stones. See `docs/VISUAL_OVERHAUL.md` and matching captures/profiles under `artifacts/limestone-boundary/`.
+- Studio selection, TypeScript, production build, gameplay view and the same-camera desktop/portrait Chrome comparison passed with the optimized WebP assets. The brief vsync-limited sample does not prove physical-device GPU performance. Promotion to the sole 5365 checkout and live gameplay route are next. Whole-game visual quality remains the active goal.
+
 ## 2026-09-23 · Distribution-board physical entries and visual hardware
 
 - In isolated `codex/db-hardware-visual`, replaced fake bottom entry discs with seven perforations, three open sleeves, pressed entry lips and cabinet-back supports. Fitted Inspector stage also has more modeled device faces and two-tone earth conductor marking; there is no circuit or gameplay installation.
