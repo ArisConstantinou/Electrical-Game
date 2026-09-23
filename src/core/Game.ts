@@ -459,6 +459,10 @@ export class Game {
       this.modelInspector.update(dt);if(present)this.renderer.render();return;
     }
     this.modelInspector.beforeWorld(dt);
+    this.room.mansionWing?.updateGameplayVisibility(
+      this.player.camera.position.x, this.player.camera.position.z,
+      this.player.camera.position.y - this.player.eyeHeight,
+    );
     this.room.update(dt);
     this.hammerWorkStance.restore(this.renderer.camera);
     const active = this.mission.activePoint;

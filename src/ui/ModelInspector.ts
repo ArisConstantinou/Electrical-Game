@@ -39,6 +39,7 @@ export class ModelInspector {
   private aimMode=false;
   private statsTime=0;
   private openButton=document.createElement('button');
+  private opening=false;
 
   constructor(private game:Game){
     this.scene.background=new THREE.Color('#dfe7ea');
@@ -102,12 +103,17 @@ export class ModelInspector {
   private status(message:string):void{this.el('#model-status').textContent=message;}
 
   async open():Promise<void>{
-    if(this.active||!this.game.workerBody.loaded)return;
-    await this.game.renderer.waitForFrame();
-    this.active=true;this.panel.hidden=false;this.game.input.resetTransientInput();this.game.mortar.cancel();if(document.pointerLockElement)document.exitPointerLock();
-    this.game.hud.shell.classList.add('model-open');this.game.renderer.modelScene=this.scene;this.game.renderer.viewCamera=this.camera;
-    this.buildLibrary();this.resize();this.controls.enabled=true;this.el('#model-close').focus();
-    await this.select('character');
+    if(this.active||this.opening)return;
+    this.opening=true;
+    try{
+      await this.game.workerBody.ready;
+      await this.game.renderer.waitForFrame();
+      this.active=true;this.panel.hidden=false;this.game.input.resetTransientInput();this.game.mortar.cancel();if(document.pointerLockElement)document.exitPointerLock();
+      this.game.hud.shell.classList.add('model-open');this.game.renderer.modelScene=this.scene;this.game.renderer.viewCamera=this.camera;
+      dispatchEvent(new CustomEvent('wirehouse:model-inspector-open'));
+      this.buildLibrary();this.resize();this.controls.enabled=true;this.el('#model-close').focus();
+      await this.select('character');
+    }finally{this.opening=false;}
   }
   close():void{
     this.setLive(false);this.active=false;this.panel.hidden=true;this.controls.enabled=false;this.game.input.resetTransientInput();

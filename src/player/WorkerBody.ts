@@ -23,7 +23,12 @@ export class WorkerBody extends THREE.Group {
       const wrist=camera.localToWorld(new THREE.Vector3(sign*(paper?.325:.17),paper?-.32:-.19,paper?-.45:-.43));
       this.limb('upper_arm.'+side,'forearm.'+side,'hand.'+side,wrist,new THREE.Vector3(sign,-1,0));
       const frame=this.handFrames.get(side)!;
-      const along=paper?new THREE.Vector3(-sign*.45,.89,0).normalize().applyQuaternion(camera.quaternion):direction;
+      const along=paper?new THREE.Vector3(-sign*.45,.89,0).normalize().applyQuaternion(camera.quaternion):direction.clone();
+      // The directive follows the view, but a hand cannot rotate independently
+      // through its forearm. Clamp the visible wrist bend before rebuilding the
+      // hand basis so fast camera pitch/yaw changes keep the skin continuous.
+      const forearm=this.point('hand.'+side).sub(this.point('forearm.'+side)).normalize(),wristAngle=along.angleTo(forearm),wristLimit=THREE.MathUtils.degToRad(22);
+      if(wristAngle>wristLimit){const towardForearm=new THREE.Quaternion().setFromUnitVectors(along,forearm);along.applyQuaternion(new THREE.Quaternion().slerp(towardForearm,(wristAngle-wristLimit)/wristAngle)).normalize();}
       const radial=paper?new THREE.Vector3(.89,sign*.45,0).normalize().applyQuaternion(camera.quaternion):new THREE.Vector3(-sign,0,0).applyQuaternion(camera.quaternion);
       radial.addScaledVector(along,-radial.dot(along)).normalize();
       const basis=new THREE.Matrix4().makeBasis(radial,along,radial.clone().cross(along).normalize());

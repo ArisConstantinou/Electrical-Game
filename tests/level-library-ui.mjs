@@ -16,9 +16,9 @@ try {
   };
   await page.goto(base);
   await ready();
-  assert.equal(await page.locator('#start-level-current').textContent(), 'BASIC · ORIGINAL');
+  assert.equal(await page.locator('#start-level-current').textContent(), 'MANSION SITE · PREVIEW');
   await page.locator('#start-load').tap();
-  assert(await page.locator('.start-level-choice').first().textContent().then(text => text.includes('BASIC · ORIGINAL')));
+  assert(await page.locator('.start-level-choice').first().textContent().then(text => text.includes('ORIGINAL FIRST FIX ROOM')));
   await page.screenshot({ path: 'output/level-library/basic-menu-mobile.png' });
   await page.locator('#start-level-picker-close').tap();
   await page.locator('#start-new').tap();
@@ -98,10 +98,10 @@ try {
   await page.locator('.level-editor__bottom-nav [data-editor-tab="starts"]').tap();
   await page.locator('#level-scene-exit').tap();
   await page.locator('#start-load').tap();
-  await page.locator('.start-level-choice').filter({ hasText: 'BASIC · ORIGINAL' }).tap();
-  await page.waitForURL(url => !url.searchParams.has('level') && !url.searchParams.has('mansion'));
+  await page.locator('.start-level-choice').filter({ hasText: 'ORIGINAL FIRST FIX ROOM' }).tap();
+  await page.waitForURL(url => !url.searchParams.has('level') && url.searchParams.get('mansion') === 'basic');
   await ready();
-  assert.equal(await page.locator('#start-level-current').textContent(), 'BASIC · ORIGINAL');
+  assert.equal(await page.locator('#start-level-current').textContent(), 'ORIGINAL FIRST FIX ROOM');
   const basic = await page.evaluate(() => ({ wing: window.__wireTheHouse.room.mansionWing, wall: window.__wireTheHouse.room.brickWall.visible }));
   assert.equal(basic.wing, null);
   assert.equal(basic.wall, true);

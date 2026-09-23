@@ -95,7 +95,8 @@ export class DesktopControls {
     surface.addEventListener('wheel', event => {
       // Settings scroll, sideways touchpad motion and pinch zoom are not tool
       // selections. In particular deltaY=0 must never become a +1 cycle.
-      if (surface.classList.contains('settings-open') || event.ctrlKey || event.shiftKey ||
+      if (surface.classList.contains('settings-open') || surface.classList.contains('model-open') ||
+          (surface.dataset.apprenticeMode && surface.dataset.apprenticeMode !== 'off') || event.ctrlKey || event.shiftKey ||
           (event.target instanceof Element && event.target.closest('button,input,select,textarea,label,a,summary,#settings-panel')) ||
           !Number.isFinite(event.deltaY) || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
       event.preventDefault();
@@ -116,7 +117,7 @@ export class DesktopControls {
     }, { passive: false });
     addEventListener('keydown', event => {
       if(event.defaultPrevented)return;
-      if(document.querySelector('#model-inspector:not([hidden]):not([data-live="true"])')||event.target instanceof Element&&event.target.closest('input,textarea,select,[contenteditable="true"]'))return;
+      if(surface.classList.contains('model-open')||(surface.dataset.apprenticeMode&&surface.dataset.apprenticeMode!=='off')||event.target instanceof Element&&event.target.closest('input,textarea,select,[contenteditable="true"]'))return;
       if((event.code==='Escape'||event.key==='Escape')&&surface.dataset.boxAssembly==='true'){
         if(!event.repeat)exitBoxAssembly();
         return;

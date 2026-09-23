@@ -10,7 +10,7 @@ import { MansionCourtyard } from './MansionCourtyard';
 import { MansionSurroundings } from './MansionSurroundings';
 import { BrickWall } from './BrickWall';
 
-/** First traversable part of the approved ground plan, kept out of the released room. */
+/** Traversable unfinished mansion shell, including the original work room. */
 export class MansionGroundWing extends THREE.Group {
   readonly obstacles: PlayerObstacle[] = [];
   readonly editableWalls = new Map<string, THREE.Group>();
@@ -22,6 +22,8 @@ export class MansionGroundWing extends THREE.Group {
     segment?: { length: number; halfWidth: number; alongX?: boolean } }>();
   private readonly corner = new THREE.Vector3();
   private readonly inverseSurfaceMatrix = new THREE.Matrix4();
+  private readonly gameplayCulled = new Map<THREE.Object3D, boolean>();
+  private retainingContactMaterial: THREE.MeshStandardMaterial | null = null;
   private emptyTemplate = false;
   readonly courtyard: MansionCourtyard;
   readonly surroundings: MansionSurroundings;
@@ -64,6 +66,7 @@ export class MansionGroundWing extends THREE.Group {
     this.surroundings = new MansionSurroundings(oliveSource, neighbourSource);
     this.add(this.surroundings);
     this.addStairCore();
+    this.addBasementLevels();
     this.addFirstFloorLanding();
     this.addFirstFloorRoom();
     this.addUpperStairCore(1);
@@ -117,6 +120,8 @@ export class MansionGroundWing extends THREE.Group {
       pivot.name = id;
       pivot.userData.levelEditorKind = 'asset';
       pivot.userData.levelEditorGround = /\b(?:ground|terrain|soil|floor)\b/i.test(object.name);
+      if (object.name.startsWith('B1 ')) pivot.userData.levelEditorFloor = 5;
+      if (object.name.startsWith('B2 ')) pivot.userData.levelEditorFloor = 6;
       pivot.userData.levelEditorLabel = `${object.name}${count > 1 ? ` · ${count}` : ''}`;
       bounds.getSize(size);
       pivot.userData.baseSize = [Math.max(size.x, .01), Math.max(size.y, .01), Math.max(size.z, .01)];
@@ -137,6 +142,13 @@ export class MansionGroundWing extends THREE.Group {
         pivot.add(pickProxy);
       }
       this.editableAssets.set(id, pivot);
+      if (object.name.startsWith('B1 retaining ') || object.name.startsWith('B2 retaining ') ||
+        /^(?:B1|B2) exposed frame column /.test(object.name)) {
+        const obstacle = this.obstacles.find(item => item.id === object.name);
+        if (obstacle) this.editableAssetColliders.set(pivot, {
+          obstacle, matrix: new THREE.Matrix4().makeScale(0, 0, 0), source: object,
+        });
+      }
       if (object.name === 'Raised pallet under staged unfitted masonry supplies' ||
         object.name === 'Separate stacked clay units awaiting garage partition work') {
         const obstacle: PlayerObstacle = { id, minX: bounds.min.x, maxX: bounds.max.x,
@@ -249,6 +261,33 @@ export class MansionGroundWing extends THREE.Group {
 
   update(dt: number): void { this.courtyard.update(dt); this.surroundings.update(dt); }
 
+  /** Underground work areas do not need to draw through their ground slabs.
+   * Restore them before the editor takes its own per-floor visibility snapshot. */
+  restoreGameplayVisibility(): void {
+    for (const [object, wasVisible] of this.gameplayCulled) object.visible = wasVisible;
+    this.gameplayCulled.clear();
+  }
+
+  updateGameplayVisibility(x: number, z: number, feetY: number): void {
+    if (this.emptyTemplate) return;
+    const nearStair = Math.hypot(x - 6.5, z - 9.6) < 6.5;
+    const showB1 = feetY < -.05 || nearStair;
+    const showB2 = feetY < -2.5;
+    for (const object of this.children) {
+      const floor = object.userData.levelEditorFloor === 5 || object.name.startsWith('B1 ') ? 5
+        : object.userData.levelEditorFloor === 6 || object.name.startsWith('B2 ') ? 6 : 0;
+      if (!floor) continue;
+      const shouldCull = floor === 5 ? !showB1 : !showB2;
+      if (shouldCull) {
+        if (!this.gameplayCulled.has(object)) this.gameplayCulled.set(object, object.visible);
+        object.visible = false;
+      } else if (this.gameplayCulled.has(object)) {
+        object.visible = this.gameplayCulled.get(object)!;
+        this.gameplayCulled.delete(object);
+      }
+    }
+  }
+
   setEmptyTemplate(enabled: boolean): void { this.emptyTemplate = enabled; }
 
   surfaceHeight(x: number, z: number, currentFloor = 0): number {
@@ -265,20 +304,31 @@ export class MansionGroundWing extends THREE.Group {
     }
     const closest = (heights: number[]): number => heights.reduce((best, height) =>
       Math.abs(height - currentFloor) < Math.abs(best - currentFloor) ? height : best);
+    const stairBases = [-6.8, -3.4, 0, 3.3, 6.6, 9.9];
     const onFirst = x >= 4.8 && x <= 6.2 && z >= 8 && z < 11.08;
     if (onFirst) {
-      const step = Math.min(11, Math.floor((z - 8) / .28) + 1) * .15;
-      return closest([0, 3.3, 6.6, 9.9].map(base => base + step));
+      const step = Math.min(11, Math.floor((z - 8) / .28) + 1);
+      return closest(stairBases.map(base => base + step * (base < 0 ? 3.4 / 22 : .15)));
     }
     const onLanding = x >= 4.8 && x <= 8.2 && z >= 11.08 && z <= 12.2;
-    if (onLanding) return closest([0, 3.3, 6.6, 9.9].map(base => base + 1.65));
+    if (onLanding) return closest(stairBases.map(base => base + (base < 0 ? 1.7 : 1.65)));
     const onSecond = x >= 6.8 && x <= 8.2 && z >= 8 && z < 11.08;
     if (onSecond) {
-      const step = 1.65 + Math.min(11, Math.floor((11.08 - z) / .28) + 1) * .15;
-      return closest([0, 3.3, 6.6, 9.9].map(base => base + step));
+      const step = Math.min(11, Math.floor((11.08 - z) / .28) + 1);
+      return closest(stairBases.map(base => base + (base < 0 ? 1.7 + step * 3.4 / 22 : 1.65 + step * .15)));
     }
-    if (x >= 4.48 && x <= 6.6 && z >= 6.5 && z < 8) return closest([0, 3.3, 6.6, 9.9]);
-    if (x >= 6.5 && x <= 8.5 && z >= 4.5 && z < 8) return closest([0, 3.3, 6.6, 9.9, 13.2]);
+    if (x >= 4.48 && x <= 6.6 && z >= 6.5 && z < 8) return closest([-6.8, -3.4, 0, 3.3, 6.6, 9.9]);
+    if (x >= 6.5 && x <= 8.5 && z >= 4.5 && z < 8) return closest([-6.8, -3.4, 0, 3.3, 6.6, 9.9, 13.2]);
+    if (x >= 6.5 && x <= 9 && z >= 0 && z < 4.5) {
+      const heights = [-6.8, -3.4, 0, 3.3, 6.6, 9.9];
+      if (x >= 7 && z >= .5) heights.push(13.2); // L4 stands on L3's slab in this shared footprint.
+      return closest(heights);
+    }
+    if (x >= 9 && x <= 18 && z >= -3.5 && z < 6) {
+      const heights = [-6.8, -3.4, 0, 3.3, 6.6, 9.9];
+      if (x <= 11.14 && z >= .5 && z <= 4.5) heights.push(13.2);
+      return closest(heights);
+    }
     if (x >= 6.5 && x <= 12.5 && z >= 0 && z < 4.5) {
       const heights = [3.3, 6.6, 9.9];
       if (x >= 9) heights.unshift(0);
@@ -314,11 +364,15 @@ export class MansionGroundWing extends THREE.Group {
       entry.matrix.copy(asset.matrixWorld);
       const source = entry.source;
       if (source instanceof BrickWall) source.updateWorldMatrix(true, false);
+      if (source instanceof THREE.Mesh && /^(?:B1|B2) retaining /.test(source.name))
+        source.updateWorldMatrix(true, false);
       const bounds = source instanceof BrickWall
         ? new THREE.Box3(
           new THREE.Vector3(-source.volume.width / 2, 0, source.volume.frontZ - source.volume.depth),
           new THREE.Vector3(source.volume.width / 2, source.volume.height, source.volume.frontZ),
         ).applyMatrix4(source.matrixWorld)
+        : source instanceof THREE.Mesh && /^(?:B1|B2) retaining /.test(source.name)
+          ? (source.geometry.computeBoundingBox(), source.geometry.boundingBox!.clone().applyMatrix4(source.matrixWorld))
         : new THREE.Box3().setFromObject(source ?? asset, true);
       const obstacle = entry.obstacle;
       obstacle.minX = bounds.min.x - .01; obstacle.maxX = bounds.max.x + .01;
@@ -661,11 +715,6 @@ export class MansionGroundWing extends THREE.Group {
 
   private slab(name: string, width: number, depth: number, x: number, z: number, stairVoid = false): void {
     const concrete = siteMaterial('floor', 0xd1cbc1, width / 2.5, depth / 2.5);
-    const floor = new THREE.Mesh(new RoundedBoxGeometry(width, .18, depth, 2, .012), concrete);
-    floor.name = name;
-    floor.position.set(x, -.09, z);
-    floor.receiveShadow = true;
-    this.add(floor);
     const panels = stairVoid ? [
       { w: 6.05, d: 5, x: 1.675, z: 10.1 },
       { w: .6, d: 5, x: 8.7, z: 10.1 },
@@ -673,6 +722,11 @@ export class MansionGroundWing extends THREE.Group {
       { w: 3.7, d: .4, x: 6.55, z: 12.4 },
     ] : [{ w: width, d: depth, x, z }];
     for (const panel of panels) {
+      const floor = new THREE.Mesh(new RoundedBoxGeometry(panel.w, .18, panel.d, 2, .012), concrete);
+      floor.name = name;
+      floor.position.set(panel.x, -.09, panel.z);
+      floor.receiveShadow = true;
+      this.add(floor);
       const roof = new THREE.Mesh(new RoundedBoxGeometry(panel.w, .18, panel.d, 2, .012), siteMaterial('concrete', 0xc9c3b8, panel.w / 2.2, panel.d / 2.2));
       roof.name = `${name} load-bearing ceiling slab`;
       roof.position.set(panel.x, 3.19, panel.z);
@@ -871,10 +925,274 @@ export class MansionGroundWing extends THREE.Group {
       this.add(rail);
     }
     this.obstacles.push(
-      { id: 'stair-first-flight-west-guard', minX: 4.55, maxX: 4.7, minZ: 8, maxZ: 11.08 },
-      { id: 'stair-flight-well-guard', minX: 6.25, maxX: 6.72, minZ: 8, maxZ: 11.08 },
-      { id: 'stair-second-flight-east-guard', minX: 8.3, maxX: 8.5, minZ: 8, maxZ: 11.08 },
+      { id: 'stair-first-flight-west-guard', minX: 4.55, maxX: 4.7, minZ: 8, maxZ: 11.08, minFloorY: 0, maxFloorY: 3.3 },
+      { id: 'stair-flight-well-guard', minX: 6.25, maxX: 6.72, minZ: 8, maxZ: 11.08, minFloorY: 0, maxFloorY: 3.3 },
+      { id: 'stair-second-flight-east-guard', minX: 8.3, maxX: 8.5, minZ: 8, maxZ: 11.08, minFloorY: 0, maxFloorY: 3.3 },
     );
+  }
+
+  private addBasementLevels(): void {
+    const floorMaterial = siteMaterial('floor', 0xbdb9b1);
+    // Retaining walls share the slab's cast aggregate. Their formwork pattern
+    // is geometry below, rather than the repeated dark stripes of the generic
+    // concrete photograph on every differently oriented wall.
+    const retainingMaterial = siteMaterial('floor', 0xbcbab4);
+    const narrowCastMaterial = siteMaterial('floor', 0xbcbab4, .22, 1.6);
+    const riserMaterial = siteMaterial('concrete', 0x9f9a91, .3, .8);
+    const addCast = (name: string, width: number, height: number, depth: number,
+      x: number, y: number, z: number, material = retainingMaterial): THREE.Mesh => {
+      const mesh = new THREE.Mesh(new RoundedBoxGeometry(width, height, depth, 2, .009), material);
+      mesh.name = name;
+      mesh.position.set(x, y, z);
+      if (material === floorMaterial || material === retainingMaterial) {
+        const uv = mesh.geometry.getAttribute('uv') as THREE.BufferAttribute;
+        const uScale = material === floorMaterial ? width / 2.5 : Math.max(width, depth) / 2.5;
+        const vScale = material === floorMaterial ? depth / 2.5 : height / 2.5;
+        for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * uScale, uv.getY(i) * vScale);
+        uv.needsUpdate = true;
+      }
+      mesh.castShadow = mesh.receiveShadow = true;
+      this.add(mesh);
+      return mesh;
+    };
+    // This closes the otherwise uncovered ground corridor above the basement.
+    // The garage and foyer already have their own structural ground slabs.
+    addCast('Ground cast corridor slab over basement access', 2.5, .18, 4.5, 7.75, -.09, 2.25, floorMaterial);
+    for (const depth of [1, 2]) {
+      const base = -3.4 * depth;
+      const label = `B${depth}`;
+      const corridorFloor = addCast(`${label} circulation structural floor`, 2.5, .18, 7.6, 7.75, base - .09, 3.8, floorMaterial);
+      const garageFloor = addCast(`${label} garage and services structural floor`, 9, .18, 9.5, 13.5, base - .09, 1.25, floorMaterial);
+      this.addCastFloorJoints(corridorFloor, 2.5, 7.6, 7.75, 3.8);
+      this.addCastFloorJoints(garageFloor, 9, 9.5, 13.5, 1.25);
+      addCast(`${label} side deck at stair foot`, 2.05, .18, 1.5, 5.53, base - .09, 7.25, floorMaterial);
+      const wall = (name: string, x0: number, z0: number, x1: number, z1: number): void => {
+        const length = Math.hypot(x1 - x0, z1 - z0);
+        const alongX = Math.abs(x1 - x0) > Math.abs(z1 - z0);
+        const castWall = addCast(`${label} retaining ${name}`, alongX ? length : .28, 3.22, alongX ? .28 : length,
+          (x0 + x1) / 2, base + 1.61, (z0 + z1) / 2);
+        this.addRetainingFaceDetails(castWall, length, alongX);
+        this.obstacles.push({ id: `${label} retaining ${name}`,
+          minX: Math.min(x0, x1) - .15, maxX: Math.max(x0, x1) + .15,
+          minZ: Math.min(z0, z1) - .15, maxZ: Math.max(z0, z1) + .15,
+          minFloorY: base, maxFloorY: base + 3.22 });
+      };
+      // Doorless 2.4 m access between the stair corridor and garage; all
+      // external edges are genuine below-grade retaining walls.
+      wall('corridor west before stair passage', 6.5, 0, 6.5, 5.8);
+      wall('corridor south', 6.5, 0, 9, 0);
+      wall('corridor east before garage opening', 9, 0, 9, .8);
+      wall('corridor east after garage opening', 9, 3.2, 9, 7.65);
+      wall('corridor north west pier', 6.5, 7.65, 6.85, 7.65);
+      wall('corridor north east pier', 8.15, 7.65, 9, 7.65);
+      wall('garage south', 9, -3.5, 18, -3.5);
+      wall('garage west', 9, -3.5, 9, 0);
+      wall('garage east', 18, -3.5, 18, 6);
+      wall('garage north', 9, 6, 18, 6);
+      for (const x of [9, 13.5, 18]) for (const z of [-3.5, 6]) {
+        const name = `${label} exposed frame column ${x} ${z}`;
+        addCast(name, .36, 3.22, .36, x, base + 1.61, z, narrowCastMaterial);
+        this.obstacles.push({ id: name, minX: x - .18, maxX: x + .18,
+          minZ: z - .18, maxZ: z + .18, minFloorY: base, maxFloorY: base + 3.22 });
+      }
+      if (depth === 1) {
+        this.wall('B1 unfinished workshop partition south', 15.5, -3.3, 15.5, -.8, base);
+        this.wall('B1 unfinished workshop partition north', 15.5, 1.2, 15.5, 5.8, base);
+        addCast('B1 workshop cast head beam south', .34, .22, 2.5, 15.5, base + 3.11, -2.05, narrowCastMaterial);
+        addCast('B1 workshop cast head beam north', .34, .22, 4.6, 15.5, base + 3.11, 3.5, narrowCastMaterial);
+      } else {
+        this.wall('B2 electrical store partition south', 13, -3.3, 13, -.5, base);
+        this.wall('B2 electrical store partition north', 13, 1.2, 13, 5.8, base);
+        addCast('B2 store cast head beam south', .34, .22, 2.8, 13, base + 3.11, -1.9, narrowCastMaterial);
+        addCast('B2 store cast head beam north', .34, .22, 4.6, 13, base + 3.11, 3.5, narrowCastMaterial);
+        this.addBasementServiceTray(base);
+      }
+      const stepHeight = 3.4 / 22;
+      const treadGeometry = new RoundedBoxGeometry(1, 1, 1, 2, .006);
+      const treads = new THREE.InstancedMesh(treadGeometry, floorMaterial, 22);
+      const risers = new THREE.InstancedMesh(treadGeometry, riserMaterial, 22);
+      treads.name = `${label} to ${depth === 1 ? 'ground' : 'B1'} cast stair treads`;
+      risers.name = `${label} to ${depth === 1 ? 'ground' : 'B1'} cast stair risers`;
+      const matrix = new THREE.Matrix4(), quaternion = new THREE.Quaternion();
+      for (let step = 1; step <= 11; step++) {
+        const firstTop = base + step * stepHeight;
+        const firstZ = 8 + (step - .5) * .28;
+        treads.setMatrixAt(step - 1, matrix.compose(new THREE.Vector3(5.5, firstTop - .065, firstZ), quaternion,
+          new THREE.Vector3(1.38, .13, .28)));
+        risers.setMatrixAt(step - 1, matrix.compose(new THREE.Vector3(5.5, firstTop - stepHeight / 2, firstZ - .14), quaternion,
+          new THREE.Vector3(1.38, stepHeight, .045)));
+        const secondTop = base + 1.7 + step * stepHeight;
+        const secondZ = 11.08 - (step - .5) * .28;
+        treads.setMatrixAt(step + 10, matrix.compose(new THREE.Vector3(7.5, secondTop - .065, secondZ), quaternion,
+          new THREE.Vector3(1.38, .13, .28)));
+        risers.setMatrixAt(step + 10, matrix.compose(new THREE.Vector3(7.5, secondTop - stepHeight / 2, secondZ + .14), quaternion,
+          new THREE.Vector3(1.38, stepHeight, .045)));
+      }
+      for (const mesh of [treads, risers]) {
+        mesh.castShadow = mesh.receiveShadow = true;
+        mesh.computeBoundingSphere();
+        this.add(mesh);
+      }
+      addCast(`${label} intermediate stair landing`, 3.4, .19, 1.12, 6.5, base + 1.7 - .095, 11.64, floorMaterial);
+      for (const x of [4.65, 8.35]) {
+        addCast(`${label} cast stair-well safety kerb`, .15, .55, 3.15, x, base + 1.2, 9.55, narrowCastMaterial);
+      }
+    }
+  }
+
+  private addBasementServiceTray(base: number): void {
+    const tray = new THREE.Group();
+    tray.name = 'B2 suspended galvanized cable tray awaiting electrical fit-out';
+    tray.position.set(11.35, base + 2.74, 1.6);
+    const steel = new THREE.MeshStandardMaterial({ color: 0xa9a9a2, metalness: .48, roughness: .64,
+      side: THREE.DoubleSide });
+    const pieces = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), steel, 17);
+    pieces.name = 'Two rails, open crossbars and four soffit suspension rods';
+    const matrix = new THREE.Matrix4(), rotation = new THREE.Quaternion();
+    let index = 0;
+    const piece = (width: number, height: number, depth: number, x: number, y: number, z: number): void => {
+      pieces.setMatrixAt(index++, matrix.compose(new THREE.Vector3(x, y, z), rotation,
+        new THREE.Vector3(width, height, depth)));
+    };
+    for (const x of [-.56, .56]) piece(.055, .15, 4.4, x, 0, 0);
+    for (let i = 0; i < 11; i++)
+      piece(1.17, .026, .055, 0, -.064, -2 + i * .4);
+    for (const z of [-1.7, 1.7]) for (const x of [-.48, .48])
+      piece(.018, .43, .018, x, .29, z);
+    pieces.castShadow = pieces.receiveShadow = true;
+    pieces.computeBoundingSphere();
+    tray.add(pieces);
+    this.add(tray);
+  }
+
+  private addCastFloorJoints(floor: THREE.Mesh, width: number, depth: number, centreX: number, centreZ: number): void {
+    const positions: number[] = [], indices: number[] = [];
+    const cut = .006, y = .095;
+    const quad = (x0: number, z0: number, x1: number, z1: number): void => {
+      const first = positions.length / 3;
+      positions.push(x0, y, z0, x1, y, z0, x0, y, z1, x1, y, z1);
+      indices.push(first, first + 1, first + 2, first + 1, first + 3, first + 2);
+    };
+    const minX = centreX - width / 2, maxX = centreX + width / 2;
+    const minZ = centreZ - depth / 2, maxZ = centreZ + depth / 2;
+    for (let x = Math.ceil(minX / 2.5) * 2.5; x < maxX - .35; x += 2.5)
+      if (x > minX + .35) quad(x - centreX - cut / 2, -depth / 2 + .08,
+        x - centreX + cut / 2, depth / 2 - .08);
+    for (let z = Math.ceil(minZ / 2.5) * 2.5; z < maxZ - .35; z += 2.5)
+      if (z > minZ + .35) quad(-width / 2 + .08, z - centreZ - cut / 2,
+        width / 2 - .08, z - centreZ + cut / 2);
+    if (!positions.length) return;
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+    const joints = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
+      color: 0x77746e, transparent: true, opacity: .31, roughness: 1,
+      depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, side: THREE.DoubleSide,
+    }));
+    joints.name = 'Subtle unfinished slab control joints';
+    joints.raycast = () => undefined;
+    floor.add(joints);
+  }
+
+  private addRetainingFaceDetails(wall: THREE.Mesh, length: number, alongX: boolean): void {
+    if (length < 1.3) return;
+    const positions: number[] = [], colors: number[] = [];
+    const joint = new THREE.Color(0x484742);
+    const rim = new THREE.Color(0x696761);
+    const tie = new THREE.Color(0x242521);
+    const vertex = (u: number, y: number, side: number, color: THREE.Color): void => {
+      const face = side * .148;
+      positions.push(alongX ? u : face, y, alongX ? face : u);
+      colors.push(color.r, color.g, color.b);
+    };
+    const triangle = (a: [number, number], b: [number, number], c: [number, number], side: number,
+      ca: THREE.Color, cb = ca, cc = ca): void => {
+      vertex(a[0], a[1], side, ca); vertex(b[0], b[1], side, cb); vertex(c[0], c[1], side, cc);
+    };
+    for (const side of [-1, 1]) {
+      // Real form panels leave fine casting joints. Keep them subtle enough
+      // that the slab and wall still read as one concrete construction.
+      for (let u = -length / 2 + 2.4; u < length / 2 - .3; u += 2.4) {
+        triangle([u - .004, -1.58], [u + .004, -1.58], [u - .004, 1.58], side, joint);
+        triangle([u + .004, -1.58], [u + .004, 1.58], [u - .004, 1.58], side, joint);
+      }
+      for (const y of [-.7, .65]) for (let u = -length / 2 + .62; u < length / 2 - .35; u += 1.2) {
+        const segments = 12, radius = .052;
+        for (let i = 0; i < segments; i++) {
+          const a = i / segments * Math.PI * 2, b = (i + 1) / segments * Math.PI * 2;
+          triangle([u, y], [u + Math.cos(a) * radius, y + Math.sin(a) * radius],
+            [u + Math.cos(b) * radius, y + Math.sin(b) * radius], side, tie, rim, rim);
+        }
+      }
+    }
+    if (!positions.length) return;
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    geometry.computeVertexNormals();
+    const details = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
+      vertexColors: true, roughness: 1, metalness: 0, side: THREE.DoubleSide,
+      depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1,
+    }));
+    details.name = 'Cast panel joints and recessed form ties';
+    details.raycast = () => undefined;
+    wall.add(details);
+    this.addRetainingJunctionContact(wall, length, alongX);
+  }
+
+  private addRetainingJunctionContact(wall: THREE.Mesh, length: number, alongX: boolean): void {
+    if (!this.retainingContactMaterial) {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 64;
+      const context = canvas.getContext('2d');
+      if (!context) return;
+      const pixels = context.createImageData(64, 64);
+      for (let y = 0; y < 64; y++) for (let x = 0; x < 64; x++) {
+        const edge = 1 - THREE.MathUtils.smoothstep(y / 63 + .025 * Math.sin(x * .39), .02, .97);
+        const i = (y * 64 + x) * 4;
+        pixels.data[i] = 92; pixels.data[i + 1] = 86; pixels.data[i + 2] = 78;
+        pixels.data[i + 3] = Math.round(255 * edge * .19);
+      }
+      context.putImageData(pixels, 0, 0);
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = THREE.RepeatWrapping;
+      this.retainingContactMaterial = new THREE.MeshStandardMaterial({
+        map: texture, transparent: true, depthWrite: false, side: THREE.DoubleSide,
+        polygonOffset: true, polygonOffsetFactor: -1, roughness: 1,
+      });
+    }
+    const positions: number[] = [], uvs: number[] = [], indices: number[] = [];
+    const point = (u: number, y: number, side: number, offset: number): THREE.Vector3 =>
+      alongX ? new THREE.Vector3(u, y, side * (.143 + offset))
+        : new THREE.Vector3(side * (.143 + offset), y, u);
+    const quad = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, d: THREE.Vector3): void => {
+      const start = positions.length / 3;
+      positions.push(...a.toArray(), ...b.toArray(), ...c.toArray(), ...d.toArray());
+      uvs.push(0, 0, length / 1.2, 0, 0, 1, length / 1.2, 1);
+      indices.push(start, start + 1, start + 2, start + 1, start + 3, start + 2);
+    };
+    for (const side of [-1, 1]) {
+      const left = -length / 2 + .04, right = length / 2 - .04;
+      quad(point(left, -1.606, side, .006), point(right, -1.606, side, .006),
+        point(left, -1.43, side, .006), point(right, -1.43, side, .006));
+      quad(point(left, -1.606, side, .006), point(right, -1.606, side, .006),
+        point(left, -1.606, side, .2), point(right, -1.606, side, .2));
+      quad(point(left, 1.606, side, .006), point(right, 1.606, side, .006),
+        point(left, 1.43, side, .006), point(right, 1.43, side, .006));
+      quad(point(left, 1.606, side, .006), point(right, 1.606, side, .006),
+        point(left, 1.606, side, .15), point(right, 1.606, side, .15));
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+    const contact = new THREE.Mesh(geometry, this.retainingContactMaterial);
+    contact.name = 'Dust and shadow joining cast wall to slab and soffit';
+    contact.raycast = () => undefined;
+    wall.add(contact);
   }
 
   private addFirstFloorLanding(): void {

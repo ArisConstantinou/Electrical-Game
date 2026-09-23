@@ -197,7 +197,10 @@ export function workerArm(side:number, hand:THREE.Group, grip:THREE.Vector3):Wor
   const stitch=mesh(upper,new THREE.TorusGeometry(.050,.0012,4,24),hem,'Sleeve double stitched edge');stitch.rotation.x=Math.PI/2;stitch.position.y=.035;
   const trowelGrip=hand.userData.gripStyle==='trowel';
   const lower=mesh(forearm,new THREE.CylinderGeometry(trowelGrip?.022:.030,.047,FOREARM_M,20,5),skin,'Tapered bare forearm');
-  if(trowelGrip)mesh(forearm,ellipsoid(1,[.022,.015,.022],[0,FOREARM_M/2-.004,0]),skin,'Rounded trowel wrist transition');
+  // Overlap the hand's authored wrist heel instead of ending the forearm on a
+  // flat cap. The small joint follows the solved forearm, so camera motion can
+  // never reveal a gap between two independently transformed pieces.
+  mesh(forearm,ellipsoid(1,[trowelGrip?.023:.031,.020,trowelGrip?.023:.031],[0,FOREARM_M/2-.006,0]),skin,'Rounded wrist transition');
   lower.geometry.computeVertexNormals();
   mesh(forearm,ellipsoid(1,[.041,.037,.041],[0,-FOREARM_M/2+.01,0]),skin,'Rounded elbow');
   group.add(upper,forearm);

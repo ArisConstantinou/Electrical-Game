@@ -42,7 +42,12 @@ const originalSiteSystems = new Set([
   'ready-mortar-wheelbarrow', 'Recoverable spilled wheelbarrow mortar', 'Water Pro room puddles, runoff and flood',
   'PVC workshop · 20 × 3 m', 'PVC drilled rebar fasteners', 'PVC physical working piece',
   'Apprentice cut PVC racks', 'Apprentice 1', 'Apprentice yellow directive', 'Apprentice box preview',
+  'FPS hammer tool',
 ]);
+const isGroundSceneSystem = (object: THREE.Object3D): boolean =>
+  originalSiteSystems.has(object.name) || /^Apprentice [1-5](?: cutter)?$/.test(object.name);
+const isDetachedViewModel = (object: THREE.Object3D): boolean =>
+  /^(?:Left|Right) (?:fixed-length work arm|five-finger spring hand)$/.test(object.name);
 export function listLevelSlots(): LevelSlot[] {
   try {
     const stored = JSON.parse(localStorage.getItem(SLOTS_KEY) ?? '[]') as unknown;
@@ -145,6 +150,8 @@ export class LevelEditor {
   private currentSlotId: string | null = null;
   private readonly originalVisibility = new Map<THREE.Object3D, boolean>();
   private readonly originalSystemVisibility = new Map<THREE.Object3D, boolean>();
+  private readonly editorSceneVisibility = new Map<THREE.Object3D, boolean>();
+  private readonly editorShadows = new Map<THREE.LightShadow, boolean>();
   private readonly playerVisibility = new Map<THREE.Object3D, boolean>();
   private editorFog: { fog: THREE.Fog; near: number; far: number } | null = null;
   private readonly topCutawayVisibility = new Map<THREE.Object3D, boolean>();
@@ -179,13 +186,14 @@ export class LevelEditor {
     this.gizmo = new TransformControls(this.camera, canvas);
     this.gizmo.setSize(.34);
     this.gizmo.addEventListener('dragging-changed', event => { this.orbit.enabled = this.active && !event.value; });
-    this.gizmo.addEventListener('objectChange', () => { if (this.gizmo.object === this.selectionPivot) this.applyPivotDelta(); this.syncLiveEquipment(); this.refreshFields(); });
+    this.gizmo.addEventListener('objectChange', () => { if (this.gizmo.object === this.selectionPivot) this.applyPivotDelta(); this.syncLiveEquipment(); this.invalidateEditorShadows(); this.refreshFields(); });
     this.gizmo.addEventListener('mouseUp', () => { this.snapWallEnds(); this.refreshFields(); this.recordHistory(); });
     this.gizmo.getHelper().visible = false;
     game.renderer.scene.add(this.gizmo.getHelper());
     this.selectionPivot.name = 'Editor selection centre';
     game.renderer.scene.add(this.selectionPivot);
     this.registerSiteEquipment();
+    this.registerMissionBoxes();
     this.playerStart.copy(game.renderer.camera.position);
     this.playerStartYaw = game.player.yaw;
     this.apprenticeStart.copy(game.apprentice.camera.position);
@@ -211,7 +219,7 @@ export class LevelEditor {
     this.panel.setAttribute('aria-label', 'Level Editor');
     this.panel.innerHTML = `<header><div><small>WIRE THE HOUSE · LIVE SITE</small><h2>LEVEL EDITOR</h2></div><div class="level-editor__header-actions"><button id="level-settings" type="button" aria-label="Editor navigation settings">⚙</button><button id="level-close" type="button" aria-label="Close level editor">✕</button></div></header>
       <div id="level-settings-panel" hidden><label for="level-nav-mode">EDITOR NAVIGATION</label><select id="level-nav-mode"><option value="bottom">Bottom navigation</option><option value="wheel">Wheel navigation</option></select></div>
-      <button id="level-view-trigger" type="button" aria-expanded="false" aria-controls="level-view-panel">▤ VIEW · ALL</button><div id="level-view-panel" hidden><div class="level-view__modes"><button type="button" data-level-view="3d">◈ ANGLE</button><button type="button" data-level-view="2d">▤ TOP</button></div><label for="level-floor">VISIBLE FLOOR</label><select id="level-floor"><option value="-1">All floors · 3D only</option><option value="-2" disabled>B2 · not built yet</option><option value="-3" disabled>B1 · not built yet</option><option value="0">G-0 · ground</option><option value="1">L1 · first</option><option value="2">L2 · second</option><option value="3">L3 · third</option><option value="4">L4 · fourth</option></select><small>Only the selected level is drawn. Drag empty space to pan in top view; pinch to zoom.</small><button id="level-view-close" type="button">⌄ CLOSE VIEW</button></div>
+      <button id="level-view-trigger" type="button" aria-expanded="false" aria-controls="level-view-panel">▤ VIEW · ALL</button><div id="level-view-panel" hidden><div class="level-view__modes"><button type="button" data-level-view="3d">◈ ANGLE</button><button type="button" data-level-view="2d">▤ TOP</button></div><label for="level-floor">VISIBLE FLOOR</label><select id="level-floor"><option value="-1">All floors · 3D only</option><option value="6">B2 · services and stores</option><option value="5">B1 · garage and workshop</option><option value="0">G-0 · ground</option><option value="1">L1 · first</option><option value="2">L2 · second</option><option value="3">L3 · third</option><option value="4">L4 · fourth</option></select><small>Only the selected level is drawn. Drag empty space to pan in top view; pinch to zoom.</small><button id="level-view-close" type="button">⌄ CLOSE VIEW</button></div>
       <div class="level-editor__bar"><button id="level-translate" type="button">MOVE</button><button id="level-rotate" type="button">ROTATE</button><button id="level-scale" type="button">SCALE</button><label><input id="level-snap" type="checkbox" checked> SNAP</label><select id="level-grid" aria-label="Snap spacing"><option value="0.1">10 cm</option><option value="0.25" selected>25 cm</option><option value="0.5">50 cm</option><option value="1">1 m</option></select><button id="level-save" type="button">SAVE</button><button id="level-export" type="button">EXPORT</button></div>
       <aside><label for="level-search">SITE ELEMENTS</label><input id="level-search" type="search" placeholder="Search structures…"><div id="level-list"></div><div class="level-editor__add"><button id="level-add-brick" type="button">+ BRICK WALL</button><button id="level-add-concrete" type="button">+ CONCRETE WALL</button><button id="level-add-floor" type="button">+ FLOOR SLAB</button><button id="level-add-stair" type="button">+ STAIRS</button></div><div class="level-editor__starts"><button id="level-player" type="button">PLAYER START</button><select id="level-apprentice-index" aria-label="Apprentice number"><option value="1">APPRENTICE 1</option><option value="2">APPRENTICE 2</option><option value="3">APPRENTICE 3</option><option value="4">APPRENTICE 4</option><option value="5">APPRENTICE 5</option></select><button id="level-apprentice" type="button">EDIT START</button></div></aside>
       <section class="level-editor__inspector"><b id="level-name">Select an element</b><p id="level-kind">Tap a structure in the scene or list.</p><div class="level-editor__history"><button id="level-undo" type="button">UNDO</button><button id="level-redo" type="button">REDO</button></div><div class="level-editor__fields"><label>X <input data-axis="x" type="number" step="0.01"></label><label>Y <input data-axis="y" type="number" step="0.01"></label><label>Z <input data-axis="z" type="number" step="0.01"></label><label>WIDTH m <input data-size="x" type="number" min="0.2" step="0.01"></label><label>HEIGHT m <input data-size="y" type="number" min="0.2" step="0.01"></label><label>DEPTH m <input data-size="z" type="number" min="0.05" step="0.01"></label><label>YAW ° <input id="level-yaw" type="number" step="1"></label></div><button id="level-delete" type="button">DELETE ADDED ELEMENT</button><p id="level-status" role="status"></p></section>
@@ -261,6 +269,23 @@ export class LevelEditor {
       this.siteEquipment.push(object);
     }
   }
+  private registerMissionBoxes(): void {
+    const wing = this.game.room.mansionWing;
+    if (!wing) return;
+    // Installed electrical boxes live outside Room, but remain part of the
+    // visible site. Their mission/physics placement is not editor-transformable.
+    for (const point of this.game.mission.points) {
+      if (wing.editableAssets.has(point.name)) continue;
+      const size = new THREE.Box3().setFromObject(point.boxGroup).getSize(new THREE.Vector3());
+      point.userData.levelEditorKind = 'asset';
+      point.userData.levelEditorLabel = `Electrical box · ${point.definition.label}`;
+      point.userData.levelEditorMissionPoint = true;
+      point.userData.levelEditorLocked = true;
+      point.userData.levelEditorFloor = 0;
+      point.userData.baseSize = [size.x, size.y, size.z].map(value => Math.max(value, .01));
+      wing.editableAssets.set(point.name, point);
+    }
+  }
   private decorateControls(): void {
     this.el('.level-editor__header-actions').insertAdjacentHTML('afterbegin', '<button id="level-camera" type="button" aria-label="Switch to camera pan" title="Switch to camera pan"></button>');
     const paths: Record<string, string> = {
@@ -302,7 +327,7 @@ export class LevelEditor {
     this.panel.querySelector('aside>label')?.insertAdjacentHTML('beforeend', '<small id="level-count"></small>');
     this.el('#level-search').insertAdjacentHTML('afterend', '<select id="level-filter" aria-label="Filter site elements"><option value="all">All structures and assets</option><option value="brick-wall">Brick walls</option><option value="concrete-wall">Concrete walls</option><option value="floor">Floor slabs</option><option value="stair">Stairs</option><option value="asset">Site assets</option></select>');
     this.el('#level-filter').insertAdjacentHTML('afterend', '<div id="level-selection-actions"><button id="level-multi-toggle" type="button" aria-pressed="false">MULTI SELECT</button><button id="level-create-group" type="button" disabled>GROUP ITEMS</button></div><div id="level-group-list" aria-label="Saved editor groups"></div>');
-    this.el('aside').insertAdjacentHTML('afterbegin', '<div id="level-view-quick"><div class="level-view__modes"><button type="button" data-level-view="3d">◈ ANGLE</button><button type="button" data-level-view="2d">▤ TOP</button></div><label for="level-floor-quick">VISIBLE FLOOR</label><select id="level-floor-quick" aria-label="Visible floor"><option value="-1">All floors · 3D only</option><option value="0">G-0 · ground</option><option value="1">L1 · first</option><option value="2">L2 · second</option><option value="3">L3 · third</option><option value="4">L4 · fourth</option></select><button id="level-camera-mobile" type="button" aria-pressed="false">◎ ORBIT CAMERA</button></div><button id="level-browser-toggle" type="button" aria-expanded="false">BROWSE ELEMENTS <span>⌃</span></button>');
+    this.el('aside').insertAdjacentHTML('afterbegin', '<div id="level-view-quick"><div class="level-view__modes"><button type="button" data-level-view="3d">◈ ANGLE</button><button type="button" data-level-view="2d">▤ TOP</button></div><label for="level-floor-quick">VISIBLE FLOOR</label><select id="level-floor-quick" aria-label="Visible floor"><option value="-1">All floors · 3D only</option><option value="6">B2 · services and stores</option><option value="5">B1 · garage and workshop</option><option value="0">G-0 · ground</option><option value="1">L1 · first</option><option value="2">L2 · second</option><option value="3">L3 · third</option><option value="4">L4 · fourth</option></select><button id="level-camera-mobile" type="button" aria-pressed="false">◎ ORBIT CAMERA</button></div><button id="level-browser-toggle" type="button" aria-expanded="false">BROWSE ELEMENTS <span>⌃</span></button>');
     const sidePresets = '<div class="level-view__sides" aria-label="3D side view presets"><button type="button" data-camera-preset="front">↑ FRONT</button><button type="button" data-camera-preset="back">↓ BACK</button><button type="button" data-camera-preset="left">← LEFT</button><button type="button" data-camera-preset="right">→ RIGHT</button></div>';
     this.el('#level-view-quick .level-view__modes').insertAdjacentHTML('afterend', sidePresets);
     this.el('#level-view-panel .level-view__modes').insertAdjacentHTML('afterend', sidePresets);
@@ -531,7 +556,29 @@ export class LevelEditor {
       const wing = this.game.room.mansionWing;
       if (!wing) return;
       const hits = this.raycaster.intersectObjects(this.editables().filter(object => this.isSelectableVisible(object)), true);
-      for (const hit of hits) {
+      // This thin contact-dust decal is drawn over the masonry with polygon
+      // offset, while its raycast geometry sits just behind the brick face.
+      // Give it the same small visual precedence only at its actual triangles.
+      const frontDistance = hits.find(hit => !(hit.object instanceof THREE.Points) &&
+        !hit.object.userData.levelEditorPickThrough && this.isHitVisible(hit.object))?.distance ?? Infinity;
+      const contactDust = hits.find(hit => hit.object.userData.studioEntityId === 'world:contact-patina' &&
+        hit.distance - frontDistance <= .025);
+      // The dust's flat decal also crosses the foot of a structural column.
+      // A direct tap on that solid column must take precedence at the overlap.
+      const contactColumn = contactDust && hits.find(hit =>
+        typeof hit.object.userData.studioEntityId === 'string' &&
+        hit.object.userData.studioEntityId.startsWith('world:column:') &&
+        Math.abs(hit.distance - contactDust.distance) <= .025);
+      // A recessed box's real back face sits behind spray marks and the
+      // masonry opening. Prefer its actual raycast triangles at that depth.
+      const recessedBox = hits.find(hit => {
+        if (hit.distance - frontDistance > .06) return false;
+        for (let parent: THREE.Object3D | null = hit.object; parent; parent = parent.parent)
+          if (parent.userData.levelEditorMissionPoint) return true;
+        return false;
+      });
+      const priorityHit = contactColumn ?? recessedBox ?? contactDust;
+      for (const hit of priorityHit ? [priorityHit, ...hits] : hits) {
         // Particle effects and hidden children can raycast despite drawing nothing.
         if (hit.object instanceof THREE.Points || hit.object.userData.levelEditorPickThrough || !this.isHitVisible(hit.object)) continue;
         let object: THREE.Object3D | null = hit.object;
@@ -665,6 +712,7 @@ export class LevelEditor {
     }
     if (object === this.selectionPivot) this.applyPivotDelta();
     this.syncLiveEquipment();
+    this.invalidateEditorShadows();
     this.refreshFields();
     event.preventDefault();
   }
@@ -745,6 +793,7 @@ export class LevelEditor {
     if (alongX) wall.scale.x = length / base; else wall.scale.z = length / base;
     wall.updateMatrixWorld(true);
     this.game.room.mansionWing?.obstaclesAt(wall.position.y);
+    this.invalidateEditorShadows();
     return true;
   }
   private beginWallEndpointDrag(event: PointerEvent, end: -1 | 1): void {
@@ -897,6 +946,7 @@ export class LevelEditor {
     this.syncLiveEquipment();
     const document = this.document();
     if (this.historyIndex >= 0 && JSON.stringify(this.history[this.historyIndex]) === JSON.stringify(document)) return;
+    this.invalidateEditorShadows();
     this.history = this.history.slice(0, this.historyIndex + 1);
     this.history.push(document);
     if (this.history.length > 100) this.history.shift();
@@ -930,6 +980,10 @@ export class LevelEditor {
     try { localStorage.setItem('wirehouse:level-editor-nav', mode); } catch { /* Navigation remains usable in memory. */ }
   }
 
+  private floorElevation(index: number): number {
+    return index === 5 ? -3.4 : index === 6 ? -6.8 : index * 3.3;
+  }
+
   private setViewMode(mode: '3d' | '2d'): void {
     const previous = this.viewMode;
     if (previous === '3d' && mode === '2d' && this.cameraPreset === 'angle') {
@@ -954,13 +1008,13 @@ export class LevelEditor {
     this.resize();
     if (mode === '2d') this.frameTopFloor();
     else {
-      const floorOffset = this.floorIndex >= 0 ? this.floorIndex * 3.3 - this.angleViewTarget.y + 1.5 : 0;
+      const floorOffset = this.floorIndex >= 0 ? this.floorElevation(this.floorIndex) - this.angleViewTarget.y + 1.5 : 0;
       this.camera.position.copy(this.angleViewPosition).add(new THREE.Vector3(0, floorOffset, 0));
       this.orbit.target.copy(this.angleViewTarget).add(new THREE.Vector3(0, floorOffset, 0));
       this.orbit.update();
     }
     this.cameraPreset = mode === '2d' ? 'top' : 'angle';
-    this.applyFloorVisibility();
+    if (this.active) this.applyFloorVisibility();
     this.syncPresetButtons();
     this.updateViewLabel();
   }
@@ -976,7 +1030,7 @@ export class LevelEditor {
       if (!part.isEmpty()) bounds.union(part);
     }
     const centre = bounds.isEmpty() ? this.orbit.target.clone() : bounds.getCenter(new THREE.Vector3());
-    const targetY = this.floorIndex < 0 ? centre.y : this.floorIndex * 3.3 + 1.5;
+    const targetY = this.floorIndex < 0 ? centre.y : this.floorElevation(this.floorIndex) + 1.5;
     const distance = THREE.MathUtils.clamp(Math.max(20, this.camera.position.distanceTo(this.orbit.target)), 20, 88);
     this.orbit.target.set(centre.x, targetY, centre.z);
     const direction = preset === 'front' ? new THREE.Vector3(0, 0, 1)
@@ -995,17 +1049,17 @@ export class LevelEditor {
   }
 
   private setFloorIndex(index: number): void {
-    if (!Number.isInteger(index) || index < -1 || index > 4) return;
+    if (!Number.isInteger(index) || index < -1 || index > 6) return;
     if (this.viewMode === '2d' && index === -1) index = 0;
     const oldY = this.orbit.target.y;
     this.floorIndex = index;
     if (index >= 0) {
-      const base = index * 3.3;
+      const base = this.floorElevation(index);
       this.camera.position.y += base + 1.5 - oldY;
       this.orbit.target.y = base + 1.5;
       this.orbit.update();
     }
-    this.applyFloorVisibility();
+    if (this.active) this.applyFloorVisibility();
     if (this.viewMode === '2d') this.frameTopFloor();
     this.el<HTMLSelectElement>('#level-floor').value = String(index);
     this.el<HTMLSelectElement>('#level-floor-quick').value = String(index);
@@ -1015,7 +1069,8 @@ export class LevelEditor {
   }
 
   private updateViewLabel(): void {
-    const label = this.floorIndex < 0 ? 'ALL' : this.floorIndex === 0 ? 'G-0' : `L${this.floorIndex}`;
+    const label = this.floorIndex < 0 ? 'ALL' : this.floorIndex === 0 ? 'G-0'
+      : this.floorIndex >= 5 ? `B${this.floorIndex - 4}` : `L${this.floorIndex}`;
     this.el('#level-view-trigger').textContent = `▤ ${this.cameraPreset.toUpperCase()} · ${label}`;
   }
 
@@ -1032,29 +1087,41 @@ export class LevelEditor {
       if (!this.originalVisibility.has(object)) this.originalVisibility.set(object, object.visible);
       object.visible = this.originalVisibility.get(object)! && this.floorIndex <= 0;
     }
-    if (this.floorIndex < 0) { this.applyTemplateVisibility(); return; }
+    for (const object of this.game.renderer.scene.children) {
+      if (!isGroundSceneSystem(object)) continue;
+      const atOpen = this.editorSceneVisibility.get(object) ?? this.originalSystemVisibility.get(object) ?? object.visible;
+      object.visible = atOpen && this.template !== 'blank' && this.floorIndex <= 0;
+    }
+    this.invalidateEditorShadows();
+    if (this.floorIndex < 0) { this.applyTemplateVisibility(); this.updateStartMarkerVisibility(); return; }
     for (const object of room.children) {
       if (object !== wing && object !== room.exterior) object.visible = false;
     }
     if (this.floorIndex === 0) for (const object of room.children) object.visible = this.originalVisibility.get(object) ?? object.visible;
     const bounds = new THREE.Box3();
+    room.exterior.visible = this.floorIndex < 5 && (this.originalVisibility.get(room.exterior) ?? true);
+    wing.surroundings.visible = this.floorIndex < 5;
     for (const object of wing.children) {
       if (object === wing.surroundings) continue;
       if (object === wing.courtyard) { object.visible = this.floorIndex === 0; continue; }
       bounds.setFromObject(object);
       if (bounds.isEmpty()) continue;
-      const level = Math.floor((bounds.min.y + .3) / 3.3);
+      const level = object.userData.levelEditorFloor === 5 || object.name.startsWith('B1 ') ? 5
+        : object.userData.levelEditorFloor === 6 || object.name.startsWith('B2 ') ? 6
+          : bounds.min.y < -5 ? 6 : bounds.min.y < -1 ? 5
+            : Math.floor((bounds.min.y + .3) / 3.3);
       object.visible = (this.originalVisibility.get(object) ?? true) && level === this.floorIndex;
     }
     this.applyTemplateVisibility();
     this.applyTopCutaway();
+    this.updateStartMarkerVisibility();
   }
 
   private applyTopCutaway(): void {
     if (this.viewMode !== '2d' || this.floorIndex < 0) return;
     const wing = this.game.room.mansionWing;
     if (!wing) return;
-    const cutHeight = this.floorIndex * 3.3 + 2.35;
+    const cutHeight = this.floorElevation(this.floorIndex) + 2.35;
     wing.traverse(object => {
       if (!(object instanceof THREE.Mesh) || !object.visible) return;
       this.topCutawayBounds.setFromObject(object);
@@ -1074,11 +1141,12 @@ export class LevelEditor {
     this.game.room.mansionWing?.setEmptyTemplate(template === 'blank');
     this.game.player.setEmptySite(template === 'blank');
     for (const object of this.game.renderer.scene.children) {
-      if (!originalSiteSystems.has(object.name)) continue;
+      if (!isGroundSceneSystem(object)) continue;
       if (!this.originalSystemVisibility.has(object)) this.originalSystemVisibility.set(object, object.visible);
       object.visible = template === 'blank' ? false : this.originalSystemVisibility.get(object)!;
     }
-    this.applyFloorVisibility();
+    if (this.active) this.applyFloorVisibility();
+    else this.applyTemplateVisibility();
   }
 
   private applyTemplateVisibility(): void {
@@ -1114,10 +1182,10 @@ export class LevelEditor {
       size.z / (2 * Math.tan(halfFov) * .72),
       8,
     ), 8, 88);
-    this.orbit.target.set(centre.x, this.floorIndex * 3.3, centre.z);
+    this.orbit.target.set(centre.x, this.floorElevation(this.floorIndex), centre.z);
     // TOP is a straight-down preset for the same live perspective camera.
     // OrbitControls stays enabled so a drag can tilt this view immediately.
-    this.camera.position.set(centre.x, this.floorIndex * 3.3 + distance, centre.z);
+    this.camera.position.set(centre.x, this.floorElevation(this.floorIndex) + distance, centre.z);
     this.orbit.update();
   }
 
@@ -1125,12 +1193,26 @@ export class LevelEditor {
     this.restoreTopCutaway();
     for (const [object, visible] of this.originalVisibility) object.visible = visible;
     this.originalVisibility.clear();
+    for (const object of this.game.renderer.scene.children) {
+      if (!isGroundSceneSystem(object)) continue;
+      const atOpen = this.editorSceneVisibility.get(object) ?? this.originalSystemVisibility.get(object) ?? object.visible;
+      object.visible = this.template !== 'blank' && atOpen;
+    }
+    this.editorSceneVisibility.clear();
     this.applyTemplateVisibility();
   }
 
   async open(): Promise<void> {
     if (this.active || !this.game.room.mansionWing) return;
     await this.game.renderer.waitForFrame();
+    this.registerMissionBoxes();
+    this.editorSceneVisibility.clear();
+    for (const object of this.game.renderer.scene.children) {
+      if (!isGroundSceneSystem(object)) continue;
+      this.editorSceneVisibility.set(object, this.template === 'blank'
+        ? this.originalSystemVisibility.get(object) ?? object.visible : object.visible);
+    }
+    this.game.room.mansionWing.restoreGameplayVisibility();
     if (document.pointerLockElement) await document.exitPointerLock();
     this.game.input.resetTransientInput();
     this.game.mortar.cancel();
@@ -1140,7 +1222,8 @@ export class LevelEditor {
     this.game.renderer.viewCamera = this.camera;
     // The editor uses its own camera and start markers. Keeping the first-person
     // player rig in the scene wastes skinned draws even when the roof hides it.
-    for (const object of [this.game.workerBody, this.game.fpsRig]) {
+    for (const object of [this.game.workerBody, this.game.fpsRig,
+      ...this.game.renderer.scene.children.filter(isDetachedViewModel)]) {
       this.playerVisibility.set(object, object.visible);
       object.visible = false;
     }
@@ -1149,10 +1232,11 @@ export class LevelEditor {
     this.orbit.enabled = true;
     this.topOrbit.enabled = false;
     this.applyFloorVisibility();
+    this.enableEditorShadowCache();
     this.enableEditorRaycasts();
     this.gizmo.getHelper().visible = this.nativeGizmoVisible();
     this.syncHighlights(this.selectedObjects);
-    this.playerMarker.visible = this.apprenticeMarker.visible = true;
+    this.updateStartMarkerVisibility();
     this.resize();
     this.refreshList();
     this.status('Edit structures live. SAVE writes browser and local project; EXPORT downloads JSON.');
@@ -1167,6 +1251,7 @@ export class LevelEditor {
     this.orbit.enabled = false;
     this.topOrbit.enabled = false;
     this.restoreVisibility();
+    this.restoreEditorShadowCache();
     for (const [object, visible] of this.playerVisibility) object.visible = visible;
     this.playerVisibility.clear();
     if (this.editorFog) {
@@ -1191,6 +1276,28 @@ export class LevelEditor {
   }
 
   private nativeGizmoVisible(): boolean { return this.active && Boolean(this.gizmo.object) && !matchMedia('(max-width: 1100px)').matches; }
+  private enableEditorShadowCache(): void {
+    this.game.renderer.scene.traverse(object => {
+      if (!(object instanceof THREE.DirectionalLight || object instanceof THREE.SpotLight || object instanceof THREE.PointLight) ||
+        !object.castShadow || this.editorShadows.has(object.shadow)) return;
+      const shadow = object.shadow;
+      this.editorShadows.set(shadow, shadow.autoUpdate);
+      // The editor's geometry is static between edits. Keep the rendered map,
+      // then refresh it on every scene change instead of redrawing it per frame.
+      shadow.autoUpdate = false;
+      shadow.needsUpdate = true;
+    });
+  }
+  private invalidateEditorShadows(): void {
+    for (const shadow of this.editorShadows.keys()) shadow.needsUpdate = true;
+  }
+  private restoreEditorShadowCache(): void {
+    for (const [shadow, autoUpdate] of this.editorShadows) {
+      shadow.autoUpdate = autoUpdate;
+      shadow.needsUpdate = true;
+    }
+    this.editorShadows.clear();
+  }
   private enableEditorRaycasts(): void {
     for (const asset of this.game.room.mansionWing?.editableAssets.values() ?? []) asset.traverse(node => {
       if (!(node instanceof THREE.Mesh) || this.editorRaycasts.has(node)) return;
@@ -1280,7 +1387,7 @@ export class LevelEditor {
       this.editorFog.fog.far = Math.max(this.editorFog.far, distance + 95);
     }
     if (this.viewMode === '2d') {
-      const height = this.floorIndex * 3.3;
+      const height = this.floorElevation(this.floorIndex);
       const drift = this.orbit.target.y - height;
       if (Math.abs(drift) > 1e-5) {
         this.orbit.target.y = height;
@@ -1770,7 +1877,7 @@ export class LevelEditor {
     if (!wing) return;
     const id = crypto.randomUUID();
     const wall = wing.addEditorWall(id, kind);
-    wall.position.set(Math.round(this.orbit.target.x * 4) / 4, Math.max(0, this.floorIndex) * 3.3, Math.round(this.orbit.target.z * 4) / 4);
+    wall.position.set(Math.round(this.orbit.target.x * 4) / 4, this.floorIndex < 0 ? 0 : this.floorElevation(this.floorIndex), Math.round(this.orbit.target.z * 4) / 4);
     this.added.add(wall.name);
     this.multiMode = false;
     this.selectWall(wall);
@@ -1782,7 +1889,7 @@ export class LevelEditor {
     if (!wing) return;
     const id = crypto.randomUUID();
     const surface = wing.addEditorSurface(id, kind);
-    surface.position.set(Math.round(this.orbit.target.x * 4) / 4, this.floorIndex < 0 && kind === 'floor' ? 3.3 : Math.max(0, this.floorIndex) * 3.3, Math.round(this.orbit.target.z * 4) / 4);
+    surface.position.set(Math.round(this.orbit.target.x * 4) / 4, this.floorIndex < 0 && kind === 'floor' ? 3.3 : this.floorIndex < 0 ? 0 : this.floorElevation(this.floorIndex), Math.round(this.orbit.target.z * 4) / 4);
     this.added.add(surface.name);
     this.multiMode = false;
     this.selectWall(surface);
@@ -1803,7 +1910,13 @@ export class LevelEditor {
     this.playerMarker.rotation.y = this.playerStartYaw;
     this.apprenticeMarker.position.copy(this.apprenticeStarts.get(this.apprenticeIndex)!).add(new THREE.Vector3(0, -.3, 0));
     this.apprenticeMarker.rotation.y = this.apprenticeStartYaws.get(this.apprenticeIndex)!;
-    this.playerMarker.visible = this.apprenticeMarker.visible = this.active;
+    this.updateStartMarkerVisibility();
+  }
+  private updateStartMarkerVisibility(): void {
+    const visibleOnFloor = (marker: THREE.Object3D): boolean => this.active &&
+      (this.floorIndex < 0 || Math.abs(marker.position.y - this.floorElevation(this.floorIndex) - this.game.player.eyeHeight + .3) < .7);
+    this.playerMarker.visible = visibleOnFloor(this.playerMarker);
+    this.apprenticeMarker.visible = visibleOnFloor(this.apprenticeMarker);
   }
   private document(): LevelDocument {
     const walls: WallRecord[] = [];
@@ -1827,10 +1940,11 @@ export class LevelEditor {
       scale: surface.scale.toArray() as [number, number, number],
     });
     const assets: AssetRecord[] = [];
-    for (const asset of this.game.room.mansionWing?.editableAssets.values() ?? []) assets.push({
-      id: asset.name, position: asset.position.toArray() as [number, number, number],
-      rotationY: asset.rotation.y, scale: asset.scale.toArray() as [number, number, number],
-    });
+    for (const asset of this.game.room.mansionWing?.editableAssets.values() ?? []) {
+      if (asset.userData.levelEditorMissionPoint) continue;
+      assets.push({ id: asset.name, position: asset.position.toArray() as [number, number, number],
+        rotationY: asset.rotation.y, scale: asset.scale.toArray() as [number, number, number] });
+    }
     return { version: 1, template: this.template, walls, surfaces, assets, groups: [...this.groups.values()].map(group => ({ ...group, members: [...group.members] })), playerStart: this.playerStart.toArray() as [number, number, number], playerStartYaw: this.playerStartYaw, apprenticeStart: this.apprenticeStart.toArray() as [number, number, number],
       apprenticeStarts: Array.from({ length: 5 }, (_, offset) => this.apprenticeStarts.get(offset + 1)!.toArray() as [number, number, number]),
       apprenticeStartYaws: Array.from({ length: 5 }, (_, offset) => this.apprenticeStartYaws.get(offset + 1)!) };
@@ -1928,7 +2042,7 @@ export class LevelEditor {
         if (typeof record?.id !== 'string' || !finiteTriplet(record.position) || !finiteTriplet(record.scale) ||
           !Number.isFinite(record.rotationY) || record.scale.some(value => Math.abs(value) < .001)) continue;
         const asset = wing.editableAssets.get(record.id);
-        if (!asset) continue;
+        if (!asset || asset.userData.levelEditorMissionPoint) continue;
         asset.position.fromArray(record.position);
         asset.rotation.y = record.rotationY;
         if (!asset.userData.levelEditorScaleLocked) asset.scale.fromArray(record.scale);

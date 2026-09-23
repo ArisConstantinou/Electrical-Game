@@ -51,14 +51,27 @@ export class MansionSurroundings extends THREE.Group {
     albedo.anisotropy = 4;
     const ground = new THREE.MeshStandardMaterial({ name: 'Measured gravel scan over rising Cypriot terrain',
       map: albedo, color: 0xc9c5b4, vertexColors: true, roughness: 1 });
-    const nx = 85, nz = 82, positions: number[] = [], uvs: number[] = [], colors: number[] = [], indices: number[] = [];
+    const axis = (start: number, end: number, count: number, joints: number[]): number[] =>
+      [...new Set([...Array.from({ length: count + 1 }, (_, index) => start + index * (end - start) / count), ...joints])]
+        .sort((a, b) => a - b);
+    // The excavation is cut from the actual terrain mesh. A solid ground
+    // plane through the two below-grade stair flights would hide the route.
+    const xs = axis(-25, 80.15, 85, [4.5, 6.5, 8.5, 9, 18]);
+    const zs = axis(-43, 59, 82, [-3.5, 0, 6, 7.6, 12.6]);
+    const nx = xs.length - 1, nz = zs.length - 1;
+    const positions: number[] = [], uvs: number[] = [], colors: number[] = [], indices: number[] = [];
     for (let iz = 0; iz <= nz; iz++) for (let ix = 0; ix <= nx; ix++) {
-      const x = -25 + ix * 105.15 / nx, z = -43 + iz * 102 / nz;
+      const x = xs[ix], z = zs[iz];
       positions.push(x, this.terrainHeight(x, z), z);
       uvs.push(x / 2.5, z / 2.5);
       const variation = .91 + .065 * Math.sin(x * .17 + z * .13) + .035 * Math.sin(x * .41 - z * .34);
       colors.push(variation, variation * .985, variation * .955);
       if (ix < nx && iz < nz) {
+        const cx = (xs[ix] + xs[ix + 1]) / 2, cz = (zs[iz] + zs[iz + 1]) / 2;
+        const stairWell = cx >= 4.5 && cx <= 8.5 && cz >= 7.6 && cz <= 12.6;
+        const basementCorridor = cx >= 6.5 && cx <= 9 && cz >= 0 && cz <= 7.6;
+        const garage = cx >= 9 && cx <= 18 && cz >= -3.5 && cz <= 6;
+        if (stairWell || basementCorridor || garage) continue;
         const a = iz * (nx + 1) + ix, b = a + nx + 1;
         indices.push(a, b, a + 1, a + 1, b, b + 1);
       }
