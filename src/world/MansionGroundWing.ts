@@ -11,6 +11,7 @@ import { MansionSurroundings } from './MansionSurroundings';
 import { BrickWall } from './BrickWall';
 import { hollowClayWallEnds } from './HollowClayEnd';
 import { laidClayGeometry } from './LaidClayDamage';
+import { createGarageClayStack, createTimberPallet } from './LooseClaySupplies';
 import { MansionMasonryDemolition, type MasonryAim, type MasonryBrickInstance, type MansionBrickDamage } from './MansionMasonryDemolition';
 
 /** Traversable unfinished mansion shell, including the original work room. */
@@ -691,24 +692,8 @@ export class MansionGroundWing extends THREE.Group {
     this.addGarageStructuralJunctions();
     // Staged materials make the construction use legible while leaving the
     // whole vehicle bay empty. Each pile has a matching body obstacle.
-    const pallet = new THREE.Mesh(new RoundedBoxGeometry(1.35, .13, .9, 2, .006),
-      siteMaterial('concrete', 0x9c8970, .5, .5));
-    pallet.name = 'Raised pallet under staged unfitted masonry supplies';
-    pallet.position.set(11.1, .08, -1.85);
-    pallet.castShadow = pallet.receiveShadow = true;
-    this.add(pallet);
-    const blocks = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1),
-      siteMaterial('clay', 0xb56843, .5, .5), 24);
-    blocks.name = 'Separate stacked clay units awaiting garage partition work';
-    const matrix = new THREE.Matrix4();
-    for (let row = 0; row < 3; row++) for (let col = 0; col < 8; col++) {
-      const index = row * 8 + col;
-      blocks.setMatrixAt(index, matrix.compose(new THREE.Vector3(10.58 + (col % 4) * .32, .24 + row * .13,
-        -2.12 + Math.floor(col / 4) * .37), new THREE.Quaternion(), new THREE.Vector3(.3, .12, .35)));
-    }
-    blocks.castShadow = blocks.receiveShadow = true;
-    blocks.computeBoundingSphere();
-    this.add(blocks);
+    this.add(createTimberPallet('Raised pallet under staged unfitted masonry supplies', 1.35, .9, 11.1, -1.85));
+    this.add(createGarageClayStack());
   }
 
   private addGarageStructuralJunctions(): void {

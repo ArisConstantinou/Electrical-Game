@@ -5,6 +5,7 @@ import { brickFacePatch } from './BrickFacePatch';
 import { masonryFaceMaterial } from './BrickFaceMaterial';
 import { siteMaterial } from './SiteMaterials';
 import { MansionMasonryDemolition } from './MansionMasonryDemolition';
+import { createCourtyardClayStack, createTimberPallet } from './LooseClaySupplies';
 
 /** A traversable open-air room, with reused live olive geometry rather than a backdrop. */
 export class MansionCourtyard extends THREE.Group {
@@ -256,24 +257,8 @@ export class MansionCourtyard extends THREE.Group {
   }
 
   private addBrickStorage(): void {
-    const geometry = new THREE.BoxGeometry(1, 1, 1), patches = new Float32Array(48 * 4);
-    geometry.setAttribute('brickPatch', new THREE.InstancedBufferAttribute(patches, 4));
-    const stack = new THREE.InstancedMesh(geometry, masonryFaceMaterial, 48);
-    stack.name = 'Pallet stack of unlaid clay units in courtyard';
-    const matrix = new THREE.Matrix4();
-    for (let i = 0; i < 48; i++) {
-      const row = Math.floor(i / 12), col = i % 12;
-      const x = 16.42 + (col % 4) * .29, z = 14.42 + Math.floor(col / 4) * .19;
-      patches.set(brickFacePatch(row, col, 13), i * 4);
-      stack.setMatrixAt(i, matrix.compose(new THREE.Vector3(x, .145 + row * .135, z), new THREE.Quaternion(), new THREE.Vector3(.27, .12, .17)));
-    }
-    stack.castShadow = stack.receiveShadow = true;
-    stack.computeBoundingSphere(); this.add(stack);
-    const pallet = new THREE.Mesh(new THREE.BoxGeometry(1.28, .09, .71), siteMaterial('concrete', 0xbab1a3, .5, .4));
-    pallet.name = 'Reusable slab pallet under spare bricks';
-    pallet.position.set(16.85, .045, 14.61);
-    pallet.castShadow = pallet.receiveShadow = true;
-    this.add(pallet);
+    this.add(createCourtyardClayStack());
+    this.add(createTimberPallet('Reusable timber pallet under spare bricks', 1.28, .71, 16.85, 14.61));
     this.obstacles.push({ id: 'court-stored-masonry', minX: 16.2, maxX: 17.5, minZ: 14.25, maxZ: 15.0 });
   }
 }
