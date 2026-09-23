@@ -67,8 +67,35 @@ try {
     await page.locator('#inspector-bar-handle').tap();
     assert.equal(await page.locator('#game-shell').getAttribute('data-inspector-open'),'false');
     assert.equal(await page.locator('#mobile-top-rail').evaluate(el=>el.getBoundingClientRect().width<=44),true);
+    await page.locator('#inspector-bar-handle').tap();
+    await page.locator('#site-pro-tools').tap();
+    await page.evaluate(()=>{
+      const game=window.__wireTheHouse,mixing=game.mixing,camera=game.renderer.camera;
+      game.step=()=>{};
+      const station=mixing.models.group.getWorldPosition(camera.position.clone());
+      camera.position.copy(station).add({x:0,y:1.65,z:-1.3});camera.updateMatrixWorld(true);
+      mixing.setActive(true);mixing.update(1/60);mixing.present();
+    });
+    const mixingRail=await page.locator('#mixing-toolbelt').evaluate(rail=>{
+      const bounds=rail.getBoundingClientRect(),role=document.querySelector('#site-pro-tools').getBoundingClientRect();
+      return {hidden:rail.hidden,left:bounds.left,right:bounds.right,roleLeft:role.left,
+        scrollWidth:rail.scrollWidth,clientWidth:rail.clientWidth,edge:rail.dataset.scrollEdge,
+        labels:[...rail.querySelectorAll('button')].map(button=>button.getAttribute('aria-label'))};
+    });
+    assert.equal(mixingRail.hidden,false,'mixing tools are visible at the station');
+    assert(mixingRail.right<=mixingRail.roleLeft,'mixing tools overlap the role controls');
+    assert(mixingRail.labels.every(Boolean),'every icon-only mixing action needs an accessible name');
+    if(mixingRail.scrollWidth>mixingRail.clientWidth+2){
+      assert.equal(mixingRail.edge,'start','the rail must hint at further tools');
+      await page.locator('#mixing-toolbelt').evaluate(rail=>{rail.scrollLeft=rail.scrollWidth-rail.clientWidth;});
+      await page.waitForFunction(()=>document.querySelector('#mixing-toolbelt').dataset.scrollEdge==='end');
+      const crouched=await page.evaluate(()=>window.__wireTheHouse.player.crouched);
+      await page.locator('#mixing-stance').tap();
+      assert.notEqual(await page.evaluate(()=>window.__wireTheHouse.player.crouched),crouched,'the last scrolled action must work');
+    }else assert.equal(mixingRail.edge,'none','a fully visible rail needs no scroll hint');
+    await page.screenshot({path:`output/mobile-top-rail-ui/${name}-mixing.png`});
     assert.deepEqual(errors,[]);
-    results.push({viewport,worker,joystickBase:closed,movedInput:held.move,errors});
+    results.push({viewport,worker,mixingRail,joystickBase:closed,movedInput:held.move,errors});
     await context.close();
   }
   console.log(JSON.stringify({passed:true,results},null,2));

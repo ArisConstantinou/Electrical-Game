@@ -143,6 +143,15 @@ export class MixingStation {
     this.toolbelt.querySelector('#mixing-put-down')!.addEventListener('click',()=>this.chooseTool('hands'));
     this.toolbelt.insertAdjacentHTML('beforeend','<button type="button" id="mixing-stance" aria-label="Σκύψε για εργασία στη σύκλα" aria-pressed="false"><b>↧</b><span>ΣΚΥΨΕ</span></button>');
     this.toolbelt.querySelector('#mixing-stance')!.addEventListener('click',()=>window.dispatchEvent(new CustomEvent('wirehouse:work-height')));
+    const showToolbeltOverflow = () => {
+      const remaining = this.toolbelt.scrollWidth - this.toolbelt.clientWidth;
+      this.toolbelt.dataset.scrollEdge = remaining < 2 ? 'none'
+        : this.toolbelt.scrollLeft < 2 ? 'start'
+        : this.toolbelt.scrollLeft >= remaining - 2 ? 'end' : 'middle';
+    };
+    this.toolbelt.dataset.scrollEdge = 'start';
+    this.toolbelt.addEventListener('scroll', showToolbeltOverflow, { passive:true });
+    new ResizeObserver(showToolbeltOverflow).observe(this.toolbelt);
     game.hud.shell.append(this.toggle,this.panel,this.prompt,this.finish,this.toolbelt);
     this.receipt=new MixingReceipt(game.hud.shell);
     this.toggle.hidden=true;

@@ -49,6 +49,15 @@
     overflow-x:auto; overflow-y:hidden; touch-action:pan-x;
     border:0; border-radius:0; background:transparent; box-shadow:none;
   }
+  #game-shell.mixing-stage #mixing-toolbelt[data-scroll-edge="start"] {
+    mask-image:linear-gradient(90deg,#000 0%,#000 calc(100% - 16px),transparent 100%);
+  }
+  #game-shell.mixing-stage #mixing-toolbelt[data-scroll-edge="middle"] {
+    mask-image:linear-gradient(90deg,transparent 0%,#000 16px,#000 calc(100% - 16px),transparent 100%);
+  }
+  #game-shell.mixing-stage #mixing-toolbelt[data-scroll-edge="end"] {
+    mask-image:linear-gradient(90deg,transparent 0%,#000 16px,#000 100%);
+  }
   #game-shell.mixing-stage[data-tools-open="true"] #mixing-toolbelt button {
     flex:0 0 40px; width:40px; min-width:40px; height:44px; min-height:44px; padding:0;
     border:0; border-radius:50%; background:transparent; color:#ffdf36;

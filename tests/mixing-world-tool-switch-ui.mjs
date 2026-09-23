@@ -12,12 +12,17 @@ const baselineRef=process.argv.find(a=>a.startsWith('--baseline-ref='))?.split('
 const baselineCommit=repro?execFileSync('git',['rev-parse',baselineRef],{encoding:'utf8'}).trim():null;
 const baselineSource=repro?execFileSync('git',['show',`${baselineCommit}:src/systems/MixingStation.ts`],{encoding:'utf8'}):null;
 const out='output/mixing-world-tool-switch';await mkdir(out,{recursive:true});
-const report={url,mobileIsEmulation:true,repro,baselineCommit,cases:[],errors:[],passed:false};
+const report={url,mobileIsEmulation:true,repro,baselineCommit,cases:[],errors:[],optionalStorage404:[],passed:false};
 const browser=await chromium.launch({channel:'chrome',headless:true});
 try{
   for(const layout of [{name:'desktop',width:1366,height:768,mobile:false},{name:'portrait',width:390,height:844,mobile:true},{name:'landscape',width:844,height:390,mobile:true}]){
     const context=await browser.newContext({viewport:{width:layout.width,height:layout.height},isMobile:layout.mobile,hasTouch:layout.mobile});await blockPointerLock(context);
-    const page=await context.newPage();page.on('pageerror',e=>report.errors.push(e.message));page.on('console',m=>{if(m.type()==='error')report.errors.push(m.text());});
+    const page=await context.newPage();page.on('pageerror',e=>report.errors.push(e.message));
+    page.on('console',m=>{if(m.type()==='error'&&!m.text().startsWith('Failed to load resource:'))report.errors.push(m.text());});
+    page.on('response',response=>{if(response.status()<400)return;const path=new URL(response.url()).pathname;
+      if(response.status()===404&&path==='/__wire-house-mansion-level')report.optionalStorage404.push(response.url());
+      else report.errors.push(`${response.status()} ${response.url()}`);
+    });
     if(repro)await page.route('**/src/systems/MixingStation.ts*',async route=>{
       const live=await route.fetch(),liveSource=await live.text();
       const three=liveSource.match(/import \* as THREE from ["']([^"']+)["']/)?.[1];assert(three,'Vite-resolved Three import');
@@ -78,8 +83,16 @@ try{
     // The dedicated visible put-down button works both during and after pouring.
     await page.evaluate(()=>window.__wireTheHouse.mixing.batch.discard());await equip('water');await aim('bucket');await press('interact');await button('#mixing-put-down');const queuedPutDown=await state();assert.equal(queuedPutDown.pendingTool,'hands');assert.equal(queuedPutDown.mixing.activity,'water');assert.equal(queuedPutDown.mixing.tool,'water');await step(100);const putDown=await state();assert.equal(putDown.mixing.tool,'hands');assert.equal(putDown.waterVisible,true);assert(Math.abs(putDown.mixing.batch.waterLitres-20/3)<1e-8);await shot('water-put-down');
     await aim('water');const waterPrompt=await state();assert.match(waterPrompt.prompt,/ΠΙΑΣΕ.*(?:ΝΕΡ|ΚΑΝΑΤ)/);await press();assert.equal((await state()).mixing.tool,'water','World jug pickup matches its prompt');await button('#mixing-put-down');const immediatePutDown=await state();assert.equal(immediatePutDown.mixing.tool,'hands');assert.equal(immediatePutDown.mixing.batch.massKg,putDown.mixing.batch.massKg,'Putting down the jug preserves the actual water');
-    const controls=await page.locator('#mixing-toolbelt').evaluate(el=>Array.from(el.querySelectorAll('button')).map(button=>({id:button.id||button.dataset.mixEquip,text:button.textContent,bounds:button.getBoundingClientRect().toJSON(),textBounds:Array.from(button.querySelectorAll('span,small')).map(label=>{const range=document.createRange();range.selectNodeContents(label);return range.getBoundingClientRect().toJSON();}),fontSize:Math.min(...Array.from(button.querySelectorAll('span,small')).map(label=>parseFloat(getComputedStyle(label).fontSize)))})));
-    for(const control of controls){assert(control.bounds.x>=0&&control.bounds.right<=layout.width&&control.bounds.y>=0&&control.bounds.bottom<=layout.height,`${control.id} fits ${layout.name}`);assert(control.fontSize>=12,`${control.id} label is readable`);for(const bounds of control.textBounds)assert(bounds.x>=control.bounds.x-1&&bounds.right<=control.bounds.right+1&&bounds.y>=control.bounds.y&&bounds.bottom<=control.bounds.bottom,`${control.id} text fits its button in ${layout.name}`);}
+    const rail=await page.locator('#mixing-toolbelt').boundingBox();assert(rail&&rail.x>=0&&rail.x+rail.width<=layout.width,`mixing rail fits ${layout.name}`);
+    const controls=await page.locator('#mixing-toolbelt').evaluate(el=>Array.from(el.querySelectorAll('button')).map(button=>({id:button.id||button.dataset.mixEquip,label:button.getAttribute('aria-label'),text:button.textContent,bounds:button.getBoundingClientRect().toJSON(),textBounds:Array.from(button.querySelectorAll('span,small')).map(label=>{const range=document.createRange();range.selectNodeContents(label);return range.getBoundingClientRect().toJSON();}),fontSize:Math.min(...Array.from(button.querySelectorAll('span,small')).map(label=>parseFloat(getComputedStyle(label).fontSize)))})));
+    if(layout.mobile){
+      for(const control of controls){
+        assert(control.label,`${control.id} has an accessible name`);
+        await page.locator(control.id==='water'||control.id==='trowel'||control.id==='shovel'||control.id==='mixer'?`[data-mix-equip="${control.id}"]`:`#${control.id}`).scrollIntoViewIfNeeded();
+        const bounds=await page.locator(control.id==='water'||control.id==='trowel'||control.id==='shovel'||control.id==='mixer'?`[data-mix-equip="${control.id}"]`:`#${control.id}`).boundingBox();
+        assert(bounds&&bounds.x>=rail.x-1&&bounds.x+bounds.width<=rail.x+rail.width+1,`${control.id} is reachable in ${layout.name}`);
+      }
+    }else for(const control of controls){assert(control.bounds.x>=0&&control.bounds.right<=layout.width&&control.bounds.y>=0&&control.bounds.bottom<=layout.height,`${control.id} fits ${layout.name}`);assert(control.fontSize>=12,`${control.id} label is readable`);for(const bounds of control.textBounds)assert(bounds.x>=control.bounds.x-1&&bounds.right<=control.bounds.right+1&&bounds.y>=control.bounds.y&&bounds.bottom<=control.bounds.bottom,`${control.id} text fits its button in ${layout.name}`);}
     assert.equal(immediatePutDown.wallCalls,0);assert.equal(immediatePutDown.launched,0);assert.equal(immediatePutDown.overflow,false);assert.equal(immediatePutDown.renderError,'');report.cases.push({layout:layout.name,overlap,beforePickup,picked,sand,queuedCement,switchedCement,queuedWater,switchedWater,queuedPutDown,putDown,immediatePutDown,controls});await context.close();
   }
   assert.deepEqual(report.errors,[]);report.passed=!repro;
