@@ -155,6 +155,7 @@ export class Room extends THREE.Group {
       column.castShadow = true;
       column.receiveShadow = true;
       this.referenceWalls.push(column);
+      this.brickWall.occluders.push(column);
       this.add(column);
     }
 

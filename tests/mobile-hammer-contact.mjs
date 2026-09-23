@@ -36,8 +36,8 @@ try{
     await blockPointerLock(context);
     const page=await context.newPage();page.on('pageerror',e=>report.errors.push(e.message));
     try{
-      await page.goto(url);await page.waitForFunction(()=>window.__wireTheHouse?.renderer.renderCamera,{timeout:120000});
-      await page.locator('#start-button').tap();await page.waitForTimeout(1200);await page.locator('#site-pro-tools').tap();await page.locator('#mobile-tool-slider [data-tool="hammer"]').tap();await page.waitForFunction(()=>window.__wireTheHouse.selectedTool==='hammer');
+      await page.goto(url);await page.waitForFunction(()=>window.__wireTheHouse?.isReadyForStart,{timeout:120000});
+      await page.locator('#start-button').tap();await page.locator('#start-screen').waitFor({state:'hidden'});await page.locator('#site-pro-tools').tap();await page.locator('#mobile-tool-slider [data-tool="hammer"]').tap();await page.waitForFunction(()=>window.__wireTheHouse.selectedTool==='hammer');
       await page.evaluate(({distance,yaw})=>{
         const g=window.__wireTheHouse,c=g.renderer.camera;
         window.__contactStep=g.step.bind(g);g.step=()=>{};

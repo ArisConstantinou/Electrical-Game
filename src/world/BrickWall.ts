@@ -21,6 +21,7 @@ export interface MasonryImpact {
 // Poly Haven "Red Brick" by Rob Tuytel, CC0: https://polyhaven.com/a/red_brick
 // Each exposed physical clay unit samples one mortar-free photographed face.
 const brickImageReady = uniform(0);
+const identityMatrix = new THREE.Matrix4();
 const brickImage = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}assets/masonry/red-brick-polyhaven-1k.jpg`, () => { brickImageReady.value = 1; });
 brickImage.colorSpace = THREE.SRGBColorSpace;
 brickImage.anisotropy = 8;
@@ -49,6 +50,7 @@ type MeshData = ReturnType<MasonryVolume['buildChunkMesh']>;
 /** The wall owns one continuous material volume. Brick IDs never select damage. */
 export class BrickWall extends THREE.Group {
   readonly volume: MasonryVolume;
+  readonly occluders: THREE.Object3D[] = [];
   readonly performanceBudget = {workerMeshing:true, maxInFlightMeshes:2, supportNodesPerFrame:2048};
   private meshWorker: Worker | null = null;
   private readonly pendingMeshes = new Map<string,number>();
@@ -72,6 +74,10 @@ export class BrickWall extends THREE.Group {
   private readonly pristineRanges = new Map<string, {start: number; count: number}>();
   private readonly pristine: THREE.Mesh;
   private readonly raycaster = new THREE.Raycaster();
+  private readonly occupancyWorldMatrix = new THREE.Matrix4();
+  private readonly occupancyInverseMatrix = new THREE.Matrix4();
+  private readonly occupancyProbe = new THREE.Vector3();
+  private occupancyMatrixValid = false;
   private readonly canvas = document.createElement('canvas');
   private readonly paint: CanvasRenderingContext2D;
   private readonly texture: THREE.CanvasTexture;
@@ -161,7 +167,7 @@ export class BrickWall extends THREE.Group {
   prepareMultiPipeChases(points: readonly InstallationPoint[], width=.20): {widthM:number;removedNodes:number} {
     let removedNodes=0;
     for(const point of points){
-      const centre=point.position;
+      const centre=this.worldToLocal(point.getWorldPosition(new THREE.Vector3()));
       const chaseHalfWidth=width/2+.008;
       const cavityHalfWidth=point.boxGroup.groupWidth/2+.024;
       const boxHalfHeight=point.boxGroup.groupHeight/2+.022;
@@ -187,15 +193,44 @@ export class BrickWall extends THREE.Group {
   aim(camera: THREE.Camera, maxDistance:number = GAME_CONFIG.interaction.maxDistance): { point: THREE.Vector3 } | null {
     // This ray needs only the camera transform, not every finger/tool child.
     camera.updateWorldMatrix(true, false);
+    this.updateWorldMatrix(true, false);
     this.raycaster.setFromCamera(new THREE.Vector2(), camera);
-    const hit = this.volume.raycast(this.raycaster.ray.origin, this.raycaster.ray.direction, maxDistance);
+    const transformed = !this.matrixWorld.equals(identityMatrix);
+    const inverse = transformed ? this.matrixWorld.clone().invert() : null;
+    const origin = transformed ? this.raycaster.ray.origin.clone().applyMatrix4(inverse!) : this.raycaster.ray.origin;
+    const direction = transformed ? this.raycaster.ray.direction.clone().transformDirection(inverse!) : this.raycaster.ray.direction;
+    const scale = transformed ? this.getWorldScale(new THREE.Vector3()) : null;
+    const localRange = scale ? maxDistance / Math.max(.001, Math.min(scale.x, scale.y, scale.z)) : maxDistance;
+    const hit = this.volume.raycast(origin, direction, localRange);
     if (!hit) return null;
-    // Concrete columns stand in front of this masonry. Never drill through them
-    // by hitting the brick volume hidden behind the structural member.
-    if (Math.abs(hit.point.x) > 2.54 && Math.abs(hit.point.x) < 2.9) return null;
-    return {point: new THREE.Vector3(hit.point.x, hit.point.y, hit.point.z)};
+    const point = new THREE.Vector3(hit.point.x, hit.point.y, hit.point.z);
+    if (transformed) point.applyMatrix4(this.matrixWorld);
+    const distance = point.distanceTo(this.raycaster.ray.origin);
+    if (distance > maxDistance) return null;
+    // Test the real columns at their current editor positions. A fixed local-X
+    // exclusion band would keep blocking masonry after the wall moves away.
+    this.raycaster.near = 0;
+    this.raycaster.far = distance - .001;
+    for (const occluder of this.occluders) {
+      if (!occluder.visible || !occluder.parent?.visible) continue;
+      occluder.updateWorldMatrix(true, false);
+      if (this.raycaster.intersectObject(occluder, true).length) return null;
+    }
+    return {point};
   }
-  isSolidAt(x: number, y: number, z: number): boolean { return this.volume.isOccupied(x, y, z); }
+  isSolidAt(x: number, y: number, z: number): boolean {
+    // Debris asks for occupancy many times per frame. A full ancestor traversal
+    // and matrix inversion per probe would make a moved wall prohibitively slow.
+    if (this.matrixWorldNeedsUpdate || this.parent?.matrixWorldNeedsUpdate) this.updateWorldMatrix(true, false);
+    if (this.matrixWorld.equals(identityMatrix)) return this.volume.isOccupied(x, y, z);
+    if (!this.occupancyMatrixValid || !this.matrixWorld.equals(this.occupancyWorldMatrix)) {
+      this.occupancyWorldMatrix.copy(this.matrixWorld);
+      this.occupancyInverseMatrix.copy(this.matrixWorld).invert();
+      this.occupancyMatrixValid = true;
+    }
+    const local = this.occupancyProbe.set(x, y, z).applyMatrix4(this.occupancyInverseMatrix);
+    return this.volume.isOccupied(local.x, local.y, local.z);
+  }
   removeAtAim(camera: THREE.Camera, _continuing = false): MasonryImpact | null { return this.strike(camera); }
   processPendingSupport(): MasonryImpact | null {
     if(!this.volume.pendingSupportCount) return null;
@@ -204,7 +239,8 @@ export class BrickWall extends THREE.Group {
     this.removedNodes=this.volume.removedNodeCount;this.removedVolume=this.volume.removedVolume;
     this.lastCoverage.clear();this.lastResult=result;
     this.flushGeometry();
-    return {points:result.fragments.map(f=>new THREE.Vector3(f.position.x,f.position.y,f.position.z)),kind:'demolish-split',brickSize:new THREE.Vector3(.05,.05,.02),seed:result.seed,destroyed:false,fragments:result.fragments,removedVolume:result.removedVolume};
+    const fragments = this.fragmentsToWorld(result.fragments);
+    return {points:fragments.map(f=>new THREE.Vector3(f.position.x,f.position.y,f.position.z)),kind:'demolish-split',brickSize:new THREE.Vector3(.05,.05,.02),seed:result.seed,destroyed:false,fragments,removedVolume:result.removedVolume};
   }
   recessChaseAtAim(camera: THREE.Camera, _pointId: string): MasonryImpact | null {
     // CHASE uses the same physical contact; spray guides the player, never a cutter.
@@ -222,22 +258,59 @@ export class BrickWall extends THREE.Group {
   /** Independent workers submit physical contact without replacing the player's provider. */
   strikeContact(contact: ChiselContact): MasonryImpact | null {
     const start = performance.now();
-    const result = this.volume.impact({ ...contact, widthM: contact.widthM ?? this.chiselWidthM, trim: this.chiselTiltDegrees < 0 });
+    this.updateWorldMatrix(true, false);
+    const transformed = !this.matrixWorld.equals(identityMatrix);
+    const inverse = transformed ? this.matrixWorld.clone().invert() : null;
+    const localContact = transformed ? {
+      ...contact,
+      point: contact.point.clone().applyMatrix4(inverse!),
+      direction: contact.direction.clone().transformDirection(inverse!),
+      edge: contact.edge.clone().transformDirection(inverse!),
+    } : contact;
+    const edgeScale = transformed
+      ? contact.edge.clone().applyMatrix3(new THREE.Matrix3().setFromMatrix4(inverse!)).length() / Math.max(1e-6, contact.edge.length())
+      : 1;
+    const result = this.volume.impact({ ...localContact, widthM: (contact.widthM ?? this.chiselWidthM) * edgeScale, trim: this.chiselTiltDegrees < 0 });
     if (!result.contact) return null;
     this.lastResult = result;
     this.impactCount++;
     this.removedNodes += result.removedNodes;
     this.removedVolume += result.removedVolume;
-    if (result.removedNodes) this.maxDepth = Math.min(this.volume.depth, Math.max(this.maxDepth, this.volume.frontZ - contact.point.z + .008));
+    if (result.removedNodes) this.maxDepth = Math.min(this.volume.depth, Math.max(this.maxDepth, this.volume.frontZ - localContact.point.z + .008));
     this.lastCalculationMs = performance.now() - start;
     this.peakCalculationMs = Math.max(this.peakCalculationMs, this.lastCalculationMs);
     const meshStart = performance.now();
     this.flushGeometry();
-    this.clearPaint(contact.point, .045);
+    this.clearPaint(localContact.point, .045);
     this.lastMeshMs = performance.now() - meshStart;
     this.peakMeshMs = Math.max(this.peakMeshMs, this.lastMeshMs);
     const detached = result.fragments.some(fragment => fragment.detached);
-    return {points: [contact.point.clone()], kind: detached ? 'demolish-split' : result.removedNodes > 30 ? 'demolish-spall' : result.removedNodes ? 'demolish-chip' : 'demolish-crack', brickSize: new THREE.Vector3(.055, .035, .016), seed: result.seed, destroyed: false, fragments: result.fragments, removedVolume: result.removedVolume, releaseDirection: result.releaseDirection, releaseEnergyJ: result.releaseEnergyJ};
+    const releaseDirection = result.releaseDirection && transformed
+      ? new THREE.Vector3(result.releaseDirection.x, result.releaseDirection.y, result.releaseDirection.z).transformDirection(this.matrixWorld)
+      : result.releaseDirection;
+    return {points: [contact.point.clone()], kind: detached ? 'demolish-split' : result.removedNodes > 30 ? 'demolish-spall' : result.removedNodes ? 'demolish-chip' : 'demolish-crack', brickSize: new THREE.Vector3(.055, .035, .016), seed: result.seed, destroyed: false, fragments: this.fragmentsToWorld(result.fragments), removedVolume: result.removedVolume, releaseDirection, releaseEnergyJ: result.releaseEnergyJ};
+  }
+  private fragmentsToWorld(fragments: MasonryFragment[]): MasonryFragment[] {
+    this.updateWorldMatrix(true, false);
+    if (this.matrixWorld.equals(identityMatrix)) return fragments;
+    const linear = new THREE.Matrix3().setFromMatrix4(this.matrixWorld);
+    const source = new THREE.Vector3();
+    const corner = new THREE.Vector3();
+    return fragments.map(fragment => {
+      const position = source.set(fragment.position.x, fragment.position.y, fragment.position.z).applyMatrix4(this.matrixWorld).clone();
+      const size = new THREE.Vector3(fragment.size.x, fragment.size.y, fragment.size.z);
+      const half = size.multiplyScalar(.5);
+      const bounds = new THREE.Box3().makeEmpty();
+      for (const x of [-1, 1]) for (const y of [-1, 1]) for (const z of [-1, 1])
+        bounds.expandByPoint(corner.set(x * half.x, y * half.y, z * half.z).applyMatrix3(linear));
+      const worldSize = bounds.getSize(new THREE.Vector3());
+      const positions = fragment.positions?.slice();
+      if (positions) for (let i = 0; i < positions.length; i += 3) {
+        corner.set(positions[i], positions[i + 1], positions[i + 2]).applyMatrix3(linear);
+        positions[i] = corner.x; positions[i + 1] = corner.y; positions[i + 2] = corner.z;
+      }
+      return { ...fragment, position, size: worldSize, positions };
+    });
   }
   flushGeometry(): void {
     for(const key of this.volume.takeDirtyChunks()) {
@@ -318,14 +391,15 @@ export class BrickWall extends THREE.Group {
   }
 
   canFitBoxes(point: InstallationPoint): boolean {
-    const p = point.position;
+    const p = this.worldToLocal(point.getWorldPosition(new THREE.Vector3()));
     // Clearance also covers the small initial placement error and final leveling.
     return this.volume.cavityBox({x:p.x-point.boxGroup.groupWidth/2-.008, y:p.y-.047, z:p.z-.049}, {x:p.x+point.boxGroup.groupWidth/2+.008, y:p.y+.047, z:p.z+.001}).clear;
   }
   canFitConduit(point: InstallationPoint): boolean {
-    const startY = point.position.y - point.boxGroup.groupHeight / 2;
+    const p = this.worldToLocal(point.getWorldPosition(new THREE.Vector3()));
+    const startY = p.y - point.boxGroup.groupHeight / 2;
     for (let y=.08; y<startY; y+=.012) {
-      if (!this.volume.cavityBox({x:point.position.x-.012,y:y-.006,z:-2.446}, {x:point.position.x+.012,y:y+.006,z:-2.42}).clear) return false;
+      if (!this.volume.cavityBox({x:p.x-.012,y:y-.006,z:this.volume.frontZ-.036}, {x:p.x+.012,y:y+.006,z:this.volume.frontZ-.01}).clear) return false;
     }
     return true;
   }
@@ -341,7 +415,9 @@ export class BrickWall extends THREE.Group {
   }
   spray(camera: THREE.Camera, pointId: string, mode: SprayMode = 'live', color = 0x087fce): THREE.Vector3 | null {
     const hit = this.aim(camera); if (!hit) return null;
-    const p = hit.point;
+    // The painted canvas and chase samples live in masonry-local coordinates;
+    // callers still receive the world-space hit used by the visible tool.
+    const p = this.matrixWorld.equals(identityMatrix) ? hit.point : this.worldToLocal(hit.point.clone());
     const samples = this.samples.get(pointId) ?? [];
     if (!samples.length || samples[samples.length-1].distanceToSquared(p) > .0009) samples.push(p.clone());
     if (samples.length > 1800) samples.shift(); this.samples.set(pointId, samples); this.lastCoverage.delete(pointId);
@@ -351,7 +427,7 @@ export class BrickWall extends THREE.Group {
     this.paint.lineCap = 'round'; this.paint.lineJoin = 'round'; this.paint.globalAlpha = .8; this.paint.lineWidth = mode === 'live' ? 8 : 12;
     this.paint.beginPath(); this.paint.moveTo(a.x,a.y); this.paint.lineTo(b.x+.05,b.y); this.paint.stroke(); this.paint.globalAlpha=1;
     this.texture.needsUpdate=true; this.lastPaintPoint=mode==='live'?p.clone():null; this.paintCount++;
-    return p;
+    return hit.point;
   }
   endSprayStroke(): void { this.lastPaintPoint = null; }
   showMarks(_pointId: string): void { /* Player-authored paint is already visible. */ }
