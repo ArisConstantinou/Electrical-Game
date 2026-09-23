@@ -137,6 +137,14 @@ export class Wheelbarrow {
   }
   update(dt:number):void{
     if(document.hidden)return;
+    // A parked, settled cart has no physics to integrate. Keep presentation
+    // active so externally deposited mortar still updates the visible load.
+    if(this.state==='parked'&&!this.driving&&!this.handAction&&this.airborneKg===0&&
+      this.velocity.lengthSq()<1e-12&&Math.abs(this.pitch)<1e-6&&Math.abs(this.roll)<1e-6&&
+      Math.abs(this.pitchSpeed)<1e-6&&Math.abs(this.rollSpeed)<1e-6&&
+      this.mortarSlump.patches.every(p=>!p.sliding&&p.rest===1&&p.velocity.lengthSq()===0)){
+      this.accumulator=0;this.speed=0;this.blocked=false;this.present();return;
+    }
     this.accumulator+=clamp(dt,0,.05);
     while(this.accumulator>=1/120){this.step(1/120);this.accumulator-=1/120;}
     if(this.driving){const back=new THREE.Vector3(0,0,-.96).applyAxisAngle(UP,this.yaw).add(this.model.group.position);this.game.renderer.camera.position.copy(back).setY(1.65);this.game.player.velocity.copy(this.velocity);}

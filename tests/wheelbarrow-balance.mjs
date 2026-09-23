@@ -1,12 +1,22 @@
 import {chromium} from 'playwright';
-import {mkdir,writeFile} from 'node:fs/promises';
+import {mkdir,readFile,writeFile} from 'node:fs/promises';
+import {extname,resolve} from 'node:path';
 import assert from 'node:assert/strict';
 import {blockPointerLock} from './browser-safety.mjs';
 const baseline=process.env.BASELINE==='1',out=`output/wheelbarrow-balance/${baseline?'before':'after'}`;
 await mkdir(out,{recursive:true});const browser=await chromium.launch({channel:'chrome',headless:true}),report={errors:[]};
 try{
- const context=await browser.newContext({viewport:{width:1100,height:900}});await blockPointerLock(context);const page=await context.newPage();await page.routeWebSocket('**',()=>{});page.on('pageerror',e=>report.errors.push(e.message));
- await page.goto('http://127.0.0.1:5365/Electrical-Game/?renderer=webgl');await page.locator('#start-button').click({timeout:120000});await page.waitForFunction(()=>window.__wireTheHouse.workerBody.loaded);
+ const context=await browser.newContext({viewport:{width:1100,height:900}});await blockPointerLock(context);
+ if(process.argv.includes('--dist')){
+  const root=resolve('dist'),mime={'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png','.webp':'image/webp','.jpg':'image/jpeg','.woff2':'font/woff2','.glb':'model/gltf-binary','.svg':'image/svg+xml'};
+  await context.route('https://arisconstantinou.github.io/Electrical-Game/**',async route=>{
+   const relative=decodeURIComponent(new URL(route.request().url()).pathname.slice('/Electrical-Game/'.length))||'index.html',file=resolve(root,relative);
+   if(!file.startsWith(`${root}\\`)&&file!==root)return route.abort();
+   try{await route.fulfill({status:200,contentType:mime[extname(file)]??'application/octet-stream',body:await readFile(file)});}catch{return route.abort();}
+  });
+ }
+ const page=await context.newPage();await page.routeWebSocket('**',()=>{});page.on('pageerror',e=>report.errors.push(e.message));
+ await page.goto(process.argv.includes('--dist')?'https://arisconstantinou.github.io/Electrical-Game/?renderer=webgl':'http://127.0.0.1:5365/Electrical-Game/?renderer=webgl');await page.locator('#start-button').click({timeout:120000});await page.waitForFunction(()=>window.__wireTheHouse.workerBody.loaded);
  report.cases=await page.evaluate(()=>{
   const g=window.__wireTheHouse,w=g.mixing.wheelbarrow;g.step=()=>{};const allowed=w.positionAllowed.bind(w),emit=w.emit.bind(w),results=[];let exits=[];
   w.emit=mass=>{exits.push(w.spillPoint.toArray());emit(mass);};

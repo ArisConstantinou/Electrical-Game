@@ -1405,3 +1405,8 @@ Original prompt for this task: Selecting BOX should show an initial box in the l
 
 - Public `4c3068b` pickability audit found one listed ground-floor detail with no selectable surface: the thin contact-dust decal. Its `levelEditorPickThrough` marker contradicted the Editor's existing exact-triangle priority and prevented editor-only raycasts.
 - Removed the marker while leaving gameplay raycasts disabled. Candidate production build now passes direct-ray coverage for all visible elements on G-0/L1/L2/L3/L4 (186/66/51/55/45), a desktop click on the contact detail, a portrait touch selection, and an overlapping column click that still selects the solid column.
+
+## 2026-09-23 · Idle gameplay CPU candidate (isolated, not yet published)
+
+- The live release at `feeed32` remains on the sole 5365 listener. In an isolated checkout, a parked and fully settled wheelbarrow now skips redundant 120 Hz simulation, while PVC stock rejects out-of-reach aiming using cached bounds and avoids rebuilding its unchanged idle prompt. Driving, spills, nearby aiming and translated-stock aiming resume normally in the candidate's focused checks; the full `wheelbarrow-balance.mjs --dist` suite passed.
+- In matched 390×844 DPR3 Windows Chrome WebGL spray runs, candidate `mixing.update` averaged 0.435 vs 0.702 ms/frame and `pvc.present` 0.306 vs 0.482 ms/frame. Overall FPS was 59.1 vs 58.3 and p95 frame interval 22.7 vs 24.3 ms, which is too close and noisy to claim the reported physical iPhone lag is fixed. TypeScript and Vite production build passed; physical Safari and the broader mobile frame-time investigation remain open.

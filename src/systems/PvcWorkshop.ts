@@ -82,6 +82,10 @@ export class PvcWorkshop {
   private readonly targetRotation=new THREE.Quaternion();
   private readonly turnDummy=new THREE.Object3D();
   private readonly ray=new THREE.Raycaster();
+  private readonly stockAimBounds=new THREE.Box3();
+  private readonly stockAimMatrix=new THREE.Matrix4();
+  private stockAimBoundsReady=false;
+  private idleUiPresented=false;
   private readonly previewRoot=new THREE.Group();
   private readonly cutRing:THREE.Mesh;
   private readonly markRing:THREE.Mesh;
@@ -249,7 +253,17 @@ export class PvcWorkshop {
     this.message=this.instruction('Η εργασία κρατήθηκε. Στόχευσε τη μάτσα ή το κουτί και πάτησε E για συνέχεια.','Η εργασία κρατήθηκε. Στόχευσε τη μάτσα ή το κουτί και άγγιξε την οδηγία για συνέχεια.');
   }
   private stockAimed():boolean{
-    const c=this.game.renderer.camera;c.updateMatrixWorld(true);this.stock.updateMatrixWorld(true);this.preparedRoot.updateMatrixWorld(true);
+    const c=this.game.renderer.camera;c.updateMatrixWorld(true);
+    // Only the original bundle is raycast when no prepared pipes are present.
+    // Its world bounds also follow any editor translation, rotation or scale.
+    if(this.preparedRoot.children.length===0){
+      const bundle=this.stock.bundleRoots[0];bundle.updateWorldMatrix(true,true);
+      if(!this.stockAimBoundsReady||!bundle.matrixWorld.equals(this.stockAimMatrix)){
+        this.stockAimBounds.setFromObject(bundle);this.stockAimMatrix.copy(bundle.matrixWorld);this.stockAimBoundsReady=true;
+      }
+      if(this.stockAimBounds.distanceToPoint(c.getWorldPosition(v()))>3)return false;
+    }
+    this.stock.updateMatrixWorld(true);this.preparedRoot.updateMatrixWorld(true);
     this.ray.setFromCamera(new THREE.Vector2(),c);
     const hits=this.ray.intersectObjects([...this.stock.pipes.filter(p=>p.visible),...this.preparedRoot.children],true);
     const hit=hits.find(h=>h.distance<3&&h.object.visible);
@@ -681,6 +695,11 @@ export class PvcWorkshop {
   }
   private renderUI():void{
     const near=this.game.started&&this.stockAimed(),show=this.focused,nearBox=this.phase==='carrying'?this.game.boxPlacement.targetNear(this.game.renderer.camera):null;
+    // The idle, out-of-reach bundle has no changing prompt or controls. Run
+    // its full DOM update once, then resume immediately when aim/state changes.
+    const idleUi=this.game.started&&!show&&!near&&!nearBox&&this.phase==='sealed'&&!this.fastenerPrepAvailable;
+    if(idleUi&&this.idleUiPresented)return;
+    this.idleUiPresented=idleUi;
     const touchModifiers=this.touch&&['bending','review'].includes(this.phase);
     this.controls.hidden=!show||(this.touch&&!touchModifiers);this.controls.dataset.phase=this.phase;
     this.game.hud.shell.classList.toggle('pvc-working',this.blocksWork);
