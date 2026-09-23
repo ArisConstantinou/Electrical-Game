@@ -5,10 +5,12 @@ import { brickFacePatch } from './BrickFacePatch';
 import { masonryFaceMaterial } from './BrickFaceMaterial';
 import { siteMaterial, siteSmoothConcreteMaterial } from './SiteMaterials';
 import { curvedWallGeometry, type CurvedWallShape } from './CurvedWallGeometry';
-import { createClaySoffitPreview } from './ClaySoffitPreview';
+import { createConcreteSoffit } from './ConcreteSoffit';
 import { MansionCourtyard } from './MansionCourtyard';
 import { MansionSurroundings } from './MansionSurroundings';
 import { BrickWall } from './BrickWall';
+import { hollowClayWallEnds } from './HollowClayEnd';
+import { laidClayGeometry } from './LaidClayDamage';
 
 /** Traversable unfinished mansion shell, including the original work room. */
 export class MansionGroundWing extends THREE.Group {
@@ -564,13 +566,13 @@ export class MansionGroundWing extends THREE.Group {
       [10.75, -1.75, 3.5, 3.5], [10.75, 5.25, 3.5, 1.5], [15.25, 1.25, 5.5, 9.5],
     ]) {
       slab('Continuous cast garage roof panel around existing L1 floor', x, 3.21, z, w, d);
-      const soffit = createClaySoffitPreview(w, d, 2.94);
-      soffit.name = 'Clay infill and flush joists bearing into garage roof slab';
+      const soffit = createConcreteSoffit(w, d, 2.94);
+      soffit.name = 'Continuous cast garage roof soffit';
       soffit.position.set(x, 0, z);
       this.add(soffit);
     }
-    const sharedSoffit = createClaySoffitPreview(3.5, 4.5, 2.91);
-    sharedSoffit.name = 'Clay infill under existing L1 structural floor above garage';
+    const sharedSoffit = createConcreteSoffit(3.5, 4.5, 2.91);
+    sharedSoffit.name = 'Continuous cast soffit under existing L1 floor above garage';
     sharedSoffit.position.set(10.75, 0, 2.25);
     this.add(sharedSoffit);
     this.wall('Garage passage west fired-clay partition', 6.5, 4.5, 6.5, 7.65);
@@ -732,20 +734,12 @@ export class MansionGroundWing extends THREE.Group {
       roof.position.set(panel.x, 3.19, panel.z);
       roof.castShadow = roof.receiveShadow = true;
       this.add(roof);
-      // Individual fired-clay soffit cells stop at the stair well edge.
-      const pitch = .32, nx = Math.ceil(panel.w / pitch), nz = Math.ceil(panel.d / pitch);
-      const cells = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), siteMaterial('clay', 0xbb7954, 1, 1), nx * nz);
-      cells.name = `${name} exposed clay soffit cells`;
-      const matrix = new THREE.Matrix4();
-      for (let ix = 0; ix < nx; ix++) for (let iz = 0; iz < nz; iz++) {
-        const cx = panel.x - panel.w / 2 + (ix + .5) * panel.w / nx;
-        const cz = panel.z - panel.d / 2 + (iz + .5) * panel.d / nz;
-        cells.setMatrixAt(ix * nz + iz, matrix.compose(new THREE.Vector3(cx, 3.045, cz), new THREE.Quaternion(), new THREE.Vector3(panel.w / nx - .015, .11, panel.d / nz - .015)));
-      }
-      cells.receiveShadow = true;
-      cells.raycast = () => undefined;
-      cells.computeBoundingSphere();
-      this.add(cells);
+      // Keep the stair void open, but make each supported underside continuous
+      // cast concrete rather than a grid of fictitious overhead clay cells.
+      const soffit = createConcreteSoffit(panel.w, panel.d, 2.92);
+      soffit.name = `${name} cast concrete soffit`;
+      soffit.position.set(panel.x, 0, panel.z);
+      this.add(soffit);
     }
   }
 
@@ -762,39 +756,64 @@ export class MansionGroundWing extends THREE.Group {
     editable.position.set(centreX, baseY, centreZ);
     this.add(editable);
     this.editableWalls.set(name, editable);
-    const backing = new THREE.Mesh(new THREE.BoxGeometry(alongX ? length : .20, 3, alongX ? .20 : length), siteMaterial('concrete', 0x8b8176, length / 2, 1.5));
+    // This backing is the mortar visible in the gaps and handling chips.
+    // A little diffuse fill keeps its recessed faces legible in deep shadow.
+    const mortarBacking = siteMaterial('concrete', 0xaaa399, length / 2, 1.5);
+    mortarBacking.emissive.setHex(0x77736e);
+    mortarBacking.emissiveIntensity = .28;
+    const backing = new THREE.Mesh(new THREE.BoxGeometry(alongX ? length : .226, 3, alongX ? .226 : length), mortarBacking);
     backing.name = `${name} mortar backing`;
     backing.position.set(0, 1.5, 0);
     backing.castShadow = backing.receiveShadow = true;
     editable.add(backing);
     const pitch = .38, course = 3 / 23, gap = .006;
     const columns = Math.ceil(length / pitch) + 1, rows = 23;
-    const patches = new Float32Array(columns * rows * 4);
-    // At corridor viewing distance the photographed crop and actual mortar gap
-    // carry the edge; rounded subdivisions multiply shadow triangles per unit.
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
-    geometry.setAttribute('brickPatch', new THREE.InstancedBufferAttribute(patches, 4));
-    const bricks = new THREE.InstancedMesh(geometry, masonryFaceMaterial, columns * rows);
-    bricks.name = name;
-    bricks.castShadow = bricks.receiveShadow = true;
-    const matrix = new THREE.Matrix4(), quaternion = new THREE.Quaternion();
+    const wearTypes = ['sound', 'small-chip-a', 'small-chip-b', 'broken-corner'] as const;
+    const batches: { matrices: THREE.Matrix4[]; colors: THREE.Color[]; patches: number[] }[] =
+      wearTypes.map(() => ({ matrices: [], colors: [], patches: [] }));
+    const matrix = new THREE.Matrix4(), quaternion = new THREE.Quaternion(), tint = new THREE.Color();
+    const wallSeed = [...name].reduce((hash, char) => Math.imul(hash ^ char.charCodeAt(0), 16777619), 2166136261) >>> 0;
     for (let row = 0; row < rows; row++) for (let col = 0; col < columns; col++) {
-      const index = row * columns + col;
       // Running bond needs a half unit at the start of alternate courses.
       // Omitting it left a 19 cm dark slot at every other wall corner.
       const halfStart = row % 2 === 1 && col === 0;
       const origin = row % 2 === 1 ? (col - 1) * pitch + pitch / 2 : col * pitch;
-      const start = halfStart ? gap / 2 : origin + gap / 2;
-      const end = Math.min(length - gap / 2, halfStart ? pitch / 2 - gap / 2 : origin + pitch - gap / 2);
+      const hand = (salt: number) => ((Math.imul(row + salt * 17, 73856093) ^ Math.imul(col + salt * 29, 19349663)) >>> 0) % 101 / 100;
+      const leftJoint = gap / 2 + (hand(1) - .5) * .003;
+      const rightJoint = gap / 2 + (hand(2) - .5) * .003;
+      const start = halfStart ? leftJoint : origin + leftJoint;
+      const end = Math.min(length - rightJoint, halfStart ? pitch / 2 - rightJoint : origin + pitch - rightJoint);
       const span = Math.max(0, end - start);
-      patches.set(brickFacePatch(row, col, alongX ? 6 : 7), index * 4);
+      if (span < .005) continue;
       const coordinate = -length / 2 + (start + end) / 2;
-      const position = new THREE.Vector3(alongX ? coordinate : 0, (row + .5) * course, alongX ? 0 : coordinate);
-      const size = new THREE.Vector3(alongX ? span : .24, span ? course - gap : 0, alongX ? .24 : span);
-      bricks.setMatrixAt(index, matrix.compose(position, quaternion, size));
+      const relief = ((row * 17 + col * 11) % 7 - 3) * .00055;
+      const bottom = row * course + gap / 2 + (hand(3) - .5) * .003;
+      const top = (row + 1) * course - gap / 2 + (hand(4) - .5) * .003;
+      const position = new THREE.Vector3(alongX ? coordinate : relief, (bottom + top) / 2, alongX ? relief : coordinate);
+      const size = new THREE.Vector3(alongX ? span : .24, span ? top - bottom : 0, alongX ? .24 : span);
+      const wear = (Math.imul(row + 1, 2246822519) ^ Math.imul(col + 1, 3266489917) ^ wallSeed) >>> 0;
+      const variant = wear % 100 < 4 ? 3 : wear % 100 < 14 ? 2 : wear % 100 < 24 ? 1 : 0;
+      const batch = batches[variant];
+      batch.matrices.push(matrix.compose(position, quaternion, size).clone());
+      const warmth = ((row * 19 + col * 31) % 13) / 12;
+      batch.colors.push(tint.setRGB(.90 + warmth * .16, .88 + warmth * .15, .85 + warmth * .14).clone());
+      batch.patches.push(...brickFacePatch(row, col, alongX ? 6 : 7));
     }
-    bricks.computeBoundingSphere();
-    editable.add(bricks);
+    for (const [index, batch] of batches.entries()) {
+      if (!batch.matrices.length) continue;
+      const geometry = laidClayGeometry(wearTypes[index], alongX);
+      geometry.setAttribute('brickPatch', new THREE.InstancedBufferAttribute(new Float32Array(batch.patches), 4));
+      const bricks = new THREE.InstancedMesh(geometry, masonryFaceMaterial, batch.matrices.length);
+      bricks.name = `${name} · ${index === 0 ? 'sound clay units' : index === 1 ? 'lightly chipped units A' : index === 2 ? 'lightly chipped units B' : 'broken corners'}`;
+      bricks.castShadow = bricks.receiveShadow = true;
+      for (let i = 0; i < batch.matrices.length; i++) {
+        bricks.setMatrixAt(i, batch.matrices[i]);
+        bricks.setColorAt(i, batch.colors[i]);
+      }
+      bricks.computeBoundingSphere();
+      editable.add(bricks);
+    }
+    editable.add(hollowClayWallEnds(length, rows, course, gap, alongX, name));
     const obstacle: PlayerObstacle = { id: name, minX: Math.min(x0, x1) - .12, maxX: Math.max(x0, x1) + .12,
       minZ: Math.min(z0, z1) - .12, maxZ: Math.max(z0, z1) + .12,
       minFloorY: baseY, maxFloorY: baseY + 3 };
@@ -1207,10 +1226,10 @@ export class MansionGroundWing extends THREE.Group {
     roof.position.set(7.5, 6.5, 6.25);
     roof.castShadow = roof.receiveShadow = true;
     this.add(roof);
-    const clay = createClaySoffitPreview(2, 3.5, 6.22);
-    clay.name = 'L1 fired-clay structural soffit';
-    clay.position.set(7.5, 0, 6.25);
-    this.add(clay);
+    const soffit = createConcreteSoffit(2, 3.5, 6.22);
+    soffit.name = 'L1 cast concrete corridor soffit';
+    soffit.position.set(7.5, 0, 6.25);
+    this.add(soffit);
     const jambMaterial = siteMaterial('concrete', 0xd1cac0, .18, 1);
     for (const x of [6.52, 8.48]) {
       const jamb = new THREE.Mesh(new RoundedBoxGeometry(.18, 3, .24, 2, .009), jambMaterial);
@@ -1237,10 +1256,10 @@ export class MansionGroundWing extends THREE.Group {
     roof.position.set(9.5, 6.5, 2.25);
     roof.castShadow = roof.receiveShadow = true;
     this.add(roof);
-    const infill = createClaySoffitPreview(6, 4.5, 6.22);
-    infill.name = 'L1 room clay and concrete roof construction';
-    infill.position.set(9.5, 0, 2.25);
-    this.add(infill);
+    const soffit = createConcreteSoffit(6, 4.5, 6.22);
+    soffit.name = 'L1 room cast concrete soffit';
+    soffit.position.set(9.5, 0, 2.25);
+    this.add(soffit);
     this.wall('L1 unfinished north perimeter', 6.5, 0, 12.5, 0, 3.3);
     this.wall('L1 unfinished west perimeter', 6.5, 0, 6.5, 4.5, 3.3);
     this.wall('L1 unfinished east perimeter', 12.5, 0, 12.5, 4.5, 3.3);
@@ -1372,10 +1391,10 @@ export class MansionGroundWing extends THREE.Group {
     roomRoof.position.set(9.5, 9.8, 2.25);
     roomRoof.castShadow = roomRoof.receiveShadow = true;
     this.add(roomRoof);
-    const infill = createClaySoffitPreview(6, 4.5, 9.52);
-    infill.name = 'L2 exposed fired-clay and concrete ceiling construction';
-    infill.position.set(9.5, 0, 2.25);
-    this.add(infill);
+    const soffit = createConcreteSoffit(6, 4.5, 9.52);
+    soffit.name = 'L2 cast concrete room soffit';
+    soffit.position.set(9.5, 0, 2.25);
+    this.add(soffit);
     this.wall('L2 office north perimeter', 6.5, 0, 12.5, 0, 6.6);
     this.wall('L2 office west perimeter', 6.5, 0, 6.5, 4.5, 6.6);
     this.wall('L2 office east perimeter', 12.5, 0, 12.5, 4.5, 6.6);
@@ -1419,10 +1438,10 @@ export class MansionGroundWing extends THREE.Group {
     roomRoof.position.set((west + east) / 2, base + 3.2, (north + south) / 2);
     roomRoof.castShadow = roomRoof.receiveShadow = true;
     this.add(roomRoof);
-    const infill = createClaySoffitPreview(width, depth, base + 2.92);
-    infill.name = `${label} exposed clay-and-concrete room soffit`;
-    infill.position.set((west + east) / 2, 0, (north + south) / 2);
-    this.add(infill);
+    const soffit = createConcreteSoffit(width, depth, base + 2.92);
+    soffit.name = `${label} cast concrete room soffit`;
+    soffit.position.set((west + east) / 2, 0, (north + south) / 2);
+    this.add(soffit);
     this.wall(`${label} setback room north masonry`, west, north, east, north, base);
     this.wall(`${label} setback room west masonry`, west, north, west, south, base);
     this.wall(`${label} setback room south masonry`, 8.2, south, east, south, base);

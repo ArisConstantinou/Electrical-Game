@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import { chromium } from 'playwright';
 import { blockPointerLock } from './browser-safety.mjs';
 
-const url = process.argv[2] ?? 'http://127.0.0.1:5365/Electrical-Game/';
+const url = process.argv[2] ?? 'http://127.0.0.1:5365/Electrical-Game/?mansion=basic';
 const output = process.argv[3] ?? 'output/site-pro-room-tour';
 const only = process.argv.find(value => value.startsWith('--only='))?.slice('--only='.length);
+const isolatedRoot = process.env.QA_DIST_ROOT ? path.resolve(process.env.QA_DIST_ROOT) : null;
 const devices = [
   { name: 'mobile-portrait', width: 390, height: 844, touch: true },
   { name: 'desktop', width: 1366, height: 768, touch: false },
@@ -36,6 +39,15 @@ try {
     const context = await browser.newContext({ viewport: { width: device.width, height: device.height }, deviceScaleFactor: 1, isMobile: device.touch, hasTouch: device.touch });
     await blockPointerLock(context);
     const page = await context.newPage();
+    if (isolatedRoot) await page.route('http://127.0.0.1:5365/Electrical-Game/**', async route => {
+      const relative = decodeURIComponent(new URL(route.request().url()).pathname).slice('/Electrical-Game/'.length) || 'index.html';
+      const file = path.resolve(isolatedRoot, relative);
+      if (!file.startsWith(isolatedRoot + path.sep)) return route.abort();
+      try {
+        const extension = path.extname(file).toLowerCase();
+        await route.fulfill({ status: 200, body: await readFile(file), contentType: ({ '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webp': 'image/webp', '.jpg': 'image/jpeg', '.png': 'image/png', '.glb': 'model/gltf-binary', '.gltf': 'model/gltf+json', '.bin': 'application/octet-stream', '.svg': 'image/svg+xml' })[extension] || 'application/octet-stream' });
+      } catch { await route.fulfill({ status: 404, body: `Missing isolated asset: ${relative}` }); }
+    });
     page.on('pageerror', error => report.errors.push(error.message));
     await page.goto(url);
     await page.waitForFunction(() => window.__wireTheHouse?.renderer.renderCamera, null, { timeout: 120000 });
@@ -121,35 +133,13 @@ try {
       if (!ceiling) return null;
       ceiling.geometry.computeBoundingBox();
       const world = ceiling.geometry.boundingBox.clone().applyMatrix4(ceiling.matrixWorld);
-      const clay = room.getObjectByName('Clay and concrete ribbed soffit preview');
-      const infill = clay?.getObjectByName('Individual fired-clay ceiling infill units');
-      const ribs = clay?.getObjectByName('Flush load-bearing concrete ribs');
-      const casings = clay?.getObjectByName('Clay bearing faces along concrete joists');
-      const bounds = object => {
-        if (!object) return null;
-        object.computeBoundingBox();
-        const box = object.boundingBox.clone().applyMatrix4(object.matrixWorld);
-        return { min: box.min.toArray(), max: box.max.toArray() };
-      };
       return { min: world.min.toArray(), max: world.max.toArray(), relief: Boolean(ceiling.material.normalMap?.image?.width),
-        infill: bounds(infill), ribs: bounds(ribs), casings: bounds(casings) };
+        clayInfill: Boolean(room.getObjectByName('Clay and concrete ribbed soffit preview')) };
     });
     assert(slabBearing && slabBearing.min[0] < -4.03 && slabBearing.max[0] > 4.03 && slabBearing.max[2] > 3.77,
       `${device.name}: concrete slab must bear across both side walls and the rear wall: ${JSON.stringify(slabBearing)}`);
-    const clayCeiling = new URL(url).searchParams.get('ceiling') !== 'concrete';
-    const slabUnderside = clayCeiling ? 3.18 : 3;
-    assert(Math.abs(slabBearing.min[1] - slabUnderside) < .015 && slabBearing.relief,
+    assert(Math.abs(slabBearing.min[1] - 3) < .015 && slabBearing.relief && !slabBearing.clayInfill,
       `${device.name}: structural slab position or relief is wrong: ${JSON.stringify(slabBearing)}`);
-    if (clayCeiling) {
-      assert(slabBearing.infill && slabBearing.ribs && slabBearing.casings &&
-        Math.abs(slabBearing.infill.min[1] - 3) < .01 &&
-        Math.abs(slabBearing.ribs.min[1] - 3) < .01 &&
-        Math.abs(slabBearing.casings.min[1] - 3) < .01 &&
-        Math.abs(slabBearing.infill.max[1] - slabBearing.min[1]) < .01 &&
-        Math.abs(slabBearing.ribs.max[1] - slabBearing.min[1]) < .01 &&
-        Math.abs(slabBearing.casings.max[1] - slabBearing.min[1]) < .01,
-      `${device.name}: clay infill, ribs, wall heads and slab must form one bearing layer: ${JSON.stringify(slabBearing)}`);
-    }
     report.cases.push({ device: device.name, view: 'structural-slab-bearing', state: slabBearing });
     const masonry = await page.evaluate(() => {
       const room = window.__wireTheHouse.room;
@@ -187,7 +177,7 @@ try {
       };
     });
     assert(masonry.front && masonry.rightPractice && masonry.left > 300 && masonry.right > 400 && masonry.rear >= 480, `${device.name}: missing fired-clay wall: ${JSON.stringify(masonry)}`);
-    assert(masonry.source.includes('red-brick-polyhaven-1k.jpg') && !masonry.rearPlaster && !masonry.leftWindowBlocked, `${device.name}: wrong material or window obstruction: ${JSON.stringify(masonry)}`);
+    assert(masonry.source.includes('human-laid-brick-face-atlas.png') && !masonry.rearPlaster && !masonry.leftWindowBlocked, `${device.name}: wrong material or window obstruction: ${JSON.stringify(masonry)}`);
     assert(masonry.uniqueClayFaces >= 60 && masonry.validClayCrops, `${device.name}: clay faces repeat or sample outside the source: ${JSON.stringify(masonry)}`);
     report.cases.push({ device: device.name, view: 'four-masonry-walls', state: masonry });
     await context.close();

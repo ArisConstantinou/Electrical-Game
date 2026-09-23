@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 import { chromium } from 'playwright';
 import { blockPointerLock } from './browser-safety.mjs';
 
@@ -18,10 +19,22 @@ try {
     await blockPointerLock(context);
     const page = await context.newPage();
     page.on('pageerror', error => report.errors.push(`${device.name}: ${error.message}`));
+    if (process.env.QA_DIST_ROOT) {
+      const root = path.resolve(process.env.QA_DIST_ROOT);
+      await page.route('http://127.0.0.1:5365/Electrical-Game/**', async route => {
+        const relative = decodeURIComponent(new URL(route.request().url()).pathname).slice('/Electrical-Game/'.length) || 'index.html';
+        const file = path.resolve(root, relative);
+        if (!file.startsWith(root + path.sep)) return route.abort();
+        try {
+          const extension = path.extname(file).toLowerCase();
+          await route.fulfill({ status: 200, body: await readFile(file), contentType: ({ '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webp': 'image/webp', '.jpg': 'image/jpeg', '.png': 'image/png', '.glb': 'model/gltf-binary', '.gltf': 'model/gltf+json', '.bin': 'application/octet-stream', '.svg': 'image/svg+xml' })[extension] || 'application/octet-stream' });
+        } catch { await route.fulfill({ status: 404, body: `Missing isolated asset: ${relative}` }); }
+      });
+    }
     await page.goto('http://127.0.0.1:5365/Electrical-Game/?mansion=preview&renderer=webgl');
     await page.locator('#start-button').waitFor({ state: 'visible', timeout: 120000 });
     await page.locator('#apprentice-count').selectOption('0');
-    await page.locator('#start-button').click();
+    await page.locator('#start-button').click({ timeout: 120000 });
     await page.waitForFunction(() => window.__wireTheHouse?.started, null, { timeout: 120000 });
     await page.evaluate(() => {
       const g = window.__wireTheHouse;

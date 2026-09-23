@@ -196,6 +196,7 @@ export class Game {
     this.mortar = new MortarSystem(this.renderer.scene, this.room.brickWall, this.mission.points);
     this.mixing = new MixingStation(this);
     this.player.setObstacleProvider(()=>[...this.mixing.collisionObstacles(),...this.apprentice?.collisionObstacles()??[],
+      ...this.room.worksiteBenchObstacles(),
       ...this.room.mansionWing?.obstaclesAt(this.player.camera.position.y-this.player.eyeHeight)??[]]);
     this.mixing.onSound=(kind,intensity)=>this.audio.play(kind,intensity);
     this.mortar.reserveScoop = amount => this.mixing.reserveScoop(amount);
@@ -485,7 +486,7 @@ export class Game {
       this.player.camera.position.x, this.player.camera.position.z,
       this.player.camera.position.y - this.player.eyeHeight,
     );
-    this.room.update(dt);
+    this.room.update(dt, this.renderer.viewCamera ?? this.renderer.camera);
     this.hammerWorkStance.restore(this.renderer.camera);
     const active = this.mission.activePoint;
     const leveling = active?.stage === 'leveling';

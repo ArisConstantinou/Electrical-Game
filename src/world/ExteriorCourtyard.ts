@@ -4,6 +4,27 @@ import { siteMaterial } from './SiteMaterials';
 import { brickFacePatch } from './BrickFacePatch';
 import { masonryFaceMaterial } from './BrickFaceMaterial';
 
+function taperedBranch(points: THREE.Vector3[], segments: number, radius: number, sides: number): THREE.BufferGeometry {
+  const curve = new THREE.CatmullRomCurve3(points);
+  const geometry = new THREE.TubeGeometry(curve, segments, radius, sides, false);
+  const positions = geometry.getAttribute('position');
+  const centre = new THREE.Vector3();
+  for (let ring = 0; ring <= segments; ring++) {
+    const t = ring / segments;
+    curve.getPointAt(t, centre);
+    const taper = Math.max(.07, Math.pow(1 - t, .75));
+    for (let side = 0; side <= sides; side++) {
+      const index = ring * (sides + 1) + side;
+      positions.setXYZ(index,
+        centre.x + (positions.getX(index) - centre.x) * taper,
+        centre.y + (positions.getY(index) - centre.y) * taper,
+        centre.z + (positions.getZ(index) - centre.z) * taper);
+    }
+  }
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 /** Real geometry beyond the unglazed left opening, with a small wind-driven canopy. */
 export class ExteriorCourtyard extends THREE.Group {
   private readonly canopy = new THREE.Group();
@@ -37,7 +58,9 @@ export class ExteriorCourtyard extends THREE.Group {
     barkAlbedo.repeat.set(.35, .70);
     barkAlbedo.anisotropy = 4;
     const bark = new THREE.MeshStandardMaterial({ name: 'Weathered grey olive bark', map: barkAlbedo, color: 0xe8e2d7, roughness: 1 });
-    const leaves = new THREE.MeshStandardMaterial({ color: 0x899981, roughness: 1, side: THREE.DoubleSide });
+    // Instance colours carry separate shaded-green blades and occasional
+    // silver-backed sprays; a white base avoids bleaching them twice.
+    const leaves = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .94, side: THREE.DoubleSide });
 
     // A vertex-coloured atmosphere is spatial sky geometry, not a view image.
     // It remains behind every building and tree as the player changes angle.
@@ -307,9 +330,9 @@ export class ExteriorCourtyard extends THREE.Group {
       [[.05, 1.23, 0], [.30, 1.56, -.08], [.72, 1.85, -.20], .068],
       [[.02, 1.36, .02], [.12, 1.70, .22], [.52, 2.15, .36], .055],
     ] as const) {
-      woodyParts.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
+      woodyParts.push(taperedBranch([
         new THREE.Vector3(...start), new THREE.Vector3(...bend), new THREE.Vector3(...tip),
-      ]), 14, radius, 7, false));
+      ], 14, radius, 7));
     }
     const woodyGeometry = mergeGeometries(woodyParts);
     woodyParts.forEach(geometry => geometry.dispose());
@@ -318,19 +341,19 @@ export class ExteriorCourtyard extends THREE.Group {
     trunk.name = 'Tapered forked weathered olive trunk';
     trunk.castShadow = true; tree.add(trunk);
     this.canopy.position.set(.07, 1.43, 0); tree.add(this.canopy);
-    const sprays = [[-.72,.44,-.25],[.70,.42,-.22],[-.47,.73,.35],[.50,.76,.36],[-.08,.87,-.43],[.06,.34,.53]] as const;
-    const sprayBranches = sprays.map(([x, y, z]) => new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
+    const sprays = [[-.72,.44,-.25],[.70,.42,-.22],[-.47,.73,.35],[.50,.76,.36],[-.08,.87,-.43],[.06,.34,.53],[-.25,.52,.03],[.26,.55,.04]] as const;
+    const sprayBranches = sprays.map(([x, y, z]) => taperedBranch([
         new THREE.Vector3(0,0,0), new THREE.Vector3(x*.42,y*.63,z*.34), new THREE.Vector3(x,y,z),
-      ]), 12, .034, 6, false));
+      ], 12, .034, 6));
     const branchGeometry = mergeGeometries(sprayBranches);
     sprayBranches.forEach(geometry => geometry.dispose());
     if (!branchGeometry) throw new Error('Olive canopy branch geometry could not be merged');
     const branches = new THREE.Mesh(branchGeometry, bark);
     branches.name = 'Forked olive canopy limbs'; branches.castShadow = true; this.canopy.add(branches);
     // Kew describes narrow, leathery 2–9.5 cm blades with pale undersides.
-    // Each low-poly blade is about 7 cm long and 1.2 cm wide, rather than a
-    // quarter-metre triangular silhouette. Six instanced sprays keep draw cost
-    // bounded while each crown responds independently to wind.
+    // Each blade is about 9 cm long and 2 cm wide, within the photographed
+    // olive-leaf range. Eight instanced sprays fill the central fork while
+    // staying near the original total leaf count and geometry cost.
     const leafGeometry = new THREE.BufferGeometry();
     const leafVertices: number[] = [];
     for (let leaf = 0; leaf < 7; leaf++) {
@@ -341,8 +364,8 @@ export class ExteriorCourtyard extends THREE.Group {
         centerY + x * Math.sin(direction) + y * Math.cos(direction),
         centerZ + x * .17,
       ];
-      const stem = point(0, -.035), leftLow = point(-.004, -.018), leftWide = point(-.006, .003);
-      const tip = point(0, .036), rightWide = point(.006, .003), rightLow = point(.004, -.018);
+      const stem = point(0, -.042), leftLow = point(-.007, -.023), leftWide = point(-.010, .006);
+      const tip = point(0, .047), rightWide = point(.010, .006), rightLow = point(.007, -.023);
       for (const vertex of [stem,leftLow,leftWide, stem,leftWide,tip, stem,tip,rightWide, stem,rightWide,rightLow])
         leafVertices.push(...vertex);
     }
@@ -354,18 +377,19 @@ export class ExteriorCourtyard extends THREE.Group {
       const crown = new THREE.Group(); crown.position.set(sx, sy, sz);
       crown.name = `Wind-responsive olive branch ${sprayIndex + 1}`;
       this.canopy.add(crown); this.branchCrowns.push(crown);
-      const twig = new THREE.Mesh(new THREE.CylinderGeometry(.003, .012, .69, 5), bark);
-      twig.position.y = -.20; twig.rotation.z = (sprayIndex % 2 ? -1 : 1) * .35;
-      crown.add(twig);
-      const foliage = new THREE.InstancedMesh(leafGeometry, leaves, 270);
-      for (let i = 0; i < 270; i++) {
+      const foliage = new THREE.InstancedMesh(leafGeometry, leaves, 220);
+      for (let i = 0; i < 220; i++) {
         const angle = i * 2.39996 + sprayIndex * 1.37;
-        const radial = Math.sqrt((i + .5) / 270);
+        const radial = Math.sqrt((i + .5) / 220);
         position.set(Math.cos(angle) * radial * .37, Math.sin(i * 1.71 + sprayIndex) * .27, Math.sin(angle) * radial * .28);
         quaternion.setFromEuler(new THREE.Euler(.38 * Math.sin(i * 2.11), angle + .42, .9 * Math.sin(i * 1.37)));
         scale.setScalar(.72 + i % 5 * .095);
         matrix.compose(position, quaternion, scale); foliage.setMatrixAt(i, matrix);
-        foliage.setColorAt(i, tint.setRGB(.80 + i % 5 * .026, .85 + i % 4 * .021, .78 + i % 3 * .031));
+        const silverBack = (i + sprayIndex * 3) % 7 === 0;
+        const variation = (i * 13 + sprayIndex * 7) % 5;
+        foliage.setColorAt(i, silverBack
+          ? tint.setRGB(.31 + variation * .012, .36 + variation * .011, .30 + variation * .014)
+          : tint.setRGB(.115 + variation * .014, .185 + variation * .012, .105 + variation * .011));
       }
       foliage.name = `Narrow silver-backed olive leaves ${sprayIndex + 1}`;
       foliage.castShadow = false; foliage.raycast = () => undefined;

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 export type ReferenceToolKind='drill'|'driver'|'laser';
 
@@ -129,5 +130,28 @@ export function buildReferenceToolModel(kind:ReferenceToolKind):THREE.Group {
     part(motor,'Phillips cross tip second edge',new THREE.BoxGeometry(.0015,.0045,.006),steel,0,0,tipZ);
   }
   group.userData.gripPoint=[0,-.005,.011];group.userData.tipPoint=[0,.064,motor.position.z+tipZ-(drill?.0025:.003)];
+  if(drill){
+    // Keep the proven grip, trigger and rotating masonry bit datums. The
+    // photographed shell is visual only, so an asset load failure leaves the
+    // working drill intact rather than removing the tool from gameplay.
+    new GLTFLoader().load(`${import.meta.env.BASE_URL}assets/tools/drill-01/Drill_01_1k.gltf`,asset=>{
+      const shell=asset.scene;
+      shell.name='Photographed cordless drill shell';
+      shell.rotation.y=-Math.PI/2;
+      shell.position.set(0,-.09,-.05);
+      shell.traverse(object=>{
+        if(object instanceof THREE.Mesh){
+          object.renderOrder=20;
+          object.castShadow=false;
+          object.receiveShadow=false;
+          object.frustumCulled=false;
+        }
+      });
+      group.children.filter(child=>child.userData.toolModelPart===true).forEach(child=>{child.visible=false;});
+      motor.getObjectByName('Keyless masonry drill chuck')!.visible=false;
+      group.add(shell);
+      group.userData.visualAsset='Poly Haven Drill 01 1K glTF CC0';
+    },undefined,error=>{console.warn('Drill shell unavailable; retaining functional drill model',error);});
+  }
   return group;
 }

@@ -1,11 +1,24 @@
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
-import {mkdir,writeFile} from 'node:fs/promises';
+import {mkdir,readFile,writeFile} from 'node:fs/promises';
+import path from 'node:path';
 import {blockPointerLock} from './browser-safety.mjs';
 const out='output/worker-tools';await mkdir(out,{recursive:true});const browser=await chromium.launch({channel:'chrome',headless:true});const report={cases:[],errors:[]};
 try{
  const context=await browser.newContext({viewport:{width:1440,height:810}});await blockPointerLock(context);const page=await context.newPage();page.on('pageerror',e=>report.errors.push(e.message));
- await page.goto('http://127.0.0.1:5365/Electrical-Game/?renderer=webgl');await page.waitForFunction(()=>window.__wireTheHouse?.workerBody.loaded,{},{timeout:90000});await page.locator('#start-button').click();
+ if(process.env.QA_DIST_ROOT){
+  const root=path.resolve(process.env.QA_DIST_ROOT),worker=process.env.QA_WORKER_GLB&&path.resolve(process.env.QA_WORKER_GLB);
+  await page.route('http://127.0.0.1:5365/Electrical-Game/**',async route=>{
+   const relative=decodeURIComponent(new URL(route.request().url()).pathname).slice('/Electrical-Game/'.length)||'index.html';
+   const file=relative==='assets/worker/worker.glb'&&worker?worker:path.resolve(root,relative);
+   if(file!==worker&&!file.startsWith(root+path.sep))return route.abort();
+   try{const body=await readFile(file),ext=path.extname(file).toLowerCase();
+    await route.fulfill({status:200,body,contentType:({'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.webp':'image/webp','.jpg':'image/jpeg','.png':'image/png','.glb':'model/gltf-binary','.gltf':'model/gltf+json','.bin':'application/octet-stream'})[ext]||'application/octet-stream'});
+   }catch{await route.fulfill({status:404,body:`Missing isolated asset: ${relative}`});}
+  });
+ }
+ await page.goto('http://127.0.0.1:5365/Electrical-Game/?renderer=webgl');await page.waitForFunction(()=>window.__wireTheHouse?.workerBody.loaded,{},{timeout:90000});await page.locator('#start-button').click({timeout:90000});
+ await page.waitForFunction(()=>window.__wireTheHouse?.started&&getComputedStyle(document.querySelector('#start-screen')).visibility==='hidden',null,{timeout:30000});
  await page.evaluate(()=>{const g=window.__wireTheHouse;g.__workerStep=g.step.bind(g);g.step=()=>{};g.input.locked=false;});
  const cases=[...['spray','hammer','fitting','level','spring','cutter','trowel','hose','measure','drill','driver','laser'].map(tool=>({tool,station:false})),...['water','trowel','shovel','mixer','hands'].map(tool=>({tool,station:true})),{tool:'spray',station:false}];
  for(const [i,entry]of cases.entries()){

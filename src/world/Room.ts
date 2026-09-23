@@ -8,8 +8,9 @@ import { addLighting } from './Lighting';
 import { matteMaterial, siteMaterial, siteProScreedMaterial } from './SiteMaterials';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { ExteriorCourtyard } from './ExteriorCourtyard';
-import { createClaySoffitPreview } from './ClaySoffitPreview';
 import { MansionGroundWing } from './MansionGroundWing';
+import { createWorksiteBench } from './WorksiteBench';
+import type { PlayerObstacle } from '../player/EquipmentCollision';
 
 /** Constant-time hit on a raised clay face; backing remains hittable in joints. */
 const setBrickFaceRaycast = (
@@ -36,6 +37,16 @@ export class Room extends THREE.Group {
   readonly referenceWalls: THREE.Object3D[] = [];
   readonly exterior: ExteriorCourtyard;
   readonly mansionWing: MansionGroundWing | null;
+  readonly worksiteBench: THREE.Group;
+  private readonly benchMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
+  private readonly benchObstacle: PlayerObstacle = {
+    id: 'temporary-electrician-bench', minX: 0, maxX: 0, minZ: 0, maxZ: 0,
+    minFloorY: 0, maxFloorY: 1.2,
+  };
+
+  private sun: THREE.DirectionalLight | null = null;
+  private readonly sunShadowAnchor = new THREE.Vector3(Infinity, Infinity, Infinity);
+  private readonly sunViewPosition = new THREE.Vector3();
 
   constructor(scene: THREE.Scene, private readonly mansionPreview = false) {
     super();
@@ -86,17 +97,13 @@ export class Room extends THREE.Group {
     ceilingMaterial.emissive.set(0x827366);
     ceilingMaterial.emissiveIntensity = .28;
     const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
-    const clayCeiling = new URLSearchParams(location.search).get('ceiling') !== 'concrete';
-    // The clay units occupy an 18 cm structural layer above the wall heads.
-    // Keep the poured slab on top of that layer, clear of the exposed underside.
-    ceiling.position.set(0, GAME_CONFIG.room.height + 0.08 + (clayCeiling ? .18 : 0), .10);
+    // The exposed underside is cast concrete, bearing directly on the masonry
+    // wall heads. No fired-clay blocks are used overhead in this building.
+    ceiling.position.set(0, GAME_CONFIG.room.height + 0.08, .10);
     ceiling.name = 'Concrete slab ceiling';
     ceiling.userData.studioEntityId = 'world:ceiling';
     ceiling.receiveShadow = true;
     this.add(ceiling);
-    if (clayCeiling) {
-      this.add(createClaySoffitPreview(GAME_CONFIG.room.width, GAME_CONFIG.room.depth, GAME_CONFIG.room.height));
-    }
 
     // Mortar backing stays solid for contact and measurement. Individually
     // raised clay courses on all side-wall segments match the primary wall.
@@ -173,6 +180,8 @@ export class Room extends THREE.Group {
     this.addFloorReturns();
     this.addContactPatina();
     this.addSiteSupplies();
+    this.worksiteBench = createWorksiteBench();
+    this.add(this.worksiteBench);
 
     // Fired-clay shells leave thin angular plates, not round gravel. Share one
     // mesh/draw call for the existing 26 pieces and keep their floor positions.
@@ -207,10 +216,51 @@ export class Room extends THREE.Group {
     this.add(rubble);
     this.mansionWing?.registerOriginalRoomSurfaces(floor, ceiling);
     this.mansionWing?.registerOriginalRoomAssets(this, this.exterior, [this.brickWall, ...this.referenceWalls]);
-    addLighting(scene);
+    this.sun = addLighting(scene);
+    if (this.mansionPreview) {
+      // The mansion spans several bays beyond the original workroom's 10 m map.
+      // Follow the active view rather than spending resolution on the entire site.
+      const shadowCamera = this.sun.shadow.camera;
+      shadowCamera.left = shadowCamera.bottom = -8;
+      shadowCamera.right = shadowCamera.top = 8;
+      shadowCamera.far = 28;
+      shadowCamera.updateProjectionMatrix();
+    }
   }
 
-  update(dt: number): void { this.exterior.update(dt); this.mansionWing?.update(dt); }
+  update(dt: number, view?: THREE.Camera): void {
+    this.exterior.update(dt);
+    this.mansionWing?.update(dt);
+    if (!this.mansionPreview || !view || !this.sun) return;
+    const position = view.getWorldPosition(this.sunViewPosition);
+    // One-metre steps move the shadow map only when the view changes site bay.
+    // The light-target offset is retained, including any direction edited in Studio.
+    const anchorX = Math.round(position.x), anchorY = Math.round(position.y * 2) / 2 - .55, anchorZ = Math.round(position.z);
+    if (this.sunShadowAnchor.x === anchorX && this.sunShadowAnchor.y === anchorY && this.sunShadowAnchor.z === anchorZ) return;
+    const offset = this.sun.position.clone().sub(this.sun.target.position);
+    this.sun.target.position.set(anchorX, anchorY, anchorZ);
+    this.sun.position.copy(this.sun.target.position).add(offset);
+    this.sun.target.updateMatrixWorld(true);
+    this.sun.updateMatrixWorld(true);
+    this.sun.shadow.needsUpdate = true;
+    this.sunShadowAnchor.set(anchorX, anchorY, anchorZ);
+  }
+
+  /** Follow Level Editor moves without recomputing every mesh bound per frame. */
+  worksiteBenchObstacles(): PlayerObstacle[] {
+    this.worksiteBench.updateWorldMatrix(true, true);
+    if (!this.benchMatrix.equals(this.worksiteBench.matrixWorld)) {
+      this.benchMatrix.copy(this.worksiteBench.matrixWorld);
+      const bounds = new THREE.Box3().setFromObject(this.worksiteBench, true);
+      this.benchObstacle.minX = bounds.min.x;
+      this.benchObstacle.maxX = bounds.max.x;
+      this.benchObstacle.minZ = bounds.min.z;
+      this.benchObstacle.maxZ = bounds.max.z;
+      this.benchObstacle.minFloorY = bounds.min.y;
+      this.benchObstacle.maxFloorY = bounds.max.y;
+    }
+    return this.worksiteBench.visible ? [this.benchObstacle] : [];
+  }
 
   private addSideBrickCourses(side: THREE.Group, wallX: number, hasOpening: boolean): void {
     const pitch = GAME_CONFIG.room.depth / 20, course = GAME_CONFIG.room.height / 23, gap = .006;
@@ -240,7 +290,7 @@ export class Room extends THREE.Group {
     geometry.setAttribute('brickPatch', new THREE.InstancedBufferAttribute(patchRects, 4));
     const bricks = new THREE.InstancedMesh(geometry, masonryFaceMaterial, pieces.length);
     bricks.name = hasOpening ? 'Left fired-clay courses cut around unglazed opening' : 'Right fired-clay courses';
-    const matrix = new THREE.Matrix4(), rotation = new THREE.Quaternion(), position = new THREE.Vector3(), scale = new THREE.Vector3();
+    const matrix = new THREE.Matrix4(), rotation = new THREE.Quaternion(), position = new THREE.Vector3(), scale = new THREE.Vector3(), tint = new THREE.Color();
     for (const [index, piece] of pieces.entries()) {
       const row = Math.floor(piece.y / course), offset = (row % 2) * pitch / 2;
       const column = Math.floor((piece.z - zMin - offset) / pitch);
@@ -254,6 +304,8 @@ export class Room extends THREE.Group {
       position.set(wallX + (wallX < 0 ? .120 : -.120), piece.y, piece.z);
       scale.set(.020, piece.height, piece.length);
       bricks.setMatrixAt(index, matrix.compose(position, rotation, scale));
+      const warmth = ((row * 19 + column * 31) % 13 + 13) % 13 / 12;
+      bricks.setColorAt(index, tint.setRGB(.90 + warmth * .16, .88 + warmth * .15, .85 + warmth * .14));
     }
     bricks.castShadow = bricks.receiveShadow = true;
     const inward = wallX < 0 ? 1 : -1;
@@ -313,9 +365,9 @@ export class Room extends THREE.Group {
     geometry.setAttribute('brickPatch', new THREE.InstancedBufferAttribute(patchRects, 4));
     const bricks = new THREE.InstancedMesh(geometry, masonryFaceMaterial, columns * rows * instancesPerUnit);
     bricks.name = this.mansionPreview ? 'Staggered rear clay courses around structural opening' : 'Full staggered rear clay courses';
-    bricks.userData.textureSource = 'red-brick-polyhaven-1k.jpg';
+    bricks.userData.textureSource = 'human-laid-brick-face-atlas.png';
     bricks.userData.studioEntityId = 'world:rear-exposed-masonry';
-    const matrix = new THREE.Matrix4(), position = new THREE.Vector3(), rotation = new THREE.Quaternion(), scale = new THREE.Vector3();
+    const matrix = new THREE.Matrix4(), position = new THREE.Vector3(), rotation = new THREE.Quaternion(), scale = new THREE.Vector3(), tint = new THREE.Color();
     for (let row = 0; row < rows; row++) for (let column = 0; column < columns; column++) {
       const index = (row * columns + column) * instancesPerUnit;
       const left = -GAME_CONFIG.room.width / 2 + column * brickWidth + (row % 2) * brickWidth / 2;
@@ -335,6 +387,8 @@ export class Room extends THREE.Group {
         scale.set(width, width > 0 ? course - gap : 0, width > 0 ? .020 : 0);
         matrix.compose(position, rotation, scale);
         bricks.setMatrixAt(index + part, matrix);
+        const warmth = ((row * 19 + column * 31 + part * 7) % 13) / 12;
+        bricks.setColorAt(index + part, tint.setRGB(.90 + warmth * .16, .88 + warmth * .15, .85 + warmth * .14));
       }
     }
     bricks.castShadow = bricks.receiveShadow = true;
@@ -367,20 +421,17 @@ export class Room extends THREE.Group {
   private addConstructionJoints(): void {
     const width = GAME_CONFIG.room.width, depth = GAME_CONFIG.room.depth;
     const sections: Array<{position: THREE.Vector3; size: THREE.Vector3}> = [];
-    // Drying-shrinkage cuts in the screed, and the darker margin at the wall
-    // make the floor read as a poured surface inside a built enclosure.
-    for (const x of [-1.27, 1.27]) sections.push({position: new THREE.Vector3(x, .0015, 0), size: new THREE.Vector3(.003, .002, depth - .06)});
-    for (const z of [-1.2, 1.2]) sections.push({position: new THREE.Vector3(0, .0015, z), size: new THREE.Vector3(width - .06, .002, .003)});
+    // The unfinished screed is poured as one field. The previous four full
+    // length, equally spaced cuts read like manufactured floor tiles.
     for (const x of [-width / 2 + .015, width / 2 - .015]) sections.push({position: new THREE.Vector3(x, .002, 0), size: new THREE.Vector3(.022, .004, depth)});
     for (const z of [-depth / 2 + .015, depth / 2 - .015]) sections.push({position: new THREE.Vector3(0, .002, z), size: new THREE.Vector3(width, .004, .022)});
     const cuts = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), matteMaterial(0x756d60), sections.length);
     const transform = new THREE.Matrix4();
     for (const [index, section] of sections.entries()) cuts.setMatrixAt(index, transform.compose(section.position, new THREE.Quaternion(), section.size));
-    cuts.name = 'Screed joints and wall perimeter gap';
+    cuts.name = 'Screed wall perimeter gap';
     cuts.raycast = () => undefined;
     cuts.computeBoundingSphere();
     this.add(cuts);
-
   }
 
   private addWallHeadContact(): void {

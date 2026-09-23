@@ -1,5 +1,14 @@
 Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web game named WIRE THE HOUSE, based on real Cyprus residential first-fix practices, editable in Web Game Studio, playable on desktop/mobile, deployed to arisconstantinou/Electrical-Game via GitHub Pages, and ending at FIRST FIX COMPLETE without cable pulling.
 
+## 2026-09-23 · Full visual overhaul (in progress)
+
+- New approved scope: upgrade the complete game's visual quality toward the supplied atmospheric references while retaining its Cypriot construction-site setting. The user confirmed that earlier concept images should be reused; `Site Pro 04` and mansion concept images are already present.
+- Protected the active 5365 `codex/site-pro-04-mansion` listener and its extensive unrelated dirty work. Created isolated `codex/full-visual-upgrade` from recorded live commit `aabc0f3`; uncommitted live changes are not included.
+- Captured live gameplay before the change and visually inspected it. Added two small CC0 Poly Haven normal maps for the existing scanned screed and plaster, and wired shared photographed site materials to use restrained normal detail. TypeScript and production build passed. The isolated built game rendered default and mansion entries without browser errors using request interception at the same 5365 origin. The isolated entry is older than the dirty live runtime, so its screenshot is not a valid direct before/after of the live page.
+- Full scope, visual acceptance and integration boundary are recorded in `docs/VISUAL_OVERHAUL.md`. Next: continue with a final-quality representative workroom scene, then cover all listed areas; reconcile active source changes before promotion, and run matching runtime visual and performance comparisons. Do not claim the full upgrade finished from this material pass.
+- Added a detailed temporary electrician workbench under the window with CC0 scanned timber, separate fittings and batched static geometry. Same-camera before/after screenshots were visually inspected in the isolated runtime. Browser checks passed 0.28 m body clearance, mansion Level Editor inclusion, no page errors, and a short 90-frame headless Chrome comparison with unchanged median/p95 frame intervals. The result is a first prop, not the final visual target or physical-device performance proof.
+- Inspected a 390 × 844 portrait screenshot of the same bench. It is visible below the window, while the mixing toolbar and touch controls remain on screen. This is viewport emulation on Windows, not a physical phone test.
+
 ## 2026-09-22 · Site Pro 04 mobile concepts and live floor framing
 
 - Published five mobile Level Editor UI concepts as 25 separate 780 × 1748 JPEG screens at commit `5dbc1dd` on `codex/site-pro-04-mansion`. The user selected Concept 01 Dock Nest and it is now the implemented mobile/tablet editor UI: the bottom dock collapses to a small arc and each tab opens a temporary sheet.
@@ -1423,3 +1432,58 @@ Original prompt for this task: Selecting BOX should show an initial box in the l
 - The editor now opens in 3D ANGLE so left mouse drag orbits. TOP retains left drag pan. Added Ctrl+Z/Ctrl+Shift+Z/Ctrl+Y, Delete, internal Ctrl+C/V for selected walls, slabs and stairs, a 100-entry labeled history list, and selection restoration across undo/redo. Duplicates have new IDs and a 0.5 m offset per paste; authored/runtime-linked assets remain protected from duplication or deletion.
 - Focused desktop and mobile emulation, desktop save/reload/collision test, responsive editor dock test, TypeScript and Vite build passed. The bundled web-game client rendered the active editor without page errors. Screenshots: `artifacts/editor-shortcuts-camera/`.
 - Existing build warnings about cinematic image paths and large chunks remain. No physical phone or publish verification was attempted.
+## 2026-09-23 · Full visual overhaul, second isolated slice
+
+- Branch `codex/full-visual-upgrade` keeps the shared 5365 listener and the active mansion checkout untouched. The held drill now uses Poly Haven's CC0 photographed 1K glTF shell around the original gameplay grip, trigger and rotating masonry bit; a failed download falls back to the procedural body. Matching CC0 brick normal detail is mapped to the existing photographed crops on side, rear and soffit clay courses. The destructible front work wall remains on a separate shader.
+- TypeScript and Vite production build passed. Browser comparison captures `artifacts/visual-overhaul/drill-{before,after}.png`, `brick-normal-{before,after}.png`, and `drill-mobile-viewport.png` were inspected. Tip world position remained identical with the visual shell hidden/shown; trigger and motor remained present; no page errors. Headless Chrome 90-frame median/p95 was 16.7/33.4 ms in both drill modes. This is an isolated desktop-host check, not a physical phone or full concept acceptance.
+
+## 2026-09-23 · Full visual overhaul, third isolated slice
+
+- In `codex/full-visual-upgrade`, the 1G/2G casing gained rounded front rims, moulded ribs and bosses, entry knockouts and visible steel fitting screws. The wet wall mortar uses the existing CC0 plaster scan as world-projected albedo. A trial bump shader made no measurable visual difference and was discarded.
+- The isolated production build and browser comparison passed for B/C boxes and a 390×844 portrait viewport; the existing box-fit preflight and mortar-volume regression passed. Same-camera screenshots and metadata are in `artifacts/visual-overhaul/box-*` and `mortar-*`. No errors occurred in the browser. These are limited visual and desktop-host checks; the square chase edge, entire mansion, worker/hand quality, real-device performance and final integration remain open.
+
+## 2026-09-23 · Full visual overhaul, articulated glove slice
+
+- The editable `assets/source/worker.blend` and runtime `public/assets/worker/worker.glb` now map a CC0 photographed dark woven material onto the worker's existing skinned hands, ending at the original wrist seam. A rigid source glove mesh could not follow the game's grips, and a first cropped rubber scan visibly stretched at close range. The previous assets were preserved in ignored `output/visual-overhaul/glove-before/` and in Git history at `4a032b7`.
+- The candidate source reopened with both maps packed, 52 bones and 24 Actions; geometry and skin-weight fingerprints match the previous source. The shipped GLB matches the candidate hash and passes its 52-joint/24-clip contract. Isolated Chrome comparisons of spray and drill on desktop/mobile and 18 tool/station poses passed with no page errors and unchanged sampled wrist reach. TypeScript and Vite production build passed; `dist` contains the same GLB hash. Headless frame intervals were noisy and do not establish physical-mobile performance or complete visual fidelity.
+
+## 2026-09-23 · Full visual overhaul, touch work card
+
+- The drill/driver card now shows its instruction without an empty height placeholder or inactive progress line, using the Site Pro graphite/yellow treatment. The laser placement button and meaningful height display remain available. Only HUD presentation changed.
+- The isolated production build was captured before/after in real coarse-pointer Chrome emulation at 390×844 portrait and 844×390 landscape through the existing 5365 URL. The portrait card shrank from 121 to 79 CSS pixels high and the landscape card from 102 to 61, with no page errors or overlap against top controls. TypeScript and Vite build passed. Physical iPhone/Safari and overall visual acceptance remain open.
+
+## 2026-09-23 · Full visual overhaul, mansion courtyard olive
+
+- The courtyard tree received a fuller two-tone canopy, two central leaf sprays, larger narrow leaves, tapered branches, and a 1.35-scale trunk with matching collision bounds. The same editable source remains shared with the surrounding grove LODs. The unchanged 5365 listener still serves the protected active checkout; the isolated production build was intercepted for verification.
+- Same-camera desktop and touch-portrait before/after images and leaf-cost metadata are in `artifacts/visual-overhaul/courtyard-olive-*`. Leaf clusters rose 1,620→1,760, their triangles 45,360→49,280. The four-viewport courtyard route, return, wind, and trunk collision test passed without page errors. TypeScript and Vite build passed. Chrome frame intervals are limited host evidence; the full mansion's visual fidelity and physical mobile performance remain open.
+
+## 2026-09-23 · Full visual overhaul, mansion sunlight coverage
+
+- In the isolated branch, the mansion preview's directional sun shadow area now follows the game view across site bays. It covers 16 m with the same 1024-pixel map; the original room keeps its previous 10 m stationary shadow map. Same-camera courtyard screenshots show the formerly missing structure/tree shadows. The flat ground and circular tree bed remain visually below the approved concept.
+- TypeScript and Vite production build passed. The four-viewport mansion courtyard route/return/tree-contact regression passed without page errors. A focused browser test confirmed shadow target movement from the initial bay into the courtyard, with unchanged sun target/frustum in `?mansion=basic`. Desktop and touch-portrait screenshots were inspected. A short 90-frame headless Chrome sample remained near 16.7–16.8 ms median/p95 before and after; physical mobile performance, long-run shadow stability and final integration are still open. The protected 5365 listener was not changed.
+
+## 2026-09-23 · Full visual overhaul, courtyard ground transition
+
+- Replaced the retained olive's perfect dark concrete-textured disc with a shallow irregular ground basin using the courtyard's existing photographed gravel and continuous world-aligned UVs. The original walking surface and trunk collider remain unchanged; no new texture or draw call was added.
+- Isolated production build, TypeScript, same-camera desktop/portrait visual comparison, and the four-viewport courtyard route/return/wind/contact regression passed without page errors. The 90-frame headless Chrome intervals remained near 16.7–16.8 ms median/p95, which is not physical-phone evidence. Larger stones, excavation detail, full-mansion visual quality, and integration remain open.
+
+## 2026-09-23 · Full visual overhaul, spray-can printed wrap
+
+- A trial normal map on the destructible work wall passed rendering and actual angled masonry removal, but matched near-camera views changed only faintly, so the trial was removed. The work wall and its pre-existing uncommitted line-ending state were preserved.
+- Replaced the spray can's two hovering rectangular labels with one cylindrical printed wrap, keeping nozzle, selected-colour band, grip and tip locations. Same-camera desktop/portrait isolated-production captures passed without page or render errors; grip error remained zero, colour switching worked, and mesh parts fell 23→21. The 18-state worker/tool browser test passed. Headless Chrome 90-frame median/p95 remained about 16.7–16.8 ms. The broad tool visual smoke still fails on pre-existing fitting-tool grip assumptions and a hidden CSS label; the new spray model itself passed its focused checks. Final tool set, physical mobile and integration remain open.
+
+## 2026-09-23 · Full visual overhaul, laid walls and ceilings in isolated checkout
+
+- The user's photos clarified four longitudinal bores per laid block, variable individual handling damage, rough mortar along cut ends, and concrete overhead rather than brick. Replaced clay ceiling previews in the original room and mansion rooms/garage with concrete undersides. Fixed the closed Level Editor hiding gameplay roof panels.
+- Staggered mansion units now vary in warm color, joint width and subtle relief; some units use closed chipped geometry. Exposed ends show four recessed round bores with variable mortar bands. The first chip trial produced black slots and was replaced; the interim grey material-slot artefact was also removed. Same-camera isolated Chrome captures and the original-room tour verified the current source. These walls remain substantially cleaner and more repetitive than the real photographs, and the live destructible wall still needs corresponding damage variety.
+- New electrical photos define the next required DB and box slice. Current 1G/2G box details are partial and their knockout rings are not actual cable openings. The DB interior shown in the photos does not yet exist in the game. Do not count the references or this note as implementation.
+
+## 2026-09-23 · Full visual overhaul, cable entries in installation boxes
+
+- Converted the 1G/2G back panel into a molded, open shell with one/two actual cable apertures beneath the retained entry lips and screw mounts. The openings reveal the current first-fix chase; no cable or second-fix work has been implied.
+- TypeScript, Vite, real raycast through the entry holes, box-fit/mortar/overlap preflight, and desktop plus 390×844 Chrome captures passed. The rear mesh has 176/340 triangles rather than 12 with no added draw call. Same-camera box photos are under `artifacts/visual-overhaul/box-*-entry-*`; differing held-hand appearance from the earlier baseline is unrelated to the openings. DB interior, finished faceplates, wired states and physical mobile remain open.
+
+## 2026-09-23 · Full visual overhaul, DB stage reference sample
+
+- The new photographs distinguish the bare recessed DB from the later open board with DIN rails, device rows, terminal bars and visible conductors. An inspector-only visual sample now provides both stages under 3D MODELS → ALL ASSETS. The later sample is 13,204 triangles, batched from 307 source pieces to 16 meshes, and is created only on inspector open. No ratings, live circuits or DB placement are implied.
+- Browser captures of both stages and a 390×844 viewport, asset-list selection, TypeScript and Vite build passed with no browser errors. See `artifacts/visual-overhaul/db-reference-*`. Direct comparison with the supplied photographs shows this is still a structural sample: plastic/device surfaces, cable terminations, plaster edge and surrounding room need further art work. It is not a finished DB or gameplay integration. Physical mobile performance and the complete visual goal remain open.

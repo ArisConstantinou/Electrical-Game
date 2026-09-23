@@ -240,7 +240,7 @@ export class MansionSurroundings extends THREE.Group {
     const sprays = sourceCanopy.children.filter(child => child instanceof THREE.Group);
     const foliageSources = sprays.map(spray => spray.children.find(child => child instanceof THREE.InstancedMesh))
       .filter((child): child is THREE.InstancedMesh => child instanceof THREE.InstancedMesh);
-    if (foliageSources.length !== 6) throw new Error('Source olive model lacks six leaf sprays');
+    if (foliageSources.length !== 8) throw new Error('Source olive model lacks eight leaf sprays');
     const count = foliageSources.reduce((sum, foliage) => sum + Math.ceil(foliage.count / 2), 0);
     const foliage = new THREE.InstancedMesh(foliageSources[0].geometry, foliageSources[0].material, count);
     foliage.name = `Merged photographed-shape olive leaves ${index + 1}`;

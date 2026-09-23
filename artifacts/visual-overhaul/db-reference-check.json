@@ -1,0 +1,42 @@
+{
+  "results": [
+    {
+      "stage": "first-fix",
+      "title": "Distribution board · first-fix empty enclosure",
+      "count": 6,
+      "triangles": 1116,
+      "stageMetadata": {
+        "visualReferenceOnly": true,
+        "stage": "first-fix",
+        "circuitDesignAssigned": false,
+        "sourcePartCount": 32
+      },
+      "selected": "3b705196-307f-4757-a708-64d367e14e13"
+    },
+    {
+      "stage": "second-fix",
+      "title": "Distribution board · second-fix visual reference",
+      "count": 16,
+      "triangles": 13204,
+      "stageMetadata": {
+        "visualReferenceOnly": true,
+        "stage": "second-fix",
+        "circuitDesignAssigned": false,
+        "sourcePartCount": 307
+      },
+      "selected": "861c164a-0d96-4e01-a3af-1c7c3d472b83"
+    }
+  ],
+  "listedBoards": 2,
+  "viewport": {
+    "panel": {
+      "width": 390,
+      "height": 844
+    },
+    "stage": {
+      "width": 390,
+      "height": 509.203125
+    }
+  },
+  "errors": []
+}

@@ -16,4 +16,29 @@ siteClayImage.anisotropy = 8;
 const cycle = sin(positionWorld.y.mul(620));
 const clayRibHeight = smoothstep(.66, .98, cycle);
 const shoulder = smoothstep(-.35, .2, sin(positionWorld.y.mul(620).add(1.15)));
-export const clayRibShade = clayRibHeight.mul(.055).oneMinus().add(shoulder.mul(.012));
+export const clayRibShade = clayRibHeight.mul(.19).oneMinus().add(shoulder.mul(.028));
+
+// One fine normal profile is shared by all exposed clay faces. The ten raised
+// bands per unit are visible under moving daylight without thousands of tiny
+// strip meshes or any change to the collision/demolition volume.
+const ribPixels = new Uint8Array(16 * 256 * 4);
+for (let y = 0; y < 256; y++) for (let x = 0; x < 16; x++) {
+  const phase = y / 256 * 10 % 1;
+  const slope = phase < .16 ? .76 * Math.sin(Math.PI * phase / .16)
+    : phase > .84 ? -.76 * Math.sin(Math.PI * (phase - .84) / .16) : 0;
+  const grain = Math.sin(x * 13.7 + y * 2.93) * .025;
+  const ny = THREE.MathUtils.clamp(slope + grain, -.9, .9);
+  const nz = Math.sqrt(1 - ny * ny);
+  const index = (y * 16 + x) * 4;
+  ribPixels[index] = 128;
+  ribPixels[index + 1] = Math.round((ny * .5 + .5) * 255);
+  ribPixels[index + 2] = Math.round((nz * .5 + .5) * 255);
+  ribPixels[index + 3] = 255;
+}
+export const clayRibNormal = new THREE.DataTexture(ribPixels, 16, 256, THREE.RGBAFormat);
+clayRibNormal.name = 'Pressed horizontal clay rib relief';
+clayRibNormal.wrapS = clayRibNormal.wrapT = THREE.RepeatWrapping;
+clayRibNormal.minFilter = THREE.LinearMipmapLinearFilter;
+clayRibNormal.magFilter = THREE.LinearFilter;
+clayRibNormal.generateMipmaps = true;
+clayRibNormal.needsUpdate = true;

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { WebGPURenderer, MeshStandardNodeMaterial } from 'three/webgpu';
-import { positionWorld, materialColor, sin, dot, floor, fract, vec2, vec3, smoothstep, mix } from 'three/tsl';
+import { positionWorld, materialColor, sin, dot, floor, fract, vec2, vec3, smoothstep, mix, texture } from 'three/tsl';
 import { GAME_CONFIG } from '../data/gameConfig';
 import { laserBand, laserTint, laserEmission } from '../systems/LaserProjection';
 import type { RoomWaterSystem } from '../systems/RoomWaterSystem';
@@ -44,6 +44,7 @@ export class Renderer {
   private pendingSize:{width:number;height:number}|null=null;
   private lastRenderTime=performance.now();
   private readonly materialCache=new WeakMap<THREE.Material,THREE.Material>();
+  private mortarSurface:THREE.Texture|null=null;
   private readonly gazeEuler=new THREE.Euler(0,0,0,'YXZ');
   private readonly gazeQuaternion=new THREE.Quaternion();
   renderError='';
@@ -217,7 +218,16 @@ export class Renderer {
           surfaceColor=materialColor.rgb.mul(grain.mul(.15).add(.90).add(mottling.mul(.045)).sub(grooves.mul(.035)));
         }else if(mortar){
           const grain=fract(sin(dot(floor(positionWorld.mul(1600)),vec3(127.1,311.7,74.7))).mul(43758.5453));
-          surfaceColor=materialColor.rgb.mul(grain.mul(.06).add(.96));
+          if(!this.mortarSurface){
+            this.mortarSurface=new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}assets/site-materials/plastered_wall_03-albedo-512.webp`);
+            this.mortarSurface.name='Mortar albedo from scanned plaster';
+            this.mortarSurface.colorSpace=THREE.SRGBColorSpace;
+            this.mortarSurface.wrapS=this.mortarSurface.wrapT=THREE.RepeatWrapping;
+            this.mortarSurface.anisotropy=4;
+          }
+          const plaster=texture(this.mortarSurface,positionWorld.xy.mul(1.75));
+          surfaceColor=mix(materialColor.rgb,plaster.rgb.mul(vec3(.83,.81,.74)),.78)
+            .mul(grain.mul(.055).add(.972));
         }
         node.colorNode=mix(surfaceColor,laserTint,laserBand);
         node.emissiveNode=laserEmission;

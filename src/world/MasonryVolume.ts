@@ -315,7 +315,39 @@ export class MasonryVolume {
         }
       }
       const z = this.frontZ - face * this.depth;
-      for (const r of rectangles) mesh.quad({ x: r.xa, y: r.ya, z }, { x: r.xb, y: r.ya, z }, { x: r.xb, y: r.yb, z }, { x: r.xa, y: r.yb, z }, r.color, { x: 0, y: 0, z: face ? -1 : 1 });
+      const clayRelief = !face && this.options.material !== 'concrete'
+        && this.options.solidMaterial === undefined && !(this.options.renderThickness ?? 0);
+      const materialAt = (worldX: number, worldY: number): MaterialId => this.baseMaterial(
+        clamp(Math.floor((worldX + this.width / 2) / this.hx + .5), 1, this.nx),
+        clamp(Math.floor(worldY / this.hy + .5), 1, this.ny), 1);
+      for (const r of rectangles) {
+        const clay = clayRelief && r.color[0] > r.color[1] * 2;
+        const depth = clayRelief && !clay ? .006 : 0;
+        const pitchY = this.height / 23, pitchX = this.width / 21;
+        const row = Math.floor((r.ya + r.yb) * .5 / pitchY);
+        const stagger = row % 2 ? pitchX * .5 : 0;
+        const col = Math.floor(((r.xa + r.xb) * .5 + this.width / 2 - stagger) / pitchX);
+        const laidOffset = clay ? ((hash(col, row, 71, this.seed) % 7) - 3) * .0005 : 0;
+        const surfaceZ = z - depth + laidOffset;
+        mesh.quad({ x: r.xa, y: r.ya, z: surfaceZ }, { x: r.xb, y: r.ya, z: surfaceZ },
+          { x: r.xb, y: r.yb, z: surfaceZ }, { x: r.xa, y: r.yb, z: surfaceZ },
+          r.color, { x: 0, y: 0, z: face ? -1 : 1 });
+        if (!clay) continue;
+        const recessZ = z - .006;
+        const sideColor = [r.color[0] * .72, r.color[1] * .69, r.color[2] * .67];
+        if (materialAt(r.xa - this.hx * .55, (r.ya + r.yb) / 2) === MaterialId.Mortar)
+          mesh.quad({ x: r.xa, y: r.ya, z: surfaceZ }, { x: r.xa, y: r.yb, z: surfaceZ },
+            { x: r.xa, y: r.yb, z: recessZ }, { x: r.xa, y: r.ya, z: recessZ }, sideColor, { x: -1, y: 0, z: 0 });
+        if (materialAt(r.xb + this.hx * .55, (r.ya + r.yb) / 2) === MaterialId.Mortar)
+          mesh.quad({ x: r.xb, y: r.yb, z: surfaceZ }, { x: r.xb, y: r.ya, z: surfaceZ },
+            { x: r.xb, y: r.ya, z: recessZ }, { x: r.xb, y: r.yb, z: recessZ }, sideColor, { x: 1, y: 0, z: 0 });
+        if (materialAt((r.xa + r.xb) / 2, r.ya - this.hy * .55) === MaterialId.Mortar)
+          mesh.quad({ x: r.xb, y: r.ya, z: surfaceZ }, { x: r.xa, y: r.ya, z: surfaceZ },
+            { x: r.xa, y: r.ya, z: recessZ }, { x: r.xb, y: r.ya, z: recessZ }, sideColor, { x: 0, y: -1, z: 0 });
+        if (materialAt((r.xa + r.xb) / 2, r.yb + this.hy * .55) === MaterialId.Mortar)
+          mesh.quad({ x: r.xa, y: r.yb, z: surfaceZ }, { x: r.xb, y: r.yb, z: surfaceZ },
+            { x: r.xb, y: r.yb, z: recessZ }, { x: r.xa, y: r.yb, z: recessZ }, sideColor, { x: 0, y: 1, z: 0 });
+      }
     }
     return mesh.finish();
   }

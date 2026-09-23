@@ -1,0 +1,32 @@
+[
+  {
+    "view": "room-wall",
+    "state": {
+      "camera": [
+        0,
+        1.65,
+        -1.55
+      ],
+      "roofs": [],
+      "exposedEnds": false,
+      "clayBatches": {
+        "sound": 0,
+        "light": 0,
+        "broken": 0
+      },
+      "roomSlabY": 3.08,
+      "roomClayCeiling": false,
+      "mansionClayCeilings": 0,
+      "mansionConcreteSoffits": 0,
+      "render": {
+        "calls": 83,
+        "triangles": 746813,
+        "geometries": 740,
+        "textures": 136
+      },
+      "renderError": ""
+    },
+    "editorCycle": null,
+    "errors": []
+  }
+]

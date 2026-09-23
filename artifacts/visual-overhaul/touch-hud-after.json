@@ -1,0 +1,154 @@
+[
+  {
+    "name": "portrait",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "layout": {
+      "coarse": true,
+      "shell": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 844
+      },
+      "panel": {
+        "x": 10,
+        "y": 72,
+        "width": 205,
+        "height": 78.90625
+      },
+      "prompt": null,
+      "controls": [
+        {
+          "x": 224,
+          "y": 10,
+          "width": 48,
+          "height": 48
+        },
+        {
+          "x": 278,
+          "y": 10,
+          "width": 48,
+          "height": 48
+        },
+        {
+          "x": 209.90625,
+          "y": 700,
+          "width": 48,
+          "height": 48
+        },
+        {
+          "x": 14,
+          "y": 706.90625,
+          "width": 113.09375,
+          "height": 113.09375
+        },
+        {
+          "x": 262.90625,
+          "y": 706.90625,
+          "width": 113.09375,
+          "height": 113.09375
+        },
+        {
+          "x": 132.09375,
+          "y": 700,
+          "width": 48,
+          "height": 120
+        }
+      ]
+    },
+    "laser": {
+      "tool": "laser",
+      "title": "LASER LEVEL",
+      "visible": true,
+      "height": "—",
+      "heightHidden": true,
+      "placeHidden": false
+    },
+    "laserWithHeight": {
+      "height": "1.25 m",
+      "heightHidden": false,
+      "progressHidden": false,
+      "placeHidden": false
+    },
+    "errors": []
+  },
+  {
+    "name": "landscape",
+    "viewport": {
+      "width": 844,
+      "height": 390
+    },
+    "layout": {
+      "coarse": true,
+      "shell": {
+        "x": 0,
+        "y": 0,
+        "width": 844,
+        "height": 390
+      },
+      "panel": {
+        "x": 12,
+        "y": 12,
+        "width": 240,
+        "height": 61
+      },
+      "prompt": null,
+      "controls": [
+        {
+          "x": 678,
+          "y": 10,
+          "width": 48,
+          "height": 48
+        },
+        {
+          "x": 732,
+          "y": 10,
+          "width": 48,
+          "height": 48
+        },
+        {
+          "x": 687,
+          "y": 254,
+          "width": 44,
+          "height": 44
+        },
+        {
+          "x": 14,
+          "y": 272,
+          "width": 94,
+          "height": 94
+        },
+        {
+          "x": 736,
+          "y": 272,
+          "width": 94,
+          "height": 94
+        },
+        {
+          "x": 113,
+          "y": 264,
+          "width": 44,
+          "height": 102
+        }
+      ]
+    },
+    "laser": {
+      "tool": "laser",
+      "title": "LASER LEVEL",
+      "visible": true,
+      "height": "—",
+      "heightHidden": true,
+      "placeHidden": false
+    },
+    "laserWithHeight": {
+      "height": "1.25 m",
+      "heightHidden": false,
+      "progressHidden": false,
+      "placeHidden": false
+    },
+    "errors": []
+  }
+]

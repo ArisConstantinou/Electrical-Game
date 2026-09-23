@@ -24,8 +24,9 @@ export class MansionCourtyard extends THREE.Group {
     if (this.tree) {
       this.tree.name = 'Existing olive tree retained in open mansion court';
       this.tree.position.set(13.35, .025, 11.35);
+      this.tree.scale.setScalar(1.35);
       this.add(this.tree);
-      this.obstacles.push({ id: 'retained-olive-trunk', minX: 13.11, maxX: 13.59, minZ: 11.1, maxZ: 11.6 });
+      this.obstacles.push({ id: 'retained-olive-trunk', minX: 13.02, maxX: 13.68, minZ: 11.02, maxZ: 11.68 });
     }
   }
 
@@ -73,10 +74,48 @@ export class MansionCourtyard extends THREE.Group {
     ground.name = 'Nine-by-ten-metre open ground within courtyard and shaded veranda zone';
     ground.receiveShadow = true;
     this.add(ground);
-    const soil = new THREE.Mesh(new THREE.CircleGeometry(1.28, 32), siteMaterial('floor', 0xa29178, .8, .8));
+    // The retained tree sits in the same compacted gravel, with a slightly
+    // darker shallow basin. World-aligned UVs keep the scan continuous across
+    // its irregular edge instead of exposing a concrete-textured disc.
+    const bedPositions: number[] = [], bedUvs: number[] = [], bedColors: number[] = [], bedIndices: number[] = [];
+    const bedX = 13.35, bedZ = 11.35, sides = 48;
+    const groundHeight = (x: number, z: number): number => -.012 + .009 * Math.sin(x * 1.19 + z * .34) + .006 * Math.cos(z * 1.73 - x * .42);
+    const addBedVertex = (x: number, y: number, z: number, shade: number): void => {
+      bedPositions.push(x, y, z);
+      bedUvs.push((x - 9) / 2.5, (z - 6) / 2.5);
+      bedColors.push(shade, shade * .985, shade * .955);
+    };
+    addBedVertex(bedX, groundHeight(bedX, bedZ) + .016, bedZ, .82);
+    for (let ring = 0; ring < 3; ring++) {
+      const radius = [.38, .82, 1.2][ring];
+      const shade = [.84, .9, 1][ring];
+      for (let side = 0; side < sides; side++) {
+        const angle = side * Math.PI * 2 / sides;
+        const irregularity = 1 + .055 * Math.sin(angle * 7 + .4) + .033 * Math.sin(angle * 13 - .7);
+        const x = bedX + Math.cos(angle) * radius * irregularity;
+        const z = bedZ + Math.sin(angle) * radius * irregularity;
+        const lift = ring === 2 ? .002 : ring === 1 ? .014 : .018;
+        addBedVertex(x, groundHeight(x, z) + lift, z, shade);
+        if (ring === 0) bedIndices.push(0, 1 + (side + 1) % sides, 1 + side);
+        else {
+          const inner = 1 + (ring - 1) * sides + side;
+          const innerNext = 1 + (ring - 1) * sides + (side + 1) % sides;
+          const outer = 1 + ring * sides + side;
+          const outerNext = 1 + ring * sides + (side + 1) % sides;
+          bedIndices.push(inner, innerNext, outer, innerNext, outerNext, outer);
+        }
+      }
+    }
+    const bedGeometry = new THREE.BufferGeometry();
+    bedGeometry.setAttribute('position', new THREE.Float32BufferAttribute(bedPositions, 3));
+    bedGeometry.setAttribute('uv', new THREE.Float32BufferAttribute(bedUvs, 2));
+    bedGeometry.setAttribute('color', new THREE.Float32BufferAttribute(bedColors, 3));
+    bedGeometry.setIndex(bedIndices);
+    bedGeometry.computeVertexNormals();
+    const soil = new THREE.Mesh(bedGeometry, new THREE.MeshStandardMaterial({
+      name: 'Compacted gravel around retained olive', map: albedo, vertexColors: true, roughness: 1,
+    }));
     soil.name = 'Unfinished planting bed around retained olive';
-    soil.rotation.x = -Math.PI / 2;
-    soil.position.set(13.35, .004, 11.35);
     soil.receiveShadow = true;
     this.add(soil);
     // A narrow poured threshold physically joins the foyer screed to the

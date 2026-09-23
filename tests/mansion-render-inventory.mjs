@@ -1,13 +1,25 @@
 import { chromium } from 'playwright';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import { blockPointerLock } from './browser-safety.mjs';
 
+const isolatedRoot = process.env.QA_DIST_ROOT ? path.resolve(process.env.QA_DIST_ROOT) : null;
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 try {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 3 });
   await blockPointerLock(context);
   const page = await context.newPage();
+  if (isolatedRoot) await page.route('http://127.0.0.1:5365/Electrical-Game/**', async route => {
+    const relative = decodeURIComponent(new URL(route.request().url()).pathname).slice('/Electrical-Game/'.length) || 'index.html';
+    const file = path.resolve(isolatedRoot, relative);
+    if (!file.startsWith(isolatedRoot + path.sep)) return route.abort();
+    try {
+      const extension = path.extname(file).toLowerCase();
+      await route.fulfill({ status: 200, body: await readFile(file), contentType: ({ '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webp': 'image/webp', '.jpg': 'image/jpeg', '.png': 'image/png', '.glb': 'model/gltf-binary', '.gltf': 'model/gltf+json', '.bin': 'application/octet-stream', '.svg': 'image/svg+xml' })[extension] || 'application/octet-stream' });
+    } catch { await route.fulfill({ status: 404, body: `Missing isolated asset: ${relative}` }); }
+  });
   await page.goto('http://127.0.0.1:5365/Electrical-Game/?mansion=preview&renderer=webgl&editor=1');
-  await page.waitForFunction(() => window.__wireTheHouse?.levelEditor?.active, null, { timeout: 45000 });
+  await page.waitForFunction(() => window.__wireTheHouse?.levelEditor?.active, null, { timeout: 120000 });
   const result = await page.evaluate(async () => {
     const game = window.__wireTheHouse, room = game.room, renderer = game.renderer;
     await renderer.waitForFrame();

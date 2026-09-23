@@ -1,0 +1,38 @@
+[
+  {
+    "variant": "before",
+    "mobile": false,
+    "loaded": true,
+    "gloveMeshes": 0,
+    "medianMs": 33.20000000000073,
+    "p95Ms": 33.400000000001455,
+    "errors": []
+  },
+  {
+    "variant": "before",
+    "mobile": true,
+    "loaded": true,
+    "gloveMeshes": 0,
+    "medianMs": 33.29999999999927,
+    "p95Ms": 50.10000000000218,
+    "errors": []
+  },
+  {
+    "variant": "candidate",
+    "mobile": false,
+    "loaded": true,
+    "gloveMeshes": 1,
+    "medianMs": 33.29999999999927,
+    "p95Ms": 33.400000000001455,
+    "errors": []
+  },
+  {
+    "variant": "candidate",
+    "mobile": true,
+    "loaded": true,
+    "gloveMeshes": 1,
+    "medianMs": 16.799999999999272,
+    "p95Ms": 33.400000000001455,
+    "errors": []
+  }
+]

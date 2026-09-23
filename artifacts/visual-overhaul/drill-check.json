@@ -1,0 +1,48 @@
+{
+  "state": {
+    "selectedTool": "drill"
+  },
+  "visual": {
+    "shellLoaded": true,
+    "proceduralCount": 49,
+    "tip": [
+      0,
+      0.064,
+      -0.3325
+    ],
+    "grip": [
+      0,
+      -0.005,
+      0.011
+    ]
+  },
+  "timing": {
+    "before": {
+      "visible": false,
+      "medianMs": 16.700000000000728,
+      "p95Ms": 33.39999999999782
+    },
+    "after": {
+      "visible": true,
+      "medianMs": 16.700000000000728,
+      "p95Ms": 33.400000000001455
+    }
+  },
+  "interaction": {
+    "tipWithShell": [
+      2.199293614638082,
+      1.5527321462551167,
+      0.5646192322598169
+    ],
+    "tipWithoutShell": [
+      2.199293614638082,
+      1.5527321462551167,
+      0.5646192322598169
+    ],
+    "triggerPresent": true,
+    "motorPresent": true,
+    "shellTipGapM": 0.13412607368852392,
+    "triangles": 2926
+  },
+  "errors": []
+}

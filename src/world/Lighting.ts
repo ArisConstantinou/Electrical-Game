@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GAME_CONFIG } from '../data/gameConfig';
 
-export const addLighting = (scene: THREE.Scene): void => {
+export const addLighting = (scene: THREE.Scene): THREE.DirectionalLight => {
   const fill = new THREE.AmbientLight(0xe5e9ea, .58);
   fill.name = 'Construction site fill light';
   fill.userData.studioEntityId = 'lighting:ambient-fill';
@@ -48,4 +48,5 @@ export const addLighting = (scene: THREE.Scene): void => {
   slabBounce.position.set(0, .4, 0);
   slabBounce.target.position.set(0, 3.4, 0);
   scene.add(slabBounce.target, slabBounce);
+  return sun;
 };
