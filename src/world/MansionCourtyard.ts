@@ -24,8 +24,9 @@ export class MansionCourtyard extends THREE.Group {
     if (this.tree) {
       this.tree.name = 'Existing olive tree retained in open mansion court';
       this.tree.position.set(13.35, .025, 11.35);
+      this.tree.scale.setScalar(1.35);
       this.add(this.tree);
-      this.obstacles.push({ id: 'retained-olive-trunk', minX: 13.11, maxX: 13.59, minZ: 11.1, maxZ: 11.6 });
+      this.obstacles.push({ id: 'retained-olive-trunk', minX: 13.02, maxX: 13.68, minZ: 11.02, maxZ: 11.68 });
     }
   }
 

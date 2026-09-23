@@ -157,6 +157,25 @@ captures the top controls and thumb zones remain separate, the laser card and
 placement button are visible, and no page error was observed. This is Chrome
 emulation, not physical iPhone/Safari or final mobile performance proof.
 
+## Sixth isolated implementation: courtyard olive
+
+The retained mansion olive now has a broader 1.35-scale canopy and trunk, with
+larger narrow leaf blades, dark green and silver-backed variation, two central
+sprays filling the fork, and tapered branch ends. The old detached vertical
+twigs were removed. Its body obstacle now covers the larger trunk. The same
+tree source continues to feed the exterior grove's near and distant LODs.
+
+`capture-courtyard-olive.mjs` renders the isolated production build from one
+camera in `?mansion=preview`. `courtyard-olive-{before,after}-{desktop,portrait}.png`
+and the JSON reports document the visible change, 1,620 to 1,760 leaf clusters
+and 45,360 to 49,280 corresponding leaf triangles. The 90-frame headless Chrome
+samples remained close to 16.7 ms, but they are too short to establish real
+mobile GPU performance. The four-viewport courtyard route, return, wind and
+trunk-contact test passed with no page errors; see
+`courtyard-olive-route-check.json`. The tree is still procedural and the larger
+mansion scene remains much simpler than the selected image concept. Further
+environment assets, lighting and real-device checks remain open.
+
 ## Integration boundary
 
 Do not promote this branch or replace the 5365 listener while the active

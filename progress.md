@@ -1418,3 +1418,8 @@ Original prompt for this task: Selecting BOX should show an initial box in the l
 
 - The drill/driver card now shows its instruction without an empty height placeholder or inactive progress line, using the Site Pro graphite/yellow treatment. The laser placement button and meaningful height display remain available. Only HUD presentation changed.
 - The isolated production build was captured before/after in real coarse-pointer Chrome emulation at 390×844 portrait and 844×390 landscape through the existing 5365 URL. The portrait card shrank from 121 to 79 CSS pixels high and the landscape card from 102 to 61, with no page errors or overlap against top controls. TypeScript and Vite build passed. Physical iPhone/Safari and overall visual acceptance remain open.
+
+## 2026-09-23 · Full visual overhaul, mansion courtyard olive
+
+- The courtyard tree received a fuller two-tone canopy, two central leaf sprays, larger narrow leaves, tapered branches, and a 1.35-scale trunk with matching collision bounds. The same editable source remains shared with the surrounding grove LODs. The unchanged 5365 listener still serves the protected active checkout; the isolated production build was intercepted for verification.
+- Same-camera desktop and touch-portrait before/after images and leaf-cost metadata are in `artifacts/visual-overhaul/courtyard-olive-*`. Leaf clusters rose 1,620→1,760, their triangles 45,360→49,280. The four-viewport courtyard route, return, wind, and trunk collision test passed without page errors. TypeScript and Vite build passed. Chrome frame intervals are limited host evidence; the full mansion's visual fidelity and physical mobile performance remain open.
