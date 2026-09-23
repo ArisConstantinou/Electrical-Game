@@ -532,7 +532,7 @@ export class LevelEditor {
       const hits = this.raycaster.intersectObjects(this.editables().filter(object => this.isSelectableVisible(object)), true);
       for (const hit of hits) {
         // Particle effects and hidden children can raycast despite drawing nothing.
-        if (hit.object instanceof THREE.Points || !this.isHitVisible(hit.object)) continue;
+        if (hit.object instanceof THREE.Points || hit.object.userData.levelEditorPickThrough || !this.isHitVisible(hit.object)) continue;
         let object: THREE.Object3D | null = hit.object;
         while (object && object !== wing &&
           wing.editableWalls.get(object.name) !== object &&
@@ -1178,6 +1178,7 @@ export class LevelEditor {
   private enableEditorRaycasts(): void {
     for (const asset of this.game.room.mansionWing?.editableAssets.values() ?? []) asset.traverse(node => {
       if (!(node instanceof THREE.Mesh) || this.editorRaycasts.has(node)) return;
+      if (node.userData.levelEditorPickThrough) return;
       if (!(node.geometry instanceof THREE.BufferGeometry)) {
         this.editorRaycasts.set(node, node.raycast);
         node.raycast = () => undefined;

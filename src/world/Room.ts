@@ -592,7 +592,9 @@ export class Room extends THREE.Group {
     for(const x of [-2.72,2.72])span(new THREE.Vector3(x-.18,0,-2.174),new THREE.Vector3(x+.18,0,-2.174));
     const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));geometry.setIndex(indices);geometry.computeVertexNormals();
     const patina=new THREE.Mesh(geometry,material);patina.name='Feathered construction dust at wall contacts';
-    patina.userData.studioEntityId='world:contact-patina';patina.raycast=()=>undefined;
+    patina.userData.studioEntityId='world:contact-patina';
+    patina.userData.levelEditorPickThrough=true;
+    patina.raycast=()=>undefined;
     this.add(patina);
   }
 
