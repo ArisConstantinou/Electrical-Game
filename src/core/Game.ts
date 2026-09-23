@@ -180,6 +180,9 @@ export class Game {
       this.player.camera.position.set(0, this.player.eyeHeight, 5.2);
       this.player.yaw = Math.PI;
       this.player.pitch = -0.08;
+      // Resource preparation runs before the first player update. Aim its
+      // render camera at the actual starting view rather than the old room.
+      this.renderer.camera.rotation.set(this.player.pitch, this.player.yaw, 0);
     }
     if (this.room.mansionWing) this.player.setSurfaceProvider((x,z,currentFloor)=>this.room.mansionWing!.surfaceHeight(x,z,currentFloor));
     this.renderer.scene.add(this.room);
@@ -384,7 +387,7 @@ export class Game {
     loadingIcons.forEach((icon, index) => { icon.style.animationDelay = `${iconOrder[index] * .85}s`; });
     let preparedStages = 0;
     const markPrepared = (): void => {
-      const percent = Math.round(++preparedStages / 7 * 100);
+      const percent = Math.round(++preparedStages / 8 * 100);
       startLoadPercent.value = `${percent}%`;
       startLoadPercent.setAttribute('aria-label', `Site preparation ${percent}%`);
     };
@@ -409,6 +412,17 @@ export class Game {
           ? `SAVED · ${root.querySelector<HTMLInputElement>('#level-slot-name')?.value ?? 'Custom level'}`
           : 'SAVED LEVEL UNAVAILABLE';
       } else if (params.get('template') === 'blank') root.querySelector('#start-level-current')!.textContent = 'NEW SITE · UNSAVED';
+      markPrepared();
+      if (!missingSelectedLevel && params.get('editor') !== '1') {
+        // A one-pixel shader warmup leaves the full-size colour/shadow passes
+        // cold. On WebGL the first live view otherwise blocks after Start.
+        startButtonLabel.textContent = 'PREPARING FIRST VIEW';
+        await new Promise<void>(resolve => setTimeout(resolve, 0));
+        this.renderer.render();
+        await this.renderer.waitForFrame();
+        this.renderer.render();
+        await this.renderer.waitForFrame();
+      }
       markPrepared();
       this.loopReady=true;
       if (!missingSelectedLevel && params.get('editor') === '1' && this.room.mansionWing) {
