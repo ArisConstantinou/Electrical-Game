@@ -81,6 +81,7 @@
   #level-editor .level-editor__wheel-ring button:nth-child(5){left:9px;top:70px}
   #level-editor[data-nav-mode=wheel] aside,#level-editor[data-nav-mode=wheel] .level-editor__inspector,#level-editor[data-nav-mode=wheel] .level-editor__save{bottom:calc(max(6px,env(safe-area-inset-bottom)) + 65px)}
 }
+
 @media(max-width:700px){
   #level-editor aside,#level-editor .level-editor__inspector,#level-editor .level-editor__save{left:6px;right:6px;width:auto;height:min(34vh,285px)}
   #level-editor[data-tab=save] .level-editor__save{height:auto;max-height:min(38vh,320px)}
@@ -411,4 +412,40 @@
   #level-editor .level-editor__wheel-ring button:nth-child(3){right:22px;bottom:50px}
   #level-editor .level-editor__wheel-ring button:nth-child(4){left:22px;bottom:50px}
   #level-editor .level-editor__wheel-ring button:nth-child(5){left:9px;top:70px}
+}
+
+/* The dock handle is a single hinge between an open sheet and the centre tab.
+   A drawn chevron stays centred at every scale, unlike the old font glyph. */
+@media(max-width:1100px){
+  #level-editor.sheet-open:not(.dock-collapsed) :is(aside,.level-editor__bar,.level-editor__inspector,.level-editor__save){bottom:calc(max(8px,env(safe-area-inset-bottom)) + 90px)}
+}
+@media(min-width:1101px){
+  #level-editor.sheet-open:not(.dock-collapsed) :is(aside,.level-editor__bar,.level-editor__inspector,.level-editor__save){bottom:110px}
+}
+#game-shell #level-editor[data-nav-mode=bottom] #level-dock-toggle{
+  display:block;position:absolute;z-index:12;top:-18px;left:50%;width:64px;height:44px;min-height:44px;
+  transform:translateX(-50%);padding:0;border:0!important;border-radius:0;background:transparent!important;box-shadow:none;color:#203c35;
+}
+#game-shell #level-editor[data-nav-mode=bottom] #level-dock-toggle::before{
+  content:"";position:absolute;inset:0 6px 14px;border:1px solid #71857a;border-bottom:0;
+  border-radius:13px 13px 0 0;background:#203c35f5;box-shadow:0 3px 6px #0003;
+}
+#game-shell #level-editor[data-nav-mode=bottom].sheet-open #level-dock-toggle{top:-29px}
+#game-shell #level-editor[data-nav-mode=bottom].sheet-open #level-dock-toggle::before{
+  background:#eee9d7f5;border-color:#b5b7a5;border-top:0;border-bottom:1px solid #b5b7a5;
+  border-radius:0 0 13px 13px;box-shadow:0 3px 6px #0002;
+}
+#game-shell #level-editor[data-nav-mode=bottom] #level-dock-toggle span{
+  position:absolute;left:50%;top:9px;width:10px;height:10px;transform:translateX(-50%) rotate(45deg);
+  border-right:2px solid #ffda28;border-bottom:2px solid #ffda28;border-radius:1px;
+}
+#game-shell #level-editor[data-nav-mode=bottom].sheet-open #level-dock-toggle span{border-color:#203c35}
+#game-shell #level-editor[data-nav-mode=bottom].dock-collapsed #level-dock-toggle{
+  top:-14px;left:50%;width:72px;height:44px;min-height:44px;border:0!important;border-radius:0;background:transparent!important;
+}
+#game-shell #level-editor[data-nav-mode=bottom].dock-collapsed #level-dock-toggle::before{
+  inset:0 0 4px;border:1px solid #71857a;border-radius:22px 22px 7px 7px;background:#203c35f5;
+}
+#game-shell #level-editor[data-nav-mode=bottom].dock-collapsed #level-dock-toggle span{
+  top:17px;transform:translateX(-50%) rotate(225deg);
 }
