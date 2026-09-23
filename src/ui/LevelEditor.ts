@@ -145,6 +145,8 @@ export class LevelEditor {
   private currentSlotId: string | null = null;
   private readonly originalVisibility = new Map<THREE.Object3D, boolean>();
   private readonly originalSystemVisibility = new Map<THREE.Object3D, boolean>();
+  private readonly playerVisibility = new Map<THREE.Object3D, boolean>();
+  private editorFog: { fog: THREE.Fog; near: number; far: number } | null = null;
   private readonly topCutawayVisibility = new Map<THREE.Object3D, boolean>();
   private readonly topCutawayBounds = new THREE.Box3();
   private haloElement!: HTMLElement;
@@ -1137,6 +1139,14 @@ export class LevelEditor {
     this.panel.hidden = false;
     this.game.hud.shell.classList.add('level-editor-open');
     this.game.renderer.viewCamera = this.camera;
+    // The editor uses its own camera and start markers. Keeping the first-person
+    // player rig in the scene wastes skinned draws even when the roof hides it.
+    for (const object of [this.game.workerBody, this.game.fpsRig]) {
+      this.playerVisibility.set(object, object.visible);
+      object.visible = false;
+    }
+    const fog = this.game.renderer.scene.fog;
+    this.editorFog = fog instanceof THREE.Fog ? { fog, near: fog.near, far: fog.far } : null;
     this.orbit.enabled = true;
     this.topOrbit.enabled = false;
     this.applyFloorVisibility();
@@ -1158,6 +1168,13 @@ export class LevelEditor {
     this.orbit.enabled = false;
     this.topOrbit.enabled = false;
     this.restoreVisibility();
+    for (const [object, visible] of this.playerVisibility) object.visible = visible;
+    this.playerVisibility.clear();
+    if (this.editorFog) {
+      this.editorFog.fog.near = this.editorFog.near;
+      this.editorFog.fog.far = this.editorFog.far;
+      this.editorFog = null;
+    }
     this.restoreEditorRaycasts();
     this.touchDrag = null;
     this.gizmo.enabled = true;
@@ -1256,6 +1273,13 @@ export class LevelEditor {
   update(): void {
     if (!this.active) return;
     this.orbit.update();
+    if (this.editorFog) {
+      // A portrait overview needs a long camera distance to fit the full floor.
+      // Gameplay fog ending at 88 m otherwise erases almost every surface.
+      const distance = this.camera.position.distanceTo(this.orbit.target);
+      this.editorFog.fog.near = Math.max(this.editorFog.near, distance - 14);
+      this.editorFog.fog.far = Math.max(this.editorFog.far, distance + 95);
+    }
     if (this.viewMode === '2d') {
       const height = this.floorIndex * 3.3;
       const drift = this.orbit.target.y - height;
