@@ -3,6 +3,7 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { blockPointerLock } from './browser-safety.mjs';
+import { openEditorDetails, saveEditorLevel } from './editor-navigation.mjs';
 
 const sidecar = new URL('../.studio/mansion-level.json', import.meta.url);
 const priorSidecar = await readFile(sidecar).catch(() => null);
@@ -57,6 +58,7 @@ try {
   assert.equal(await page.evaluate(() => window.__wireTheHouse.levelEditor.selected?.name), pick.id);
   assert(await page.locator('#level-scale').isDisabled(),
     'Scaling a stock of fixed 3 m pipes must not silently change material length');
+  await openEditorDetails(page);
   await page.locator('[data-axis="x"]').fill(String(before.position[0] + .35));
   await page.locator('[data-axis="x"]').dispatchEvent('change');
   const moved = await page.evaluate(() => {
@@ -88,7 +90,7 @@ try {
     'Gameplay ray must find one of the moved and rotated PVC bundles');
   assert(rotated.focusError < .001, 'PVC marking camera must follow the edited stock');
   assert(rotated.cutPoint.every(Number.isFinite));
-  await page.locator('#level-save').click();
+  await saveEditorLevel(page);
   await page.waitForFunction(() => new URL(location.href).searchParams.has('level'));
   slotId = new URL(page.url()).searchParams.get('level');
   await page.reload();

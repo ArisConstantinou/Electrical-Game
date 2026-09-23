@@ -569,6 +569,10 @@ export class LevelEditor {
     this.tab = tab;
     this.panel.dataset.tab = tab;
     this.panel.classList.toggle('sheet-open', open);
+    if (tab !== 'select') {
+      this.panel.classList.remove('browser-open');
+      this.el('#level-browser-toggle').setAttribute('aria-expanded', 'false');
+    }
     if (tab !== 'transform') this.setDetailsOpen(false);
     this.panel.querySelectorAll<HTMLButtonElement>('[data-editor-tab]').forEach(button => button.setAttribute('aria-current', String(button.dataset.editorTab === tab)));
   }
@@ -699,6 +703,7 @@ export class LevelEditor {
   }
   private setWallPathActive(active: boolean): void {
     this.wallPathActive = active && Boolean(this.selected && this.game.room.mansionWing?.editableWalls.has(this.selected.name));
+    if (this.wallPathActive) this.setDetailsOpen(false);
     const button = this.el<HTMLButtonElement>('#level-wall-continue');
     button.setAttribute('aria-pressed', String(this.wallPathActive));
     button.textContent = this.wallPathActive ? '✓ TAP NEXT POINT · DONE' : '＋ CONTINUE · TAP POINTS';
@@ -1438,12 +1443,13 @@ export class LevelEditor {
     let shown = 0;
     for (const wall of this.editables()) {
       if (!this.isSelectableVisible(wall)) continue;
-      if (!wall.name.toLowerCase().includes(search)) continue;
+      const label = this.displayName(wall);
+      if (!label.toLowerCase().includes(search) && !wall.name.toLowerCase().includes(search)) continue;
       if (filter !== 'all' && wall.userData.levelEditorKind !== filter) continue;
       shown += 1;
       const button = document.createElement('button');
       button.type = 'button';
-      button.textContent = this.displayName(wall);
+      button.textContent = label;
       button.classList.toggle('selected', this.selectedObjects.has(wall));
       button.addEventListener('click', event => this.selectWall(wall, event.ctrlKey || event.shiftKey));
       list.append(button);

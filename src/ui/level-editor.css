@@ -365,3 +365,50 @@
   #level-editor.wall-selected.details-open .level-editor__inspector{height:min(58dvh,500px)}
 }
 @media(max-width:420px){#level-editor[data-tab=build] .level-editor__add{grid-template-columns:repeat(2,minmax(0,1fr))}#level-editor[data-tab=build] .level-editor__add button{min-height:65px;flex-direction:row;font-size:11px}}
+
+/* The same on-demand Dock Nest works on a large monitor. The site remains
+   the workspace; the element browser and inspector are temporary sheets. */
+@media(min-width:1101px){
+  #level-editor header,#level-editor #level-view-trigger,#level-editor #level-view-panel{display:none!important}
+  #level-editor aside,#level-editor .level-editor__bar,#level-editor .level-editor__inspector,#level-editor .level-editor__save{display:none!important}
+  #level-editor[data-nav-mode=bottom] .level-editor__bottom-nav{position:absolute;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;left:50%;right:auto;bottom:14px;width:min(570px,calc(100% - 28px));height:70px;transform:translateX(-50%);padding:5px;pointer-events:auto;border:1px solid #a2b9b6;border-radius:19px;background:#192e33f3;box-shadow:0 13px 32px #061115bb}
+  #level-editor .level-editor__bottom-nav [data-editor-tab]{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:58px;padding:3px;border:0;border-radius:12px;background:transparent;box-shadow:none;color:#e0eae5;font-size:12px;font-weight:800;letter-spacing:.04em}
+  #level-editor .level-editor__bottom-nav [data-editor-tab] .level-editor__icon{width:22px;height:22px}
+  #level-editor .level-editor__bottom-nav [data-editor-tab][aria-current=true]{border:1px solid #f1b778;background:#b9743d;color:#fff6e8}
+  #level-editor[data-nav-mode=bottom] #level-dock-toggle{display:grid;place-items:center;position:absolute;z-index:2;top:-23px;left:50%;width:78px;height:25px;min-height:25px;transform:translateX(-50%);padding:0;border:1px solid #a2b9b6;border-bottom:0;border-radius:23px 23px 0 0;background:#192e33f5;color:#f5ca8c;box-shadow:none;font:800 19px/1 system-ui,sans-serif}
+  #level-editor[data-nav-mode=bottom].dock-collapsed .level-editor__bottom-nav{width:72px;height:24px;bottom:8px;padding:0;border-radius:24px 24px 7px 7px}
+  #level-editor[data-nav-mode=bottom].dock-collapsed .level-editor__bottom-nav [data-editor-tab]{display:none}
+  #level-editor[data-nav-mode=bottom].dock-collapsed #level-dock-toggle{top:-13px;width:72px;height:39px;min-height:39px;border-bottom:1px solid #a2b9b6;border-radius:26px 26px 7px 7px}
+  #level-editor.sheet-open:not(.dock-collapsed) aside,#level-editor.sheet-open:not(.dock-collapsed) .level-editor__bar,#level-editor.sheet-open:not(.dock-collapsed) .level-editor__inspector,#level-editor.sheet-open:not(.dock-collapsed) .level-editor__save{position:absolute;top:auto;bottom:96px;left:50%;right:auto;width:min(600px,calc(100% - 28px));height:auto;max-height:min(48dvh,440px);transform:translateX(-50%);overflow:auto;border-color:#9fbcb9;border-radius:18px;background:linear-gradient(160deg,#21383cf8,#172b30fa);pointer-events:auto}
+  #level-editor.sheet-open[data-tab=select]:not(.dock-collapsed) aside,#level-editor.sheet-open[data-tab=build]:not(.dock-collapsed) aside,#level-editor.sheet-open[data-tab=starts]:not(.dock-collapsed) aside{display:flex!important}
+  #level-editor.sheet-open[data-tab=select]:not(.browser-open) aside> :not(#level-browser-toggle):not(#level-view-quick){display:none!important}
+  #level-editor.sheet-open[data-tab=select]:not(.browser-open) #level-view-quick{display:grid;gap:8px}
+  #level-editor.sheet-open[data-tab=select] #level-browser-toggle{display:block;width:100%;min-height:43px;background:#315157;border-color:#8dd6d3;font-weight:800}
+  #level-editor.browser-open[data-tab=select] aside{height:min(48dvh,440px)}
+  #level-editor.browser-open[data-tab=select] #level-view-quick{display:none!important}
+  #level-editor[data-tab=select] .level-editor__add,#level-editor[data-tab=select] .level-editor__starts,#level-editor[data-tab=select] .level-editor__build-heading,#level-editor[data-tab=select] .level-editor__scene-actions{display:none}
+  #level-editor[data-tab=build] aside> :not(.level-editor__build-heading):not(.level-editor__add),#level-editor[data-tab=starts] aside> :not(.level-editor__starts):not(.level-editor__scene-actions){display:none!important}
+  #level-editor.sheet-open[data-tab=build] .level-editor__build-heading{display:flex;align-items:center;justify-content:space-between;color:#f7e8d0}
+  #level-editor[data-tab=build] .level-editor__add{grid-template-columns:repeat(4,minmax(0,1fr));border-top:0}
+  #level-editor[data-tab=build] .level-editor__add button{display:flex;flex-direction:column;align-items:center;gap:6px;min-height:76px;font-size:12px}
+  #level-editor.sheet-open[data-tab=starts] .level-editor__scene-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  #level-editor.sheet-open[data-tab=transform]:not(.details-open) .level-editor__bar{display:flex!important;align-items:center;justify-content:center;flex-wrap:wrap;gap:6px;padding:9px}
+  #level-editor .level-editor__bar #level-save,#level-editor .level-editor__bar #level-export,#level-editor #level-touch-help{display:none}
+  #level-editor .level-editor__bar #level-details-toggle{display:inline-flex!important;align-items:center;background:#31616c;border-color:#75ddea;font-weight:800}
+  #level-editor.details-open[data-tab=transform] .level-editor__inspector{display:block!important;width:min(470px,calc(100% - 28px));max-height:min(50dvh,470px)}
+  #level-editor #level-details-close{display:block;position:absolute;top:10px;right:10px;min-height:34px;padding:3px 9px}
+  #level-editor .level-editor__inspector b{padding-right:48px}
+  #level-editor.sheet-open[data-tab=save] .level-editor__save{display:grid!important;align-content:start;gap:8px;width:min(470px,calc(100% - 28px));padding:17px}
+  #level-editor .level-editor__save p{margin:0}
+  #level-editor #level-settings-panel{top:auto;right:max(14px,calc((100% - 570px)/2));bottom:100px}
+  #level-editor[data-nav-mode=wheel] .level-editor__wheel{position:absolute;display:block;bottom:16px;left:50%;width:58px;height:58px;transform:translateX(-50%);pointer-events:auto}
+  #level-wheel-toggle{position:absolute;z-index:2;inset:0;width:58px;height:58px;border:2px solid #eeb870!important;border-radius:50%!important;background:#35474b!important;font-size:26px!important}
+  #level-editor .level-editor__wheel-ring{display:none;position:absolute;left:50%;bottom:-5px;width:254px;height:254px;transform:translateX(-50%);border:3px solid #bd8b55;border-radius:50%;background:#1c2b30f7;box-shadow:0 12px 40px #000c}
+  #level-editor.wheel-open .level-editor__wheel-ring{display:block}
+  #level-editor .level-editor__wheel-ring button{position:absolute;display:flex;flex-direction:column;align-items:center;min-width:72px;min-height:42px;padding:3px;border-radius:14px;font-size:11px;font-weight:800}
+  #level-editor .level-editor__wheel-ring button:nth-child(1){left:91px;top:8px}
+  #level-editor .level-editor__wheel-ring button:nth-child(2){right:9px;top:70px}
+  #level-editor .level-editor__wheel-ring button:nth-child(3){right:22px;bottom:50px}
+  #level-editor .level-editor__wheel-ring button:nth-child(4){left:22px;bottom:50px}
+  #level-editor .level-editor__wheel-ring button:nth-child(5){left:9px;top:70px}
+}

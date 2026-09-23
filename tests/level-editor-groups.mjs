@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import { readFile, writeFile, rm, mkdir } from 'node:fs/promises';
+import { openEditorBrowser, openEditorBuild, openEditorDetails, saveEditorLevel } from './editor-navigation.mjs';
 
 const sidecar = '.studio/mansion-level.json';
 const previous = await readFile(sidecar).catch(() => null);
@@ -20,31 +21,30 @@ try {
     await page.waitForFunction(() => window.__wireTheHouse?.isReadyForStart, null, { timeout: 120_000 });
     await page.locator('#start-level-editor').click();
     await page.waitForFunction(() => window.__wireTheHouse?.levelEditor.active, null, { timeout: 120_000 });
-    if (isMobile) await page.locator('.level-editor__bottom-nav [data-editor-tab="build"]').click();
+    await openEditorBuild(page);
     await page.locator('#level-add-brick').click();
-    if (isMobile) await page.locator('#level-details-toggle').click();
+    await openEditorDetails(page);
     const first = await page.evaluate(() => window.__wireTheHouse.levelEditor.gizmo.object.name);
     await page.locator('[data-axis="x"]').fill('11');
     await page.locator('[data-axis="x"]').dispatchEvent('change');
     await page.locator('[data-axis="z"]').fill('0');
     await page.locator('[data-axis="z"]').dispatchEvent('change');
-    if (isMobile) await page.locator('.level-editor__bottom-nav [data-editor-tab="build"]').click();
+    await openEditorBuild(page);
     await page.locator('#level-add-concrete').click();
-    if (isMobile) await page.locator('#level-details-toggle').click();
+    await openEditorDetails(page);
     const second = await page.evaluate(() => window.__wireTheHouse.levelEditor.gizmo.object.name);
     await page.locator('[data-axis="x"]').fill('13');
     await page.locator('[data-axis="x"]').dispatchEvent('change');
     await page.locator('[data-axis="z"]').fill('0');
     await page.locator('[data-axis="z"]').dispatchEvent('change');
-    if (isMobile) await page.locator('.level-editor__bottom-nav [data-editor-tab="select"]').click();
-    if (isMobile) await page.locator('#level-browser-toggle').click();
+    await openEditorBrowser(page);
     await page.locator('#level-multi-toggle').click();
     await page.locator('#level-search').fill('Editor');
     await page.locator('#level-list button').filter({ hasText: 'Brick wall' }).last().click();
     assert.equal(await page.locator('#level-create-group').isEnabled(), true);
     assert.equal(await page.evaluate(() => window.__wireTheHouse.levelEditor.selectedObjects.size), 2);
     await page.locator('#level-create-group').click();
-    if (isMobile) await page.locator('#level-details-toggle').click();
+    await openEditorDetails(page);
     assert.equal(await page.locator('#level-group-list button').count(), 1);
     assert.equal(await page.evaluate(() => window.__wireTheHouse.levelEditor.highlights.size), 2);
     await page.locator('#level-group-name').fill('Garage partitions');
@@ -95,8 +95,7 @@ try {
     }
     await mkdir('artifacts/site-pro-04/review/level-editor', { recursive: true });
     await page.screenshot({ path: `artifacts/site-pro-04/review/level-editor/${device}-group.png`, fullPage: true });
-    if (isMobile) await page.locator('.level-editor__bottom-nav [data-editor-tab="save"]').click();
-    await page.locator(isMobile ? '#level-save-mobile' : '#level-save').click();
+    await saveEditorLevel(page);
     await page.waitForFunction(() => document.querySelector('#level-status')?.textContent?.includes('saved separately'));
     const slotId = new URL(page.url()).searchParams.get('level');
     assert.match(slotId, /^[0-9a-f-]{36}$/i);
@@ -107,9 +106,9 @@ try {
     assert.equal(saved[0].name, 'Garage partitions');
     assert.deepEqual([...saved[0].members].sort(), [first, second].sort());
     await page.locator('#start-level-editor').click();
-    if (isMobile) { await page.locator('.level-editor__bottom-nav [data-editor-tab="select"]').click(); await page.locator('#level-browser-toggle').click(); }
+    await openEditorBrowser(page);
     await page.locator('#level-group-list button').click();
-    if (isMobile) await page.locator('#level-details-toggle').click();
+    await openEditorDetails(page);
     await page.locator('#level-ungroup').click();
     assert.equal(await page.evaluate(() => window.__wireTheHouse.levelEditor.groups.size), 0);
     await page.locator('#level-undo').click();

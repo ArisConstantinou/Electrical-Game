@@ -3,6 +3,7 @@ import { chromium } from 'playwright';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { blockPointerLock } from './browser-safety.mjs';
+import { openEditorDetails, openEditorTab, saveEditorLevel } from './editor-navigation.mjs';
 
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const output = new URL('../artifacts/site-pro-04/review/level-editor-selection/', import.meta.url);
@@ -41,6 +42,7 @@ try {
   await page.waitForTimeout(100);
   const wallSelection = await clickCenter();
   assert.equal(wallSelection, wall.target, `Registered masonry must select by canvas click: ${JSON.stringify({ wall, wallSelection })}`);
+  await openEditorDetails(page);
   await page.locator('#level-wall-continue').click();
   const wallsBeforeSwitch = await page.evaluate(() => window.__wireTheHouse.room.mansionWing.editableWalls.size);
   const otherWall = await aimAt('Courtyard east solid pier B', 'wall');
@@ -59,10 +61,19 @@ try {
   const columnSelection = await clickCenter();
   await page.screenshot({ path: fileURLToPath(new URL('asset-selected.png', output)) });
   const inventory = await page.evaluate(() => {
-    const wing = window.__wireTheHouse.room.mansionWing;
+    const room = window.__wireTheHouse.room, wing = room.mansionWing;
+    const registered = new Set([...wing.editableWalls.values(), ...wing.editableSurfaces.values(), ...wing.editableAssets.values()]);
+    const unregisteredMeshes = [];
+    room.traverseVisible(object => {
+      if (!object.isMesh || object.userData.levelEditorHighlight || object.userData.levelEditorPickProxy) return;
+      let owner = object;
+      while (owner && !registered.has(owner)) owner = owner.parent;
+      if (!owner) unregisteredMeshes.push(object.name || object.parent?.name || '(unnamed)');
+    });
     return { direct: wing.children.length, walls: wing.editableWalls.size, surfaces: wing.editableSurfaces.size, assets: wing.editableAssets.size,
       unregistered: wing.children.filter(item => item.visible && !wing.editableWalls.has(item.name) && !wing.editableSurfaces.has(item.name) && !wing.editableAssets.has(item.name))
-        .map(item => ({ name: item.name, type: item.type })).slice(0, 30) };
+        .map(item => ({ name: item.name, type: item.type })).slice(0, 30),
+      unregisteredMeshes: [...new Set(unregisteredMeshes)].slice(0, 40) };
   });
   console.log(JSON.stringify({ wall, wallSelection, column, columnSelection, inventory, errors }, null, 2));
   assert.deepEqual(errors, []);
@@ -71,6 +82,7 @@ try {
   const before = await page.evaluate(id => window.__wireTheHouse.room.mansionWing.editableAssets.get(id).position.x, column.target);
   const hitBefore = await page.evaluate(id => window.__wireTheHouse.room.mansionWing.obstaclesAt(0).find(item => item.id === id)?.minX, column.target);
   assert(Number.isFinite(hitBefore), 'The staged masonry must have a player obstacle');
+  await openEditorDetails(page);
   await page.locator('[data-axis="x"]').fill(String(before + .5));
   await page.locator('[data-axis="x"]').dispatchEvent('change');
   await page.locator('#level-yaw').fill('30');
@@ -82,7 +94,7 @@ try {
   assert(Math.abs(changed.x - before - .5) < .001 && Math.abs(changed.yaw - Math.PI / 6) < .001);
   const hitAfter = await page.evaluate(id => window.__wireTheHouse.room.mansionWing.obstaclesAt(0).find(item => item.id === id)?.minX, column.target);
   assert(Math.abs(hitAfter - hitBefore) > .05, 'The staged masonry hitbox must follow its live edit');
-  await page.locator('#level-save').click();
+  await saveEditorLevel(page);
   await page.waitForFunction(() => new URL(location.href).searchParams.has('level'));
   slotId = new URL(page.url()).searchParams.get('level');
   await page.reload();
@@ -97,6 +109,10 @@ try {
     ['Rough unfinished concrete floor', [0, 0, -1.5], 1.5, 'room-floor-selected.png'],
     ['Concrete slab ceiling', [0, 3.4, 0], 7, 'room-ceiling-selected.png'],
   ]) {
+    if (label === 'Concrete slab ceiling') {
+      await openEditorTab(page, 'select');
+      await page.locator('#level-view-quick [data-level-view="3d"]').click();
+    }
     await page.evaluate(({ point, height }) => {
       const editor = window.__wireTheHouse.levelEditor;
       editor.orbit.target.set(...point);
@@ -114,6 +130,7 @@ try {
         pivotY: window.__wireTheHouse.levelEditor.selected.position.y,
         walkY: window.__wireTheHouse.room.mansionWing.surfaceHeight(2.5, 2.5, 0),
       }));
+      await openEditorDetails(page);
       await page.locator('[data-axis="y"]').fill(String(floorBefore.pivotY + .12));
       await page.locator('[data-axis="y"]').dispatchEvent('change');
       roomFloorAfter = await page.evaluate(() => window.__wireTheHouse.room.mansionWing.surfaceHeight(2.5, 2.5, 0));
@@ -153,6 +170,7 @@ try {
     x: window.__wireTheHouse.levelEditor.selected.position.x,
     handleX: window.__wireTheHouse.levelEditor.gizmo.object.position.x,
   }));
+  await openEditorDetails(page);
   await page.locator('[data-axis="x"]').fill(String(terrainBefore.x + .5));
   await page.locator('[data-axis="x"]').dispatchEvent('change');
   const terrainAfter = await page.evaluate(() => ({
@@ -161,6 +179,7 @@ try {
   }));
   assert(Math.abs(terrainAfter.x - terrainBefore.x - .5) < .001, 'Terrain must move through live editor dimensions');
   assert(Math.abs(terrainAfter.handleX - terrainBefore.handleX - .5) < .001, 'The terrain gizmo must follow the moved edit point');
+  await page.locator('#level-details-close').click();
   await page.evaluate(() => {
     const editor = window.__wireTheHouse.levelEditor;
     editor.orbit.target.set(20, 25, -10);
@@ -172,7 +191,7 @@ try {
   assert.equal(await clickCenter(), null, 'Clicking empty sky must clear selection');
   assert.equal(await page.evaluate(() => window.__wireTheHouse.levelEditor.highlights.size), 0, 'Deselect must remove the highlight');
   assert.equal(await page.locator('#level-halo-badge').count(), 0, 'No floating selected label may obscure the scene');
-  await page.locator('#level-save').click();
+  await saveEditorLevel(page);
   await page.reload();
   await page.waitForFunction(() => window.__wireTheHouse?.levelEditor?.active, null, { timeout: 120000 });
   const terrainRestored = await page.evaluate(id => window.__wireTheHouse.room.mansionWing.editableAssets.get(id).position.x, terrainBefore.id);

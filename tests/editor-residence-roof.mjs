@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile, rm, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { blockPointerLock } from './browser-safety.mjs';
+import { openEditorDetails, saveEditorLevel } from './editor-navigation.mjs';
 
 const sidecar = new URL('../.studio/mansion-level.json', import.meta.url);
 const priorSidecar = await readFile(sidecar).catch(() => null);
@@ -36,6 +37,7 @@ try {
   });
   const before = await state();
   assert.equal(before.selected, before.roofId, 'The roof must be the selected edit target');
+  await openEditorDetails(page);
   const field = page.locator('[data-axis="x"]');
   const fieldBefore = Number(await field.inputValue());
   await field.fill(String(fieldBefore + .5));
@@ -48,7 +50,7 @@ try {
   assert(Math.abs((await state()).roofX - before.roofX) < .011, 'Undo must restore the roof alone');
   await page.locator('#level-redo').click();
   assert(Math.abs((await state()).roofX - moved.roofX) < .011, 'Redo must restore the roof edit');
-  await page.locator('#level-save').click();
+  await saveEditorLevel(page);
   await page.waitForFunction(() => new URL(location.href).searchParams.has('level'));
   slotId = new URL(page.url()).searchParams.get('level');
   await page.reload();

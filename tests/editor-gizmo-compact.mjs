@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import { mkdir } from 'node:fs/promises';
 import { blockPointerLock } from './browser-safety.mjs';
+import { openEditorBuild } from './editor-navigation.mjs';
 
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const output = 'artifacts/site-pro-04/review/editor-gizmo-compact';
@@ -14,6 +15,7 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('http://127.0.0.1:5365/Electrical-Game/?mansion=preview&template=blank&editor=1&renderer=webgl');
   await page.waitForFunction(() => window.__wireTheHouse?.levelEditor?.active, null, { timeout: 120000 });
+  await openEditorBuild(page);
   await page.locator('#level-add-brick').click();
   await page.evaluate(() => {
     const editor = window.__wireTheHouse.levelEditor;

@@ -3,6 +3,7 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { blockPointerLock } from './browser-safety.mjs';
+import { openEditorDetails, saveEditorLevel } from './editor-navigation.mjs';
 
 const url = 'http://127.0.0.1:5365/Electrical-Game/?mansion=preview&editor=1&renderer=webgl';
 const names = ['Open mortar bucket', 'Coiled water hose'];
@@ -60,6 +61,7 @@ try {
   const desktopPicks = [];
   for (const name of names) desktopPicks.push(await pickSupply(page, name));
   const bucket = await pickSupply(page, names[0]);
+  await openEditorDetails(page);
   await page.locator('[data-axis="x"]').fill(String(bucket.position[0] + .35));
   await page.locator('[data-axis="x"]').dispatchEvent('change');
   await page.locator('#level-yaw').fill('25');
@@ -70,7 +72,7 @@ try {
   }, bucket.id);
   assert(Math.abs(moved.x - bucket.position[0] - .35) < .011);
   assert(Math.abs(moved.yaw - 25 * Math.PI / 180) < .02);
-  await page.locator('#level-save').click();
+  await saveEditorLevel(page);
   await page.waitForFunction(() => new URL(location.href).searchParams.has('level'));
   slotId = new URL(page.url()).searchParams.get('level');
   await page.reload();

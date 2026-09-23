@@ -3,6 +3,7 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { blockPointerLock } from './browser-safety.mjs';
+import { openEditorDetails, saveEditorLevel } from './editor-navigation.mjs';
 
 const sidecar = new URL('../.studio/mansion-level.json', import.meta.url);
 const priorSidecar = await readFile(sidecar).catch(() => null);
@@ -36,6 +37,7 @@ try {
     return { x: object.position.x, obstacle: game.mixing.collisionObstacles().find(item => item.id === 'concrete-mixer')?.minX };
   });
   assert(Number.isFinite(before.obstacle));
+  await openEditorDetails(page);
   await page.locator('[data-axis="x"]').fill(String(before.x + .5));
   await page.locator('[data-axis="x"]').dispatchEvent('change');
   const moved = await page.evaluate(() => {
@@ -49,7 +51,7 @@ try {
   await page.locator('[data-size="x"]').dispatchEvent('change');
   const mirroredScale = await page.evaluate(() => window.__wireTheHouse.mixing.models.concreteMixer.scale.x);
   assert(mirroredScale < -1, 'Resizing the authored mirrored mixer must preserve its orientation');
-  await page.locator('#level-save').click();
+  await saveEditorLevel(page);
   await page.waitForFunction(() => new URL(location.href).searchParams.has('level'));
   slotId = new URL(page.url()).searchParams.get('level');
   await page.reload();
@@ -94,6 +96,7 @@ try {
     return { x: game.mixing.wheelbarrow.model.group.position.x,
       obstacle: game.mixing.collisionObstacles().find(item => item.id === 'wheelbarrow')?.minX };
   });
+  await openEditorDetails(page);
   await page.locator('[data-axis="x"]').fill(String(wheelBefore.x + .25));
   await page.locator('[data-axis="x"]').dispatchEvent('change');
   const wheelMoved = await page.evaluate(() => {
@@ -109,7 +112,7 @@ try {
   await page.waitForTimeout(150);
   const wheelYaw = await page.evaluate(() => window.__wireTheHouse.mixing.wheelbarrow.model.group.rotation.y);
   assert(Math.abs(wheelYaw - Math.PI / 6) < .02, 'Wheelbarrow simulation must retain editor yaw');
-  await page.locator('#level-save').click();
+  await saveEditorLevel(page);
   await page.reload();
   await page.waitForFunction(() => window.__wireTheHouse?.levelEditor?.active, null, { timeout: 45000 });
   const wheelRestored = await page.evaluate(() => {
@@ -130,6 +133,7 @@ try {
     game.levelEditor.setSelection([game.mixing.models.mixer]);
     return game.mixing.models.mixer.position.x;
   });
+  await openEditorDetails(page);
   await page.locator('[data-axis="x"]').fill(String(toolBefore + .2));
   await page.locator('[data-axis="x"]').dispatchEvent('change');
   const toolAfterUpdate = await page.evaluate(() => {
@@ -139,7 +143,7 @@ try {
   });
   assert(Math.abs(toolAfterUpdate - toolBefore - .2) < .011,
     'The cordless mixer must retain its editor rest position during simulation');
-  await page.locator('#level-save').click();
+  await saveEditorLevel(page);
   await page.reload();
   await page.waitForFunction(() => window.__wireTheHouse?.levelEditor?.active, null, { timeout: 45000 });
   const toolRestored = await page.evaluate(() => {
@@ -155,6 +159,7 @@ try {
     const obstacle = game.mixing.collisionObstacles().find(item => item.id === 'wheelbarrow');
     return { scaleX: wheel.model.group.scale.x, width: obstacle.maxX - obstacle.minX };
   });
+  await openEditorDetails(page);
   const wheelWidth = Number(await page.locator('[data-size="x"]').inputValue());
   await page.locator('[data-size="x"]').fill(String(wheelWidth + .2));
   await page.locator('[data-size="x"]').dispatchEvent('change');
@@ -166,7 +171,7 @@ try {
   });
   assert(wheelAfterScale.scaleX > wheelBeforeScale.scaleX && wheelAfterScale.width > wheelBeforeScale.width,
     'Resizing the wheelbarrow must expand its physical collision footprint');
-  await page.locator('#level-save').click();
+  await saveEditorLevel(page);
   await page.reload();
   await page.waitForFunction(() => window.__wireTheHouse?.levelEditor?.active, null, { timeout: 45000 });
   const wheelScaleRestored = await page.evaluate(() => {
@@ -194,6 +199,7 @@ try {
     const game = window.__wireTheHouse, root = game.mixing.models.sand.parent;
     return { x: root.position.x, obstacle: game.mixing.collisionObstacles().find(item => item.id === 'sand-pile')?.minX };
   });
+  await openEditorDetails(page);
   await page.locator('[data-axis="x"]').fill(String(sandBefore.x + .15));
   await page.locator('[data-axis="x"]').dispatchEvent('change');
   const sandAfter = await page.evaluate(() => {
@@ -221,7 +227,7 @@ try {
   assert(Math.abs(sandTransformed.yaw - 25 * Math.PI / 180) < .02 && sandTransformed.scaleX > 1 &&
     Number.isFinite(sandTransformed.minX) && Number.isFinite(sandTransformed.maxX),
     'Sand yaw and width must retain a finite physical footprint');
-  await page.locator('#level-save').click();
+  await saveEditorLevel(page);
   await page.reload();
   await page.waitForFunction(() => window.__wireTheHouse?.levelEditor?.active, null, { timeout: 45000 });
   const sandRestored = await page.evaluate(() => {
