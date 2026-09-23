@@ -4,6 +4,7 @@ import { mkdir, readFile, stat } from 'node:fs/promises';
 import { extname, resolve } from 'node:path';
 import { blockPointerLock } from './browser-safety.mjs';
 
+const live = process.argv.includes('--live');
 const dist = resolve('dist');
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 try {
@@ -11,7 +12,7 @@ try {
   await blockPointerLock(context);
   const mime = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.webp':'image/webp',
     '.png':'image/png', '.jpg':'image/jpeg', '.glb':'model/gltf-binary', '.svg':'image/svg+xml' };
-  await context.route('https://arisconstantinou.github.io/Electrical-Game/**', async route => {
+  if (!live) await context.route('https://arisconstantinou.github.io/Electrical-Game/**', async route => {
     const file = resolve(dist, decodeURIComponent(new URL(route.request().url()).pathname.slice('/Electrical-Game/'.length)) || 'index.html');
     if (!file.startsWith(`${dist}\\`)) return route.abort();
     try {
@@ -21,7 +22,9 @@ try {
   });
   const page = await context.newPage(), errors = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto('https://arisconstantinou.github.io/Electrical-Game/?mansion=preview&renderer=webgl');
+  await page.goto(live
+    ? 'http://127.0.0.1:5365/Electrical-Game/?mansion=preview&renderer=webgl'
+    : 'https://arisconstantinou.github.io/Electrical-Game/?mansion=preview&renderer=webgl');
   await page.waitForFunction(() => window.__wireTheHouse?.isReadyForStart, null, { timeout:120000 });
   await page.locator('#apprentice-count').selectOption('0');
   await page.locator('#start-button').click();
@@ -132,5 +135,5 @@ try {
   const out = resolve('output/mansion-masonry-demolition');
   await mkdir(out, {recursive:true});
   await page.locator('#game-canvas').screenshot({path:resolve(out,'doorway.png')});
-  console.log(JSON.stringify({pass:true,result}));
+  console.log(JSON.stringify({pass:true,live,result}));
 } finally { await browser.close(); }
