@@ -45,6 +45,10 @@ export class Room extends THREE.Group {
     minFloorY: 0, maxFloorY: 1.2,
   };
 
+  private sun: THREE.DirectionalLight | null = null;
+  private readonly sunShadowAnchor = new THREE.Vector3(Infinity, Infinity, Infinity);
+  private readonly sunViewPosition = new THREE.Vector3();
+
   constructor(scene: THREE.Scene, private readonly mansionPreview = false) {
     super();
     this.name = 'Living room first-fix site';
@@ -217,10 +221,35 @@ export class Room extends THREE.Group {
     this.add(rubble);
     this.mansionWing?.registerOriginalRoomSurfaces(floor, ceiling);
     this.mansionWing?.registerOriginalRoomAssets(this, this.exterior, [this.brickWall, ...this.referenceWalls]);
-    addLighting(scene);
+    this.sun = addLighting(scene);
+    if (this.mansionPreview) {
+      // The mansion spans several bays beyond the original workroom's 10 m map.
+      // Follow the active view rather than spending resolution on the entire site.
+      const shadowCamera = this.sun.shadow.camera;
+      shadowCamera.left = shadowCamera.bottom = -8;
+      shadowCamera.right = shadowCamera.top = 8;
+      shadowCamera.far = 28;
+      shadowCamera.updateProjectionMatrix();
+    }
   }
 
-  update(dt: number): void { this.exterior.update(dt); this.mansionWing?.update(dt); }
+  update(dt: number, view?: THREE.Camera): void {
+    this.exterior.update(dt);
+    this.mansionWing?.update(dt);
+    if (!this.mansionPreview || !view || !this.sun) return;
+    const position = view.getWorldPosition(this.sunViewPosition);
+    // One-metre steps move the shadow map only when the view changes site bay.
+    // The light-target offset is retained, including any direction edited in Studio.
+    const anchorX = Math.round(position.x), anchorY = Math.round(position.y * 2) / 2 - .55, anchorZ = Math.round(position.z);
+    if (this.sunShadowAnchor.x === anchorX && this.sunShadowAnchor.y === anchorY && this.sunShadowAnchor.z === anchorZ) return;
+    const offset = this.sun.position.clone().sub(this.sun.target.position);
+    this.sun.target.position.set(anchorX, anchorY, anchorZ);
+    this.sun.position.copy(this.sun.target.position).add(offset);
+    this.sun.target.updateMatrixWorld(true);
+    this.sun.updateMatrixWorld(true);
+    this.sun.shadow.needsUpdate = true;
+    this.sunShadowAnchor.set(anchorX, anchorY, anchorZ);
+  }
 
   /** Follow Level Editor moves without recomputing every mesh bound per frame. */
   worksiteBenchObstacles(): PlayerObstacle[] {

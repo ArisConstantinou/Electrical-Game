@@ -1,0 +1,50 @@
+[
+  {
+    "name": "desktop",
+    "viewport": {
+      "width": 1365,
+      "height": 768
+    },
+    "touch": false,
+    "state": {
+      "leafInstances": 1760,
+      "leafTriangles": 49280,
+      "treeScale": 1.35,
+      "obstacle": {
+        "id": "retained-olive-trunk",
+        "minX": 13.02,
+        "maxX": 13.68,
+        "minZ": 11.02,
+        "maxZ": 11.68
+      },
+      "medianMs": 16.69999999999709,
+      "p95Ms": 16.700000000000728,
+      "renderError": ""
+    },
+    "errors": []
+  },
+  {
+    "name": "portrait",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "touch": true,
+    "state": {
+      "leafInstances": 1760,
+      "leafTriangles": 49280,
+      "treeScale": 1.35,
+      "obstacle": {
+        "id": "retained-olive-trunk",
+        "minX": 13.02,
+        "maxX": 13.68,
+        "minZ": 11.02,
+        "maxZ": 11.68
+      },
+      "medianMs": 16.700000000000728,
+      "p95Ms": 16.799999999999272,
+      "renderError": ""
+    },
+    "errors": []
+  }
+]

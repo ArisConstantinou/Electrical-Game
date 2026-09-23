@@ -35,6 +35,7 @@ try {
       camera.position.set(10.2, 1.65, 13.8);
       camera.lookAt(13.35, 1.8, 11.35);
       camera.updateMatrixWorld(true);
+      game.room.update(0, camera);
     });
     await page.waitForTimeout(1200);
     await page.evaluate(async () => { const renderer = window.__wireTheHouse.renderer; renderer.render(); await renderer.waitForFrame(); });

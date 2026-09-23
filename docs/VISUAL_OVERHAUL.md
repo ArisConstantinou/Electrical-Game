@@ -176,6 +176,28 @@ trunk-contact test passed with no page errors; see
 mansion scene remains much simpler than the selected image concept. Further
 environment assets, lighting and real-device checks remain open.
 
+## Seventh isolated implementation: mansion sunlight coverage
+
+The mansion preview's directional sun now keeps a 16 m shadow map centred near
+the active camera, so the courtyard and other distant bays receive actual
+structure and tree shadows. Its 1024-pixel map resolution is unchanged; the
+original workroom keeps its prior 10 m shadow area and light position. The
+camera anchor advances in metre steps to avoid shifting the map on every small
+view movement. Studio light direction edits remain relative to the sun target.
+
+`courtyard-olive-after-desktop.png` and
+`courtyard-olive-sun-follow-{desktop,portrait}.png` show the same courtyard
+camera before and after the source change. The new shadows make the brick and
+concrete spatial relationships clearer, but the courtyard still has simplified
+structure, a flat ground finish and a conspicuous circular tree bed; it is not
+the selected concept's final quality. The isolated production build passed the
+four-viewport courtyard route/return/tree-contact test and
+`tests/mansion-shadow-follow.mjs`: the mansion target follows a moved view from
+`[0, 0.95, 5]` to `[10, 0.95, 14]`, while the original room retains
+`[0, 1.1, -2.4]`. The desktop/portrait 90-frame headless Chrome captures
+reported 16.7/16.8 ms median/p95 versus 16.7/16.8 ms before, but this brief
+host sample cannot establish phone GPU cost or frame-time stability.
+
 ## Integration boundary
 
 Do not promote this branch or replace the 5365 listener while the active
