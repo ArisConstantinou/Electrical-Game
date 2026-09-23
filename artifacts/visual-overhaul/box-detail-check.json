@@ -1,0 +1,57 @@
+{
+  "captures": [
+    {
+      "id": "B",
+      "boxes": 1,
+      "details": 3,
+      "detailBoundsInside": true,
+      "target": [
+        0,
+        0.33699999999999997,
+        -2.41
+      ],
+      "camera": [
+        0,
+        0.33699999999999997,
+        -2.13
+      ],
+      "widthM": 0.134,
+      "heightM": 0.074
+    },
+    {
+      "id": "C",
+      "boxes": 1,
+      "details": 3,
+      "detailBoundsInside": true,
+      "target": [
+        1.65,
+        1.2369999999999999,
+        -2.41
+      ],
+      "camera": [
+        1.65,
+        1.2369999999999999,
+        -2.13
+      ],
+      "widthM": 0.074,
+      "heightM": 0.074
+    }
+  ],
+  "timing": {
+    "before": {
+      "visible": false,
+      "medianMs": 16.700000000000728,
+      "p95Ms": 33.400000000001455
+    },
+    "after": {
+      "visible": true,
+      "medianMs": 16.700000000000728,
+      "p95Ms": 33.29999999999927
+    }
+  },
+  "held": {
+    "visualDetails": 18,
+    "selectedTool": "fitting"
+  },
+  "errors": []
+}

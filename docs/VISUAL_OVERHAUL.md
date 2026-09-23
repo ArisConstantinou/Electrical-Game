@@ -86,6 +86,32 @@ changed the sampled wall region by less than one RGB level on average, so its
 extra normal texture sample was rejected. The next work-wall pass needs a
 visible geometry, mortar and edge-wear solution rather than another subtle map.
 
+## Third isolated implementation: fitted boxes and mortar
+
+The 1G and 2G casings now show shallow moulded screw bosses, stiffening ribs,
+entry knockouts, cross-head slots and steel screw faces. The front rim has a
+1 mm bevel. These details stay inside the existing fitting envelope and are
+non-interactive; the original fit dimensions, collision, mortar mass and
+installation sequence are unchanged. The shape language is informed by the
+[Legrand Batibox masonry box](https://www.legrand.com/ecatalogue/en/catalog/products/batibox-flush-mounting-box-square-1-gang-depth-40-mm-for-masonry-080141),
+while the game retains its own sizes and concept palette. Three batched visual
+meshes per casing keep the small features from becoming dozens of draw calls.
+
+The dynamic mortar surface now samples the already licensed Poly Haven
+`plastered_wall_03` albedo by world position. This is a visual approximation of
+cement variation, not a claim that the scan depicts wet mortar. It does not
+modify field nodes or mesh topology. In the same-camera B-box crop, more than
+half the measured patch pixels changed by over 3 RGB levels compared with the
+flat material, with a mean channel change of roughly 3 levels. A bump-shading
+trial gave no measurable pixel change and was removed. The square voxel contour
+and the surrounding unfinished scene still fall short of the selected concept.
+
+Matching isolated browser screenshots: `box-B-before.png`, `box-B-after.png`,
+`box-C-before.png`, `box-C-after.png`, `mortar-before.png`, `mortar-after.png`.
+`box-C-mobile-viewport.png` is a fixed work camera in portrait emulation;
+`box-C-gameplay-mobile.png` is a normal player view. The source and visual
+metadata are in `capture-box-detail.mjs` and `box-detail-check.json`.
+
 ## Integration boundary
 
 Do not promote this branch or replace the 5365 listener while the active

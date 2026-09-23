@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { INSTALLATION_RULES, type BoxKind } from '../data/installationRules';
 
 const whitePlastic = new THREE.MeshStandardMaterial({ color: 0xe7e4d9, roughness: 0.78, metalness: 0.02 });
@@ -48,8 +50,8 @@ export class ElectricalBox extends THREE.Group {
     bottom.position.set(0, -this.height / 2 + wall / 2, -bodyDepth / 2 - rimDepth);
     this.add(left, right, top, bottom);
 
-    const horizontalRim = new THREE.BoxGeometry(this.width + rim * 2, rim, rimDepth);
-    const verticalRim = new THREE.BoxGeometry(rim, this.height, rimDepth);
+    const horizontalRim = new RoundedBoxGeometry(this.width + rim * 2, rim, rimDepth, 2, .001);
+    const verticalRim = new RoundedBoxGeometry(rim, this.height, rimDepth, 2, .001);
     const rimTop = mesh(horizontalRim);
     const rimBottom = mesh(horizontalRim);
     const rimLeft = mesh(verticalRim);
@@ -68,6 +70,67 @@ export class ElectricalBox extends THREE.Group {
       knockout.position.set(x, -this.height * 0.22, -this.depth + wall + 0.0006);
       knockout.name = '20 mm knockout';
       this.add(knockout);
+    }
+
+    // The shallow moulding is kept inside the established fitting envelope.
+    // None of these non-interactive surfaces changes placement, level or reach.
+    const moulded: THREE.BufferGeometry[] = [];
+    const recessed: THREE.BufferGeometry[] = [];
+    const hardware: THREE.BufferGeometry[] = [];
+    const detail = (parts: THREE.BufferGeometry[], geometry: THREE.BufferGeometry,
+      x: number, y: number, z: number, rotation = new THREE.Euler()): void => {
+      geometry.applyMatrix4(new THREE.Matrix4().compose(
+        new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(rotation),
+        new THREE.Vector3(1, 1, 1)));
+      parts.push(geometry);
+    };
+    const screwX = this.width / 2 - .009;
+    for (const side of [-1, 1]) {
+      const x = side * screwX;
+      detail(moulded, new THREE.CylinderGeometry(.0051, .0063, .016, 14), x, 0, -.013,
+        new THREE.Euler(Math.PI / 2, 0, 0));
+      detail(moulded, new THREE.BoxGeometry(.008, .008, .019), side * (this.width / 2 - .006), 0, -.015);
+      detail(hardware, new THREE.CylinderGeometry(.0031, .0031, .0014, 16), x, 0, -.0041,
+        new THREE.Euler(Math.PI / 2, 0, 0));
+      detail(recessed, new THREE.BoxGeometry(.0034, .00055, .0004), x, 0, -.00325);
+      detail(recessed, new THREE.BoxGeometry(.00055, .0034, .0004), x, 0, -.00325);
+      for (const y of [-.021, .021]) {
+        detail(moulded, new THREE.BoxGeometry(.002, .008, .016),
+          side * (this.width / 2 - .0046), y, -.019);
+        detail(recessed, new THREE.TorusGeometry(.0064, .00075, 5, 16),
+          side * (this.width / 2 - wall - .0004), y, -.021,
+          new THREE.Euler(0, Math.PI / 2, 0));
+      }
+    }
+    for (const y of [-1, 1]) {
+      detail(moulded, new THREE.BoxGeometry(this.width - .019, .0021, .0033),
+        0, y * (this.height / 2 - .008), -.018);
+      for (const x of this.kind === '2G' ? [-this.width * .24, this.width * .24] : [0])
+        detail(recessed, new THREE.TorusGeometry(.008, .0007, 5, 20),
+          x, y * .020, -this.depth + wall + .0007);
+    }
+    if (this.kind === '2G') {
+      detail(moulded, new THREE.BoxGeometry(.003, this.height - .020, .012), 0, 0, -this.depth + .010);
+      for (const y of [-.021, .021])
+        detail(moulded, new THREE.BoxGeometry(.010, .003, .016), 0, y, -.020);
+    }
+    const darkDetail = new THREE.MeshStandardMaterial({ color: 0xa6a399, roughness: .94 });
+    const screwSteel = new THREE.MeshStandardMaterial({ color: 0x888b89, metalness: .56, roughness: .48 });
+    for (const [name, parts, material] of [
+      ['Moulded electrical box bosses and ribs', moulded, innerPlastic],
+      ['Recessed electrical box entry rings and screw slots', recessed, darkDetail],
+      ['Electrical box fitting screws', hardware, screwSteel],
+    ] as const) {
+      const geometry = mergeGeometries(parts, false);
+      parts.forEach(part => part.dispose());
+      if (!geometry) throw new Error(`Cannot merge ${name}`);
+      const fitted = mesh(geometry, material);
+      fitted.name = name;
+      fitted.userData.visualBoxDetail = true;
+      fitted.userData.levelEditorPickThrough = true;
+      fitted.raycast = () => undefined;
+      fitted.castShadow = false;
+      this.add(fitted);
     }
   }
 }
