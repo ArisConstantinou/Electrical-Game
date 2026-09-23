@@ -323,10 +323,23 @@ device-specific details, convincing wire termination, enclosure deformation
 and wall integration. It must be refined before it is treated as a final
 visual model or added to gameplay.
 
-## Integration boundary
+## Current integration and remaining wall work
 
-Do not promote this branch or replace the 5365 listener while the active
-`site-pro-04-mansion` checkout has unrelated unfinished changes. Before
-integration, compare its then-current commit and dirty state, bring approved
-changes into a protected integration checkout, and repeat visual, gameplay and
-performance checks on the combined build.
+Commit `9d262ec` combined the approved visual work with the Site Pro 04 release
+in `codex/site-pro-visual-integration`; that checkout now serves the sole 5365
+preview. The earlier protected checkout was not overwritten.
+
+The next wall pass varies the fired-clay tone per unit and the joint/face
+position of mansion bricks. It leaves the material lattice, collision and box
+fit unchanged. Matching captures from the integrated build and candidate are
+in `artifacts/brick-humanization/`: the same mansion block-end camera and
+front-wall camera show the difference. A trial that painted chip corners in
+the voxel colour field produced bright square artefacts and was removed.
+
+The change is visible but modest. The front destructible wall still reads as
+a regular grid, and the broader site remains short of the selected concept.
+The mobile Chrome emulation performance focus had identical draw-call counts
+before/after in all four poses; p95 varied between runs (the released room
+measured 21.6 ms before and 31.5 ms after, while the same preview room measured
+20.9 ms before and 20.0 ms after). This single pair cannot establish a stable
+frame-time gain or regression, and is not physical-device evidence.

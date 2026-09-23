@@ -1,0 +1,54 @@
+{
+  "environment": "390x844 DPR3 Chrome WebGL mobile emulation on Windows host; not physical phone",
+  "cases": [
+    {
+      "name": "released-room",
+      "frames": 114,
+      "p95Ms": 31.5,
+      "maxMs": 53.800000071525574,
+      "meanDrawCalls": 850,
+      "minDrawCalls": 850,
+      "maxDrawCalls": 850,
+      "meanTriangles": 2560447,
+      "mansionWing": true,
+      "renderError": ""
+    },
+    {
+      "name": "preview-same-room-pose",
+      "frames": 140,
+      "p95Ms": 20,
+      "maxMs": 21.5,
+      "meanDrawCalls": 850,
+      "minDrawCalls": 850,
+      "maxDrawCalls": 850,
+      "meanTriangles": 2560439,
+      "mansionWing": true,
+      "renderError": ""
+    },
+    {
+      "name": "preview-new-foyer",
+      "frames": 106,
+      "p95Ms": 25.800000071525574,
+      "maxMs": 32.5,
+      "meanDrawCalls": 1217,
+      "minDrawCalls": 1217,
+      "maxDrawCalls": 1217,
+      "meanTriangles": 3186929,
+      "mansionWing": true,
+      "renderError": ""
+    },
+    {
+      "name": "preview-third-floor-terrace",
+      "frames": 132,
+      "p95Ms": 21.5,
+      "maxMs": 26,
+      "meanDrawCalls": 655,
+      "minDrawCalls": 655,
+      "maxDrawCalls": 655,
+      "meanTriangles": 2174010,
+      "mansionWing": true,
+      "renderError": ""
+    }
+  ],
+  "errors": []
+}

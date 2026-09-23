@@ -1,5 +1,11 @@
 Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web game named WIRE THE HOUSE, based on real Cyprus residential first-fix practices, editable in Web Game Studio, playable on desktop/mobile, deployed to arisconstantinou/Electrical-Game via GitHub Pages, and ending at FIRST FIX COMPLETE without cable pulling.
 
+## 2026-09-23 · Integrated 5365 and next fired-clay variation
+
+- `codex/site-pro-visual-integration` at `9d262ec` combines the prior visual branch with the Site Pro release and serves the sole 5365 preview; browser room tour, mixer workflow and editor smoke passed on the merged build.
+- In separate `codex/brick-humanization`, tested per-brick kiln tone and small joint/face offsets for mansion units. Rejected a front-wall chip-colour experiment because it produced square bright artefacts. TypeScript, production build, desktop room tour, mansion close view and four-pose emulated performance check passed; the render-call count stayed equal and p95 varied. See `docs/VISUAL_OVERHAUL.md` and the same-camera captures under `artifacts/brick-humanization/`.
+- The result remains a partial visual step. The front masonry silhouette, all-area finish, construction phase transitions, effects and physical-device performance are still outstanding.
+
 ## 2026-09-23 · Full visual overhaul (in progress)
 
 - New approved scope: upgrade the complete game's visual quality toward the supplied atmospheric references while retaining its Cypriot construction-site setting. The user confirmed that earlier concept images should be reused; `Site Pro 04` and mansion concept images are already present.
