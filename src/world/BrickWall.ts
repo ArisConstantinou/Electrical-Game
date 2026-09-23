@@ -22,7 +22,7 @@ export interface MasonryImpact {
 // physical unit selects one face without photographic mortar joints.
 const brickImageReady = uniform(0);
 const identityMatrix = new THREE.Matrix4();
-const brickImage = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}assets/masonry/human-laid-brick-face-atlas.png`, () => { brickImageReady.value = 1; });
+const brickImage = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}assets/masonry/human-laid-brick-face-atlas-v3.png`, () => { brickImageReady.value = 1; });
 brickImage.colorSpace = THREE.SRGBColorSpace;
 brickImage.anisotropy = 8;
 brickImage.wrapS = brickImage.wrapT = THREE.RepeatWrapping;

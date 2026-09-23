@@ -1,15 +1,19 @@
 /** Eight orthographic clay faces in a 2×4 atlas, cropped inside the tile
- * borders. Mortar remains geometric rather than baked into the unit face. */
+ * borders. Worn variants are rarer and individual units can mirror their
+ * face, so a conspicuous chip does not repeat at every few bricks. */
 export function brickFacePatch(row: number, column: number, seed = 0): [number, number, number, number] {
   let hash = Math.imul(row + seed * 17 + 41, 73856093) ^ Math.imul(column + seed * 29 + 73, 19349663);
   hash = Math.imul(hash ^ (hash >>> 16), 2246822519) >>> 0;
-  const tile = hash % 8;
+  const tiles = [0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 4, 4, 4, 4, 5, 5, 6, 7];
+  const tile = tiles[hash % tiles.length];
   const atlasColumn = tile % 2, atlasRow = Math.floor(tile / 2);
-  // Keep the full clay face inside its tile, but shift the crop so repeated
-  // units do not reuse the same stain, chip and rib pattern at every course.
-  const cropX = .003 + ((hash >>> 3) % 11) * .0013;
-  const cropY = .003 + ((hash >>> 9) % 4) * .003;
-  return [atlasColumn * .5 + cropX, (3 - atlasRow) * .25 + cropY, .48, .235];
+  const cropX = .006 + ((hash >>> 3) % 5) * .01;
+  const cropY = .004 + ((hash >>> 9) % 3) * .007;
+  const width = .448, height = .228;
+  const mirrorU = Boolean((hash >>> 16) & 1), mirrorV = Boolean((hash >>> 17) & 1);
+  return [atlasColumn * .5 + cropX + (mirrorU ? width : 0),
+    (3 - atlasRow) * .25 + cropY + (mirrorV ? height : 0),
+    mirrorU ? -width : width, mirrorV ? -height : height];
 }
 
 /** Fired-clay units from adjacent batches and differently heated kiln spots.

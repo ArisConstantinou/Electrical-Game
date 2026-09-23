@@ -4,7 +4,10 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { blockPointerLock } from './browser-safety.mjs';
 
-const selected = process.argv.includes('--focus') ? new Set(['released-room', 'preview-same-room-pose', 'preview-new-foyer', 'preview-third-floor-terrace']) : null;
+const namedScenes = process.argv.find(value => value.startsWith('--scenes='))?.slice('--scenes='.length);
+const selected = namedScenes ? new Set(namedScenes.split(','))
+  : process.argv.includes('--focus') ? new Set(['released-room', 'preview-same-room-pose', 'preview-new-foyer', 'preview-third-floor-terrace']) : null;
+const warmupMs = Number(process.argv.find(value => value.startsWith('--warmup-ms='))?.slice('--warmup-ms='.length) ?? 500);
 const out = process.env.QA_PERF_OUTPUT ?? (selected ? 'output/mansion-performance-focus.json' : 'artifacts/site-pro-04/performance/mansion-ground-preview.json');
 const isolatedRoot = process.env.QA_DIST_ROOT ? path.resolve(process.env.QA_DIST_ROOT) : null;
 await mkdir(path.dirname(out), { recursive: true });
@@ -61,7 +64,7 @@ try {
         return result;
       };
     }, scene);
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(warmupMs);
     await page.evaluate(() => { window.__mansionProfile.active = true; });
     await page.waitForTimeout(2200);
     const sample = await page.evaluate(() => {

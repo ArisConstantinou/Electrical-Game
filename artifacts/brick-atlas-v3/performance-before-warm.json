@@ -1,0 +1,18 @@
+{
+  "environment": "390x844 DPR3 Chrome WebGL mobile emulation on Windows host; not physical phone",
+  "cases": [
+    {
+      "name": "preview-new-foyer",
+      "frames": 91,
+      "p95Ms": 28.899999976158142,
+      "maxMs": 33.10000002384186,
+      "meanDrawCalls": 1217,
+      "minDrawCalls": 1217,
+      "maxDrawCalls": 1217,
+      "meanTriangles": 3186945,
+      "mansionWing": true,
+      "renderError": ""
+    }
+  ],
+  "errors": []
+}

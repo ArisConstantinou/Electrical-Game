@@ -5,7 +5,7 @@ import { clayRibNormal, clayRibShade, siteClayImage, siteClayReady } from './Bri
 
 // The reference-derived atlas has independent broad faces; geometry supplies
 // each real mortar joint rather than sampling it from a texture.
-const brickFace = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}assets/masonry/human-laid-brick-face-atlas.png`);
+const brickFace = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}assets/masonry/human-laid-brick-face-atlas-v3.png`);
 brickFace.colorSpace = THREE.SRGBColorSpace;
 brickFace.anisotropy = 8;
 brickFace.wrapS = brickFace.wrapT = THREE.RepeatWrapping;

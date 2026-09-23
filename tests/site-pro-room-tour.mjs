@@ -153,6 +153,10 @@ try {
       const patchAttribute = rear?.geometry?.getAttribute('brickPatch');
       const patchRectangles = patchAttribute ? Array.from({ length: rear.count }, (_, index) =>
         Array.from({ length: 4 }, (_, component) => patchAttribute.getComponent(index, component))) : [];
+      const validCrop = ([u, v, width, height]) =>
+        Math.min(u, u + width) >= -1e-6 && Math.min(v, v + height) >= -1e-6 &&
+        Math.max(u, u + width) <= 1 + 1e-6 && Math.max(v, v + height) <= 1 + 1e-6 &&
+        Math.abs(height) > 0;
       const leftWindowBlocked = (() => {
         if (!leftBricks?.isInstancedMesh) return true;
         const matrix = new leftBricks.matrixWorld.constructor();
@@ -170,14 +174,14 @@ try {
         left: leftBricks?.count ?? 0, right: rightBricks?.count ?? 0,
         source: rear?.userData.textureSource ?? '',
         uniqueClayFaces: new Set(patchRectangles.map(rect => `${rect[0].toFixed(4)},${rect[1].toFixed(4)}`)).size,
-        validClayCrops: patchRectangles.length > 0 && patchRectangles.every(([u, v, width, height]) =>
-          u >= 0 && v >= 0 && width >= 0 && height > 0 && u + width <= 1 && v + height <= 1),
+        validClayCrops: patchRectangles.length > 0 && patchRectangles.every(validCrop),
+        invalidClayCrops: patchRectangles.filter(rect => !validCrop(rect)).slice(0, 4),
         rearPlaster: Boolean(room.getObjectByName('Trowelled plaster lift with unfinished masonry edge')),
         leftWindowBlocked,
       };
     });
     assert(masonry.front && masonry.rightPractice && masonry.left > 300 && masonry.right > 400 && masonry.rear >= 480, `${device.name}: missing fired-clay wall: ${JSON.stringify(masonry)}`);
-    assert(masonry.source.includes('human-laid-brick-face-atlas.png') && !masonry.rearPlaster && !masonry.leftWindowBlocked, `${device.name}: wrong material or window obstruction: ${JSON.stringify(masonry)}`);
+    assert(masonry.source.includes('human-laid-brick-face-atlas-v3.png') && !masonry.rearPlaster && !masonry.leftWindowBlocked, `${device.name}: wrong material or window obstruction: ${JSON.stringify(masonry)}`);
     assert(masonry.uniqueClayFaces >= 60 && masonry.validClayCrops, `${device.name}: clay faces repeat or sample outside the source: ${JSON.stringify(masonry)}`);
     report.cases.push({ device: device.name, view: 'four-masonry-walls', state: masonry });
     await context.close();

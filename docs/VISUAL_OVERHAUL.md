@@ -1,5 +1,27 @@
 # Electrical-Game visual overhaul
 
+## Human-laid brick face atlas across the playable site, 2026-09-23
+
+The main breakable wall, side/rear room courses, exterior masonry and mansion
+units now sample `human-laid-brick-face-atlas-v3.png`. The eight orthographic
+long clay faces were generated from the user's construction photos and edited
+to a restrained terracotta range after the first version looked too much like
+a dark/red checkerboard in the mansion. Individual units draw from weighted
+tiles and may mirror their face, reducing repeated damage marks. The new file
+is 2.86 MB versus 3.54 MB for the previous atlas; it does not add a texture
+slot or draw call. See `public/assets/masonry/GENERATED_ATLAS.md` for the
+image-generation prompt and provenance.
+
+The comparison folder `artifacts/brick-atlas-v3/` contains matching camera
+captures of the main work wall, rear room wall and mansion block end, plus a
+390 × 844 portrait gameplay view. The candidate production build passed the
+desktop and portrait room tour, Studio contract, and four-bore masonry profile.
+In a warmed 390 × 844 DPR3 headless Chrome foyer sample, p95 frame time was
+28.9 ms before and 24.5 ms after; cold samples varied more widely, so this
+does not establish a general speedup or physical-phone result. Four-chamber
+edge geometry, concrete ceilings and saved masonry damage were retained.
+The current wall geometry and wider site remain short of the approved concept.
+
 ## Playable work wall: selective mortar squeeze-out, 2026-09-23
 
 The main breakable masonry wall now has grainy, irregular mortar at the visible
