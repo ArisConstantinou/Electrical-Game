@@ -207,11 +207,31 @@ try {
   assert(Math.abs(sandAfter.x - sandBefore.x - .15) < .011 &&
     Math.abs(sandAfter.obstacle - sandBefore.obstacle - .15) < .011 && sandAfter.scoopedKg > 0,
     'Sand collision and shovel simulation must follow the editor placement');
+  await page.locator('#level-yaw').fill('25');
+  await page.locator('#level-yaw').dispatchEvent('change');
+  const sandWidth = Number(await page.locator('[data-size="x"]').inputValue());
+  await page.locator('[data-size="x"]').fill(String(sandWidth + .15));
+  await page.locator('[data-size="x"]').dispatchEvent('change');
+  const sandTransformed = await page.evaluate(() => {
+    const game = window.__wireTheHouse, sand = game.mixing.models.sand;
+    const obstacle = game.mixing.collisionObstacles().find(item => item.id === 'sand-pile');
+    return { yaw: sand.parent.rotation.y, scaleX: sand.parent.scale.x,
+      minX: obstacle?.minX, maxX: obstacle?.maxX };
+  });
+  assert(Math.abs(sandTransformed.yaw - 25 * Math.PI / 180) < .02 && sandTransformed.scaleX > 1 &&
+    Number.isFinite(sandTransformed.minX) && Number.isFinite(sandTransformed.maxX),
+    'Sand yaw and width must retain a finite physical footprint');
   await page.locator('#level-save').click();
   await page.reload();
   await page.waitForFunction(() => window.__wireTheHouse?.levelEditor?.active, null, { timeout: 45000 });
-  assert(Math.abs(await page.evaluate(() => window.__wireTheHouse.mixing.models.sand.parent.position.x) - sandAfter.x) < .011,
-    'Sand pile placement must survive Save/Load');
+  const sandRestored = await page.evaluate(() => {
+    const root = window.__wireTheHouse.mixing.models.sand.parent;
+    return { x: root.position.x, yaw: root.rotation.y, scaleX: root.scale.x };
+  });
+  assert(Math.abs(sandRestored.x - sandAfter.x) < .011 &&
+    Math.abs(sandRestored.yaw - sandTransformed.yaw) < .011 &&
+    Math.abs(sandRestored.scaleX - sandTransformed.scaleX) < .011,
+    'Sand pile position, rotation and size must survive Save/Load');
   const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   await blockPointerLock(mobile);
   const touchPage = await mobile.newPage();
@@ -274,7 +294,7 @@ try {
   console.log(JSON.stringify({ selected, mobileSelected, before, moved, mirroredScale, restored,
     wheelName, wheelBefore, wheelMoved, wheelYaw, wheelRestored, wheelYawAfterPhysics,
     toolBefore, toolAfterUpdate, toolRestored, wheelBeforeScale, wheelAfterScale, wheelScaleRestored,
-    sandName, sandBefore, sandAfter }));
+    sandName, sandBefore, sandAfter, sandTransformed, sandRestored }));
 } finally {
   await browser.close();
   if (slotId) await rm(new URL(`../.studio/levels/${slotId}.json`, import.meta.url), { force: true });
