@@ -30,6 +30,7 @@ export const addLighting = (scene: THREE.Scene): void => {
   sun.shadow.normalBias = .012;
   sun.shadow.bias = -.00012;
   sun.shadow.radius = 2;
+  sun.shadow.camera.layers.enable(1);
   scene.add(sun);
 
   // Daylight bouncing off the open front illuminates the back masonry without

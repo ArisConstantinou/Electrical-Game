@@ -1,0 +1,19 @@
+{
+  "scope": "Rigid shadow geometry of the concrete drum mixer and cordless mixer only; visible meshes, movable drum/paddle, editor picking and collisions remain separate.",
+  "baseline": "Public main d617350ffd69c0af0bafdb01efd8956f0c09928f",
+  "candidate": "codex/site-pro-04-pages-release working tree before commit",
+  "environment": "Windows desktop Chrome in 390x844 DPR3 touch emulation, WebGL backend, renderer pixel ratio 1.75; physical iPhone/Safari not tested. Host CPU Intel Core Ultra 9 285K; available GPUs Intel Graphics and NVIDIA GeForce RTX 5080 (browser adapter not independently confirmed).",
+  "samePageAB": {
+    "scene": "Camera fixed at the mixing station, 180 animation frames per phase, alternating original and batched shadow casters on one loaded page",
+    "original": { "drawCalls": 864, "triangles": 2181305, "meanFrameMs": [18.48, 21.16], "p95FrameMs": [33.4, 33.4] },
+    "batched": { "drawCalls": 798, "triangles": 2181305, "meanFrameMs": [18.13, 20.24], "p95FrameMs": [33.3, 33.4] }
+  },
+  "rotatingSprayTwoRuns": {
+    "public": { "drawCalls": [567.1, 569.2], "fps": [54.7, 57.9], "p95FrameMs": [25.2, 26.1] },
+    "candidate": { "drawCalls": [504.2, 502.4], "fps": [58.3, 55.5], "p95FrameMs": [22.0, 23.6] }
+  },
+  "visualReview": "Same 780x1688 mixing-station pose inspected before/after. Mean absolute RGB difference 0.318/255; 0.107% of pixels differed by more than 20 in any channel, predominantly changing hand/model animation. No lost shadows or visible material change observed.",
+  "memoryCost": "Two new position buffers total 829656 bytes, plus GPU copies and object overhead.",
+  "checks": ["TypeScript project build", "Vite production build", "mixing-equipment-collision on candidate dist", "editor direct selection of both mixer roots", "mobile-top-rail-ui at 390x844, 320x740 and 844x390"],
+  "limits": "Draw-call reduction is proven; host frame timings overlap and do not prove smooth physical-phone playback. A separate mixing-world-tool-switch test fails at its cement-stroke assertion on both public baseline and candidate, so this change does not claim that workflow passes."
+}

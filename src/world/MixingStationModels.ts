@@ -3,6 +3,7 @@ import { MeshStandardNodeMaterial } from 'three/webgpu';
 import { attribute, mix, texture as sampleTexture, uv, vec3 } from 'three/tsl';
 import { createConcreteMixer, createWheelbarrow, type WheelbarrowModel } from './SiteEquipmentModels';
 import { SandPileSimulation } from './SandPileSimulation';
+import { batchStaticShadows } from './StaticShadowBatch';
 
 type Point = readonly [number, number, number];
 const material = (color: number, roughness = .8, metalness = 0): THREE.MeshStandardMaterial => new THREE.MeshStandardMaterial({ color, roughness, metalness });
@@ -254,6 +255,9 @@ export function createMixingStationModels(): MixingStationModels {
   // Open horseshoe: paired mixers at the back, sand left, cement/water right.
   // Keep the middle aisle clear for the worker and a wheelbarrow.
   const concreteMixer=createConcreteMixer();concreteMixer.position.set(-.55,0,.73);concreteMixer.rotation.y=0;concreteMixer.scale.x=-1;group.add(concreteMixer);
+  const drumCradle=concreteMixer.getObjectByName('tilting-drum-cradle');
+  const tiltWheel=concreteMixer.getObjectByName('tilt-wheel-and-lock');
+  batchStaticShadows(concreteMixer,concreteMixer.children.filter(child=>child!==drumCradle&&child!==tiltWheel));
   const { bucket, fill } = bucketModel(0x344b37, 'mixing-garden-bucket'); bucket.position.set(.90,0,.08);group.add(bucket);
   const sand = sandMound();
   const sandRoot = new THREE.Group(); sandRoot.name = 'mixing-sand-pile';
@@ -264,6 +268,7 @@ export function createMixingStationModels(): MixingStationModels {
   // only its resting transform; taking/using it still requires interaction.
   const mixer = createMixerModel(); mixer.position.copy(bucket.position).add(new THREE.Vector3(0,.06,0)); group.add(mixer);
   const paddle = mixer.getObjectByName('mixing-paddle') as THREE.Group;
+  batchStaticShadows(mixer, mixer.children.filter(child => child !== paddle));
   const rinseParts = bucketModel(0x548492, 'mixing-rinse-pail'); const rinse = rinseParts.bucket; rinse.position.set(2.20, 0, -.03); rinse.scale.setScalar(.8);
   rinseParts.fill.visible = true; rinseParts.fill.position.y = .23; rinseParts.fill.scale.setScalar(.162);
   const water = rinseParts.fill.material as THREE.MeshStandardMaterial; water.color.setHex(0x81bfc9); water.roughness = .17; water.transparent = true; water.opacity = .82;

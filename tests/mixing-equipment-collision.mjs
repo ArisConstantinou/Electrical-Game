@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, stat } from 'node:fs/promises';
+import { resolve, extname } from 'node:path';
 import { blockPointerLock } from './browser-safety.mjs';
 
 const vite=await createServer({server:{middlewareMode:true,hmr:false},optimizeDeps:{noDiscovery:true,include:[]},appType:'custom',logLevel:'error'});
@@ -19,11 +20,21 @@ try{
   assert(Math.hypot(slide.x-closestX,slide.z-closestZ)>=radius-1e-8,'Sliding preserves body clearance');
 }finally{await vite.close();}
 
-const url=process.env.QA_BASE??'http://127.0.0.1:5365/Electrical-Game/',out='output/mixing-equipment-collision';await mkdir(out,{recursive:true});
+const url=process.argv.find(arg=>/^https?:/.test(arg))??process.env.QA_BASE??'http://127.0.0.1:5365/Electrical-Game/',out='output/mixing-equipment-collision';await mkdir(out,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:true}),report={url,errors:[],obstacles:[],contacts:[],passed:false};
 try{
   const context=await browser.newContext({viewport:{width:1366,height:768}});await blockPointerLock(context);const page=await context.newPage();
+  await context.route('**/__wire-house-mansion-level?list=1',route=>route.fulfill({status:200,contentType:'application/json',body:'{"slots":[]}'}));
+  if(process.argv.includes('--dist')){
+    const dist=resolve('dist'),mime={'.html':'text/html','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.webp':'image/webp','.png':'image/png','.jpg':'image/jpeg','.glb':'model/gltf-binary','.woff2':'font/woff2'};
+    await context.route('https://arisconstantinou.github.io/Electrical-Game/**',async route=>{
+      const path=resolve(dist,decodeURIComponent(new URL(route.request().url()).pathname.slice('/Electrical-Game/'.length))||'index.html');
+      if(!path.startsWith(dist))return route.abort();
+      try{if(!(await stat(path)).isFile())return route.abort();await route.fulfill({status:200,contentType:mime[extname(path)]??'application/octet-stream',body:await readFile(path)});}catch{return route.abort();}
+    });
+  }
   page.on('pageerror',error=>report.errors.push(error.message));page.on('console',message=>{if(message.type()==='error')report.errors.push(message.text());});
+  page.on('response',response=>{if(response.status()>=400)report.errors.push(`${response.status()} ${response.url()}`);});
   await page.goto(url);await page.waitForFunction(()=>window.__wireTheHouse?.mixing,undefined,{timeout:120000});await page.locator('#apprentice-count').selectOption('0');await page.locator('#start-button').click();
   await page.waitForFunction(()=>window.__wireTheHouse?.workerBody.telemetry.loaded,undefined,{timeout:120000});
   await page.evaluate(()=>{const g=window.__wireTheHouse;window.__collisionStep=g.step.bind(g);g.step=()=>{};});
