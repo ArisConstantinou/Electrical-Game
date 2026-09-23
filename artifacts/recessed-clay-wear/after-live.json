@@ -1,0 +1,236 @@
+{
+  "result": {
+    "walls": [
+      {
+        "id": "recessed-room-side-9--1",
+        "columns": 10,
+        "rows": 23,
+        "occupied": 218,
+        "variants": [
+          {
+            "name": "recessed-room-side-9--1 · sound clay units",
+            "count": 173,
+            "triangles": 12
+          },
+          {
+            "name": "recessed-room-side-9--1 · lightly chipped clay units 1",
+            "count": 16,
+            "triangles": 68
+          },
+          {
+            "name": "recessed-room-side-9--1 · lightly chipped clay units 2",
+            "count": 21,
+            "triangles": 60
+          },
+          {
+            "name": "recessed-room-side-9--1 · broken corners",
+            "count": 8,
+            "triangles": 76
+          }
+        ],
+        "chipped": 45,
+        "reliefRange": 0.006000000052154064,
+        "firstRow": [
+          -1.3606150150299072,
+          -1.0208250284194946,
+          -0.6808249950408936,
+          -0.34013500809669495,
+          0.0007650000043213367,
+          0.3396250009536743,
+          0.6797299981117249,
+          1.019760012626648,
+          1.3596999645233154
+        ],
+        "secondRow": [
+          -1.4457499980926514,
+          -1.1904499530792236,
+          -0.8500750064849854,
+          -0.5099999904632568,
+          -0.17125999927520752,
+          0.1705400049686432,
+          0.5103300213813782,
+          0.8508250117301941,
+          1.190119981765747,
+          1.4444149732589722
+        ]
+      },
+      {
+        "id": "recessed-room-back-9",
+        "columns": 8,
+        "rows": 23,
+        "occupied": 172,
+        "variants": [
+          {
+            "name": "recessed-room-back-9 · sound clay units",
+            "count": 133,
+            "triangles": 12
+          },
+          {
+            "name": "recessed-room-back-9 · lightly chipped clay units 1",
+            "count": 13,
+            "triangles": 68
+          },
+          {
+            "name": "recessed-room-back-9 · lightly chipped clay units 2",
+            "count": 16,
+            "triangles": 60
+          },
+          {
+            "name": "recessed-room-back-9 · broken corners",
+            "count": 10,
+            "triangles": 76
+          }
+        ],
+        "chipped": 39,
+        "reliefRange": 0.006000000052154064,
+        "firstRow": [
+          -0.968196451663971,
+          -0.6455192565917969,
+          -0.32260215282440186,
+          0.00007500000356230885,
+          0.32369714975357056,
+          0.6463742852210999,
+          0.9689913988113403
+        ],
+        "secondRow": [
+          -1.0498406887054443,
+          -0.8063178658485413,
+          -0.4854407012462616,
+          -0.1614435762166977,
+          0.16154856979846954,
+          0.4839557111263275,
+          0.8066178560256958,
+          1.0493457317352295
+        ]
+      },
+      {
+        "id": "recessed-room-side-13--1",
+        "columns": 10,
+        "rows": 23,
+        "occupied": 218,
+        "variants": [
+          {
+            "name": "recessed-room-side-13--1 · sound clay units",
+            "count": 175,
+            "triangles": 12
+          },
+          {
+            "name": "recessed-room-side-13--1 · lightly chipped clay units 1",
+            "count": 23,
+            "triangles": 68
+          },
+          {
+            "name": "recessed-room-side-13--1 · lightly chipped clay units 2",
+            "count": 13,
+            "triangles": 60
+          },
+          {
+            "name": "recessed-room-side-13--1 · broken corners",
+            "count": 7,
+            "triangles": 76
+          }
+        ],
+        "chipped": 43,
+        "reliefRange": 0.006000000052154064,
+        "firstRow": [
+          -1.3598049879074097,
+          -1.0208100080490112,
+          -0.6803150177001953,
+          -0.3393700122833252,
+          0.00011999999696854502,
+          0.34097498655319214,
+          0.6798200011253357,
+          1.020015001296997,
+          1.3596099615097046
+        ],
+        "secondRow": [
+          -1.4450750350952148,
+          -1.1913650035858154,
+          -0.8499699831008911,
+          -0.5094450116157532,
+          -0.16978999972343445,
+          0.17001500725746155,
+          0.5103600025177002,
+          0.8498349785804749,
+          1.190345048904419,
+          1.4452550411224365
+        ]
+      },
+      {
+        "id": "recessed-room-back-13",
+        "columns": 8,
+        "rows": 23,
+        "occupied": 172,
+        "variants": [
+          {
+            "name": "recessed-room-back-13 · sound clay units",
+            "count": 132,
+            "triangles": 12
+          },
+          {
+            "name": "recessed-room-back-13 · lightly chipped clay units 1",
+            "count": 15,
+            "triangles": 68
+          },
+          {
+            "name": "recessed-room-back-13 · lightly chipped clay units 2",
+            "count": 20,
+            "triangles": 60
+          },
+          {
+            "name": "recessed-room-back-13 · broken corners",
+            "count": 5,
+            "triangles": 76
+          }
+        ],
+        "chipped": 40,
+        "reliefRange": 0.006000000052154064,
+        "firstRow": [
+          -0.9679264426231384,
+          -0.6462692618370056,
+          -0.32279714941978455,
+          -0.00011999999696854502,
+          0.32344213128089905,
+          0.646629273891449,
+          0.9687514305114746
+        ],
+        "secondRow": [
+          -1.0485657453536987,
+          -0.8073228597640991,
+          -0.48358070850372314,
+          -0.16196857392787933,
+          0.16264356672763824,
+          0.48403072357177734,
+          0.8085078597068787,
+          1.0494656562805176
+        ]
+      }
+    ],
+    "drawCalls": 148,
+    "triangles": 721379,
+    "geometries": 918,
+    "textures": 170,
+    "renderError": ""
+  },
+  "desktopFrames": {
+    "medianMs": 16.700000000000728,
+    "p95Ms": 16.80000000000291
+  },
+  "mobile": {
+    "drawCalls": 816,
+    "triangles": 2421032,
+    "renderError": ""
+  },
+  "mobileFrames": {
+    "medianMs": 16.69999999999709,
+    "p95Ms": 16.799999999999272
+  },
+  "damage": {
+    "accepted": true,
+    "index": 99,
+    "removedNodes": 26,
+    "removedBricks": 0,
+    "restoredNodes": 26
+  },
+  "errors": []
+}

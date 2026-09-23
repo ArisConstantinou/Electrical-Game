@@ -7,3 +7,5 @@ Candidate: alternate rows receive correctly sized half units at both ends, while
 The browser test confirmed all four walls contain four wear variants and a real offset between alternating courses. Three impacts on a recessed back wall removed 26 clay nodes, zero complete bricks; the Studio document restored those 26 nodes. `mansion-masonry-demolition` and `mansion-joint-fracture` passed. TypeScript and the Vite production build passed.
 
 Same-scene headless Chrome measurements: desktop 134 → 148 draw calls, 709,619 → 721,379 triangles, 904 → 918 geometries, and 170 textures unchanged. At 390×844, draw calls were 806 → 815 and triangles 2,412,484 → 2,419,844. The 90-frame desktop and narrow-viewport p95 remained 16.8 ms in this host run. The viewport result is not a physical phone performance measurement.
+
+After integration at `744556b`, the direct `--live` test passed on the existing 5365 listener. `after-live.png`, `after-live-mobile.png`, and `after-live.json` record the served runtime. TypeScript and production Vite builds passed in that checkout.
