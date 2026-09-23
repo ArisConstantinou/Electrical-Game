@@ -1,0 +1,30 @@
+{
+  "result": {
+    "accepted": true,
+    "removedBricks": 1,
+    "partialBricks": 0,
+    "originalSolidNodes": 4400,
+    "afterCarve": 3520,
+    "remainingFraction": 0.2,
+    "oldBoxFraction": 0.5000000000000001,
+    "removedClayNodes": 0,
+    "mortarInstances": 575,
+    "expectedMortarInstances": 1150,
+    "bedHeight": null,
+    "headWidth": null,
+    "crossMortarInstances": 161,
+    "expectedCrossMortarInstances": 322,
+    "crossBedHeight": 0.13243478536605835,
+    "crossHeadWidth": 0.322857141494751,
+    "drawCalls": 57,
+    "triangles": 425506,
+    "renderError": ""
+  },
+  "profile": {
+    "frameP95Ms": 33.29999999999927,
+    "renderCpuP95Ms": 22.799999952316284,
+    "drawCalls": 762,
+    "triangles": 2262317
+  },
+  "errors": []
+}

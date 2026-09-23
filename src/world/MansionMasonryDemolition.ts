@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { PlayerObstacle } from '../player/EquipmentCollision';
 import { hollowClayEndMaterial, hollowClayEndShapes } from './HollowClayEnd';
-import { MasonryVolume, type MasonrySave } from './MasonryVolume';
+import { MasonryVolume, MaterialId, type MasonrySave } from './MasonryVolume';
 import { damagedMasonryMaterial } from './BrickFaceMaterial';
 
 export interface MasonryAim {
@@ -16,7 +16,7 @@ export interface MasonryBrickInstance {
   instance: number;
 }
 export interface MansionBrickDamage { index: number; save: MasonrySave }
-interface BrokenBrick { volume: MasonryVolume; mesh: THREE.Mesh; origin: THREE.Vector3; rotation: THREE.Quaternion }
+interface BrokenBrick { volume: MasonryVolume; mesh: THREE.Mesh; origin: THREE.Vector3; rotation: THREE.Quaternion; originalSolidNodes: number }
 
 /** A light demolition layer for the authored fired-clay walls. The intact wall
  * keeps its original two draw calls; a hit swaps the solid backing for a
@@ -158,9 +158,11 @@ export class MansionMasonryDemolition {
       return false;
     }
     this.broken.set(index, entry);
-    // Only a mostly excavated unit becomes a full opening and changes player
-    // collision. A normal hammer blow never swaps a complete brick for air.
-    if (entry.volume.removedVolume >= entry.volume.width * entry.volume.height * entry.volume.depth * .48)
+    // The four hollow bores are air from the start. A threshold based on the
+    // bounding box discarded a visibly substantial clay shell at 48% of that
+    // box, making a struck brick suddenly disappear. Retire it only when its
+    // actual original clay lattice is almost completely gone.
+    if (entry.volume.removedNodeCount >= entry.originalSolidNodes * .94)
       return this.strike(index);
     if (entry.volume.removedNodeCount) this.showBrokenBrick(index, entry);
     return true;
@@ -185,13 +187,17 @@ export class MansionMasonryDemolition {
     const volume = new MasonryVolume({ width, height, depth: .24, frontZ: .12, cellSize: .012,
       seed: seed ?? (Math.imul(index + 1, 2654435761) ^ Math.imul(this.columns, 2246822519)) >>> 0,
       hollowProfile: 'single-horizontal-four-bore', maxConnectivityNodes: 1800 });
+    let originalSolidNodes = 0;
+    for (let y = 1; y <= volume.ny; y++) for (let x = 1; x <= volume.nx; x++)
+      for (let z = 1; z <= volume.nz; z++)
+        if (volume.baseMaterial(x, y, z) !== MaterialId.Air) originalSolidNodes++;
     const mesh = new THREE.Mesh(new THREE.BufferGeometry(), damagedMasonryMaterial);
     mesh.name = `${this.group.name} locally fractured brick ${index}`;
     mesh.position.copy(origin); mesh.quaternion.copy(rotation);
     mesh.castShadow = mesh.receiveShadow = true;
     mesh.raycast = () => undefined;
     this.group.add(mesh);
-    return { volume, mesh, origin, rotation };
+    return { volume, mesh, origin, rotation, originalSolidNodes };
   }
 
   private showBrokenBrick(index: number, entry: BrokenBrick): void {
@@ -229,9 +235,8 @@ export class MansionMasonryDemolition {
     this.temp.makeScale(0, 0, 0);
     ref?.mesh.setMatrixAt(ref.instance, this.temp);
     if (ref) { ref.mesh.instanceMatrix.needsUpdate = true; ref.mesh.computeBoundingSphere(); }
-    this.mortarCells!.setMatrixAt(index, this.temp);
-    this.mortarCells!.instanceMatrix.needsUpdate = true;
-    this.mortarCells!.computeBoundingSphere();
+    // Bed and head joints remain around a partly chipped unit; they are not
+    // a solid grey replacement brick behind its open chambers.
   }
 
   strike(index: number, refreshCaps = true): boolean {
@@ -245,7 +250,8 @@ export class MansionMasonryDemolition {
     this.temp.makeScale(0, 0, 0);
     const ref = this.brickRefs[index];
     if (ref) ref.mesh.setMatrixAt(ref.instance, this.temp);
-    this.mortarCells!.setMatrixAt(index, this.temp);
+    this.mortarCells!.setMatrixAt(index * 2, this.temp);
+    this.mortarCells!.setMatrixAt(index * 2 + 1, this.temp);
     if (ref) {
       ref.mesh.instanceMatrix.needsUpdate = true;
       ref.mesh.computeBoundingSphere();
@@ -390,16 +396,31 @@ export class MansionMasonryDemolition {
   private ensureMortarCells(): void {
     if (this.mortarCells) return;
     const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const cells = new THREE.InstancedMesh(geometry, this.backing.material, this.brickRefs.length);
-    cells.name = `${this.group.name} remaining mortar cells`;
+    const cells = new THREE.InstancedMesh(geometry, this.backing.material, this.brickRefs.length * 2);
+    cells.name = `${this.group.name} real bed and head mortar joints`;
     cells.castShadow = cells.receiveShadow = true;
     for (let index = 0; index < this.brickRefs.length; index++) {
       this.original[index].decompose(this.position, this.rotation, this.scale);
-      if (this.originalHasBrick(index)) {
-        if (this.alongX) this.scale.set(this.scale.x + .006, 3 / this.rows + .002, .20);
-        else this.scale.set(.20, 3 / this.rows + .002, this.scale.z + .006);
-        cells.setMatrixAt(index, this.temp.compose(this.position, this.rotation, this.scale));
-      } else cells.setMatrixAt(index, this.temp.makeScale(0, 0, 0));
+      if (this.originalHasBrick(index) && this.remaining[index]) {
+        const width = this.alongX ? this.scale.x : this.scale.z;
+        const height = this.scale.y;
+        const bedHeight = Math.max(.005, Math.min(.016, 3 / this.rows - height));
+        const bedPosition = this.position.clone();
+        bedPosition.y -= height / 2 + bedHeight / 2;
+        const bedScale = this.alongX ? new THREE.Vector3(width + .006, bedHeight, .20)
+          : new THREE.Vector3(.20, bedHeight, width + .006);
+        cells.setMatrixAt(index * 2, this.temp.compose(bedPosition, this.rotation, bedScale));
+        const headPosition = this.position.clone();
+        if (this.alongX) headPosition.x += width / 2 + .004;
+        else headPosition.z += width / 2 + .004;
+        const headScale = this.alongX ? new THREE.Vector3(.008, height, .20)
+          : new THREE.Vector3(.20, height, .008);
+        cells.setMatrixAt(index * 2 + 1, this.temp.compose(headPosition, this.rotation, headScale));
+      } else {
+        this.temp.makeScale(0, 0, 0);
+        cells.setMatrixAt(index * 2, this.temp);
+        cells.setMatrixAt(index * 2 + 1, this.temp);
+      }
     }
     cells.computeBoundingSphere();
     this.group.add(cells);
