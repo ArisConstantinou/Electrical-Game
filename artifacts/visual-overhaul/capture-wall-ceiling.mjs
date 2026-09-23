@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 
 const variant = process.argv[2] || 'before';
+const mobile = process.argv.includes('--mobile');
+const selectedView = process.argv[3]?.startsWith('--') ? null : process.argv[3];
 const root = path.resolve('dist');
 const output = path.resolve('artifacts/visual-overhaul');
 const views = [
@@ -16,8 +18,8 @@ const views = [
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const report = [];
 try {
-  for (const view of views.filter(item => !process.argv[3] || item.name === process.argv[3])) {
-    const context = await browser.newContext({ viewport: { width: 1365, height: 768 }, deviceScaleFactor: 1 });
+  for (const view of views.filter(item => !selectedView || item.name === selectedView)) {
+    const context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1365, height: 768 }, deviceScaleFactor: 1, isMobile: mobile, hasTouch: mobile });
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
@@ -31,7 +33,8 @@ try {
       } catch { await route.fulfill({ status: 404, body: `Missing isolated asset: ${relative}` }); }
     });
     await page.goto(`http://127.0.0.1:5365/Electrical-Game/?mansion=${view.mansion ? 'preview' : 'basic'}&renderer=webgl`);
-    await page.locator('#start-button').click({ timeout: 120000 });
+    if (mobile) await page.locator('#start-button').tap({ timeout: 120000 });
+    else await page.locator('#start-button').click({ timeout: 120000 });
     await page.waitForFunction(() => window.__wireTheHouse?.started, null, { timeout: 120000 });
     await page.waitForTimeout(500);
     const state = await page.evaluate(async pose => {

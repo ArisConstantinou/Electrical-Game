@@ -702,7 +702,12 @@ export class MansionGroundWing extends THREE.Group {
     editable.position.set(centreX, baseY, centreZ);
     this.add(editable);
     this.editableWalls.set(name, editable);
-    const backing = new THREE.Mesh(new THREE.BoxGeometry(alongX ? length : .226, 3, alongX ? .226 : length), siteMaterial('concrete', 0x988d7e, length / 2, 1.5));
+    // This backing is the mortar visible in the gaps and handling chips.
+    // A little diffuse fill keeps its recessed faces legible in deep shadow.
+    const mortarBacking = siteMaterial('concrete', 0xaaa399, length / 2, 1.5);
+    mortarBacking.emissive.setHex(0x77736e);
+    mortarBacking.emissiveIntensity = .28;
+    const backing = new THREE.Mesh(new THREE.BoxGeometry(alongX ? length : .226, 3, alongX ? .226 : length), mortarBacking);
     backing.name = `${name} mortar backing`;
     backing.position.set(0, 1.5, 0);
     backing.castShadow = backing.receiveShadow = true;
