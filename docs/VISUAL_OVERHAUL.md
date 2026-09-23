@@ -1,5 +1,27 @@
 # Electrical-Game visual overhaul
 
+## Playable work wall: selective mortar squeeze-out, 2026-09-23
+
+The main breakable masonry wall now has grainy, irregular mortar at the visible
+brick boundaries. Most units retain narrow joints; a small deterministic set
+has wider hand-laid mortar. This changes only the clay-face shading. The
+volumetric clay, four horizontal bores, chisel contacts and saved damage stay
+unchanged. A trial with broad grey waves on every brick was rejected after
+visual inspection.
+
+Matching 1365 x 768 close views are in `artifacts/workwall-mortar/before-desktop.png`
+and `after-desktop.png`; `after-gameplay.png` shows the reachable installation
+wall with the normal HUD, and `after-portrait.png` is 390 x 844 Chrome emulation.
+The isolated production build, desktop room tour, masonry profile and Studio
+contract passed. `tests/masonry-contact.mjs` expects a 25 degree default tilt
+and fails at the existing 15 degree setting on both the base and candidate;
+this visual slice does not change that gameplay value. A 90-sample headless
+Chrome comparison of the same close pose is in `artifacts/workwall-mortar/profile.json`;
+frame intervals varied between runs, so it establishes no physical-mobile
+performance guarantee. The wall remains much more regular and less damaged
+than the selected Site Pro 04 concept; this slice does not complete the room
+or the larger visual goal.
+
 ## Approved direction and scope
 
 The user asked for a complete visual upgrade across the game, using the first two

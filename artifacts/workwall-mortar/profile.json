@@ -1,0 +1,86 @@
+[
+  {
+    "label": "before",
+    "device": "desktop",
+    "sample": {
+      "frameMs": {
+        "median": 12.199999928474426,
+        "p95": 14.899999976158142,
+        "max": 21.399999976158142
+      },
+      "submitMs": {
+        "median": 11.899999976158142,
+        "p95": 14.600000023841858,
+        "max": 21.100000023841858
+      },
+      "calls": 540,
+      "triangles": 2043879,
+      "geometries": 538,
+      "textures": 70,
+      "renderError": ""
+    }
+  },
+  {
+    "label": "before",
+    "device": "portrait-emulation",
+    "sample": {
+      "frameMs": {
+        "median": 10.799999952316284,
+        "p95": 13.100000023841858,
+        "max": 14.299999952316284
+      },
+      "submitMs": {
+        "median": 10.300000071525574,
+        "p95": 12.699999928474426,
+        "max": 13.799999952316284
+      },
+      "calls": 486,
+      "triangles": 1457171,
+      "geometries": 540,
+      "textures": 67,
+      "renderError": ""
+    }
+  },
+  {
+    "label": "after",
+    "device": "desktop",
+    "sample": {
+      "frameMs": {
+        "median": 10.800000071525574,
+        "p95": 15.399999976158142,
+        "max": 24.199999928474426
+      },
+      "submitMs": {
+        "median": 10.299999952316284,
+        "p95": 14.900000095367432,
+        "max": 23.59999990463257
+      },
+      "calls": 540,
+      "triangles": 2043847,
+      "geometries": 538,
+      "textures": 70,
+      "renderError": ""
+    }
+  },
+  {
+    "label": "after",
+    "device": "portrait-emulation",
+    "sample": {
+      "frameMs": {
+        "median": 6.5,
+        "p95": 8.800000071525574,
+        "max": 11.599999904632568
+      },
+      "submitMs": {
+        "median": 6.199999928474426,
+        "p95": 8.600000023841858,
+        "max": 11.099999904632568
+      },
+      "calls": 486,
+      "triangles": 1457175,
+      "geometries": 540,
+      "textures": 67,
+      "renderError": ""
+    }
+  }
+]

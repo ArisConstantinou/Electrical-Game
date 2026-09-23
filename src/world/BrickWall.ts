@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import * as THREE from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
-import { attribute, dot, floor, fract, min, mix, normalMap, positionWorld, sin, smoothstep, texture as sampleTexture, uniform, uv, vec2 } from 'three/tsl';
+import { attribute, dot, floor, fract, min, mix, normalMap, positionWorld, sin, smoothstep, texture as sampleTexture, uniform, uv, vec2, vec3 } from 'three/tsl';
 import { GAME_CONFIG } from '../data/gameConfig';
 import { laserBand, laserTint, laserEmission } from '../systems/LaserProjection';
 import type { InstallationDefinition } from '../data/installationRules';
@@ -42,9 +42,19 @@ const photographedClay = sampleTexture(brickImage, uv()).rgb.mul(masonryColor.r.
   .mul(attribute<'vec3'>('brickTone', 'vec3'));
 const clayInterior = sampleTexture(siteClayImage, vec2(brickLocalUv.x, brickLocalUv.y.mul(.66).add(.32))).rgb;
 const finishedClay = mix(photographedClay, clayInterior, siteClayReady.mul(.25)).mul(edgeShade).mul(clayRibShade);
+// Mortar squeezed out by hand follows the joints, with gaps and grit instead
+// of a constant-width graphic line. The underlying breakable field is intact.
+const mortarNoise = sin(positionWorld.x.mul(68).add(positionWorld.y.mul(19)))
+  .mul(sin(positionWorld.y.mul(91).sub(positionWorld.x.mul(27))));
+const mortarWear = attribute<'float'>('brickWear', 'float');
+const mortarReach = mortarNoise.mul(.005).add(mortarWear.mul(.022)).add(.018);
+const mortarMask = smoothstep(mortarReach.sub(.007), mortarReach.add(.012), edgeDistance).oneMinus();
+const mortarGrain = fract(sin(dot(floor(positionWorld.xy.mul(590)), vec2(127.1, 311.7))).mul(43758.5453));
+const roughMortar = vec3(.42, .405, .375).mul(mortarGrain.mul(.18).add(.91));
+const laidFace = mix(finishedClay, roughMortar, mortarMask.mul(.68));
 // A face mask keeps real mortar joints, internal chambers and broken edges on
 // their own rough clay/mortar colors in both WebGPU and the WebGL backend.
-wallMaterial.colorNode = mix(mix(rawMasonry, finishedClay, attribute<'float'>('brickFace', 'float').mul(brickImageReady)),laserTint,laserBand);
+wallMaterial.colorNode = mix(mix(rawMasonry, laidFace, attribute<'float'>('brickFace', 'float').mul(brickImageReady)),laserTint,laserBand);
 wallMaterial.normalNode = normalMap(sampleTexture(clayRibNormal, brickLocalUv),
   vec2(.75, .75).mul(attribute<'float'>('brickFace', 'float')));
 wallMaterial.emissiveNode=laserEmission;
@@ -363,7 +373,7 @@ export class BrickWall extends THREE.Group {
   private addBrickSurfaceAttributes(geometry: THREE.BufferGeometry, pristine = false): void {
     const positions = geometry.getAttribute('position'), normals = geometry.getAttribute('normal'), colors = geometry.getAttribute('color');
     const coordinates = new Float32Array(positions.count * 2), localCoordinates = new Float32Array(positions.count * 2), faces = new Float32Array(positions.count);
-    const tones = new Float32Array(positions.count * 3);
+    const tones = new Float32Array(positions.count * 3), wears = new Float32Array(positions.count);
     const pitchX = this.volume.width / 21, course = this.volume.height / 23;
     for (let i = 0; i < positions.count; i += 3) {
       const originalPlane = [0, 1, 2].every(j => {
@@ -381,6 +391,8 @@ export class BrickWall extends THREE.Group {
       const left = -this.volume.width / 2 + column * pitchX + stagger;
       const patch = brickFacePatch(row, column);
       const tone = brickFaceTone(row, column);
+      const wearHash = (Math.imul(row + 41, 73856093) ^ Math.imul(column + 73, 19349663)) >>> 0;
+      const wear = wearHash % 7 === 0 ? 1 : wearHash % 11 === 0 ? .55 : 0;
       for (let j = 0; j < 3; j++) {
         const localU = (positions.getX(i + j) - left) / pitchX;
         const localV = (positions.getY(i + j) - row * course) / course;
@@ -390,12 +402,14 @@ export class BrickWall extends THREE.Group {
         localCoordinates[(i + j) * 2 + 1] = localV;
         faces[i + j] = face;
         tones.set(tone, (i + j) * 3);
+        wears[i + j] = wear;
       }
     }
     geometry.setAttribute('uv', new THREE.BufferAttribute(coordinates, 2));
     geometry.setAttribute('brickLocalUv', new THREE.BufferAttribute(localCoordinates, 2));
     geometry.setAttribute('brickFace', new THREE.BufferAttribute(faces, 1));
     geometry.setAttribute('brickTone', new THREE.BufferAttribute(tones, 3));
+    geometry.setAttribute('brickWear', new THREE.BufferAttribute(wears, 1));
   }
 
   canFitBoxes(point: InstallationPoint): boolean {
