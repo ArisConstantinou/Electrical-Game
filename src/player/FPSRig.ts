@@ -403,6 +403,34 @@ export class FPSRig extends THREE.Group {
     return {point:tip.clone().addScaledVector(edge,bladeOffsetM), direction, edge, chisel:wall.chiselType, energyJ:wall.chiselEnergyJ, widthM:wall.chiselWidthM, bladeOffsetM};
   }
 
+  /** Seat the same physical hammer model on an authored masonry wall outside
+   * the original mission room. No original-wall coordinates are involved. */
+  contactMasonry(camera: THREE.Camera, point: THREE.Vector3): boolean {
+    this.selectedTool = 'hammer';
+    const hammer = this.tools.get('hammer')!;
+    const eye = camera.getWorldPosition(new THREE.Vector3());
+    const normal = eye.clone().sub(point);
+    normal.y = 0;
+    if (normal.lengthSq() < 1e-5) normal.copy(camera.getWorldDirection(new THREE.Vector3())).negate().setY(0);
+    normal.normalize();
+    const right = new THREE.Vector3(0, 1, 0).cross(normal).normalize();
+    const up = normal.clone().cross(right).normalize();
+    const orientation = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(right, up, normal));
+    hammer.quaternion.copy(this.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(orientation));
+    hammer.position.copy(this.worldToLocal(point.clone())).sub(this.tipAnchor.clone().applyQuaternion(hammer.quaternion));
+    hammer.updateWorldMatrix(true, true);
+    this.poseArms(camera);
+    this.chiselTipWorld.copy(hammer.localToWorld(this.tipAnchor.clone()));
+    // The 75 cm chisel reaches past the wrist. Judge the actual tool grips,
+    // not shoulder-to-wall distance, which rejects every normal work stance.
+    const reachable = this.gripsReachable(camera, hammer);
+    this.reachable = reachable;
+    this.chiselInAir = !reachable;
+    this.contactStatus = reachable ? 'ready' : 'out-of-reach';
+    this.reachReason = reachable ? 'Chisel in contact. Hold to hammer.' : 'Move closer to the masonry.';
+    return reachable;
+  }
+
   constructor() {
     super();
     this.name = 'Modular FPS hands and tools';

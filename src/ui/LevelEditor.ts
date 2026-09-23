@@ -28,9 +28,9 @@ type SurfaceRecord = {
   rotationY: number;
   scale: [number, number, number];
 };
-type AssetRecord = { id: string; position: [number, number, number]; rotationY: number; scale: [number, number, number] };
+type AssetRecord = { id: string; position: [number, number, number]; rotationY: number; scale: [number, number, number]; hidden?: boolean };
 type GroupRecord = { id: string; name: string; members: string[] };
-type LevelDocument = { version: 1; name?: string; template?: 'mansion' | 'blank'; walls: WallRecord[]; surfaces: SurfaceRecord[]; assets?: AssetRecord[]; groups?: GroupRecord[]; playerStart: [number, number, number]; playerStartYaw: number; apprenticeStart: [number, number, number]; apprenticeStarts: [number, number, number][]; apprenticeStartYaws: number[] };
+type LevelDocument = { version: 1; name?: string; template?: 'mansion' | 'blank'; walls: WallRecord[]; surfaces: SurfaceRecord[]; assets?: AssetRecord[]; groups?: GroupRecord[]; demolition?: Record<string, number[]>; hiddenWalls?: string[]; playerStart: [number, number, number]; playerStartYaw: number; apprenticeStart: [number, number, number]; apprenticeStarts: [number, number, number][]; apprenticeStartYaws: number[] };
 export type LevelSlot = { id: string; name: string; updatedAt: string; template: 'mansion' | 'blank' };
 const LEGACY_STORAGE_KEY = 'wirehouse:level-editor:mansion:v1';
 const MIGRATED_KEY = 'wirehouse:level-editor:legacy-imported:v1';
@@ -134,6 +134,7 @@ export class LevelEditor {
   private wallEndpointDrag: { pointerId: number; wall: THREE.Group; fixed: THREE.Vector3; end: -1 | 1 } | null = null;
   private wallPathActive = false;
   private wallPathEnd: -1 | 1 = 1;
+  private openingPositionWall = '';
   private readonly wallPathPoint = new THREE.Vector3();
   private readonly editorTouches = new Map<number, THREE.Vector2>();
   private pinchZoom: { startSpan: number; startDistance: number; direction: THREE.Vector3 } | null = null;
@@ -228,7 +229,7 @@ export class LevelEditor {
       <button id="level-view-trigger" type="button" aria-expanded="false" aria-controls="level-view-panel">▤ VIEW · ALL</button><div id="level-view-panel" hidden><div class="level-view__modes"><button type="button" data-level-view="3d">◈ ANGLE</button><button type="button" data-level-view="2d">▤ TOP</button></div><label for="level-floor">VISIBLE FLOOR</label><select id="level-floor"><option value="-1">All floors · 3D only</option><option value="6">B2 · services and stores</option><option value="5">B1 · garage and workshop</option><option value="0">G-0 · ground</option><option value="1">L1 · first</option><option value="2">L2 · second</option><option value="3">L3 · third</option><option value="4">L4 · fourth</option></select><small>Only the selected level is drawn. Drag empty space to pan in top view; pinch to zoom.</small><button id="level-view-close" type="button">⌄ CLOSE VIEW</button></div>
       <div class="level-editor__bar"><button id="level-translate" type="button">MOVE</button><button id="level-rotate" type="button">ROTATE</button><button id="level-scale" type="button">SCALE</button><label><input id="level-snap" type="checkbox" checked> SNAP</label><select id="level-grid" aria-label="Snap spacing"><option value="0.1">10 cm</option><option value="0.25" selected>25 cm</option><option value="0.5">50 cm</option><option value="1">1 m</option></select><button id="level-save" type="button">SAVE</button><button id="level-export" type="button">EXPORT</button></div>
       <aside><label for="level-search">SITE ELEMENTS</label><input id="level-search" type="search" placeholder="Search structures…"><div id="level-list"></div><div class="level-editor__add"><button id="level-add-brick" type="button">+ BRICK WALL</button><button id="level-add-concrete" type="button">+ CONCRETE WALL</button><button id="level-add-floor" type="button">+ FLOOR SLAB</button><button id="level-add-stair" type="button">+ STAIRS</button></div><div class="level-editor__starts"><button id="level-player" type="button">PLAYER START</button><select id="level-apprentice-index" aria-label="Apprentice number"><option value="1">APPRENTICE 1</option><option value="2">APPRENTICE 2</option><option value="3">APPRENTICE 3</option><option value="4">APPRENTICE 4</option><option value="5">APPRENTICE 5</option></select><button id="level-apprentice" type="button">EDIT START</button></div></aside>
-      <section class="level-editor__inspector"><b id="level-name">Select an element</b><p id="level-kind">Tap a structure in the scene or list.</p><div class="level-editor__history"><button id="level-undo" type="button" title="Ctrl+Z">UNDO</button><button id="level-redo" type="button" title="Ctrl+Y / Ctrl+Shift+Z">REDO</button></div><details class="level-editor__history-log"><summary>HISTORY <span id="level-history-count"></span></summary><div id="level-history-list" aria-label="Editor history"></div></details><div class="level-editor__fields"><label>X <input data-axis="x" type="number" step="0.01"></label><label>Y <input data-axis="y" type="number" step="0.01"></label><label>Z <input data-axis="z" type="number" step="0.01"></label><label>WIDTH m <input data-size="x" type="number" min="0.2" step="0.01"></label><label>HEIGHT m <input data-size="y" type="number" min="0.2" step="0.01"></label><label>DEPTH m <input data-size="z" type="number" min="0.05" step="0.01"></label><label>YAW ° <input id="level-yaw" type="number" step="1"></label></div><div class="level-editor__object-actions"><button id="level-copy" type="button" title="Ctrl+C">COPY</button><button id="level-paste" type="button" title="Ctrl+V">PASTE</button><button id="level-delete" type="button" title="Delete / Backspace">DELETE</button></div><p id="level-status" role="status"></p></section>
+      <section class="level-editor__inspector"><b id="level-name">Select an element</b><p id="level-kind">Tap a structure in the scene or list.</p><div class="level-editor__history"><button id="level-undo" type="button" title="Ctrl+Z">UNDO</button><button id="level-redo" type="button" title="Ctrl+Y / Ctrl+Shift+Z">REDO</button></div><details class="level-editor__history-log"><summary>HISTORY <span id="level-history-count"></span></summary><div id="level-history-list" aria-label="Editor history"></div></details><div class="level-editor__fields"><label>X <input data-axis="x" type="number" step="0.01"></label><label>Y <input data-axis="y" type="number" step="0.01"></label><label>Z <input data-axis="z" type="number" step="0.01"></label><label>WIDTH m <input data-size="x" type="number" min="0.2" step="0.01"></label><label>HEIGHT m <input data-size="y" type="number" min="0.2" step="0.01"></label><label>DEPTH m <input data-size="z" type="number" min="0.05" step="0.01"></label><label>YAW ° <input id="level-yaw" type="number" step="1"></label></div><button id="level-remove-sill" type="button" hidden>REMOVE WINDOW SILL</button><div class="level-editor__object-actions"><button id="level-copy" type="button" title="Ctrl+C">COPY</button><button id="level-paste" type="button" title="Ctrl+V">PASTE</button><button id="level-delete" type="button" title="Delete / Backspace">DELETE</button></div><p id="level-status" role="status"></p></section>
       <section class="level-editor__save"><b>SAVE LEVEL</b><p>Basic stays unchanged. Save your work as a separate named level.</p><label for="level-slot-name">LEVEL NAME</label><input id="level-slot-name" type="text" maxlength="48" value="My Level"><button id="level-save-mobile" type="button">SAVE LEVEL</button><button id="level-save-as" type="button">SAVE AS NEW COPY</button><button id="level-export-mobile" type="button">EXPORT JSON</button><p id="level-save-status" role="status"></p></section>
       <div id="level-halo" hidden><button id="level-halo-handle" type="button" aria-label="Drag element with current edit tool"><span aria-hidden="true">✥</span></button></div>
       <nav class="level-editor__bottom-nav" aria-label="Level editor navigation"><button id="level-dock-toggle" type="button" aria-label="Hide editor navigation" aria-expanded="true"><span aria-hidden="true"></span></button><button data-editor-tab="select" type="button">VIEW</button><button data-editor-tab="build" type="button">BUILD</button><button data-editor-tab="transform" type="button">EDIT</button><button data-editor-tab="starts" type="button">SCENE</button><button data-editor-tab="save" type="button">SAVE</button></nav>
@@ -348,6 +349,9 @@ export class LevelEditor {
       <div class="level-wall-tools__heading"><strong>WALL SECTION</strong><span>LIVE GEOMETRY + COLLISION</span></div>
       <div class="level-wall-tools__ends" role="group" aria-label="Wall continuation endpoint"><button id="level-wall-start" type="button">◉ START</button><button id="level-wall-end" type="button" aria-pressed="true">END ◉</button></div>
       <button id="level-wall-continue" type="button" aria-pressed="false">＋ CONTINUE · TAP POINTS</button>
+      <div class="level-wall-tools__row"><label for="level-wall-opening-width">OPENING WIDTH m</label><input id="level-wall-opening-width" type="number" min="0.5" max="4" step="0.05" value="1.5"></div>
+      <div class="level-wall-tools__row"><label for="level-wall-opening-position">FROM START m</label><input id="level-wall-opening-position" type="number" min="0" step="0.05" placeholder="CENTER"></div>
+      <button id="level-wall-opening" type="button">＋ CUT WALL OPENING</button>
       <div class="level-wall-tools__row"><label for="level-wall-material">MATERIAL</label><select id="level-wall-material"><option value="brick-wall">FIRED CLAY BRICK</option><option value="concrete-wall">CAST CONCRETE</option></select></div>
       <div class="level-wall-tools__row"><label for="level-wall-radius">CURVE RADIUS m</label><input id="level-wall-radius" type="number" min="0.5" max="50" step="0.25" value="4"></div>
       <div class="level-wall-tools__curve"><button id="level-wall-curve-left" type="button">↶ CURVE LEFT</button><button id="level-wall-curve-right" type="button">CURVE RIGHT ↷</button></div>
@@ -420,6 +424,8 @@ export class LevelEditor {
     this.el('#level-wall-start').addEventListener('click', () => this.setWallPathEnd(-1));
     this.el('#level-wall-end').addEventListener('click', () => this.setWallPathEnd(1));
     this.el('#level-wall-continue').addEventListener('click', () => this.setWallPathActive(!this.wallPathActive));
+    this.el('#level-wall-opening').addEventListener('click', () => this.cutSelectedWallOpening());
+    this.el('#level-remove-sill').addEventListener('click', () => this.removeSelectedWindowSill());
     this.el<HTMLSelectElement>('#level-wall-material').addEventListener('change', event => this.changeSelectedWallMaterial((event.target as HTMLSelectElement).value as WallKind));
     this.el('#level-wall-curve-left').addEventListener('click', () => this.curveSelectedWall(-1));
     this.el('#level-wall-curve-right').addEventListener('click', () => this.curveSelectedWall(1));
@@ -863,6 +869,61 @@ export class LevelEditor {
     this.game.room.mansionWing!.obstaclesAt(start.y);
     return wall;
   }
+  private cutSelectedWallOpening(): void {
+    const wall = this.selected;
+    const wing = this.game.room.mansionWing;
+    if (!wall || !wing?.editableWalls.has(wall.name) || wall.userData.levelEditorLocked) return;
+    if (validCurvedShape(wall.userData.curveShape)) {
+      this.status('Cutting a curved wall is not supported yet. Use a straight section.');
+      return;
+    }
+    const [start, end] = this.wallEndpoints(wall);
+    const length = start.distanceTo(end);
+    const requested = Number(this.el<HTMLInputElement>('#level-wall-opening-width').value);
+    const width = THREE.MathUtils.clamp(Number.isFinite(requested) ? requested : 1.5, .5, 4);
+    if (length < width + .4) {
+      this.status(`This wall needs at least ${(width + .4).toFixed(2)} m for that opening and two remaining sections.`);
+      return;
+    }
+    const positionField = this.el<HTMLInputElement>('#level-wall-opening-position');
+    const offset = positionField.value === '' ? length / 2 : Number(positionField.value);
+    if (!Number.isFinite(offset) || offset - width / 2 < .2 || offset + width / 2 > length - .2) {
+      this.status(`Opening centre must leave 20 cm of wall at both ends (wall length ${length.toFixed(2)} m).`);
+      return;
+    }
+    const direction = end.clone().sub(start).normalize();
+    const leftEnd = start.clone().addScaledVector(direction, offset - width / 2);
+    const rightStart = start.clone().addScaledVector(direction, offset + width / 2);
+    const kind = wall.userData.levelEditorKind as WallKind;
+    const chainId = wall.userData.wallChainId as string | undefined ?? crypto.randomUUID();
+    const left = this.createWallSection(start, leftEnd, kind, chainId, 0);
+    const right = this.createWallSection(rightStart, end, kind, chainId, 1);
+    if (!left || !right) return;
+    const thickness = (wall.userData.alongX ? wall.scale.z : wall.scale.x);
+    for (const section of [left, right]) {
+      section.scale.y = wall.scale.y;
+      section.scale.z = thickness;
+    }
+    const oldName = wall.name;
+    if (this.added.has(oldName)) { wing.removeEditorWall(wall); this.added.delete(oldName); }
+    else wing.setEditorWallHidden(wall, true);
+    for (const group of this.groups.values())
+      group.members = group.members.flatMap(name => name === oldName ? [left.name, right.name] : [name]);
+    this.setWallPathActive(false);
+    this.setSelection([left]);
+    positionField.value = '';
+    this.status(`Opening cut at ${offset.toFixed(2)} m. Both remaining sections are editable; SAVE to keep the route.`);
+    this.recordHistory();
+  }
+  private removeSelectedWindowSill(): void {
+    const sill = this.selected;
+    const wing = this.game.room.mansionWing;
+    if (!sill?.userData.levelEditorOpeningSill || !wing?.editableAssets.has(sill.name)) return;
+    wing.setEditorAssetHidden(sill, true);
+    this.setSelection([]);
+    this.status('Window sill removed. The opening is now passable; use RESTORE in the list or UNDO to bring it back.');
+    this.recordHistory();
+  }
   private extendWallAtPointer(event: PointerEvent): boolean {
     const wall = this.selected;
     if (!wall || !this.game.room.mansionWing?.editableWalls.has(wall.name)) return false;
@@ -1137,8 +1198,8 @@ export class LevelEditor {
     if (!this.active) { this.applyTemplateVisibility(); return; }
     this.restoreTopCutaway();
     for (const object of [...room.children, ...wing.children]) {
-      if (!this.originalVisibility.has(object)) this.originalVisibility.set(object, object.visible);
-      object.visible = this.originalVisibility.get(object)!;
+      if (!this.originalVisibility.has(object)) this.originalVisibility.set(object, object.userData.levelEditorHidden === true ? true : object.visible);
+      object.visible = this.originalVisibility.get(object)! && object.userData.levelEditorHidden !== true;
     }
     for (const object of this.siteEquipment) {
       if (!this.originalVisibility.has(object)) this.originalVisibility.set(object, object.visible);
@@ -1167,7 +1228,7 @@ export class LevelEditor {
         : object.userData.levelEditorFloor === 6 || object.name.startsWith('B2 ') ? 6
           : bounds.min.y < -5 ? 6 : bounds.min.y < -1 ? 5
             : Math.floor((bounds.min.y + .3) / 3.3);
-      object.visible = (this.originalVisibility.get(object) ?? true) && level === this.floorIndex;
+      object.visible = (this.originalVisibility.get(object) ?? true) && level === this.floorIndex && object.userData.levelEditorHidden !== true;
     }
     this.applyTemplateVisibility();
     this.applyTopCutaway();
@@ -1248,7 +1309,7 @@ export class LevelEditor {
 
   private restoreVisibility(): void {
     this.restoreTopCutaway();
-    for (const [object, visible] of this.originalVisibility) object.visible = visible;
+    for (const [object, visible] of this.originalVisibility) object.visible = visible && object.userData.levelEditorHidden !== true;
     this.originalVisibility.clear();
     for (const object of this.game.renderer.scene.children) {
       if (!isGroundSceneSystem(object)) continue;
@@ -1631,6 +1692,23 @@ export class LevelEditor {
     list.replaceChildren();
     let shown = 0;
     for (const wall of this.editables()) {
+      if (wall.userData.levelEditorHidden === true) {
+        const label = this.displayName(wall);
+        if (!label.toLowerCase().includes(search) && !wall.name.toLowerCase().includes(search)) continue;
+        if (filter !== 'all' && wall.userData.levelEditorKind !== filter) continue;
+        shown += 1;
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = `RESTORE · ${label}`;
+        button.addEventListener('click', () => {
+          if (wall.userData.levelEditorOpeningSill) wing.setEditorAssetHidden(wall, false);
+          else wing.setEditorWallHidden(wall, false);
+          this.refreshList();
+          this.recordHistory();
+        });
+        list.append(button);
+        continue;
+      }
       if (!this.isSelectableVisible(wall)) continue;
       const label = this.displayName(wall);
       if (!label.toLowerCase().includes(search) && !wall.name.toLowerCase().includes(search)) continue;
@@ -1863,8 +1941,15 @@ export class LevelEditor {
     for (const id of ['#level-translate', '#level-rotate', '#level-scale']) this.el<HTMLButtonElement>(id).disabled = locked || !object;
     this.el<HTMLButtonElement>('#level-scale').disabled ||= scaleLocked;
     const wallSelected = Boolean(this.selected && this.selectedObjects.size === 1 && this.game.room.mansionWing?.editableWalls.has(this.selected.name));
+    const sillSelected = Boolean(this.selectedObjects.size === 1 && this.selected?.userData.levelEditorOpeningSill);
+    this.el<HTMLButtonElement>('#level-remove-sill').hidden = !sillSelected;
+    this.el<HTMLButtonElement>('#level-delete').hidden = sillSelected;
     this.panel.classList.toggle('wall-selected', wallSelected);
     this.el('#level-wall-tools').hidden = !wallSelected;
+    if (this.openingPositionWall !== (wallSelected ? this.selected!.name : '')) {
+      this.openingPositionWall = wallSelected ? this.selected!.name : '';
+      this.el<HTMLInputElement>('#level-wall-opening-position').value = '';
+    }
     if (wallSelected) this.el<HTMLSelectElement>('#level-wall-material').value = this.selected!.userData.levelEditorKind as WallKind;
     else if (this.wallPathActive) this.setWallPathActive(false);
     this.el<HTMLButtonElement>('#level-focus').disabled = !object;
@@ -2052,9 +2137,12 @@ export class LevelEditor {
     for (const asset of this.game.room.mansionWing?.editableAssets.values() ?? []) {
       if (asset.userData.levelEditorMissionPoint) continue;
       assets.push({ id: asset.name, position: asset.position.toArray() as [number, number, number],
-        rotationY: asset.rotation.y, scale: asset.scale.toArray() as [number, number, number] });
+        rotationY: asset.rotation.y, scale: asset.scale.toArray() as [number, number, number],
+        hidden: asset.userData.levelEditorOpeningSill ? asset.userData.levelEditorHidden === true : undefined });
     }
-    return { version: 1, template: this.template, walls, surfaces, assets, groups: [...this.groups.values()].map(group => ({ ...group, members: [...group.members] })), playerStart: this.playerStart.toArray() as [number, number, number], playerStartYaw: this.playerStartYaw, apprenticeStart: this.apprenticeStart.toArray() as [number, number, number],
+    const hiddenWalls = [...this.game.room.mansionWing?.editableWalls.values() ?? []]
+      .filter(wall => wall.userData.levelEditorHidden === true).map(wall => wall.name);
+    return { version: 1, template: this.template, walls, surfaces, assets, demolition: this.game.room.mansionWing?.demolitionSnapshot(), hiddenWalls, groups: [...this.groups.values()].map(group => ({ ...group, members: [...group.members] })), playerStart: this.playerStart.toArray() as [number, number, number], playerStartYaw: this.playerStartYaw, apprenticeStart: this.apprenticeStart.toArray() as [number, number, number],
       apprenticeStarts: Array.from({ length: 5 }, (_, offset) => this.apprenticeStarts.get(offset + 1)!.toArray() as [number, number, number]),
       apprenticeStartYaws: Array.from({ length: 5 }, (_, offset) => this.apprenticeStartYaws.get(offset + 1)!) };
   }
@@ -2125,6 +2213,13 @@ export class LevelEditor {
       this.setTemplateMode(data.template === 'blank' ? 'blank' : 'mansion');
       const wing = this.game.room.mansionWing;
       if (!wing) return;
+      wing.restoreDemolition(data.demolition && typeof data.demolition === 'object' ? data.demolition : {});
+      const hiddenWalls = new Set(Array.isArray(data.hiddenWalls) ? data.hiddenWalls.filter(name => typeof name === 'string') : []);
+      for (const wall of wing.editableWalls.values())
+        if (!wall.name.startsWith('Editor ')) wing.setEditorWallHidden(wall, hiddenWalls.has(wall.name));
+      const hiddenAssets = new Set((data.assets ?? []).filter(asset => asset?.hidden === true).map(asset => asset.id));
+      for (const asset of wing.editableAssets.values())
+        if (asset.userData.levelEditorOpeningSill) wing.setEditorAssetHidden(asset, hiddenAssets.has(asset.name));
       const names = new Set([...data.walls.map(wall => wall?.id), ...(data.surfaces ?? []).map(surface => surface?.id)]);
       for (const name of this.added) if (!names.has(name)) {
         const wall = wing.editableWalls.get(name);
@@ -2215,6 +2310,8 @@ export class LevelEditor {
         this.game.apprentice.setEditorStart(1, this.apprenticeStart);
       }
       this.updateStarts();
-      this.applyFloorVisibility();
+      // Floor isolation belongs to an open editor. Loading a saved level from
+      // the main menu must leave the full playable building visible.
+      if (this.active) this.applyFloorVisibility();
   }
 }

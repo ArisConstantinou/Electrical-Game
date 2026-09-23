@@ -103,6 +103,7 @@
 #game-shell #level-editor h2,
 #game-shell #level-editor .level-editor__inspector b,
 #game-shell #level-editor .level-editor__save b { color: #1d342f; font-family: Bahnschrift, Arial, sans-serif; font-weight: 900; }
+#game-shell #level-editor .level-editor__inspector #level-name { color: #f6f4ef; }
 #game-shell #level-editor :is(.level-editor__scene, .level-editor__inspector p, .level-editor__save p, #level-view-panel small, #level-status, #level-save-status, #level-touch-help) { color: #4c655c; }
 #game-shell #level-editor button { border: 1px solid #81988c; border-radius: 6px; background: #fffdf4; box-shadow: none; color: #1d342f; font-family: Bahnschrift, Arial, sans-serif; font-weight: 800; }
 #game-shell #level-editor button:hover:not(:disabled),

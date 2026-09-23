@@ -135,14 +135,14 @@ export class PlayerController {
     this.camera.position.x = this.emptySite
       ? THREE.MathUtils.clamp(this.camera.position.x, -3.5 + radius, 26.5 - radius)
       : this.mansionPreview
-      ? THREE.MathUtils.clamp(this.camera.position.x, -18 + radius, 18 - radius)
+      ? THREE.MathUtils.clamp(this.camera.position.x, -18 + radius, 26.5 - radius)
       : THREE.MathUtils.clamp(this.camera.position.x, -GAME_CONFIG.room.width / 2 + radius, GAME_CONFIG.room.width / 2 - radius);
     // The original room uses its fixed facade limit. In the editable mansion,
     // the work wall's live segment owns body collision, including after a move
     // or rotation, so the old facade coordinate cannot become an invisible wall.
     this.camera.position.z = THREE.MathUtils.clamp(this.camera.position.z,
       this.emptySite ? -6 + radius : this.mansionPreview ? -18 + radius : GAME_CONFIG.room.wallFrontZ + radius,
-      this.emptySite ? 22 - radius : this.mansionPreview ? 16 - radius : GAME_CONFIG.room.depth / 2 - radius);
+      this.emptySite ? 22 - radius : this.mansionPreview ? 22 - radius : GAME_CONFIG.room.depth / 2 - radius);
     // Only adjacent 15 cm risers may change the floor height in one movement
     // step. This prevents entering the elevated return flight from ground level
     // or walking off an unfinished landing through empty air.
