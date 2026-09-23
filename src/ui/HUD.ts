@@ -69,11 +69,12 @@ export class HUD {
             <div class="chisel-orientation-values"><div><strong><span id="chisel-edge-label">EDGE</span> <output id="chisel-edge-degrees">0°</output></strong><span id="chisel-live-width">50 mm</span></div><div class="chisel-aim-values"><span id="chisel-live-tilt">TILT 15° ↓</span><span id="chisel-requested-tilt" hidden></span><span id="chisel-live-side">SIDE 15° →</span></div><div class="hammer-view-buttons" role="group" aria-label="Hammer screen side"><button id="hammer-view-left" type="button" aria-label="Hold hammer on the left" aria-pressed="false">TOOL LEFT</button><button id="hammer-view-right" type="button" aria-label="Hold hammer on the right" aria-pressed="true">TOOL RIGHT</button></div></div>
           </aside>
           <button id="settings-toggle" type="button" aria-label="Open settings" aria-expanded="false" aria-controls="settings-panel">
-            <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M13.2 3.5h5.6l.8 3.1 2.3 1.3 3-.9 2.8 4.8-2.2 2.2v2.7l2.2 2.2-2.8 4.8-3-.9-2.3 1.3-.8 3.1h-5.6l-.8-3.1-2.3-1.3-3 .9-2.8-4.8 2.2-2.2V14l-2.2-2.2L7.1 7l3 .9 2.3-1.3z"/><circle cx="16" cy="15.4" r="4.2"/></svg>
+            <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M27 4a8 8 0 0 0-9 10L5 27l-2-2 13-13A8 8 0 0 0 27 4l-5 5-4-1-1-4z"/><circle cx="7" cy="24" r="1"/></svg>
           </button>
           <div id="settings-scrim" aria-hidden="true"></div>
           <section id="settings-panel" class="hud-card" aria-label="Game settings" aria-hidden="true">
             <header><div><span>GAME</span><strong>SETTINGS</strong></div><button id="settings-close" type="button" aria-label="Close settings">×</button></header>
+            <button id="settings-change-site" type="button">CHANGE WORKSITE <small>Restarts the current site</small></button>
             <div id="spray-controls" aria-label="Spray settings">
               <button id="spray-color" type="button" aria-label="Change spray color"><span>SPRAY COLOR</span><span class="setting-value"><i></i><b>BLUE</b></span></button>
             </div>
@@ -196,8 +197,8 @@ export class HUD {
             <button id="mobile-interact" type="button" aria-label="Interact with nearby mixing object" aria-pressed="false" hidden><b>INTERACT</b><small>ΣΤΑΘΜΟΣ</small></button>
             <div id="mobile-move-zone" aria-label="Touch here to move"></div><div id="joystick" aria-label="Movement joystick"><div class="joystick-ring"></div><div id="joystick-thumb"></div></div>
             <nav id="mobile-stance-controls" aria-label="Player height">
-              <button id="mobile-stand" type="button" data-height="stand" aria-label="Stand up" aria-pressed="true"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 27V5M8 13l8-8 8 8"/></svg><span>STAND</span></button>
-              <button id="mobile-crouch" type="button" data-height="crouch" aria-label="Crouch" aria-pressed="false"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M19 6a3 3 0 1 0 0 .1M17 12l-5 7h10l-3 9M13 18l-7 7M16 13l7 3 5-4"/></svg><span>CROUCH</span></button>
+              <button id="mobile-stand" type="button" data-height="stand" aria-label="Stand up" aria-pressed="true"><span>STAND</span></button>
+              <button id="mobile-crouch" type="button" data-height="crouch" aria-label="Crouch" aria-pressed="false"><span>CROUCH</span></button>
             </nav>
             <div id="look-joystick" role="button" tabindex="0" aria-label="Drag to aim"><div class="look-joystick-ring"></div><div id="look-joystick-thumb"><span id="mobile-action" aria-hidden="true">AIM</span><small aria-hidden="true">LOOK</small></div><div id="drag-aim-cue" aria-hidden="true"></div><small id="aim-control-label">AIM</small></div>
             <button id="site-pro-use" type="button" aria-label="Hold to use selected tool" aria-pressed="false"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 25h18M12 22V8h8v14M9 8h14M16 3v5"/></svg><span>USE</span><output id="mobile-use-status">READY</output></button>
@@ -222,8 +223,8 @@ export class HUD {
             <button id="tool-mode-toggle" type="button" aria-label="Change selected tool mode">
               <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 10h15l-3-3m3 3-3 3M25 22H10l3 3m-3-3 3-3"/></svg><span>LIVE</span>
             </button>
-            <button id="site-pro-tools" type="button" aria-label="Worker tools" aria-controls="mobile-tool-slider" aria-expanded="false" aria-pressed="true"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="m6 24 13-13M18 9a6 6 0 0 0 8-7l-4 4-2-4a6 6 0 0 0-7 8L3 15a5 5 0 0 0 7 7l8-8"/></svg><span>WORKER</span></button>
-            <button id="site-pro-coordinator" type="button" aria-label="Coordinator commands" aria-pressed="false"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="7" r="3"/><path d="M16 10v9m0-6-9 5m9-5 9 5M11 29l5-10 5 10M3 4h7m-7 4h5"/></svg><span>COORDINATOR</span></button>
+            <button id="site-pro-tools" type="button" aria-label="Open worker tools" aria-controls="mobile-tool-slider" aria-expanded="false" aria-pressed="true"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="m6 24 13-13M18 9a6 6 0 0 0 8-7l-4 4-2-4a6 6 0 0 0-7 8L3 15a5 5 0 0 0 7 7l8-8"/></svg><span>WORKER</span></button>
+            <button id="site-pro-coordinator" type="button" aria-label="Open inspector commands" aria-controls="apprentice-controls" aria-expanded="false" aria-pressed="false"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="7" r="3"/><path d="M16 10v9m0-6-9 5m9-5 9 5M11 29l5-10 5 10M3 4h7m-7 4h5"/></svg><span>COORDINATOR</span></button>
             <nav id="mobile-tool-slider" aria-label="Select tool">
               <button type="button" data-tool="measure" aria-label="Tape measure"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 5h17a5 5 0 0 1 5 5v10H5zM8 20v8h11M12 6v7M17 6v4M22 6v7M8 24h4"/><circle cx="17" cy="14" r="3"/></svg><span>MEASURE</span></button>
               <button type="button" data-tool="drill" aria-label="Drill fixing hole"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 7h15v10H3zM18 10h7M25 9v4M6 17v10h9v-4l-3-6M5 27h12"/></svg><span>DRILL</span></button>
@@ -246,21 +247,36 @@ export class HUD {
             <div class="start-content">
               <div class="eyebrow">CYPRUS · RESIDENTIAL FIRST FIX</div>
               <h1>WIRE <span>THE HOUSE</span></h1>
+              <p class="start-intro">Real Cyprus first fix · chase, fit boxes, level and route PVC.</p>
+              <svg class="start-icon-definitions" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <symbol id="start-icon-drill" viewBox="0 0 32 32"><path d="M3 8h16c3 0 5 2 5 5s-2 5-5 5H3zM24 12h5m-5 3h5M10 18v9h7v-9M9 27h9v2H9zM8 11h8"/></symbol>
+                <symbol id="start-icon-mark" viewBox="0 0 32 32"><path d="M5 25 22 8l3 3L8 28l-5 1zM20 6l3-3 6 6-3 3M4 4h9M4 8h6"/></symbol>
+                <symbol id="start-icon-hammer" viewBox="0 0 32 32"><path d="M5 8h17l5 5-5 5H5zM16 18v11"/></symbol>
+                <symbol id="start-icon-box" viewBox="0 0 32 32"><path d="M5 6h22v21H5zM8 10h3m10 0h3"/><circle cx="16" cy="17" r="6"/></symbol>
+                <symbol id="start-icon-trowel" viewBox="0 0 32 32"><path d="M3 28 9 10l14 10zM16 14l5-6 7-3"/></symbol>
+                <symbol id="start-icon-pvc" viewBox="0 0 32 32"><path d="M3 26V9a6 6 0 0 1 6-6h14M8 26V9a1 1 0 0 1 1-1h14M23 3v5m3-5v5M3 26h5"/></symbol>
+                <symbol id="start-icon-plan" viewBox="0 0 32 32"><path d="M8 4h16v24H8zM12 4v24M15 9h6v6h-6zM15 20h7m-7 4h5M5 8v17m0-17 3 2m-3 15 3-2"/></symbol>
+                <symbol id="start-icon-brick" viewBox="0 0 32 32"><path d="M3 11h20v16H3zM3 19h20M13 11v8M8 19v8m10-8v8M23 5l5 5m-3-7 4 4M24 10l-4 4"/></symbol>
+                <symbol id="start-icon-rule" viewBox="0 0 32 32"><path d="M4 25 22 7l5 5L9 30zM11 22l3 3m1-7 3 3m1-7 3 3M6 4l5 5m-5-5-2 7 7-2"/></symbol>
+                <symbol id="start-icon-backbox" viewBox="0 0 32 32"><path d="M5 5h22v22H5zM9 9h14v14H9zM5 12H2m3 8H2m25-8h3m-3 8h3"/><circle cx="16" cy="16" r="3"/><path d="M12 5V2m8 3V2m-8 25v3m8-3v3"/></symbol>
+                <symbol id="start-icon-wrench" viewBox="0 0 32 32"><path d="M27 4a8 8 0 0 0-9 10L5 27l-2-2 13-13A8 8 0 0 0 27 4l-5 5-4-1-1-4z"/><circle cx="7" cy="24" r="1"/></symbol>
+                <symbol id="start-icon-worker" viewBox="0 0 32 32"><path d="M7 15a9 9 0 0 1 18 0M5 15h22v3H5zM12 8V5h8v3"/><circle cx="16" cy="21" r="4"/><path d="M7 31c0-4 4-6 9-6s9 2 9 6"/></symbol>
+              </svg>
               <div class="start-actions">
-                <button id="start-button" type="button">START</button>
-                <span id="start-level-current" class="start-level-current">BASIC · ORIGINAL</span>
-                <button id="start-level-editor" type="button" disabled>LEVEL EDITOR</button>
-                <div class="start-level-actions"><button id="start-load" type="button">▤ LOAD LEVEL</button><button id="start-new" type="button">✣ NEW SITE</button></div>
+                <section class="start-card start-work-card" aria-label="Work site">
+                  <div class="start-card-heading"><span>01 / WORK SITE</span><span id="start-level-current" class="start-level-current">ORIGINAL FIRST FIX ROOM</span></div>
+                  <button id="start-button" type="button" data-preparing="true" disabled><span id="start-button-label">START WORK</span><span class="start-loading-indicator"><span class="start-loading-icons" aria-hidden="true"><svg><use href="#start-icon-trowel"/></svg><svg><use href="#start-icon-drill"/></svg><svg><use href="#start-icon-box"/></svg><svg><use href="#start-icon-pvc"/></svg><svg><use href="#start-icon-wrench"/></svg><svg><use href="#start-icon-mark"/></svg></span><output id="start-load-percent" role="status" aria-live="polite" aria-label="Site preparation 0%">0%</output></span></button>
+                  <div class="start-work-order"><div class="start-order-heading"><span>FIRST FIX / WORK ORDER</span><span>1G · 2G · 20 mm PVC</span></div><div class="start-order-brief"><b>Install the wall boxes and conduit.</b><span>Mark and chase blockwork, seat the boxes, apply mortar, level, then route PVC.</span></div><ol class="start-work-sequence"><li><svg aria-hidden="true"><use href="#start-icon-mark"/></svg><span>MARK</span></li><li><svg aria-hidden="true"><use href="#start-icon-hammer"/></svg><span>CHASE</span></li><li><svg aria-hidden="true"><use href="#start-icon-box"/></svg><span>FIT BOXES</span></li><li><svg aria-hidden="true"><use href="#start-icon-trowel"/></svg><span>MORTAR &amp; LEVEL</span></li><li><svg aria-hidden="true"><use href="#start-icon-pvc"/></svg><span>ROUTE PVC</span></li></ol></div>
+                </section>
+                <section class="start-card start-site-card" aria-label="Site plans">
+                  <div class="start-card-heading"><span>02 / SITE PLANS</span></div>
+                  <div class="start-level-actions"><button id="start-level-editor" type="button" disabled><svg aria-hidden="true"><use href="#start-icon-rule"/></svg><span>LEVEL EDITOR</span></button><button id="start-new" type="button"><svg aria-hidden="true"><use href="#start-icon-brick"/></svg><span>NEW SITE</span></button><button id="start-load" type="button"><svg aria-hidden="true"><use href="#start-icon-plan"/></svg><span>LOAD LEVEL</span></button></div>
+                  <section class="start-projects" aria-label="Saved projects"><div class="start-projects-heading"><span>SAVED PROJECTS</span><output id="start-project-count" aria-live="polite">0 SAVED</output><div class="start-projects-controls" hidden><button id="start-project-up" type="button" aria-label="Scroll saved projects up" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 15 7-7 7 7"/></svg></button><button id="start-project-down" type="button" aria-label="Scroll saved projects down" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 9 7 7 7-7"/></svg></button></div></div><ul id="start-project-list" class="start-project-list" tabindex="0" aria-label="Saved projects" aria-busy="true"><li class="start-project-empty"><svg viewBox="0 0 32 32" aria-hidden="true"><use href="#start-icon-plan"/></svg><strong>NO SAVED PROJECTS</strong><span>Create a site or save one in Level Editor.</span></li></ul></section>
+                </section>
                 <section id="start-level-picker" class="start-level-picker" aria-label="Choose a level" hidden><div class="start-level-picker__heading"><b>LOAD LEVEL</b><button id="start-level-picker-close" type="button" aria-label="Close level list">✕</button></div><div id="start-level-list"></div></section>
-                <div class="start-utilities" aria-label="Preview and settings">
-                  <button id="start-models" type="button" aria-label="Open 3D models" title="3D Models">
-                    <svg viewBox="0 0 32 32" aria-hidden="true"><path d="m16 3 11 6-11 6L5 9zM5 9v13l11 7 11-7V9M16 15v14"/></svg><span>3D MODELS</span>
-                  </button>
-                  <button id="start-settings" type="button" aria-label="Open settings" title="Settings">
-                    <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M13.2 3.5h5.6l.8 3.1 2.3 1.3 3-.9 2.8 4.8-2.2 2.2v2.7l2.2 2.2-2.8 4.8-3-.9-2.3 1.3-.8 3.1h-5.6l-.8-3.1-2.3-1.3-3 .9-2.8-4.8 2.2-2.2V14l-2.2-2.2L7.1 7l3 .9 2.3-1.3z"/><circle cx="16" cy="15.4" r="4.2"/></svg><span>SETTINGS</span>
-                  </button>
-                </div>
+                <section class="start-card start-tools-card" aria-label="Inspect and setup"><div class="start-card-heading"><span>03 / INSPECT &amp; SETUP</span></div><div class="start-utilities"><button id="start-models" type="button" aria-label="Open 3D models" title="3D Models"><svg aria-hidden="true"><use href="#start-icon-backbox"/></svg><span>3D MODELS</span></button><button id="start-settings" type="button" aria-label="Open settings" title="Settings"><svg aria-hidden="true"><use href="#start-icon-wrench"/></svg><span>SETTINGS</span></button></div></section>
               </div>
+              <div class="start-menu-footer">CYPRUS RESIDENTIAL FIRST FIX SIMULATOR</div>
             </div>
           </section>
           <section id="result-panel" class="screen-panel result-panel">
@@ -382,11 +398,31 @@ export class HUD {
     });
     const toolsToggle = root.querySelector<HTMLButtonElement>('#site-pro-tools')!;
     const coordinatorToggle = root.querySelector<HTMLButtonElement>('#site-pro-coordinator')!;
+    const workerHandle = document.createElement('button');
+    workerHandle.id = 'worker-bar-handle'; workerHandle.type = 'button';
+    workerHandle.setAttribute('aria-controls', 'mobile-tool-slider');
+    root.querySelector('#mobile-tool-slider')!.before(workerHandle);
+    const inspectorHandle = document.createElement('button');
+    inspectorHandle.id = 'inspector-bar-handle'; inspectorHandle.type = 'button';
+    inspectorHandle.setAttribute('aria-controls', 'apprentice-controls');
+    root.querySelector('#mobile-tool-slider')!.after(inspectorHandle);
     this.shell.dataset.bottomRole='worker';
+    this.shell.dataset.inspectorOpen='false';
+    const setInspectorOpen = (open: boolean): void => {
+      this.shell.dataset.inspectorOpen=String(open);
+      coordinatorToggle.setAttribute('aria-expanded',String(open));
+      coordinatorToggle.setAttribute('aria-label',open?'Close inspector commands':'Open inspector commands');
+      inspectorHandle.textContent=open?'›':'‹';
+      inspectorHandle.setAttribute('aria-expanded',String(open));
+      inspectorHandle.setAttribute('aria-label',open?'Hide inspector tools':'Show inspector tools');
+      const inspectorPanel=this.shell.querySelector<HTMLElement>('#apprentice-controls');
+      if(inspectorPanel&&matchMedia('(pointer:coarse)').matches)inspectorPanel.inert=!open;
+    };
     const setBottomRole = (role:'worker'|'coordinator'):void => {
       this.shell.dataset.bottomRole=role;
       toolsToggle.setAttribute('aria-pressed',String(role==='worker'));
       coordinatorToggle.setAttribute('aria-pressed',String(role==='coordinator'));
+      if(role==='worker')setInspectorOpen(false);
     };
     const wheelPages = {work:['measure','spray','hammer','fitting','trowel','hose'],utility:['drill','driver','laser','level','spring','cutter']};
     const wheelNav = root.querySelector<HTMLElement>('#mobile-tool-slider')!;
@@ -403,31 +439,47 @@ export class HUD {
     root.querySelector('#tool-wheel-back')!.addEventListener('click', () => { this.shell.dataset.toolWheelPage='work'; });
     const setToolsOpen = (open: boolean): void => {
       this.shell.dataset.toolsOpen = String(open);
+      if(matchMedia('(pointer:coarse)').matches){
+        for(const id of ['#mobile-tool-slider','#tool-quick-controls','#aim-quick-controls'])
+          (this.shell.querySelector<HTMLElement>(id)!).inert=!open;
+      }
       if(open)this.shell.dataset.toolWheelPage=wheelPages.utility.includes(this.selectedTool)?'utility':'work';
       toolsToggle.setAttribute('aria-expanded', String(open));
-      toolsToggle.setAttribute('aria-label', open ? 'Close worker tools' : 'Worker tools');
+      toolsToggle.setAttribute('aria-label', open ? 'Close worker tools' : 'Open worker tools');
       toolsToggle.querySelector('span')!.textContent = 'WORKER';
+      workerHandle.textContent=open?'‹':'›';
+      workerHandle.setAttribute('aria-expanded',String(open));
+      workerHandle.setAttribute('aria-label',open?'Hide worker tools':'Show worker tools');
     };
     const toggleTools = (): void => {
       if(this.shell.dataset.bottomRole==='coordinator'){
+        setInspectorOpen(false);
         setBottomRole('worker');
         window.dispatchEvent(new CustomEvent('wirehouse:select-tool',{detail:this.selectedTool}));
         setToolsOpen(true);
       } else setToolsOpen(this.shell.dataset.toolsOpen !== 'true');
     };
     coordinatorToggle.addEventListener('click',()=>{
-      if(this.shell.dataset.bottomRole==='coordinator')return;
+      if(this.shell.dataset.bottomRole==='coordinator'){
+        setInspectorOpen(this.shell.dataset.inspectorOpen!=='true');
+        return;
+      }
       if(document.querySelector<HTMLSelectElement>('#apprentice-count')?.value==='0'){
         this.notify('Επίλεξε Apprentice στην αρχική οθόνη για οδηγίες.',false,1800);return;
       }
       setToolsOpen(false);
       setBottomRole('coordinator');
+      setInspectorOpen(true);
       window.dispatchEvent(new CustomEvent('wirehouse:coordinator-open'));
     });
+    workerHandle.addEventListener('click',toggleTools);
+    inspectorHandle.addEventListener('click',()=>setInspectorOpen(this.shell.dataset.inspectorOpen!=='true'));
     root.querySelector('#tool-wheel-center')!.addEventListener('click', () => setToolsOpen(false));
     let toolsTouch: { id: number; x: number; y: number; travel: number } | null = null;
+    let suppressToolsClick = false;
     toolsToggle.addEventListener('pointerdown', event => {
-      if (event.pointerType === 'mouse') return;
+      if (event.pointerType === 'mouse') {suppressToolsClick=false;return;}
+      suppressToolsClick=true;
       toolsTouch = { id: event.pointerId, x: event.clientX, y: event.clientY, travel: 0 };
       toolsToggle.setPointerCapture(event.pointerId);
     });
@@ -442,10 +494,12 @@ export class HUD {
       if (touch.travel <= 10 && event.clientX >= bounds.left && event.clientX <= bounds.right && event.clientY >= bounds.top && event.clientY <= bounds.bottom) toggleTools();
     });
     toolsToggle.addEventListener('pointercancel', event => { if (toolsTouch?.id === event.pointerId) toolsTouch = null; });
-    toolsToggle.addEventListener('click', event => { if (event instanceof PointerEvent && event.pointerType !== 'mouse') return; toggleTools(); });
+    toolsToggle.addEventListener('click', () => {if(suppressToolsClick){suppressToolsClick=false;return;}toggleTools();});
+    setToolsOpen(false);
+    setInspectorOpen(false);
     window.addEventListener('wirehouse:select-tool', () => {setToolsOpen(false);setBottomRole('worker');});
     window.addEventListener('wirehouse:coordinator-close',()=>setBottomRole('worker'));
-    window.addEventListener('wirehouse:coordinator-entered',()=>{setToolsOpen(false);setBottomRole('coordinator');});
+    window.addEventListener('wirehouse:coordinator-entered',()=>{setToolsOpen(false);setBottomRole('coordinator');setInspectorOpen(true);});
     const settingsToggle = root.querySelector<HTMLButtonElement>('#settings-toggle');
     const keyGuideToggle = root.querySelector<HTMLButtonElement>('#desktop-key-guide-toggle')!;
     const keyGuide = root.querySelector<HTMLElement>('#desktop-key-guide')!;

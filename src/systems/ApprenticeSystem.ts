@@ -38,7 +38,8 @@ const NAV_ICONS:Record<string,string>={
   resume:'M5 12a7 7 0 1 1 3 6M5 6v6h6',
   cancel:'M5 5l14 14M19 5 5 19',
 };
-const navButton=(action:string,label:string,title:string)=>`<button type="button" data-apprentice="${action}" aria-label="${title}" title="${title}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${NAV_ICONS[action]}"/></svg><span>${label}</span></button>`;
+const NAV_KEYS:Record<string,string>={point:'1',layout:'2',plan:'3',cancel:'ESC'};
+const navButton=(action:string,label:string,title:string)=>`<button type="button" data-apprentice="${action}"${NAV_KEYS[action]?` data-hotkey="${NAV_KEYS[action]}"`:''} aria-label="${title}" title="${title}">${NAV_KEYS[action]?`<kbd>${NAV_KEYS[action]}</kbd>`:''}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${NAV_ICONS[action]}"/></svg><span>${label}</span></button>`;
 const groundButton=(action:GroundAction,label:string,icon:string,title:string)=>`<button type="button" data-ground="${action}" aria-label="${title}" title="${title}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${NAV_ICONS[icon]}"/></svg><span>${label}</span></button>`;
 
 /** One independent apprentice. Job confirmation is the only demolition entry point. */
@@ -189,15 +190,40 @@ export class ApprenticeSystem {
     this.paperCanvas.width=1024;this.paperCanvas.height=768;
     this.paper=new THREE.Mesh(new THREE.PlaneGeometry(.62,.465),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(this.paperCanvas),side:THREE.DoubleSide,toneMapped:false}));
     this.paper.name='Electrical instruction drawing';this.paper.position.set(0,-.025,-.48);this.paper.rotation.x=-.08;this.paper.visible=false;game.renderer.camera.add(this.paper);this.drawPlan();
-    const label=document.createElement('label');label.className='apprentice-count';label.innerHTML='Apprentices <select id="apprentice-count" aria-label="Apprentices"><option value="0">0</option><option value="1" selected>1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select>';
-    document.querySelector('#start-button')!.after(label);
-    label.querySelector('select')!.addEventListener('change',e=>{void this.prepareCrew(Number((e.target as HTMLSelectElement).value));});
+    const selector=document.createElement('div');selector.className='apprentice-count';selector.setAttribute('role','group');selector.setAttribute('aria-labelledby','apprentice-count-label');
+    selector.innerHTML=`<span id="apprentice-count-label">APPRENTICES</span><div class="apprentice-count-track">
+      <button type="button" class="apprentice-count-none" data-apprentice-count="0" aria-label="No apprentices" title="No apprentices"><span aria-hidden="true">0</span></button>
+      ${[1,2,3,4,5].map(index=>`<button type="button" data-apprentice-count="${index}" aria-label="${index} apprentice${index===1?'':'s'}" title="${index} apprentice${index===1?'':'s'}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="3.5"/><path d="M5.5 21v-3.5a6.5 6.5 0 0 1 13 0V21M8.5 21v-4M15.5 21v-4"/></svg><span>${index}</span></button>`).join('')}
+    </div><output aria-live="polite">1 APPRENTICE</output><select id="apprentice-count" aria-label="Apprentices"><option value="0">0</option><option value="1" selected>1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select>`;
+    document.querySelector('#start-button')!.after(selector);
+    const select=selector.querySelector<HTMLSelectElement>('#apprentice-count')!,output=selector.querySelector<HTMLOutputElement>('output')!;
+    const syncCount=(next:number,prepare=true)=>{
+      const count=Math.max(0,Math.min(5,Math.round(next)));select.value=String(count);
+      for(const button of selector.querySelectorAll<HTMLButtonElement>('[data-apprentice-count]')){
+        const value=Number(button.dataset.apprenticeCount),active=value===0?count===0:value<=count;
+        button.classList.toggle('selected',active);button.setAttribute('aria-pressed',String(value===count));
+      }
+      output.value=count===0?'NO APPRENTICE':`${count} APPRENTICE${count===1?'':'S'}`;
+      if(prepare&&count!==this.count)void this.prepareCrew(count);
+    };
+    let dragging=false;
+    const countAt=(x:number,y:number)=>Number(document.elementFromPoint(x,y)?.closest<HTMLElement>('[data-apprentice-count]')?.dataset.apprenticeCount??NaN);
+    selector.addEventListener('pointerdown',event=>{
+      if(event.button!==0)return;const count=countAt(event.clientX,event.clientY);if(!Number.isFinite(count))return;
+      event.preventDefault();dragging=true;selector.setPointerCapture(event.pointerId);syncCount(count);
+    });
+    selector.addEventListener('pointermove',event=>{if(!dragging)return;const count=countAt(event.clientX,event.clientY);if(Number.isFinite(count))syncCount(count);});
+    const stopDrag=(event:PointerEvent)=>{if(!dragging)return;dragging=false;if(selector.hasPointerCapture(event.pointerId))selector.releasePointerCapture(event.pointerId);};
+    selector.addEventListener('pointerup',stopDrag);selector.addEventListener('pointercancel',stopDrag);
+    selector.addEventListener('click',event=>{if((event as MouseEvent).detail!==0)return;const button=(event.target as Element).closest<HTMLElement>('[data-apprentice-count]');if(button)syncCount(Number(button.dataset.apprenticeCount));});
+    select.addEventListener('change',()=>syncCount(Number(select.value)));
+    syncCount(this.count,false);
     this.toolbar.id='apprentice-controls';this.toolbar.setAttribute('aria-label','Οδηγίες Apprentice');
     this.toolbar.innerHTML=`<div class="apprentice-actions">${[
       navButton('point','ΔΕΙΞΕ','Δείξε με το δάχτυλο · T'),navButton('layout','ΚΟΥΤΙΑ','Προεπισκόπηση κουτιών στον τοίχο · E'),
       navButton('break-now','ΣΠΑΣΕ','Σπάσε τη σημαδεμένη περιοχή'),navButton('confirm','OK','Επιβεβαίωσε τα κουτιά'),
       navButton('pipe-socket','ΠΡΙΖΑ','Κόψε 20 σωλήνες πρίζας 50 cm'),navButton('pipe-switch','SWITCH','Κόψε 20 σωλήνες switch 140 cm'),
-      navButton('plan','ΣΧΕΔΙΟ','Ηλεκτρολογικό σχέδιο · V'),navButton('resume','ΣΥΝΕΧΕΙΑ','Συνέχισε την εργασία'),navButton('cancel','ΕΞΟΔΟΣ','Έξοδος από τις οδηγίες')
+      navButton('plan','ΣΧΕΔΙΟ','Ηλεκτρολογικό σχέδιο · V'),navButton('resume','ΣΥΝΕΧΕΙΑ','Συνέχισε την εργασία'),navButton('cancel','ΕΡΓΑΣΙΑ','Επιστροφή στην εργασία · Esc')
     ].join('')}</div>`;
     this.status.className='apprentice-status';this.status.setAttribute('role','status');this.toolbar.prepend(this.status);game.hud.shell.append(this.toolbar);
     const returnButton=document.createElement('button');returnButton.id='apprentice-return';returnButton.type='button';returnButton.setAttribute('aria-label','Επιστροφή στον Apprentice');
@@ -214,7 +240,12 @@ export class ApprenticeSystem {
     this.bindGroundGesture(game.renderer.webgl.domElement);
     addEventListener('keydown',e=>{
       if(!game.started||e.repeat||e.target instanceof Element&&e.target.closest('input,textarea,select,[contenteditable="true"]')||game.hud.shell.classList.contains('settings-open')||game.modelInspector?.active)return;
-      const action=e.code==='KeyT'&&!e.shiftKey?'point':e.code==='KeyV'&&!e.shiftKey?'plan':e.code==='KeyE'&&this.mode==='point'&&!this.aimedAtApprentice()?'layout':e.code==='Digit1'&&this.mode==='pipe-choice'?'pipe-socket':e.code==='Digit2'&&this.mode==='pipe-choice'?'pipe-switch':e.code==='Enter'&&this.mode==='layout'?'confirm':e.code==='Enter'&&this.groundIntent==='break'?'break-now':e.code==='Escape'&&this.mode!=='off'?'cancel':null;
+      if(this.mode==='plan'&&['Digit1','Digit2','Digit3'].includes(e.code)){
+        e.preventDefault();e.stopImmediatePropagation();
+        this.drawingTab=e.code==='Digit1'?'electrical':e.code==='Digit2'?'ground':'section';this.drawPlan();return;
+      }
+      const action=this.mode!=='off'&&e.code==='Digit1'?'point':this.mode!=='off'&&e.code==='Digit2'?'layout':this.mode!=='off'&&e.code==='Digit3'?'plan':
+        e.code==='KeyT'&&!e.shiftKey?'point':e.code==='KeyV'&&!e.shiftKey?'plan':e.code==='KeyE'&&this.mode==='point'&&!this.aimedAtApprentice()?'layout':e.code==='Enter'&&this.mode==='layout'?'confirm':e.code==='Enter'&&this.groundIntent==='break'?'break-now':e.code==='Escape'&&this.mode!=='off'?'cancel':null;
       if(action){e.preventDefault();e.stopImmediatePropagation();game.input.resetTransientInput();this.command(action);}
     },{capture:true});
     addEventListener('wirehouse:select-tool',()=>{this.mode='off';this.paper.visible=false;this.ghost.visible=false;});
@@ -342,10 +373,9 @@ export class ApprenticeSystem {
     if(action==='point'||action==='plan'){
       window.dispatchEvent(new CustomEvent('wirehouse:box-exit-assembly'));
       this.mode=action;this.ghost.visible=false;this.paper.visible=false;g.input.resetTransientInput();
-      // Pointing still aims through the player's camera on desktop. Keep the
-      // cursor locked there; only the readable plan needs a free pointer.
-      if(action==='point'&&matchMedia('(any-pointer: fine)').matches)window.dispatchEvent(new Event('wirehouse:request-desktop-look-lock'));
-      else if(document.pointerLockElement)void document.exitPointerLock();
+      // Keep the cursor free when Coordinator opens. Clicking the world
+      // requests mouse look; the toolbar remains usable until then.
+      if(action==='plan'&&document.pointerLockElement)void document.exitPointerLock();
       if(action==='point'){this.pipeSelection=null;g.pvc.stock.highlightBundle(null);}
       if(action==='plan')this.drawPlan();
       this.message=action==='point'?'Έδαφος: πάτημα για μετακίνηση · κράτημα για εντολές · τοίχος: USE':'Ηλεκτρολογικό σχέδιο · T επιστροφή στις οδηγίες';
@@ -958,6 +988,8 @@ export class ApprenticeSystem {
     else if(this.mode!=='off'&&this.game.hud.shell.dataset.bottomRole!=='coordinator'&&matchMedia('(pointer:coarse)').matches)
       window.dispatchEvent(new CustomEvent('wirehouse:coordinator-entered'));
     this.toolbar.hidden=!this.game.started||this.count===0||this.mode==='off';
+    if(matchMedia('(pointer:coarse)').matches)
+      this.toolbar.inert=this.toolbar.hidden||this.game.hud.shell.dataset.inspectorOpen!=='true';
     const returnButton=this.game.hud.shell.querySelector<HTMLButtonElement>('#apprentice-return');
     if(returnButton)returnButton.hidden=!this.game.started||this.count===0||this.mode!=='off';
     this.mobilePlan.hidden=!this.game.started||this.mode!=='plan';
@@ -1016,8 +1048,8 @@ export class ApprenticeSystem {
     ctx.fillStyle='#122f39';ctx.font='23px sans-serif';ctx.fillText('T: δείξε τοίχο ή μάτσα PVC   ·   E: διάταξη κουτιών   ·   OK: ανάθεση',47,739);
     this.paper.material.map!.needsUpdate=true;
     const points=this.game.mission.points.filter(point=>!point.definition.id.startsWith('extra-')||point.boxGroup.visible);
-    const drawings={electrical:{label:'Ηλεκτρολογικό',url:electricalDrawingUrl},ground:{label:'Ισόγειο',url:groundFloorDrawingUrl},section:{label:'Τομή ορόφων',url:buildingSectionDrawingUrl}};
+    const drawings={electrical:{key:'1',label:'Ηλεκτρολογικό',url:electricalDrawingUrl},ground:{key:'2',label:'Ισόγειο',url:groundFloorDrawingUrl},section:{key:'3',label:'Τομή ορόφων',url:buildingSectionDrawingUrl}};
     const active=drawings[this.drawingTab];
-    this.mobilePlan.innerHTML=`<div class="drawing-header"><strong>ΣΧΕΔΙΑ ΕΡΓΟΤΑΞΙΟΥ</strong><div class="drawing-header-actions"><button type="button" data-drawing-zoom aria-label="Εναλλαγή μεγέθυνσης σχεδίου">${this.drawingFit?'ΜΕΓΕΘΥΝΣΗ':'ΣΥΝΟΛΟ'}</button><button type="button" data-drawing-close aria-label="Κλείσιμο σχεδίων">ΚΛΕΙΣΕ ×</button></div></div><div class="drawing-tabs" role="tablist" aria-label="Επιλογή σχεδίου">${Object.entries(drawings).map(([key,drawing])=>`<button type="button" role="tab" data-drawing-tab="${key}" aria-selected="${key===this.drawingTab}">${drawing.label}</button>`).join('')}</div><div class="drawing-scroll"><img src="${active.url}" alt="${active.label} κατοικίας Site Pro 04" draggable="false"/></div><div class="drawing-live"><b>Ζωντανή εργασία:</b> ${points.map(point=>`${point.definition.id}: ${point.definition.kind==='switch'?'διακόπτης':'πρίζα'} ${Math.round(point.definition.bottom*100)} cm`).join(' · ')}<br>Κοπές PVC: πρίζα ${this.pipeBatch.telemetry.finishedSocket}/20 · switch ${this.pipeBatch.telemetry.finishedSwitch}/20${this.job?` · εντολή ${this.job.modules.map(m=>m.kind).join('+')}`:''}</div>`;
+    this.mobilePlan.innerHTML=`<div class="drawing-header"><strong>ΣΧΕΔΙΑ ΕΡΓΟΤΑΞΙΟΥ</strong><div class="drawing-header-actions"><button type="button" data-drawing-zoom aria-label="Εναλλαγή μεγέθυνσης σχεδίου">${this.drawingFit?'ΜΕΓΕΘΥΝΣΗ':'ΣΥΝΟΛΟ'}</button><button type="button" data-drawing-close aria-label="Κλείσιμο σχεδίων"><kbd>ESC</kbd> ΚΛΕΙΣΕ ×</button></div></div><div class="drawing-tabs" role="tablist" aria-label="Επιλογή σχεδίου">${Object.entries(drawings).map(([key,drawing])=>`<button type="button" role="tab" data-drawing-tab="${key}" aria-selected="${key===this.drawingTab}"><kbd>${drawing.key}</kbd> ${drawing.label}</button>`).join('')}</div><div class="drawing-scroll"><img src="${active.url}" alt="${active.label} κατοικίας Site Pro 04" draggable="false"/></div><div class="drawing-live"><b>Ζωντανή εργασία:</b> ${points.map(point=>`${point.definition.id}: ${point.definition.kind==='switch'?'διακόπτης':'πρίζα'} ${Math.round(point.definition.bottom*100)} cm`).join(' · ')}<br>Κοπές PVC: πρίζα ${this.pipeBatch.telemetry.finishedSocket}/20 · switch ${this.pipeBatch.telemetry.finishedSwitch}/20${this.job?` · εντολή ${this.job.modules.map(m=>m.kind).join('+')}`:''}</div>`;
   }
 }

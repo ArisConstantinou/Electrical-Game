@@ -115,6 +115,8 @@ export class Game {
   private lastTime = performance.now();
   private animationFrame:number|null=null;
   private loopReady=false;
+  private waterProTask:Promise<void>|null=null;
+  private waterProFailed=false;
   private lifecyclePaused=false;
   private lifecycleGeneration=0;
   private resultShown = false;
@@ -191,6 +193,7 @@ export class Game {
     this.mortar.onLaunch=({speed})=>this.audio.play('trowel-whoosh',speed/8);
     this.mortar.onImpact=({speed,retainedKg})=>this.audio.play('mortar-splat',Math.min(1.4,.35+speed/9+retainedKg/.65*.35));
     this.roomWater = new RoomWaterSystem(this.renderer.scene, this.room.brickWall);
+    this.roomWater.waterProBackend=new URLSearchParams(location.search).get('waterPro')==='0'?'diagnostic-disabled':'deferred-until-wet';
     this.boxPlacement = new BoxPlacementSystem(this.room.brickWall,this.mortar,this.mission.points);
     for(const point of this.mission.points){
       this.boxPlacement.prepareInstalled(point);
@@ -225,14 +228,86 @@ export class Game {
     this.levelEditor=new LevelEditor(this);
     const levelPicker = root.querySelector<HTMLElement>('#start-level-picker')!;
     const levelList = root.querySelector<HTMLElement>('#start-level-list')!;
-    const levelUrl = (choice: 'basic' | 'new' | string): string => {
+    const levelUrl = (choice: 'basic' | 'mansion' | 'new' | string): string => {
       const url = new URL(location.href);
       for (const key of ['mansion', 'renderer', 'editor', 'template', 'level']) url.searchParams.delete(key);
       if (choice === 'new') { url.searchParams.set('mansion', 'preview'); url.searchParams.set('renderer', 'webgl'); url.searchParams.set('template', 'blank'); url.searchParams.set('editor', '1'); }
       else if (choice === 'basic') { url.searchParams.set('mansion', 'basic'); }
+      else if (choice === 'mansion') { url.searchParams.set('mansion', 'preview'); url.searchParams.set('renderer', 'webgl'); }
       else if (choice !== 'basic') { url.searchParams.set('mansion', 'preview'); url.searchParams.set('renderer', 'webgl'); url.searchParams.set('level', choice); }
       return url.toString();
     };
+    const projectList = root.querySelector<HTMLUListElement>('#start-project-list')!;
+    const projectCount = root.querySelector<HTMLOutputElement>('#start-project-count')!;
+    const projectControls = root.querySelector<HTMLElement>('.start-projects-controls')!;
+    const projectUp = root.querySelector<HTMLButtonElement>('#start-project-up')!;
+    const projectDown = root.querySelector<HTMLButtonElement>('#start-project-down')!;
+    const emptyProject = projectList.firstElementChild!.cloneNode(true);
+    const updateProjectScroll = (): void => {
+      const end = projectList.scrollHeight - projectList.clientHeight;
+      projectControls.hidden = !projectList.querySelector('.start-project-entry') || end < 2;
+      projectUp.disabled = projectList.scrollTop < 2;
+      projectDown.disabled = projectList.scrollTop >= end - 2;
+    };
+    const scrollProjects = (direction: number): void => {
+      const first = projectList.querySelector<HTMLElement>('.start-project-entry');
+      projectList.scrollBy({ top: direction * ((first?.offsetHeight ?? 61) + 7), behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    };
+    projectUp.addEventListener('click', () => scrollProjects(-1));
+    projectDown.addEventListener('click', () => scrollProjects(1));
+    projectList.addEventListener('scroll', updateProjectScroll, { passive: true });
+    projectList.addEventListener('keydown', event => {
+      if (event.target !== projectList || !['ArrowUp', 'ArrowDown'].includes(event.key)) return;
+      event.preventDefault();
+      scrollProjects(event.key === 'ArrowUp' ? -1 : 1);
+    });
+    new ResizeObserver(updateProjectScroll).observe(projectList);
+    let projectRefresh = 0;
+    const refreshProjectLibrary = async (): Promise<void> => {
+      const request = ++projectRefresh;
+      projectList.setAttribute('aria-busy', 'true');
+      const slots = await listAvailableLevelSlots();
+      if (request !== projectRefresh) return;
+      projectCount.value = `${slots.length} SAVED`;
+      if (!slots.length) projectList.replaceChildren(emptyProject.cloneNode(true));
+      else projectList.replaceChildren(...slots.map(slot => {
+        const item = document.createElement('li');
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'start-project-entry';
+        button.title = `Open ${slot.name}`;
+        if (new URLSearchParams(location.search).get('level') === slot.id) button.setAttribute('aria-current', 'page');
+        const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        icon.setAttribute('viewBox', '0 0 32 32');
+        icon.setAttribute('aria-hidden', 'true');
+        const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+        use.setAttribute('href', slot.template === 'blank' ? '#start-icon-brick' : '#start-icon-plan');
+        icon.append(use);
+        const copy = document.createElement('span');
+        copy.className = 'start-project-entry-copy';
+        const name = document.createElement('strong');
+        name.textContent = slot.name;
+        const detail = document.createElement('small');
+        const savedAt = Date.parse(slot.updatedAt);
+        const date = Number.isFinite(savedAt) ? new Date(savedAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'SAVED';
+        detail.textContent = `${slot.template === 'blank' ? 'NEW SITE' : 'MANSION COPY'} · ${date}`;
+        copy.append(name, detail);
+        const arrow = document.createElement('span');
+        arrow.className = 'start-project-entry-arrow';
+        arrow.setAttribute('aria-hidden', 'true');
+        arrow.textContent = '›';
+        button.append(icon, copy, arrow);
+        button.addEventListener('click', () => { location.href = levelUrl(slot.id); });
+        item.append(button);
+        return item;
+      }));
+      projectList.scrollTop = 0;
+      projectList.setAttribute('aria-busy', 'false');
+      requestAnimationFrame(updateProjectScroll);
+    };
+    void refreshProjectLibrary();
+    addEventListener('wirehouse:level-saved', () => { void refreshProjectLibrary(); });
+    addEventListener('storage', event => { if (event.key?.startsWith('wirehouse:level-editor:')) void refreshProjectLibrary(); });
     root.querySelector('#start-load')?.addEventListener('click', async () => {
       levelList.replaceChildren();
       const addChoice = (label: string, detail: string, choice: string): void => {
@@ -245,11 +320,13 @@ export class Game {
         button.addEventListener('click', () => { location.href = levelUrl(choice); });
         levelList.append(button);
       };
-      addChoice('BASIC · ORIGINAL', 'Unchanged original game', 'basic');
+      addChoice('ORIGINAL FIRST FIX ROOM', 'The original residential first-fix site', 'basic');
+      addChoice('MANSION SITE · PREVIEW', 'Walk through the open passage to the foyer and courtyard', 'mansion');
       levelPicker.hidden = false;
       for (const slot of await listAvailableLevelSlots()) addChoice(slot.name, `${slot.template === 'blank' ? 'New site' : 'Mansion copy'} · ${new Date(slot.updatedAt).toLocaleDateString()}`, slot.id);
     });
     root.querySelector('#start-level-picker-close')?.addEventListener('click', () => { levelPicker.hidden = true; });
+    root.querySelector('#settings-change-site')?.addEventListener('click', () => { location.reload(); });
     root.querySelector('#start-new')?.addEventListener('click', () => { location.href = levelUrl('new'); });
     root.querySelector<HTMLButtonElement>('#start-level-editor')?.addEventListener('click', () => {
       if (!this.loopReady) return;
@@ -262,7 +339,7 @@ export class Game {
         return;
       }
       root.querySelector('#start-screen')?.classList.add('hidden');
-      void this.levelEditor.open();
+      void this.levelEditor.open().then(()=>this.resumeLifecycle());
     });
     const bodyBanner=document.createElement('button');bodyBanner.id='body-view-banner';bodyBanner.hidden=true;bodyBanner.textContent='Ολόσωμη μπροστινή προβολή · C επιστροφή';bodyBanner.addEventListener('click',()=>window.dispatchEvent(new CustomEvent('wirehouse:front-body-view')));this.hud.shell.append(bodyBanner);
     addEventListener('wirehouse:front-body-view',()=>{if(!this.started)return;if(this.modelInspector.active){this.modelInspector.faceFront();return;}this.frontBodyView=!this.frontBodyView;bodyBanner.hidden=!this.frontBodyView;this.hud.shell.classList.toggle('front-body-view',this.frontBodyView);});
@@ -282,19 +359,39 @@ export class Game {
       // entered explicitly through its navigation control.
       this.apprentice.command('cancel');
       if (matchMedia('(any-pointer: fine)').matches && !this.apprentice.ownsInput) this.desktopControls.requestLock(false);
+      void this.resumeLifecycle();
     });
+    addEventListener('wirehouse:model-inspector-open',()=>void this.resumeLifecycle());
     addEventListener('resize', this.renderer.resize);
     this.assets.markLoaded('procedural-core');
     const startButton = root.querySelector<HTMLButtonElement>('#start-button')!;
+    const startButtonLabel = root.querySelector<HTMLElement>('#start-button-label')!;
+    const startLoadPercent = root.querySelector<HTMLOutputElement>('#start-load-percent')!;
+    const loadingIcons = Array.from(root.querySelectorAll<SVGElement>('.start-loading-icons svg'));
+    const iconOrder = loadingIcons.map((_, index) => index);
+    for (let index = iconOrder.length - 1; index > 0; index--) {
+      const swap = Math.floor(Math.random() * (index + 1));
+      [iconOrder[index], iconOrder[swap]] = [iconOrder[swap], iconOrder[index]];
+    }
+    loadingIcons.forEach((icon, index) => { icon.style.animationDelay = `${iconOrder[index] * .85}s`; });
+    let preparedStages = 0;
+    const markPrepared = (): void => {
+      const percent = Math.round(++preparedStages / 7 * 100);
+      startLoadPercent.value = `${percent}%`;
+      startLoadPercent.setAttribute('aria-label', `Site preparation ${percent}%`);
+    };
     startButton.disabled = true;
-    startButton.textContent = 'PREPARING WATER AND SITE…';
-    this.ready = this.renderer.ready.then(async () => {
-      await this.workerBody.ready;
-      await this.apprentice.ready;
+    const observePreparation = (task: Promise<void>): Promise<void> => task.then(markPrepared);
+    this.ready = Promise.all([
+      observePreparation(this.renderer.ready),
+      observePreparation(this.workerBody.ready),
+      observePreparation(this.apprentice.ready),
+    ]).then(async () => {
       await this.apprentice.crewReady;
-      await this.renderer.attachRoomWater(this.roomWater);
+      markPrepared();
       this.renderer.setWarmupFactory(()=>this.mortar.createRenderWarmup());
       await this.renderer.prepareToolResources(this.mortar.createRenderWarmup());
+      markPrepared();
       const params = new URLSearchParams(location.search);
       let missingSelectedLevel = false;
       if (this.room.mansionWing && params.has('level')) {
@@ -304,18 +401,49 @@ export class Game {
           ? `SAVED · ${root.querySelector<HTMLInputElement>('#level-slot-name')?.value ?? 'Custom level'}`
           : 'SAVED LEVEL UNAVAILABLE';
       } else if (params.get('template') === 'blank') root.querySelector('#start-level-current')!.textContent = 'NEW SITE · UNSAVED';
-      startButton.disabled = missingSelectedLevel;
-      const editorButton = root.querySelector<HTMLButtonElement>('#start-level-editor');
-      if (editorButton) editorButton.disabled = missingSelectedLevel;
-      startButton.textContent = missingSelectedLevel ? 'CHOOSE LEVEL IN LOAD' : 'START';
-      (missingSelectedLevel ? root.querySelector<HTMLButtonElement>('#start-load') : startButton)?.focus({ preventScroll: true });
+      markPrepared();
       this.loopReady=true;
       if (!missingSelectedLevel && params.get('editor') === '1' && this.room.mansionWing) {
         root.querySelector('#start-screen')?.classList.add('hidden');
-        void this.levelEditor.open();
+        void this.levelEditor.open().then(()=>this.resumeLifecycle());
       }
-      if(document.hidden)this.suspendLifecycle();else await this.resumeLifecycle();
+      if(document.hidden)this.suspendLifecycle();
+      markPrepared();
+      startButton.dataset.preparing = 'false';
+      startButton.disabled = missingSelectedLevel;
+      const editorButton = root.querySelector<HTMLButtonElement>('#start-level-editor');
+      if (editorButton) editorButton.disabled = missingSelectedLevel;
+      startButtonLabel.textContent = missingSelectedLevel ? 'CHOOSE LEVEL IN LOAD' : 'START WORK';
+      (missingSelectedLevel ? root.querySelector<HTMLButtonElement>('#start-load') : startButton)?.focus({ preventScroll: true });
     });
+  }
+
+  /** Load the licensed optical water renderer only for a wet room (or an
+   * explicit water test). The construction site starts dry. */
+  async activateWaterPro():Promise<void>{
+    if(this.roomWater.waterProActive)return;
+    if(this.waterProTask)return this.waterProTask;
+    if(this.waterProFailed)return;
+    if(new URLSearchParams(location.search).get('waterPro')==='0'){
+      this.waterProFailed=true;
+      this.roomWater.waterProBackend='diagnostic-disabled';
+      return;
+    }
+    const task=(async()=>{
+      await this.renderer.waitForFrame();
+      await this.renderer.attachRoomWater(this.roomWater);
+    })();
+    this.waterProTask=task;
+    try{await task;}
+    catch(error){
+      this.waterProFailed=true;
+      this.roomWater.waterProBackend='fallback';
+      console.error('Room water optics could not load',error);
+      this.hud.notify('Water optics unavailable. Basic water remains active.',false,4500);
+    }finally{
+      if(this.waterProTask===task)this.waterProTask=null;
+      this.lastTime=performance.now();
+    }
   }
 
   step(dt: number, waterDt = dt, present = true): void {
@@ -554,6 +682,8 @@ export class Game {
     // only once at presentation, keeping cheap flat patches within one budget.
     if(present)this.mortar.flushWetGeometry(64,3);
     if(present)this.chasing.flushFragmentRendering(2048,.5);
+    if(this.roomWater.surface.visible&&!this.roomWater.waterProActive&&!this.waterProTask&&!this.waterProFailed)void this.activateWaterPro();
+    if(this.waterProTask)return;
     if (present && this.renderer.render()) {
       const workReticle = !this.apprentice.ownsInput && this.selectedTool === 'hammer' && this.fpsRig.reachable
         ? this.fpsRig.chiselTipWorld.clone().project(this.renderer.renderCamera) : null;
@@ -952,7 +1082,7 @@ export class Game {
     this.renderer.suspend();
   };
   private async resumeLifecycle():Promise<void>{
-    if(!this.loopReady||document.hidden)return;
+    if(!this.loopReady||document.hidden||!this.started&&!this.levelEditor.active&&!this.modelInspector.active)return;
     const generation=++this.lifecycleGeneration;this.lifecyclePaused=true;
     if(this.animationFrame!==null)cancelAnimationFrame(this.animationFrame);this.animationFrame=null;
     this.mobileControls.cancelActiveGestures();this.input.resetTransientInput();
@@ -972,6 +1102,8 @@ export class Game {
   private loop = (time: number): void => {
     this.animationFrame=null;
     if(this.lifecyclePaused||document.hidden)return;
+    if(!this.started&&!this.levelEditor.active&&!this.modelInspector.active)return;
+    if(this.waterProTask){this.animationFrame=requestAnimationFrame(this.loop);return;}
     // Water's depth, reflection and final colour passes share the live scene.
     // Moving its camera/arms between those passes caused alternating tool
     // positions and shadows. Keep elapsed time until the next accepted frame;

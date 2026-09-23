@@ -1,0 +1,161 @@
+/* Paper, ink and safety-yellow controls shared by the menu's older surfaces. */
+#start-screen .start-actions:has(#start-level-picker:not([hidden]))::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: #0b1d18a8;
+}
+
+#start-screen .start-level-picker {
+  z-index: 50;
+  width: min(480px, calc(100% - 24px));
+  padding: 17px;
+  border: 1px solid #71857a;
+  border-radius: 10px;
+  background: #eee9d7;
+  box-shadow: 0 8px 0 #384e43, 0 25px 65px #0009;
+  color: #1d342f;
+  font-family: Bahnschrift, 'Arial Narrow', Arial, sans-serif;
+}
+#start-screen .start-level-picker__heading { color: #23463d; font: 900 21px/1.1 Bahnschrift, Arial, sans-serif; }
+#start-screen #start-level-picker-close { border-color: #8a9d91; border-radius: 6px; background: #fffdf2; color: #23463d; }
+#start-screen .start-level-choice { min-height: 66px; border-color: #8ea298; border-radius: 6px; background: #fffdf4; color: #1d342f; }
+#start-screen .start-level-choice:hover,
+#start-screen .start-level-choice:focus-visible { border-color: #a8841d; background: #fff5c4; outline: 2px solid #e6c640; }
+#start-screen .start-level-choice strong { font: 900 16px/1.2 Bahnschrift, Arial, sans-serif; }
+#start-screen .start-level-choice small { color: #4c655c; font: 600 14px/1.3 Bahnschrift, Arial, sans-serif; }
+
+#game-shell.settings-open #settings-panel {
+  width: min(370px, calc(100% - 20px));
+  border: 1px solid #71857a;
+  border-radius: 10px;
+  background: #eee9d7f7;
+  box-shadow: 0 8px 0 #384e43, 0 20px 50px #0008;
+  color: #1d342f;
+  font-family: Bahnschrift, 'Arial Narrow', Arial, sans-serif;
+}
+#settings-panel header { border-bottom-color: #a4b4a6; }
+#settings-panel header span { color: #436e5e; font: 900 12px/1.2 Bahnschrift, Arial, sans-serif; }
+#settings-panel header strong { color: #1d342f; font: 900 18px/1.2 Bahnschrift, Arial, sans-serif; }
+#settings-panel #settings-close { border: 1px solid #8a9d91; border-radius: 6px; background: #fffdf2; color: #23463d; }
+#settings-panel :is(#spray-controls, #chisel-settings, #mobile-control-settings) button,
+#settings-panel :is(#mortar-settings, .hammer-speed-setting) {
+  min-height: 48px;
+  border: 1px solid #8ea298;
+  border-radius: 6px;
+  background: #fffdf4;
+  color: #1d342f;
+  font: 800 13px/1.25 Bahnschrift, Arial, sans-serif;
+}
+#settings-panel :is(#spray-controls, #chisel-settings, #mobile-control-settings) button:hover { border-color: #b28d25; background: #fff5c4; }
+#settings-panel :is(#spray-controls, #chisel-settings, #mobile-control-settings) b,
+#settings-panel .hammer-speed-setting output { color: #28584b; }
+#settings-panel :is(.hammer-speed-setting, #mortar-settings) :is(small, p),
+#settings-panel #mobile-control-settings small { color: #4c655c; font: 600 13px/1.35 Bahnschrift, Arial, sans-serif; }
+#settings-panel .hammer-speed-setting input { accent-color: #e3b91e; }
+#settings-panel .hammer-speed-setting select { width: 100%; min-height: 40px; border: 1px solid #8ea298; border-radius: 5px; background: #fff; color: #1d342f; }
+#settings-panel #mortar-settings summary { color: #28584b; }
+#settings-panel #mortar-settings summary::before { color: #a8841d; }
+#settings-panel #mortar-settings button { border: 1px solid #8ea298; border-radius: 5px; background: #f5f2e7; color: #1d342f; }
+#settings-panel #mortar-settings #mortar-swing { border-color: #b29223; background: #ffda28; }
+#settings-panel #settings-change-site { width: 100%; min-height: 48px; margin-bottom: 12px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid #8ea298; border-radius: 5px; background: #fffdf2; color: #1d342f; font: 900 14px/1.1 Bahnschrift, Arial, sans-serif; cursor: pointer; }
+#settings-panel #settings-change-site small { color: #4c655c; font: 600 12px/1.2 Bahnschrift, Arial, sans-serif; text-align: right; }
+#settings-panel #settings-change-site:hover, #settings-panel #settings-change-site:focus-visible { border-color: #b28d25; background: #fff5c4; }
+
+#model-inspector.model-viewer { color: #1d342f; font-family: Bahnschrift, 'Arial Narrow', Arial, sans-serif; }
+#model-inspector :is(.model-viewer__header, .model-viewer__subjects, .model-viewer__forms, .model-viewer__footer) { background: #eee9d7; color: #1d342f; }
+#model-inspector .model-viewer__header { border-bottom: 1px solid #a4b4a6; }
+#model-inspector .model-viewer__header span { color: #436e5e; font: 900 12px/1.2 Bahnschrift, Arial, sans-serif; }
+#model-inspector h2 { color: #1d342f; font: 900 26px/1 Bahnschrift, Arial, sans-serif; letter-spacing: .04em; }
+#model-inspector .model-viewer__footer { border-top: 1px solid #a4b4a6; }
+#model-inspector button { border: 1px solid #81988c; border-radius: 6px; background: #fffdf4; color: #1d342f; font: 800 13px/1.15 Bahnschrift, Arial, sans-serif; }
+#model-inspector button:hover:not(:disabled) { border-color: #b28d25; background: #fff5c4; }
+#model-inspector button[aria-pressed='true'] { border-color: #b29223; background: #ffda28; color: #233125; }
+#model-inspector :is(select, input[type=search]) { border-color: #81988c; border-radius: 6px; background: #fffdf4; color: #1d342f; }
+#model-inspector label,
+#model-inspector #model-stats,
+#model-inspector .model-viewer__footer p { color: #4c655c; }
+#model-inspector .model-library { border-right-color: #81988c; background: #eee9d7f7; }
+
+/* The editor stays a live 3D canvas; these rules skin its controls only. */
+#game-shell #level-editor {
+  --editor-bg: #eee9d7;
+  --editor-card: #f6f3e7;
+  --editor-line: #81988c;
+  --editor-ink: #1d342f;
+  --editor-muted: #4c655c;
+  --editor-accent: #e3b91e;
+  color: #1d342f;
+  font-family: Bahnschrift, 'Arial Narrow', Arial, sans-serif;
+}
+#game-shell #level-editor :is(header, .level-editor__bar, aside, .level-editor__inspector, .level-editor__save),
+#game-shell #level-editor #level-settings-panel,
+#game-shell #level-editor #level-view-panel {
+  border: 1px solid #81988c;
+  border-radius: 10px;
+  background: #eee9d7f5;
+  box-shadow: 0 8px 0 #384e43, 0 17px 34px #0006;
+  color: #1d342f;
+}
+#game-shell #level-editor header small,
+#game-shell #level-editor :is(aside > label, .level-editor__save label, #level-view-panel label, #level-settings-panel label) { color: #436e5e; font-weight: 900; }
+#game-shell #level-editor h2,
+#game-shell #level-editor .level-editor__inspector b,
+#game-shell #level-editor .level-editor__save b { color: #1d342f; font-family: Bahnschrift, Arial, sans-serif; font-weight: 900; }
+#game-shell #level-editor :is(.level-editor__scene, .level-editor__inspector p, .level-editor__save p, #level-view-panel small, #level-status, #level-save-status, #level-touch-help) { color: #4c655c; }
+#game-shell #level-editor button { border: 1px solid #81988c; border-radius: 6px; background: #fffdf4; box-shadow: none; color: #1d342f; font-family: Bahnschrift, Arial, sans-serif; font-weight: 800; }
+#game-shell #level-editor button:hover:not(:disabled),
+#game-shell #level-editor button:focus-visible { border-color: #b28d25; background: #fff5c4; color: #1d342f; }
+#game-shell #level-editor button:focus-visible,
+#game-shell #level-editor :is(input, select):focus-visible { outline: 2px solid #c69b19; outline-offset: 2px; }
+#game-shell #level-editor :is(button[aria-pressed='true'], .level-editor__bar button[aria-pressed='true'], #level-camera[aria-pressed='true'], #level-camera-mobile[aria-pressed='true'], #level-list button.selected, #level-group-list button.selected, #level-multi-toggle[aria-pressed='true']) { border-color: #b29223; background: #ffda28; color: #233125; }
+#game-shell #level-editor :is(input, select) { border-color: #81988c; border-radius: 6px; background: #fffdf4; color: #1d342f; }
+#game-shell #level-editor :is(#level-filter, #level-floor-quick, #level-floor) { background: #fffdf4; color: #1d342f; }
+#game-shell #level-editor #level-list button { border-color: #a4b4a6; background: #f8f6eb; color: #1d342f; }
+#game-shell #level-editor #level-list button::before { background: #81988c; }
+#game-shell #level-editor #level-list button.selected { border-color: #b29223; background: #ffda28; }
+#game-shell #level-editor #level-list button.selected::before { background: #705710; }
+#game-shell #level-editor .level-editor__fields label,
+#game-shell #level-editor #level-group-edit,
+#game-shell #level-editor #level-wall-tools { border: 1px solid #a4b4a6; border-radius: 7px; background: #e7ecdf; color: #285047; }
+#game-shell #level-editor :is(#level-group-edit label, .level-wall-tools__heading strong, .level-wall-tools__row label) { color: #285047; }
+#game-shell #level-editor :is(.level-wall-tools__heading span, #level-wall-tools small, #level-count) { color: #4c655c; }
+#game-shell #level-editor #level-fields-tabs { border-color: #a4b4a6; background: #e7ecdf; }
+#game-shell #level-editor #level-fields-tabs button[aria-pressed='true'] { border-color: #b29223; background: #ffda28; color: #233125; }
+#game-shell #level-editor #level-delete { border-color: #a46b5a !important; background: #f3dfd7 !important; color: #6f3028; }
+#game-shell #level-editor :is(#level-save, #level-save-mobile, #level-save-as) { border-color: #b29223; background: #ffda28; color: #233125; }
+#game-shell #level-editor #level-save-as { background: #fffdf4; }
+#game-shell #level-editor :is(#level-view-trigger, #level-browser-toggle, #level-details-toggle) { border-color: #b29223 !important; background: #ffda28 !important; color: #233125; }
+#game-shell #level-editor :is(#level-view-quick, #level-view-panel) :is(label, small) { color: #4c655c; }
+#game-shell #level-editor :is(#level-view-quick, #level-view-panel) button[aria-pressed='true'] { border-color: #b29223; background: #ffda28; color: #233125; }
+#game-shell #level-editor .level-editor__build-heading :is(strong, span) { color: #285047; }
+
+#game-shell #level-editor .level-editor__bottom-nav,
+#game-shell #level-editor .level-editor__wheel-ring { border: 1px solid #71857a; background: #203c35f5; box-shadow: 0 9px 24px #0006; }
+#game-shell #level-editor .level-editor__bottom-nav button,
+#game-shell #level-editor .level-editor__wheel-ring button { border: 0; background: transparent; color: #f3eed9; }
+#game-shell #level-editor .level-editor__bottom-nav [data-editor-tab]:hover:not(:disabled):not([aria-current='true']),
+#game-shell #level-editor .level-editor__wheel-ring [data-editor-tab]:hover:not(:disabled):not([aria-current='true']) { border: 0; background: #31564a; color: #fff8e8; }
+#game-shell #level-editor .level-editor__bottom-nav [data-editor-tab]:focus-visible,
+#game-shell #level-editor .level-editor__wheel-ring [data-editor-tab]:focus-visible { border: 0; outline: 0; box-shadow: inset 0 0 0 2px #ffe27a; }
+#game-shell #level-editor .level-editor__bottom-nav [data-editor-tab][aria-current='true'],
+#game-shell #level-editor .level-editor__wheel-ring [data-editor-tab][aria-current='true'] { border: 0; background: #ffda28; color: #233125; }
+#game-shell #level-editor #level-dock-toggle,
+#game-shell #level-editor #level-wheel-toggle { border-color: #71857a !important; background: #203c35f5 !important; color: #ffda28; }
+#game-shell #level-editor #level-halo::before { border-top-color: #d5b43a; }
+#game-shell #level-editor #level-halo-badge { border-color: #b29223; background: #203c35f3; color: #fff4ce; }
+#game-shell #level-editor #level-halo-handle { border-color: #ffda28; border-right-color: #71857a; border-bottom-color: #71857a; background: radial-gradient(circle at center, #203c35 0 26px, #315b4c 27px 100%); box-shadow: inset 0 0 0 4px #192e27, 0 0 0 5px #0f28338a; color: #fff4ce; }
+#game-shell #level-editor #level-halo-handle span { border-color: #d2bb67; background: #203c35; }
+#game-shell #level-editor #level-wall-endpoints button { border-color: #ffda28; background: #315b4c; color: #fff4ce; box-shadow: 0 0 0 5px #173529bd, 0 8px 19px #0008; }
+#game-shell #level-editor #level-wall-endpoints button[aria-pressed='true'] { background: #ffda28; color: #233125; }
+
+@media (max-width: 1100px) {
+  #game-shell #level-editor .level-editor__save { height: auto; max-height: min(52dvh, 440px); overflow-y: auto; }
+}
+
+#result-panel { background-image: linear-gradient(100deg, #0e1a13c7, #1520178c), url('/Electrical-Game/assets/ui/start-site-cinematic.webp'); background-position: center; background-size: cover; }
+#result-panel h2 { color: #ffda28; }
+#result-panel ul { padding: 12px 18px; border: 1px solid #81988c; border-radius: 9px; background: #eee9d7f2; color: #1d342f; }
+#result-panel li { border-bottom-color: #a4b4a6; }
+#result-panel li b { color: #28584b; }

@@ -1,0 +1,195 @@
+#start-screen {
+  justify-content: flex-start;
+  align-items: center;
+  overflow: auto;
+  padding: 42px 20px 27px;
+  background-image: linear-gradient(100deg, #0e1a13a6, #15201747), url('/Electrical-Game/assets/ui/start-site-cinematic.webp');
+}
+
+#start-screen .start-content {
+  width: min(850px, 100%);
+  min-height: 100%;
+  margin: 0 auto;
+  justify-content: center;
+  color: #1d342f;
+  font-family: Bahnschrift, 'Arial Narrow', Arial, sans-serif;
+}
+
+#start-screen .eyebrow { color: #ffe161; font-size: 13px; font-weight: 900; letter-spacing: .18em; }
+#start-screen h1 { margin: 8px 0 0; color: #fff8e9; font-family: Bahnschrift, 'Arial Narrow', Arial, sans-serif; font-size: clamp(60px, 9vw, 102px); font-weight: 900; line-height: .84; letter-spacing: -.055em; }
+#start-screen h1 span { color: #ffda28; }
+#start-screen .start-intro { max-width: none; margin: 15px 0 0; color: #fff3d4; font: 700 16px/1.3 Bahnschrift, Arial, sans-serif; text-align: center; }
+.start-icon-definitions { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+#start-screen .start-actions {
+  position: relative;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 14px;
+  align-items: stretch;
+  justify-items: stretch;
+  margin-top: clamp(20px, 3vh, 36px);
+  padding-top: 0;
+  text-align: left;
+}
+
+#start-screen .start-card {
+  min-width: 0;
+  padding: 17px;
+  border: 1px solid #71857a;
+  border-radius: 10px;
+  background: #e8e1ccf2;
+  box-shadow: 0 8px 0 #384e43, 0 18px 35px #0007;
+}
+
+#start-screen .start-work-card { display: flex; flex-direction: column; background: linear-gradient(155deg, #f0ebd9f6, #ded4baf5); }
+#start-screen .start-card-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 12px; color: #2f544b; font: 900 13px/1.2 Bahnschrift, Arial, sans-serif; letter-spacing: .13em; }
+#start-screen .start-level-current { width: auto; color: #4c655c; font: 900 12px/1.2 Bahnschrift, Arial, sans-serif; letter-spacing: .07em; text-align: right; text-shadow: none; }
+
+#start-screen .start-card button:not(.apprentice-count button) svg,
+#start-screen .start-work-sequence svg { flex: none; width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+#start-screen #start-button { order: 1; position: relative; display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; min-height: 72px; padding: 4px 14px; border: 2px solid #b29223; border-radius: 6px; background: #ffda28; box-shadow: 0 5px 0 #ae8a19; color: #233125; font: 900 28px/1 Bahnschrift, 'Arial Narrow', Arial, sans-serif; letter-spacing: .12em; }
+#start-screen #start-button .start-loading-indicator { position: absolute; right: 13px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; justify-content: flex-end; gap: 6px; min-width: 70px; }
+#start-screen #start-button .start-loading-icons { position: relative; display: block; flex: none; width: 25px; height: 25px; background: transparent; }
+#start-screen #start-button .start-loading-icons svg { position: absolute; inset: 0; width: 25px; height: 25px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; background: transparent; opacity: 0; animation: start-loading-swap 5.1s linear infinite; }
+#start-screen #start-button .start-loading-icons svg:nth-child(2) { animation-delay: .85s; }
+#start-screen #start-button .start-loading-icons svg:nth-child(3) { animation-delay: 1.7s; }
+#start-screen #start-button .start-loading-icons svg:nth-child(4) { animation-delay: 2.55s; }
+#start-screen #start-button .start-loading-icons svg:nth-child(5) { animation-delay: 3.4s; }
+#start-screen #start-button .start-loading-icons svg:nth-child(6) { animation-delay: 4.25s; }
+#start-screen #start-button:not([data-preparing='true']) .start-loading-icons { display: none; }
+@keyframes start-loading-swap { 0%, 16.6% { opacity: 1; } 16.7%, 100% { opacity: 0; } }
+#start-screen #start-button:disabled { opacity: 1; filter: none; cursor: progress; }
+#start-screen #start-button:hover:not(:disabled) { background: #ffe65a; transform: translateY(-1px); }
+#start-screen #start-button:focus-visible,
+#start-screen .start-card button:focus-visible { outline: 2px solid #315b4c; outline-offset: -5px; }
+#start-screen #start-load-percent { color: #284c3c; font: 900 16px/1 Bahnschrift, Arial, sans-serif; letter-spacing: .02em; }
+
+#start-screen .start-work-order { order: 3; margin-top: 15px; padding: 12px 13px; border: 1px solid #8ea298; border-radius: 5px; background: #f9f7ed; color: #213c36; }
+#start-screen .start-order-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; font: 900 12px/1.2 Bahnschrift, Arial, sans-serif; letter-spacing: .08em; }
+#start-screen .start-order-heading span:last-child { color: #56716a; font-size: 12px; white-space: nowrap; }
+#start-screen .start-order-brief { margin: 9px 0; padding: 8px 10px; border-left: 3px solid #cc9b22; background: #e7ecdf; color: #285047; font: 700 12px/1.35 Bahnschrift, Arial, sans-serif; }
+#start-screen .start-order-brief b { display: block; margin-bottom: 2px; color: #1b3731; font-size: 13px; }
+#start-screen .start-work-sequence { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; margin: 0; padding: 0; list-style: none; }
+#start-screen .start-work-sequence li { display: grid; align-content: center; justify-items: center; gap: 3px; min-width: 0; min-height: 45px; padding: 4px 1px; border: 0; background: transparent; color: #2c554a; font: 800 12px/1.1 Bahnschrift, Arial, sans-serif; text-align: center; }
+#start-screen .start-work-sequence svg { width: 22px; height: 22px; }
+
+
+#start-screen .apprentice-count { order: 4; display: flex; flex-wrap: wrap; justify-content: flex-start; align-items: center; align-self: stretch; gap: 7px; width: 100%; margin-top: 12px; padding: 10px 0 0; border: 0; border-top: 1px solid #9aab9e; border-radius: 0; background: none; color: #28413a; }
+#start-screen .apprentice-count > span { color: #28413a; font: 900 12px/1.2 Bahnschrift, Arial, sans-serif; }
+#start-screen .apprentice-count button { width: 34px; height: 40px; border-color: #9aab9e; border-radius: 5px; background: #f8f6ed; color: #28413a; }
+#start-screen .apprentice-count button.selected { background: #ffda28; border-color: #d7ad2a; color: #243528; box-shadow: none; }
+#start-screen .apprentice-count button svg { width: 20px; height: 20px; }
+#start-screen .apprentice-count output { min-width: 0; color: #31574c; font: 900 12px/1.2 Bahnschrift, Arial, sans-serif; }
+
+#start-screen .start-level-actions { display: grid; grid-template-columns: 1fr; gap: 9px; }
+#start-screen .start-level-actions button,
+#start-screen .start-utilities button { display: flex; align-items: center; justify-content: flex-start; gap: 9px; width: 100%; min-height: 50px; padding: 7px 18px; border: 1px solid #81988c; border-radius: 6px; background: #f5f2e7; box-shadow: none; color: #1b3834; font: 800 16px/1.1 Bahnschrift, Arial, sans-serif; letter-spacing: .07em; text-align: left; cursor: pointer; }
+#start-screen .start-level-actions button:hover:not(:disabled),
+#start-screen .start-utilities button:hover { border-color: #466b5b; background: #fffdf2; }
+#start-screen .start-level-actions button:disabled { opacity: .55; cursor: wait; }
+#start-screen .start-site-card { display: flex; flex-direction: column; min-height: 0; }
+#start-screen .start-projects { display: flex; flex: 1; flex-direction: column; min-height: 0; margin-top: 14px; padding-top: 12px; border-top: 1px solid #a4b6a9; }
+#start-screen .start-projects-heading { display: flex; align-items: center; gap: 7px; color: #2f544b; font: 900 12px/1.2 Bahnschrift, Arial, sans-serif; letter-spacing: .09em; }
+#start-screen #start-project-count { margin-left: auto; color: #6a6040; font: 800 12px/1 Bahnschrift, Arial, sans-serif; letter-spacing: 0; white-space: nowrap; }
+#start-screen .start-projects-controls { display: flex; gap: 4px; margin-left: 4px; }
+#start-screen .start-projects-controls[hidden] { display: none; }
+#start-screen .start-projects-controls button { display: grid; place-items: center; width: 27px; height: 27px; padding: 0; border: 1px solid #899d8e; border-radius: 5px; background: #f8f5e9; color: #2e5548; cursor: pointer; }
+#start-screen .start-projects-controls button:disabled { opacity: .36; cursor: default; }
+#start-screen .start-projects-controls button:not(:disabled):hover,
+#start-screen .start-projects-controls button:not(:disabled):focus-visible { border-color: #ad8424; background: #ffe28a; }
+#start-screen .start-projects-controls button svg { width: 16px; height: 16px; }
+#start-screen .start-project-list { display: grid; flex: 1 1 0; align-content: start; gap: 7px; height: 0; min-height: 0; margin: 9px 0 0; padding: 1px 5px 1px 0; overflow-y: auto; overscroll-behavior-y: contain; scroll-snap-type: y proximity; scrollbar-width: thin; scrollbar-color: #bd9c36 #e0e7dc; }
+#start-screen .start-project-list::-webkit-scrollbar { width: 7px; }
+#start-screen .start-project-list::-webkit-scrollbar-track { border-radius: 8px; background: #e0e7dc; }
+#start-screen .start-project-list::-webkit-scrollbar-thumb { border: 1px solid #e0e7dc; border-radius: 8px; background: #bd9c36; }
+#start-screen .start-project-list li { min-width: 0; list-style: none; scroll-snap-align: start; }
+#start-screen .start-project-list .start-project-entry { display: grid; grid-template-columns: 28px minmax(0,1fr) 14px; align-items: center; gap: 8px; width: 100%; min-height: 56px; padding: 6px 8px; border: 1px solid #9eb0a2; border-radius: 6px; background: #fffdf4; color: #1d342f; box-shadow: none; text-align: left; cursor: pointer; }
+#start-screen .start-project-list .start-project-entry:hover,
+#start-screen .start-project-list .start-project-entry:focus-visible { border-color: #aa8222; background: #fff3c4; outline: 2px solid #e6c640; outline-offset: -2px; }
+#start-screen .start-project-list .start-project-entry[aria-current='page'] { border-color: #bc952d; background: #fff3c4; }
+#start-screen .start-project-list .start-project-entry > svg { width: 24px; height: 24px; fill: none; stroke: #315c4c; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+#start-screen .start-project-entry-copy { display: grid; gap: 4px; min-width: 0; }
+#start-screen .start-project-entry-copy strong { overflow: hidden; color: #213b34; font: 900 14px/1.1 Bahnschrift, Arial, sans-serif; text-overflow: ellipsis; white-space: nowrap; }
+#start-screen .start-project-entry-copy small { overflow: hidden; color: #5e7469; font: 700 12px/1.1 Bahnschrift, Arial, sans-serif; text-overflow: ellipsis; white-space: nowrap; }
+#start-screen .start-project-entry-arrow { color: #a07a1f; font: 900 16px/1 Bahnschrift, Arial, sans-serif; }
+#start-screen .start-project-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 100%; padding: 12px; border-radius: 6px; background: #e4e9dc; color: #466658; text-align: center; }
+#start-screen .start-project-empty svg { width: 27px; height: 27px; fill: none; stroke: #907522; stroke-width: 1.7; }
+#start-screen .start-project-empty strong { font: 900 13px/1.1 Bahnschrift, Arial, sans-serif; letter-spacing: .07em; }
+#start-screen .start-project-empty span { max-width: 200px; font: 700 12px/1.2 Bahnschrift, Arial, sans-serif; }
+#start-screen .start-tools-card { grid-column: 1 / -1; padding-bottom: 14px; }
+#start-screen .start-utilities { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+#start-screen .start-utilities svg { stroke: currentColor; }
+#start-screen .start-utilities span { font: inherit; }
+#start-screen .start-level-picker { position: fixed; z-index: 50; left: 50%; top: 50%; }
+#start-screen .start-menu-footer { align-self: center; margin-top: 23px; color: #f3eed9; font: 800 12px/1.2 Bahnschrift, Arial, sans-serif; letter-spacing: .1em; text-align: center; }
+
+@media (orientation: portrait) and (max-width: 1100px) {
+  #start-screen { background-image: linear-gradient(0deg, #111b18db, #15221a68), url('/Electrical-Game/assets/ui/start-site-cinematic-portrait.webp'); }
+}
+
+@media (max-width: 650px) {
+  #start-screen { padding: 24px 15px; }
+  #start-screen .start-content { justify-content: flex-start; }
+  #start-screen .eyebrow { font-size: 11px; }
+  #start-screen h1 { font-size: clamp(48px, 14vw, 66px); line-height: .88; }
+  #start-screen .start-intro { margin-top: 8px; font-size: 12px; }
+  #start-screen .start-actions { grid-template-columns: 1fr; gap: 8px; margin-top: 12px; padding-top: 0; }
+  #start-screen .start-card { padding: 10px 12px; }
+  #start-screen .start-card-heading { margin-bottom: 7px; font-size: 12px; }
+  #start-screen .start-level-current { font-size: 12px; }
+  #start-screen #start-button { min-height: 68px; font-size: 24px; }
+  #start-screen .start-work-order { margin-top: 9px; padding: 8px; }
+  #start-screen .start-order-brief { margin: 6px 0; padding: 5px 7px; font-size: 12px; }
+  #start-screen .start-order-brief b { font-size: 12px; }
+  #start-screen .start-work-sequence li { font-size: 12px; }
+  #start-screen .start-work-sequence svg { width: 19px; height: 19px; }
+  #start-screen .apprentice-count { justify-content: center; gap: 5px; margin-top: 8px; padding-top: 7px; }
+  #start-screen .apprentice-count > span { display: block; font-size: 12px; }
+  #start-screen .apprentice-count-track { gap: 4px; }
+  #start-screen .apprentice-count button { width: 30px; height: 38px; }
+  #start-screen .apprentice-count output { font-size: 12px; }
+  #start-screen .start-level-actions { grid-template-columns: 1fr 1fr; gap: 6px; }
+  #start-screen .start-level-actions button { justify-content: center; min-height: 48px; padding: 4px; font-size: 12px; letter-spacing: .02em; }
+  #start-screen #start-level-editor { grid-column: 1 / -1; }
+  #start-screen .start-projects { flex: none; margin-top: 10px; padding-top: 9px; }
+  #start-screen .start-project-list { flex: none; height: 148px; min-height: 0; max-height: 148px; }
+  #start-screen .start-tools-card { grid-column: 1; }
+  #start-screen .start-utilities { gap: 6px; }
+  #start-screen .start-utilities button { justify-content: center; min-height: 50px; padding: 4px; font-size: 12px; }
+  #start-screen .start-utilities svg,
+  #start-screen .start-level-actions svg { width: 21px; height: 21px; }
+  #start-screen .start-menu-footer { margin-top: 12px; font-size: 10px; }
+}
+
+@media (max-height: 470px) and (orientation: landscape) {
+  #start-screen { padding-top: 12px; padding-bottom: 12px; }
+  #start-screen .start-content { justify-content: flex-start; }
+  #start-screen .eyebrow { font-size: 11px; }
+  #start-screen h1 { margin-top: 2px; font-size: 53px; }
+  #start-screen .start-intro { margin-top: 5px; font-size: 12px; }
+  #start-screen .start-actions { gap: 8px; padding-top: 10px; }
+  #start-screen .start-card { padding: 9px; }
+  #start-screen .start-card-heading { margin-bottom: 5px; }
+  #start-screen #start-button { min-height: 60px; font-size: 22px; }
+  #start-screen .start-work-order { margin-top: 7px; padding: 6px; }
+  #start-screen .start-order-brief { display: none; }
+  #start-screen .start-work-sequence li { min-height: 35px; font-size: 12px; }
+  #start-screen .start-work-sequence svg { width: 16px; height: 16px; }
+  #start-screen .apprentice-count { margin-top: 6px; padding-top: 5px; }
+  #start-screen .start-menu-footer { display: none; }
+}
+
+@media (max-height: 470px) and (orientation: landscape) and (min-width: 651px) {
+  #start-screen .start-actions { grid-template-columns: 1.5fr 1fr; grid-template-rows: auto auto; }
+  #start-screen .start-work-card { grid-column: 1; grid-row: 1; }
+  #start-screen .start-site-card { grid-column: 2; grid-row: 1 / 3; }
+  #start-screen .start-tools-card { grid-column: 1; grid-row: 2; }
+  #start-screen .start-level-actions { gap: 5px; }
+  #start-screen .start-level-actions button { min-height: 43px; font-size: 13px; }
+  #start-screen .start-utilities { gap: 5px; }
+  #start-screen .start-utilities button { min-height: 43px; justify-content: center; gap: 5px; padding: 4px; font-size: 12px; letter-spacing: .02em; }
+  #start-screen .start-utilities svg { width: 20px; height: 20px; }
+}

@@ -277,7 +277,7 @@ html, body { background: #151a1d; }
   #mobile-stance-controls button svg, #mobile-stance-controls button span,
   #site-pro-use > span, #mobile-interact b, #mobile-interact small { display: none; }
   #mobile-stance-controls button::before {
-    content: ''; display: block; width: 25px; height: 25px;
+    content: ''; display: block; width: 28px; height: 28px;
     background: url('../assets/ui/stand-person.svg') center / contain no-repeat;
   }
   #mobile-stance-controls #mobile-crouch::before { background-image: url('../assets/ui/crouch-person.svg'); }
@@ -311,4 +311,77 @@ html, body { background: #151a1d; }
     height: 56px;
     border-radius: 12px;
   }
+}
+
+/* Worker and Inspector keep their horizontal toolbars. Each toolbar has a
+   small edge handle so it can leave the construction view completely clear. */
+@media (pointer:coarse), (max-width:760px) {
+  #worker-bar-handle, #inspector-bar-handle {
+    position:absolute; z-index:20; top:calc(max(10px, env(safe-area-inset-top)) + 60px);
+    box-sizing:border-box; width:36px; height:68px; padding:0;
+    display:grid; place-items:center; border:1px solid #a5b5ae;
+    background:#1d3229f5; color:#ffdb37; box-shadow:0 5px 14px #0009;
+    font:900 28px/1 Arial,sans-serif; pointer-events:auto; touch-action:manipulation;
+  }
+  #worker-bar-handle {left:max(6px, env(safe-area-inset-left));border-radius:9px 4px 4px 9px;}
+  #inspector-bar-handle {right:max(6px, env(safe-area-inset-right));border-radius:4px 9px 9px 4px;}
+  #game-shell[data-bottom-role="worker"] #inspector-bar-handle,
+  #game-shell[data-bottom-role="coordinator"] #worker-bar-handle,
+  #game-shell.settings-open :is(#worker-bar-handle,#inspector-bar-handle) {display:none;}
+
+  #game-shell[data-tools-open="true"] #mobile-tool-slider {
+    position:absolute; top:calc(max(10px, env(safe-area-inset-top)) + 60px); bottom:auto;
+    left:calc(max(6px, env(safe-area-inset-left)) + 36px); right:max(6px, env(safe-area-inset-right));
+    box-sizing:border-box; width:auto; height:68px; display:flex;
+    overflow-x:auto; overflow-y:hidden; touch-action:pan-x;
+  }
+  #game-shell[data-tools-open="true"] #tool-quick-controls,
+  #game-shell[data-tools-open="true"] #aim-quick-controls {
+    top:calc(max(10px, env(safe-area-inset-top)) + 134px); bottom:auto;
+    left:calc(max(6px, env(safe-area-inset-left)) + 36px); right:max(6px, env(safe-area-inset-right));
+    width:auto; max-width:none;
+  }
+  #game-shell[data-inspector-open="false"] #apprentice-controls:not([hidden]) {display:none!important;}
+  #game-shell[data-inspector-open="true"] #apprentice-controls:not([hidden]) {
+    position:absolute; z-index:18; top:calc(max(10px, env(safe-area-inset-top)) + 60px); bottom:auto;
+    left:max(6px, env(safe-area-inset-left)); right:calc(max(6px, env(safe-area-inset-right)) + 36px);
+    box-sizing:border-box; width:auto; height:68px; padding:3px 5px;
+    display:flex; transform:none; border:1px solid #a5b5ae; border-radius:9px 4px 4px 9px;
+    background:#1d3229f5; box-shadow:0 5px 14px #0009; pointer-events:auto;
+  }
+  #game-shell.settings-open #apprentice-controls {display:none!important;}
+  #apprentice-controls .apprentice-status {display:none!important;}
+  #apprentice-controls .apprentice-actions {
+    width:100%; height:100%; display:flex; justify-content:flex-start; align-items:center;
+    gap:4px; overflow-x:auto; overflow-y:hidden; pointer-events:auto; touch-action:pan-x;
+  }
+  #apprentice-controls .apprentice-actions button {
+    flex:0 0 64px; width:64px; min-width:64px; min-height:58px; height:58px;
+    border:1px solid #8da096; border-radius:8px; background:#263b32;
+    font-size:11px; white-space:normal; text-shadow:none;
+  }
+  #apprentice-controls .apprentice-actions button.selected {border-color:#ffdc32;background:#625425;color:#fff;}
+  #apprentice-controls .apprentice-actions button>kbd {display:none;}
+  #apprentice-controls .apprentice-actions svg {width:22px;height:22px;padding:2px;background:none;box-shadow:none;}
+
+  #game-shell[data-tool-selector="wheel"][data-tools-open="true"] #mobile-tool-slider {
+    position:fixed; top:auto; left:50%; right:auto;
+    bottom:calc(178px + env(safe-area-inset-bottom)); width:min(72vw,300px,58vh);
+    height:auto; display:block; transform:translateX(-50%); aspect-ratio:1;
+    overflow:visible; touch-action:none; border:2px solid #596367; border-radius:50%;
+    background:radial-gradient(circle,#171b20 0 28%,transparent 28.5%),repeating-conic-gradient(from -25.72deg,#292d33 0deg 50.3deg,#12171b 50.3deg 51.43deg);
+    box-shadow:0 16px 45px #000c,inset 0 0 0 8px #11161a;
+  }
+}
+@media (pointer:coarse) and (max-height:520px) {
+  #worker-bar-handle,#inspector-bar-handle,
+  #game-shell[data-tools-open="true"] #mobile-tool-slider,
+  #game-shell[data-inspector-open="true"] #apprentice-controls:not([hidden]) {
+    top:calc(max(6px, env(safe-area-inset-top)) + 54px);
+  }
+  #game-shell[data-tools-open="true"] #tool-quick-controls,
+  #game-shell[data-tools-open="true"] #aim-quick-controls {
+    top:calc(max(6px, env(safe-area-inset-top)) + 128px);
+  }
+  #game-shell[data-tool-selector="wheel"][data-tools-open="true"] #mobile-tool-slider {top:auto;bottom:calc(55px + env(safe-area-inset-bottom));}
 }

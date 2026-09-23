@@ -1,8 +1,10 @@
 import './styles/main.css';
 import './styles/apprentice.css';
 import './styles/site-pro.css';
+import './styles/start-menu.css';
 import './studio/webGameStudioAdapter';
 import { Game } from './core/Game';
+import './styles/worksite-theme.css';
 
 const root = document.querySelector<HTMLElement>('#app');
 if (!root) throw new Error('Application root not found');

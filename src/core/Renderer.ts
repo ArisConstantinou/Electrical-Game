@@ -34,8 +34,8 @@ export class Renderer {
   private warmupFactory:(()=>THREE.Group)|null=null;
   private water:RoomWaterRuntime|null=null;
   private roomWater:RoomWaterSystem|null=null;
-  // One initial/transition update synchronizes the vendor mesh and underwater
-  // fog. Once dry, water optical passes have no pixels to contribute.
+  // The first optical update initializes the vendor's surface and underwater
+  // state; later dry frames skip its unused passes.
   private waterWasVisible=true;
   private readonly waterFrustum=new THREE.Frustum();
   private readonly waterProjection=new THREE.Matrix4();
@@ -175,7 +175,12 @@ export class Renderer {
     const previous=new Set(this.scene.children);
     this.water=await createRoomWater(this.gpu,this.scene,this.renderCamera,room);
     this.waterRoots=this.scene.children.filter(object=>!previous.has(object));
+    // Water Pro leaves its new surface visible until the first update. A dry
+    // menu must not compile and draw that full optical shader behind the UI.
+    const surface=this.scene.getObjectByName('Water Pro finite room flooding surface');
+    if(surface)surface.visible=room.surface.visible;
     this.roomWater=room;
+    this.waterWasVisible=true;
   }
   /** Compile transient tool samples under the actual scene lights before play.
    * Shared geometry/materials remain owned by the tool; samples never simulate. */
