@@ -594,7 +594,8 @@ export class Room extends THREE.Group {
     const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));geometry.setIndex(indices);geometry.computeVertexNormals();
     const patina=new THREE.Mesh(geometry,material);patina.name='Feathered construction dust at wall contacts';
     patina.userData.studioEntityId='world:contact-patina';
-    patina.userData.levelEditorPickThrough=true;
+    // Keep gameplay rays clear; LevelEditor temporarily restores mesh raycasting
+    // so this visible finish can be selected at its actual triangles.
     patina.raycast=()=>undefined;
     this.add(patina);
   }

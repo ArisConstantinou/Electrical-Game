@@ -1,13 +1,31 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
+import { readFile, stat } from 'node:fs/promises';
+import { resolve, extname } from 'node:path';
 import { blockPointerLock } from './browser-safety.mjs';
 
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
+const base = process.env.QA_BASE ?? 'http://127.0.0.1:5365/Electrical-Game/';
+const installDistRoutes = async context => {
+  if (!process.argv.includes('--dist')) return;
+  const dist = resolve('dist');
+  const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml',
+    '.webp': 'image/webp', '.png': 'image/png', '.jpg': 'image/jpeg', '.glb': 'model/gltf-binary', '.woff2': 'font/woff2' };
+  await context.route('https://arisconstantinou.github.io/Electrical-Game/**', async route => {
+    const path = resolve(dist, decodeURIComponent(new URL(route.request().url()).pathname.slice('/Electrical-Game/'.length)) || 'index.html');
+    if (!path.startsWith(dist)) return route.abort();
+    try {
+      if (!(await stat(path)).isFile()) return route.abort();
+      await route.fulfill({ status: 200, contentType: mime[extname(path)] ?? 'application/octet-stream', body: await readFile(path) });
+    } catch { return route.abort(); }
+  });
+};
 try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   await blockPointerLock(context);
+  await installDistRoutes(context);
   const page = await context.newPage();
-  await page.goto('http://127.0.0.1:5365/Electrical-Game/?mansion=preview&editor=1&renderer=webgl');
+  await page.goto(`${base}?mansion=preview&editor=1&renderer=webgl`);
   await page.waitForFunction(() => window.__wireTheHouse?.levelEditor?.active, null, { timeout: 45000 });
 
   for (const floorIndex of [0, 1, 2, 3, 4]) {
@@ -71,5 +89,56 @@ try {
     console.log(JSON.stringify({ floorIndex, ...report, listCount, failures: report.failures.slice(0, 10) }));
     assert.equal(report.failures.length, 0, 'Every visible level item needs a pickable surface');
     assert.equal(listCount, report.visible, 'Scene list must omit fully hidden geometry');
+    if (floorIndex === 0) {
+      await page.evaluate(() => {
+        const editor = window.__wireTheHouse.levelEditor;
+        editor.setViewMode('3d');
+        editor.camera.position.set(2.25, .16, 0);
+        editor.orbit.target.set(3.797, .16, 0);
+        editor.camera.lookAt(editor.orbit.target);
+        editor.orbit.update();
+        editor.raycaster.near = 0;
+        editor.raycaster.far = Infinity;
+      });
+      const canvas = await page.locator('#game-canvas').boundingBox();
+      assert(canvas);
+      await page.mouse.click(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2);
+      const picked = await page.evaluate(() => window.__wireTheHouse.levelEditor.selected?.userData.levelEditorLabel);
+      assert.equal(picked, 'Feathered construction dust at wall contacts', 'A direct canvas click must select the wall-contact detail');
+      await page.evaluate(() => {
+        const editor = window.__wireTheHouse.levelEditor;
+        editor.camera.position.set(2.72, .16, -.8);
+        editor.orbit.target.set(2.72, .16, -2.18);
+        editor.camera.lookAt(editor.orbit.target);
+        editor.orbit.update();
+      });
+      await page.mouse.click(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2);
+      const column = await page.evaluate(() => window.__wireTheHouse.levelEditor.selected?.userData.levelEditorLabel);
+      assert.equal(column, 'Structural concrete column · 2', 'The solid column must win where the dust overlaps its foot');
+      await page.evaluate(() => window.__wireTheHouse.levelEditor.setViewMode('2d'));
+    }
   }
+  await context.close();
+  const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await blockPointerLock(mobile);
+  await installDistRoutes(mobile);
+  const touchPage = await mobile.newPage();
+  await touchPage.goto(`${base}?mansion=preview&editor=1&renderer=webgl`);
+  await touchPage.waitForFunction(() => window.__wireTheHouse?.levelEditor?.active, null, { timeout: 45000 });
+  await touchPage.evaluate(() => {
+    const editor = window.__wireTheHouse.levelEditor;
+    editor.setFloorIndex(0);
+    editor.setViewMode('3d');
+    editor.camera.position.set(2.25, .16, 0);
+    editor.orbit.target.set(3.797, .16, 0);
+    editor.camera.lookAt(editor.orbit.target);
+    editor.orbit.update();
+  });
+  const canvas = await touchPage.locator('#game-canvas').boundingBox();
+  assert(canvas);
+  await touchPage.touchscreen.tap(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2);
+  const mobilePick = await touchPage.evaluate(() => window.__wireTheHouse.levelEditor.selected?.userData.levelEditorLabel);
+  assert.equal(mobilePick, 'Feathered construction dust at wall contacts', 'A portrait touch must select the visible wall-contact detail');
+  console.log(JSON.stringify({ mobilePortrait: true, picked: mobilePick }));
+  await mobile.close();
 } finally { await browser.close(); }
