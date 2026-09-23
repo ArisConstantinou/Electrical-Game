@@ -1,0 +1,797 @@
+{
+  "url": "http://127.0.0.1:5365/Electrical-Game/?mansion=basic",
+  "cases": [
+    {
+      "device": "mobile-portrait",
+      "view": "front-brick-wall",
+      "state": {
+        "position": [
+          0,
+          1.65,
+          0
+        ],
+        "yaw": 0,
+        "pitch": -0.05,
+        "error": ""
+      }
+    },
+    {
+      "device": "mobile-portrait",
+      "view": "right-brick-wall",
+      "state": {
+        "position": [
+          0,
+          1.65,
+          0
+        ],
+        "yaw": -1.5707963267948966,
+        "pitch": -0.05,
+        "error": ""
+      }
+    },
+    {
+      "device": "mobile-portrait",
+      "view": "rear-room",
+      "state": {
+        "position": [
+          0,
+          1.65,
+          -0.25
+        ],
+        "yaw": 3.141592653589793,
+        "pitch": -0.06,
+        "error": ""
+      }
+    },
+    {
+      "device": "mobile-portrait",
+      "view": "rear-brick-close",
+      "state": {
+        "position": [
+          0,
+          1.65,
+          2.85
+        ],
+        "yaw": 3.141592653589793,
+        "pitch": 0,
+        "error": ""
+      }
+    },
+    {
+      "device": "mobile-portrait",
+      "view": "front-brick-close",
+      "state": {
+        "position": [
+          0,
+          1.65,
+          -1.85
+        ],
+        "yaw": 0,
+        "pitch": 0,
+        "error": ""
+      }
+    },
+    {
+      "device": "mobile-portrait",
+      "view": "front-ceiling-contact",
+      "state": {
+        "position": [
+          0,
+          1.65,
+          -1.15
+        ],
+        "yaw": 0,
+        "pitch": 0.34,
+        "error": ""
+      }
+    },
+    {
+      "device": "mobile-portrait",
+      "view": "right-ceiling-contact",
+      "state": {
+        "position": [
+          1.35,
+          1.65,
+          -0.25
+        ],
+        "yaw": -1.5707963267948966,
+        "pitch": 0.34,
+        "error": ""
+      }
+    },
+    {
+      "device": "mobile-portrait",
+      "view": "rear-ceiling-contact",
+      "state": {
+        "position": [
+          0,
+          1.65,
+          1.25
+        ],
+        "yaw": 3.141592653589793,
+        "pitch": 0.34,
+        "error": ""
+      }
+    },
+    {
+      "device": "mobile-portrait",
+      "view": "left-ceiling-contact",
+      "state": {
+        "position": [
+          -1.35,
+          1.65,
+          -0.25
+        ],
+        "yaw": 1.5707963267948966,
+        "pitch": 0.34,
+        "error": ""
+      }
+    },
+    {
+      "device": "mobile-portrait",
+      "view": "floor-detail",
+      "state": {
+        "position": [
+          0,
+          1.65,
+          -0.25
+        ],
+        "yaw": 3.141592653589793,
+        "pitch": -0.83,
+        "error": ""
+      }
+    },
+    {
+      "device": "mobile-portrait",
+      "view": "supplies",
+      "state": {
+        "position": [
+          0,
+          1.65,
+          -0.35
+        ],
+        "yaw": -2.28,
+        "pitch": -0.39,
+        "error": ""
+      }
+    },
+    {
+      "device": "mobile-portrait",
+      "view": "left-room",
+      "state": {
+        "position": [
+          0,
+          1.65,
+          -0.35
+        ],
+        "yaw": 2.28,
+        "pitch": -0.16,
+        "error": ""
+      }
+    },
+    {
+      "device": "mobile-portrait",
+      "view": "open-left-window",
+      "state": {
+        "position": [
+          -1.45,
+          1.65,
+          2
+        ],
+        "yaw": 1.5707963267948966,
+        "pitch": -0.04,
+        "error": ""
+      }
+    },
+    {
+      "device": "mobile-portrait",
+      "view": "near-open-window",
+      "state": {
+        "position": [
+          -2.9,
+          1.65,
+          2
+        ],
+        "yaw": 1.5707963267948966,
+        "pitch": -0.04,
+        "error": ""
+      }
+    },
+    {
+      "device": "mobile-portrait",
+      "view": "neighbour-through-opening",
+      "state": {
+        "position": [
+          -2.9,
+          1.65,
+          2
+        ],
+        "yaw": 1.1,
+        "pitch": -0.04,
+        "error": ""
+      }
+    },
+    {
+      "device": "mobile-portrait",
+      "view": "far-house-through-opening",
+      "state": {
+        "position": [
+          -2.9,
+          1.65,
+          1.2
+        ],
+        "yaw": 1.68,
+        "pitch": -0.04,
+        "error": ""
+      }
+    },
+    {
+      "device": "mobile-portrait",
+      "view": "rear-work-contact",
+      "state": {
+        "registered": true,
+        "withoutRear": "no-wall",
+        "withRear": {
+          "mode": "ready",
+          "heightM": 1.35,
+          "target": [
+            -7.102951435054664e-17,
+            1.35,
+            3.576
+          ],
+          "targetNormal": [
+            0,
+            0,
+            -1
+          ],
+          "targetStable": true,
+          "visible": true,
+          "count": 0,
+          "marks": []
+        }
+      }
+    },
+    {
+      "device": "mobile-portrait",
+      "view": "face-joint-and-opening-contact",
+      "state": {
+        "rearBrick": {
+          "mode": "ready",
+          "heightM": 1.35,
+          "target": [
+            -7.102951435054664e-17,
+            1.35,
+            3.576
+          ],
+          "targetNormal": [
+            0,
+            0,
+            -1
+          ],
+          "targetStable": true,
+          "visible": true,
+          "count": 0,
+          "marks": []
+        },
+        "rearJoint": {
+          "mode": "ready",
+          "heightM": 1.3,
+          "target": [
+            -7.347880816782527e-17,
+            1.3,
+            3.5960000017881395
+          ],
+          "targetNormal": [
+            0,
+            0,
+            -1
+          ],
+          "targetStable": true,
+          "visible": true,
+          "count": 0,
+          "marks": []
+        },
+        "leftBrick": {
+          "mode": "ready",
+          "heightM": 1.35,
+          "target": [
+            -3.776,
+            1.35,
+            0.1799999999999996
+          ],
+          "targetNormal": [
+            1,
+            0,
+            0
+          ],
+          "targetStable": true,
+          "visible": true,
+          "count": 0,
+          "marks": []
+        },
+        "leftJoint": {
+          "mode": "ready",
+          "heightM": 1.3,
+          "target": [
+            -3.796000000596046,
+            1.3,
+            0.1799999999999995
+          ],
+          "targetNormal": [
+            1,
+            0,
+            0
+          ],
+          "targetStable": true,
+          "visible": true,
+          "count": 0,
+          "marks": []
+        },
+        "leftOpening": {
+          "mode": "no-wall",
+          "heightM": null,
+          "target": null,
+          "targetNormal": [
+            1,
+            0,
+            0
+          ],
+          "targetStable": false,
+          "visible": false,
+          "count": 0,
+          "marks": []
+        },
+        "rightBrick": {
+          "mode": "ready",
+          "heightM": 1.35,
+          "target": [
+            3.776,
+            1.35,
+            0.1799999999999996
+          ],
+          "targetNormal": [
+            -1,
+            0,
+            0
+          ],
+          "targetStable": true,
+          "visible": true,
+          "count": 0,
+          "marks": []
+        }
+      }
+    },
+    {
+      "device": "mobile-portrait",
+      "view": "structural-slab-bearing",
+      "state": {
+        "min": [
+          -4.050000190734863,
+          3.0000000017881394,
+          -3.6000000476837157
+        ],
+        "max": [
+          4.050000190734863,
+          3.1599999982118607,
+          3.800000047683716
+        ],
+        "relief": true,
+        "clayInfill": false
+      }
+    },
+    {
+      "device": "mobile-portrait",
+      "view": "four-masonry-walls",
+      "state": {
+        "front": true,
+        "rightPractice": true,
+        "rear": 506,
+        "left": 426,
+        "right": 471,
+        "source": "human-laid-brick-face-atlas-v3.png",
+        "uniqueClayFaces": 166,
+        "validClayCrops": true,
+        "invalidClayCrops": [],
+        "rearPlaster": false,
+        "leftWindowBlocked": false
+      }
+    },
+    {
+      "device": "desktop",
+      "view": "front-brick-wall",
+      "state": {
+        "position": [
+          0,
+          1.65,
+          0
+        ],
+        "yaw": 0,
+        "pitch": -0.05,
+        "error": ""
+      }
+    },
+    {
+      "device": "desktop",
+      "view": "right-brick-wall",
+      "state": {
+        "position": [
+          0,
+          1.65,
+          0
+        ],
+        "yaw": -1.5707963267948966,
+        "pitch": -0.05,
+        "error": ""
+      }
+    },
+    {
+      "device": "desktop",
+      "view": "rear-room",
+      "state": {
+        "position": [
+          0,
+          1.65,
+          -0.25
+        ],
+        "yaw": 3.141592653589793,
+        "pitch": -0.06,
+        "error": ""
+      }
+    },
+    {
+      "device": "desktop",
+      "view": "rear-brick-close",
+      "state": {
+        "position": [
+          0,
+          1.65,
+          2.85
+        ],
+        "yaw": 3.141592653589793,
+        "pitch": 0,
+        "error": ""
+      }
+    },
+    {
+      "device": "desktop",
+      "view": "front-brick-close",
+      "state": {
+        "position": [
+          0,
+          1.65,
+          -1.85
+        ],
+        "yaw": 0,
+        "pitch": 0,
+        "error": ""
+      }
+    },
+    {
+      "device": "desktop",
+      "view": "front-ceiling-contact",
+      "state": {
+        "position": [
+          0,
+          1.65,
+          -1.15
+        ],
+        "yaw": 0,
+        "pitch": 0.34,
+        "error": ""
+      }
+    },
+    {
+      "device": "desktop",
+      "view": "right-ceiling-contact",
+      "state": {
+        "position": [
+          1.35,
+          1.65,
+          -0.25
+        ],
+        "yaw": -1.5707963267948966,
+        "pitch": 0.34,
+        "error": ""
+      }
+    },
+    {
+      "device": "desktop",
+      "view": "rear-ceiling-contact",
+      "state": {
+        "position": [
+          0,
+          1.65,
+          1.25
+        ],
+        "yaw": 3.141592653589793,
+        "pitch": 0.34,
+        "error": ""
+      }
+    },
+    {
+      "device": "desktop",
+      "view": "left-ceiling-contact",
+      "state": {
+        "position": [
+          -1.35,
+          1.65,
+          -0.25
+        ],
+        "yaw": 1.5707963267948966,
+        "pitch": 0.34,
+        "error": ""
+      }
+    },
+    {
+      "device": "desktop",
+      "view": "floor-detail",
+      "state": {
+        "position": [
+          0,
+          1.65,
+          -0.25
+        ],
+        "yaw": 3.141592653589793,
+        "pitch": -0.83,
+        "error": ""
+      }
+    },
+    {
+      "device": "desktop",
+      "view": "supplies",
+      "state": {
+        "position": [
+          0,
+          1.65,
+          -0.35
+        ],
+        "yaw": -2.28,
+        "pitch": -0.39,
+        "error": ""
+      }
+    },
+    {
+      "device": "desktop",
+      "view": "left-room",
+      "state": {
+        "position": [
+          0,
+          1.65,
+          -0.35
+        ],
+        "yaw": 2.28,
+        "pitch": -0.16,
+        "error": ""
+      }
+    },
+    {
+      "device": "desktop",
+      "view": "open-left-window",
+      "state": {
+        "position": [
+          -1.45,
+          1.65,
+          2
+        ],
+        "yaw": 1.5707963267948966,
+        "pitch": -0.04,
+        "error": ""
+      }
+    },
+    {
+      "device": "desktop",
+      "view": "near-open-window",
+      "state": {
+        "position": [
+          -2.9,
+          1.65,
+          2
+        ],
+        "yaw": 1.5707963267948966,
+        "pitch": -0.04,
+        "error": ""
+      }
+    },
+    {
+      "device": "desktop",
+      "view": "neighbour-through-opening",
+      "state": {
+        "position": [
+          -2.9,
+          1.65,
+          2
+        ],
+        "yaw": 1.1,
+        "pitch": -0.04,
+        "error": ""
+      }
+    },
+    {
+      "device": "desktop",
+      "view": "far-house-through-opening",
+      "state": {
+        "position": [
+          -2.9,
+          1.65,
+          1.2
+        ],
+        "yaw": 1.68,
+        "pitch": -0.04,
+        "error": ""
+      }
+    },
+    {
+      "device": "desktop",
+      "view": "rear-work-contact",
+      "state": {
+        "registered": true,
+        "withoutRear": "no-wall",
+        "withRear": {
+          "mode": "ready",
+          "heightM": 1.35,
+          "target": [
+            -7.102951435054662e-17,
+            1.35,
+            3.576
+          ],
+          "targetNormal": [
+            0,
+            0,
+            -1
+          ],
+          "targetStable": true,
+          "visible": true,
+          "count": 0,
+          "marks": []
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "view": "face-joint-and-opening-contact",
+      "state": {
+        "rearBrick": {
+          "mode": "ready",
+          "heightM": 1.35,
+          "target": [
+            -7.102951435054662e-17,
+            1.35,
+            3.576
+          ],
+          "targetNormal": [
+            0,
+            0,
+            -1
+          ],
+          "targetStable": true,
+          "visible": true,
+          "count": 0,
+          "marks": []
+        },
+        "rearJoint": {
+          "mode": "ready",
+          "heightM": 1.3,
+          "target": [
+            -7.347880816782525e-17,
+            1.3,
+            3.5960000017881395
+          ],
+          "targetNormal": [
+            0,
+            0,
+            -1
+          ],
+          "targetStable": true,
+          "visible": true,
+          "count": 0,
+          "marks": []
+        },
+        "leftBrick": {
+          "mode": "ready",
+          "heightM": 1.35,
+          "target": [
+            -3.776,
+            1.35,
+            0.1799999999999996
+          ],
+          "targetNormal": [
+            1,
+            0,
+            0
+          ],
+          "targetStable": true,
+          "visible": true,
+          "count": 0,
+          "marks": []
+        },
+        "leftJoint": {
+          "mode": "ready",
+          "heightM": 1.3,
+          "target": [
+            -3.796000000596046,
+            1.3,
+            0.1799999999999995
+          ],
+          "targetNormal": [
+            1,
+            0,
+            0
+          ],
+          "targetStable": true,
+          "visible": true,
+          "count": 0,
+          "marks": []
+        },
+        "leftOpening": {
+          "mode": "no-wall",
+          "heightM": null,
+          "target": null,
+          "targetNormal": [
+            1,
+            0,
+            0
+          ],
+          "targetStable": false,
+          "visible": false,
+          "count": 0,
+          "marks": []
+        },
+        "rightBrick": {
+          "mode": "ready",
+          "heightM": 1.35,
+          "target": [
+            3.776,
+            1.35,
+            0.1799999999999996
+          ],
+          "targetNormal": [
+            -1,
+            0,
+            0
+          ],
+          "targetStable": true,
+          "visible": true,
+          "count": 0,
+          "marks": []
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "view": "structural-slab-bearing",
+      "state": {
+        "min": [
+          -4.050000190734863,
+          3.0000000017881394,
+          -3.6000000476837157
+        ],
+        "max": [
+          4.050000190734863,
+          3.1599999982118607,
+          3.800000047683716
+        ],
+        "relief": true,
+        "clayInfill": false
+      }
+    },
+    {
+      "device": "desktop",
+      "view": "four-masonry-walls",
+      "state": {
+        "front": true,
+        "rightPractice": true,
+        "rear": 506,
+        "left": 426,
+        "right": 471,
+        "source": "human-laid-brick-face-atlas-v3.png",
+        "uniqueClayFaces": 166,
+        "validClayCrops": true,
+        "invalidClayCrops": [],
+        "rearPlaster": false,
+        "leftWindowBlocked": false
+      }
+    }
+  ],
+  "errors": [],
+  "passed": true
+}

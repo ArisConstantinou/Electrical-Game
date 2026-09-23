@@ -2,8 +2,9 @@ import * as THREE from 'three';
 import { GAME_CONFIG } from '../data/gameConfig';
 import { INSTALLATION_POINTS } from '../data/installationRules';
 import { BrickWall } from './BrickWall';
-import { brickFacePatch } from './BrickFacePatch';
+import { brickFacePatch, brickFaceTone } from './BrickFacePatch';
 import { masonryFaceMaterial } from './BrickFaceMaterial';
+import { laidClayGeometry, type LaidClayWear } from './LaidClayDamage';
 import { addLighting } from './Lighting';
 import { matteMaterial, siteMaterial, siteProScreedMaterial } from './SiteMaterials';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
@@ -291,6 +292,9 @@ export class Room extends THREE.Group {
     const bricks = new THREE.InstancedMesh(geometry, masonryFaceMaterial, pieces.length);
     bricks.name = hasOpening ? 'Left fired-clay courses cut around unglazed opening' : 'Right fired-clay courses';
     const matrix = new THREE.Matrix4(), rotation = new THREE.Quaternion(), position = new THREE.Vector3(), scale = new THREE.Vector3(), tint = new THREE.Color();
+    const hidden = new THREE.Matrix4().makeScale(0, 0, 0);
+    const wearTypes: LaidClayWear[] = ['small-chip-a', 'small-chip-b', 'broken-corner'];
+    const chips = wearTypes.map(() => ({ matrices: [] as THREE.Matrix4[], colors: [] as THREE.Color[], patches: [] as number[] }));
     for (const [index, piece] of pieces.entries()) {
       const row = Math.floor(piece.y / course), offset = (row % 2) * pitch / 2;
       const column = Math.floor((piece.z - zMin - offset) / pitch);
@@ -299,13 +303,29 @@ export class Room extends THREE.Group {
       const startY = row * course + gap / 2;
       const u = (piece.z - piece.length / 2 - startZ) / (pitch - gap);
       const v = (piece.y - piece.height / 2 - startY) / (course - gap);
-      patchRects.set([base[0] + base[2] * u, base[1] + base[3] * v,
-        base[2] * piece.length / (pitch - gap), base[3] * piece.height / (course - gap)], index * 4);
-      position.set(wallX + (wallX < 0 ? .120 : -.120), piece.y, piece.z);
+      const patch = [base[0] + base[2] * u, base[1] + base[3] * v,
+        base[2] * piece.length / (pitch - gap), base[3] * piece.height / (course - gap)];
+      patchRects.set(patch, index * 4);
+      const hash = (Math.imul(row + 1, 2246822519) ^ Math.imul(column + 1, 3266489917) ^ Math.imul(index + 1, 668265263) ^ (wallX < 0 ? 0x3f51c7 : 0x51a3d9)) >>> 0;
+      const relief = ((hash >>> 8) % 101 / 100 - .5) * .005;
+      position.set(wallX + (wallX < 0 ? .120 : -.120) + relief, piece.y, piece.z);
       scale.set(.020, piece.height, piece.length);
-      bricks.setMatrixAt(index, matrix.compose(position, rotation, scale));
-      const warmth = ((row * 19 + column * 31) % 13 + 13) % 13 / 12;
-      bricks.setColorAt(index, tint.setRGB(.90 + warmth * .16, .88 + warmth * .15, .85 + warmth * .14));
+      matrix.compose(position, rotation, scale);
+      const tone = brickFaceTone(row, column, wallX < 0 ? 1 : 2);
+      tint.setRGB(tone[0], tone[1], tone[2]);
+      const wear = hash % 100;
+      const variant = piece.length >= pitch * .35 && piece.height >= course * .55
+        ? wear < 4 ? 2 : wear < 14 ? 1 : wear < 24 ? 0 : -1 : -1;
+      if (variant < 0) bricks.setMatrixAt(index, matrix);
+      else {
+        // The original mesh remains the single physical pick surface. Only
+        // its render instance is hidden; a chipped shell takes its place.
+        bricks.setMatrixAt(index, hidden);
+        chips[variant].matrices.push(matrix.clone());
+        chips[variant].colors.push(tint.clone());
+        chips[variant].patches.push(...patch);
+      }
+      bricks.setColorAt(index, tint);
     }
     bricks.castShadow = bricks.receiveShadow = true;
     const inward = wallX < 0 ? 1 : -1;
@@ -318,6 +338,21 @@ export class Room extends THREE.Group {
       return rowY > gap / 2 && rowY < course - gap / 2 && brickZ > gap / 2 && brickZ < pitch - gap / 2;
     });
     bricks.computeBoundingSphere(); side.add(bricks);
+    for (const [variant, batch] of chips.entries()) {
+      if (!batch.matrices.length) continue;
+      const chippedGeometry = laidClayGeometry(wearTypes[variant], false);
+      chippedGeometry.setAttribute('brickPatch', new THREE.InstancedBufferAttribute(new Float32Array(batch.patches), 4));
+      const chipped = new THREE.InstancedMesh(chippedGeometry, masonryFaceMaterial, batch.matrices.length);
+      chipped.name = `${wallX < 0 ? 'Left' : 'Right'} physically chipped clay units ${variant + 1}`;
+      chipped.castShadow = chipped.receiveShadow = true;
+      chipped.raycast = () => undefined;
+      for (let i = 0; i < batch.matrices.length; i++) {
+        chipped.setMatrixAt(i, batch.matrices[i]);
+        chipped.setColorAt(i, batch.colors[i]);
+      }
+      chipped.computeBoundingSphere();
+      side.add(chipped);
+    }
   }
 
   private addRearWall(): void {
