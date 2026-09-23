@@ -198,6 +198,21 @@ four-viewport courtyard route/return/tree-contact test and
 reported 16.7/16.8 ms median/p95 versus 16.7/16.8 ms before, but this brief
 host sample cannot establish phone GPU cost or frame-time stability.
 
+## Eighth isolated implementation: olive ground transition
+
+The retained courtyard olive no longer stands in a perfect dark disc of
+concrete-screed texture. A shallow irregular basin uses the same CC0 scanned
+gravel as the surrounding court, with world-aligned UVs and a graded edge.
+The original trunk obstacle and ground walking surface are unchanged. The
+basin replaces one mesh with one mesh and reuses the loaded gravel map.
+
+`courtyard-olive-sun-follow-{desktop,portrait}.png` and
+`courtyard-olive-gravel-bed-{desktop,portrait}.png` are matching isolated
+production-build views before and after. The ground now reads as one material
+around the trunk. The surface still lacks larger stones, excavation marks and
+the richer environmental composition of the approved concept. The short Chrome
+frame samples remained near 16.7–16.8 ms; this is not physical-mobile proof.
+
 ## Integration boundary
 
 Do not promote this branch or replace the 5365 listener while the active
