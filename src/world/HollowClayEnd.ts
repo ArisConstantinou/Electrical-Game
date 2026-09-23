@@ -6,7 +6,7 @@ const clayShadow = new THREE.Color('#703a2b');
 const recess = new THREE.Color('#261a17');
 const cement = new THREE.Color('#84796c');
 const wetCement = new THREE.Color('#605a52');
-const material = new THREE.MeshStandardMaterial({ name: 'Rough hollow clay cut and mortar', vertexColors: true, roughness: 1, side: THREE.DoubleSide });
+export const hollowClayEndMaterial = new THREE.MeshStandardMaterial({ name: 'Rough hollow clay cut and mortar', vertexColors: true, roughness: 1, side: THREE.DoubleSide });
 
 function makeEnd(variant: number): THREE.BufferGeometry {
   const shape = new THREE.Shape();
@@ -75,7 +75,7 @@ function makeEnd(variant: number): THREE.BufferGeometry {
   return geometry;
 }
 
-const shapes = [makeEnd(0), makeEnd(1), makeEnd(2)];
+export const hollowClayEndShapes = [makeEnd(0), makeEnd(1), makeEnd(2)];
 
 export function hollowClayWallEnds(length: number, rows: number, course: number, gap: number, alongX: boolean, wallName: string): THREE.Group {
   const group = new THREE.Group();
@@ -90,7 +90,7 @@ export function hollowClayWallEnds(length: number, rows: number, course: number,
   const scale = new THREE.Vector3(.24, course - gap, 1), tint = new THREE.Color();
   for (let variant = 0; variant < batches.length; variant++) {
     if (!batches[variant].length) continue;
-    const mesh = new THREE.InstancedMesh(shapes[variant], material, batches[variant].length);
+    const mesh = new THREE.InstancedMesh(hollowClayEndShapes[variant], hollowClayEndMaterial, batches[variant].length);
     mesh.name = `Cut clay ends with mortar, variant ${variant}`;
     for (const [index, { row, end }] of batches[variant].entries()) {
       const side = end ? 1 : -1;

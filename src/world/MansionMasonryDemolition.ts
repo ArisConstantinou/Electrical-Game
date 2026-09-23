@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { PlayerObstacle } from '../player/EquipmentCollision';
+import { hollowClayEndMaterial, hollowClayEndShapes } from './HollowClayEnd';
 
 export interface MasonryAim {
   wall: MansionMasonryDemolition;
@@ -29,6 +30,7 @@ export class MansionMasonryDemolition {
   private readonly scale = new THREE.Vector3();
   private readonly rotation = new THREE.Quaternion();
   private mortarCells: THREE.InstancedMesh | null = null;
+  private fractureCaps: THREE.InstancedMesh[] | null = null;
   private removedCount = 0;
   private collisionDirty = false;
   private readonly collisionMatrix = new THREE.Matrix4();
@@ -64,6 +66,9 @@ export class MansionMasonryDemolition {
   }
 
   get damaged(): boolean { return this.removedCount > 0; }
+  get fractureCapCount(): number {
+    return this.fractureCaps?.reduce((count, mesh) => count + mesh.count, 0) ?? 0;
+  }
   removedIndices(): number[] {
     const result: number[] = [];
     for (let index = 0; index < this.remaining.length; index++)
@@ -115,7 +120,7 @@ export class MansionMasonryDemolition {
     return best < 0 ? null : { wall: this, index: best, point, distance };
   }
 
-  strike(index: number): boolean {
+  strike(index: number, refreshCaps = true): boolean {
     if (!this.remaining[index]) return false;
     this.ensureMortarCells();
     this.remaining[index] = 0;
@@ -131,12 +136,14 @@ export class MansionMasonryDemolition {
     }
     this.mortarCells!.instanceMatrix.needsUpdate = true;
     this.mortarCells!.computeBoundingSphere();
+    if (refreshCaps) this.updateFractureCaps();
     return true;
   }
 
   restoreRemoved(indices: readonly number[]): void {
     for (const index of indices)
-      if (Number.isInteger(index) && index >= 0 && index < this.remaining.length) this.strike(index);
+      if (Number.isInteger(index) && index >= 0 && index < this.remaining.length) this.strike(index, false);
+    if (this.damaged) this.updateFractureCaps();
   }
 
   reset(): void {
@@ -157,6 +164,8 @@ export class MansionMasonryDemolition {
     this.mortarCells?.removeFromParent();
     this.mortarCells?.geometry.dispose();
     this.mortarCells = null;
+    for (const mesh of this.fractureCaps ?? []) mesh.removeFromParent();
+    this.fractureCaps = null;
     this.backing.visible = true;
     this.removedCount = 0;
     this.collisionDirty = false;
@@ -209,6 +218,55 @@ export class MansionMasonryDemolition {
   private pointOnWall(coordinate: number): THREE.Vector3 {
     return new THREE.Vector3(this.alongX ? coordinate : 0, 0, this.alongX ? 0 : coordinate)
       .applyMatrix4(this.group.matrixWorld);
+  }
+
+  /** Expose the four longitudinal chambers only where a neighboring brick was
+   * actually removed. Static wall ends use the same clay cut geometry. */
+  private updateFractureCaps(): void {
+    if (!this.fractureCaps) {
+      this.fractureCaps = hollowClayEndShapes.map((shape, variant) => {
+        const mesh = new THREE.InstancedMesh(shape, hollowClayEndMaterial, this.remaining.length * 2);
+        mesh.name = `${this.group.name} broken four-chamber ends ${variant}`;
+        mesh.count = 0;
+        mesh.castShadow = mesh.receiveShadow = true;
+        mesh.raycast = () => undefined;
+        mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        this.group.add(mesh);
+        return mesh;
+      });
+    }
+    const counts = [0, 0, 0];
+    const position = new THREE.Vector3(), scale = new THREE.Vector3(), rotation = new THREE.Quaternion();
+    const cutPosition = new THREE.Vector3(), cutRotation = new THREE.Quaternion();
+    const cutScale = new THREE.Vector3(), matrix = new THREE.Matrix4(), tint = new THREE.Color();
+    for (let index = 0; index < this.remaining.length; index++) {
+      if (!this.remaining[index]) continue;
+      const column = index % this.columns;
+      for (const side of [-1, 1]) {
+        const neighbor = index + side;
+        if (column + side < 0 || column + side >= this.columns ||
+            !this.originalHasBrick(neighbor) || this.remaining[neighbor]) continue;
+        this.original[index].decompose(position, rotation, scale);
+        cutPosition.copy(position);
+        if (this.alongX) cutPosition.x += side * (scale.x / 2 + .004);
+        else cutPosition.z += side * (scale.z / 2 + .004);
+        cutRotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0),
+          this.alongX ? side * Math.PI / 2 : side > 0 ? 0 : Math.PI);
+        cutScale.set(this.alongX ? scale.z : scale.x, scale.y, 1);
+        const variant = ((Math.imul(index + 1, 2246822519) ^ Math.imul(side + 2, 3266489917)) >>> 0) % 3;
+        const mesh = this.fractureCaps[variant], slot = counts[variant]++;
+        mesh.setMatrixAt(slot, matrix.compose(cutPosition, cutRotation, cutScale));
+        const warmth = .88 + ((index * 7 + side * 3 + variant * 5) % 11) * .012;
+        mesh.setColorAt(slot, tint.setRGB(warmth, warmth * .98, warmth * .96));
+      }
+    }
+    for (let variant = 0; variant < this.fractureCaps.length; variant++) {
+      const mesh = this.fractureCaps[variant];
+      mesh.count = counts[variant];
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      if (mesh.count) mesh.computeBoundingSphere();
+    }
   }
 
   private ensureMortarCells(): void {

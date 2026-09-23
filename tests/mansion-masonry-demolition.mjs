@@ -39,6 +39,7 @@ try {
     const before = wall.removedIndices().length;
     game.performAction();
     const after = wall.removedIndices().length;
+    const capsAfterHit = wall.fractureCapCount;
     const player = game.player;
     player.wallWorkEnabled = false;
     const walk = (x = 15.3) => {
@@ -65,6 +66,7 @@ try {
     const cleared = wall.removedIndices().length;
     game.levelEditor.applyDocument(document);
     const restored = wall.removedIndices().length;
+    const capsRestored = wall.fractureCapCount;
     const targets = [
       ['recessed-room-back-9',20,1.65,9,-Math.PI/2],
       ['recessed-room-side-9--1',19.5,1.65,9,0],
@@ -80,11 +82,18 @@ try {
         parentVisible:candidate?.group.parent?.visible,
         bounds:candidate?.obstacle && [candidate.obstacle.minX,candidate.obstacle.maxX,candidate.obstacle.minZ,candidate.obstacle.maxZ,candidate.obstacle.minFloorY,candidate.obstacle.maxFloorY]};
     });
+    const crossWall = wing.masonryDemolition.get('recessed-room-side-9--1');
+    const crossIndex = crossWall.columns * 3 + 3;
+    const crossStrike = crossWall.strike(crossIndex);
+    const crossCaps = crossWall.fractureCapCount;
+    crossWall.reset();
+    const crossCapsReset = crossWall.fractureCapCount;
     for (let index=0; index<wall.original.length; index++) wall.strike(index);
     wing.obstaclesAt(0);
     const fullyOpened = wall.obstacle.minX === Infinity;
     wing.restoreDemolition({});
     wing.obstaclesAt(0);
+    const capsReset = wall.fractureCapCount;
     const resetCollision = Number.isFinite(wall.obstacle.minX) && !wall.obstacle.segments && walk() < 15.8;
     game.levelEditor.applyDocument(document);
     wing.updateGameplayVisibility(15.3,14.3,0);
@@ -95,14 +104,20 @@ try {
     return { target:target?.wall.group.name ?? null, distance:target?.distance ?? null,
       contact, armReach:target && game.fpsRig.canReachPoint(camera,target.point,.12),
       gripReach:game.fpsRig.gripsReachable(camera,game.fpsRig.tools.get('hammer')),
-      status:game.fpsRig.contactStatus, before, after, blockedZ, openZ, intactZ, cleared, restored,
+      status:game.fpsRig.contactStatus, before, after, capsAfterHit, capsRestored, capsReset,
+      blockedZ, openZ, intactZ, cleared, restored,
       saved:document.demolition?.[wall.group.name]?.length ?? 0,
+      crossStrike,crossCaps,crossCapsReset,
       wallCount:wing.masonryDemolition.size,upperInitiallyVisible,targets,fullyOpened,resetCollision,
       collisionSegments:wall.obstacle.segments?.length ?? null, errors:game.renderer.renderError };
   });
   assert.equal(result.target, 'Courtyard north fired-clay enclosure');
   assert.equal(result.contact, true, `Hammer contact failed: ${JSON.stringify(result)}`);
   assert(result.after > result.before, `Masonry did not break: ${JSON.stringify(result)}`);
+  assert(result.capsAfterHit > 0 && result.capsRestored > 0 && result.capsReset === 0,
+    `Exposed hollow-clay cut faces did not track demolition and reset: ${JSON.stringify(result)}`);
+  assert(result.crossStrike && result.crossCaps > 0 && result.crossCapsReset === 0,
+    `Perpendicular wall cut faces did not track demolition and reset: ${JSON.stringify(result)}`);
   assert(result.blockedZ < 15.8, `Intact wall did not block the player: ${JSON.stringify(result)}`);
   assert(result.openZ > 16.4, `Demolished doorway did not open: ${JSON.stringify(result)}`);
   assert(result.intactZ < 15.8, `Intact masonry/structural column did not block: ${JSON.stringify(result)}`);
