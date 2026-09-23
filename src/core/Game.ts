@@ -758,7 +758,7 @@ export class Game {
     if (this.selectedTool === 'hammer') {
       const masonry = this.room.mansionWing?.aimMasonry(this.renderer.camera);
       if (masonry) {
-        if (this.fpsRig.contactMasonry(this.renderer.camera, masonry.point) && masonry.wall.strike(masonry.index)) {
+        if (this.fpsRig.contactMasonry(this.renderer.camera, masonry.point) && masonry.wall.strikeAt(masonry.index, this.renderer.camera)) {
           this.fpsRig.strike();
           this.fpsRig.toolAction = 1;
           this.audio.play('hammer', .65);

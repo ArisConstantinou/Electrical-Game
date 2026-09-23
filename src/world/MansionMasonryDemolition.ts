@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import type { PlayerObstacle } from '../player/EquipmentCollision';
 import { hollowClayEndMaterial, hollowClayEndShapes } from './HollowClayEnd';
+import { MasonryVolume, type MasonrySave } from './MasonryVolume';
+import { damagedMasonryMaterial } from './BrickFaceMaterial';
 
 export interface MasonryAim {
   wall: MansionMasonryDemolition;
@@ -13,6 +15,8 @@ export interface MasonryBrickInstance {
   mesh: THREE.InstancedMesh;
   instance: number;
 }
+export interface MansionBrickDamage { index: number; save: MasonrySave }
+interface BrokenBrick { volume: MasonryVolume; mesh: THREE.Mesh; origin: THREE.Vector3; rotation: THREE.Quaternion }
 
 /** A light demolition layer for the authored fired-clay walls. The intact wall
  * keeps its original two draw calls; a hit swaps the solid backing for a
@@ -21,6 +25,7 @@ export class MansionMasonryDemolition {
   private readonly brickRefs: readonly (MasonryBrickInstance | null)[];
   private readonly original: THREE.Matrix4[] = [];
   private readonly remaining: Uint8Array;
+  private readonly broken = new Map<number, BrokenBrick>();
   private readonly localBox: THREE.Box3;
   private readonly inverse = new THREE.Matrix4();
   private readonly localRay = new THREE.Ray();
@@ -65,7 +70,12 @@ export class MansionMasonryDemolition {
     );
   }
 
-  get damaged(): boolean { return this.removedCount > 0; }
+  get damaged(): boolean { return this.removedCount > 0 || this.broken.size > 0; }
+  get partialDamageCount(): number { return this.broken.size; }
+  get removedClayNodes(): number { let count = 0; for (const entry of this.broken.values()) count += entry.volume.removedNodeCount; return count; }
+  damageSnapshot(): MansionBrickDamage[] {
+    return [...this.broken].map(([index, entry]) => ({ index, save: entry.volume.serialize() }));
+  }
   get fractureCapCount(): number {
     return this.fractureCaps?.reduce((count, mesh) => count + mesh.count, 0) ?? 0;
   }
@@ -117,11 +127,117 @@ export class MansionMasonryDemolition {
         const score = horizontal + vertical;
         if (score < bestDistance) { bestDistance = score; best = index; }
       }
-    return best < 0 ? null : { wall: this, index: best, point, distance };
+    if (best < 0) return null;
+    const broken = this.broken.get(best);
+    if (!broken) return { wall: this, index: best, point, distance };
+    const rayOrigin = this.localRay.origin.clone().sub(broken.origin).applyQuaternion(broken.rotation.clone().invert());
+    const rayDirection = this.localRay.direction.clone().applyQuaternion(broken.rotation.clone().invert());
+    const contact = broken.volume.raycast(rayOrigin, rayDirection, maxDistance);
+    if (!contact) return null;
+    const exact = new THREE.Vector3(contact.point.x, contact.point.y, contact.point.z)
+      .applyQuaternion(broken.rotation).add(broken.origin).applyMatrix4(this.group.matrixWorld);
+    return { wall: this, index: best, point: exact, distance: origin.distanceTo(exact) };
+  }
+
+  /** The original work wall's material lattice is allocated only for bricks
+   * actually struck. The intact instanced wall stays cheap and unchanged. */
+  strikeAt(index: number, camera: THREE.Camera): boolean {
+    if (!this.remaining[index]) return false;
+    let entry = this.broken.get(index);
+    if (!entry) entry = this.createBrokenBrick(index);
+    this.group.updateWorldMatrix(true, false);
+    this.inverse.copy(this.group.matrixWorld).invert();
+    const origin = camera.getWorldPosition(new THREE.Vector3()).applyMatrix4(this.inverse)
+      .sub(entry.origin).applyQuaternion(entry.rotation.clone().invert());
+    const direction = camera.getWorldDirection(new THREE.Vector3()).applyQuaternion(entry.rotation.clone().invert());
+    const contact = entry.volume.raycast(origin, direction, 2.4);
+    if (!contact) { if (!this.broken.has(index)) { entry.mesh.removeFromParent(); entry.mesh.geometry.dispose(); } return false; }
+    const result = entry.volume.impact({ point: contact.point, direction, chisel: 'pointed', energyJ: 5 });
+    if (!result.contact || (!result.removedNodes && !result.stats.weakenedNodes)) {
+      if (!this.broken.has(index)) { entry.mesh.removeFromParent(); entry.mesh.geometry.dispose(); }
+      return false;
+    }
+    this.broken.set(index, entry);
+    // Only a mostly excavated unit becomes a full opening and changes player
+    // collision. A normal hammer blow never swaps a complete brick for air.
+    if (entry.volume.removedVolume >= entry.volume.width * entry.volume.height * entry.volume.depth * .48)
+      return this.strike(index);
+    if (entry.volume.removedNodeCount) this.showBrokenBrick(index, entry);
+    return true;
+  }
+
+  restoreDamage(entries: readonly MansionBrickDamage[]): void {
+    for (const item of entries) {
+      if (!Number.isInteger(item.index) || !this.remaining[item.index] || !item.save || item.save.version !== 1) continue;
+      const entry = this.createBrokenBrick(item.index, item.save.seed);
+      entry.volume.restore(item.save);
+      this.broken.set(item.index, entry);
+      if (entry.volume.removedNodeCount) this.showBrokenBrick(item.index, entry);
+    }
+  }
+
+  private createBrokenBrick(index: number, seed?: number): BrokenBrick {
+    this.original[index].decompose(this.position, this.rotation, this.scale);
+    const width = this.alongX ? this.scale.x : this.scale.z;
+    const height = this.scale.y;
+    const origin = this.position.clone(); origin.y -= height / 2;
+    const rotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.alongX ? 0 : -Math.PI / 2);
+    const volume = new MasonryVolume({ width, height, depth: .24, frontZ: .12, cellSize: .012,
+      seed: seed ?? (Math.imul(index + 1, 2654435761) ^ Math.imul(this.columns, 2246822519)) >>> 0,
+      hollowProfile: 'single-horizontal-four-bore', maxConnectivityNodes: 1800 });
+    const mesh = new THREE.Mesh(new THREE.BufferGeometry(), damagedMasonryMaterial);
+    mesh.name = `${this.group.name} locally fractured brick ${index}`;
+    mesh.position.copy(origin); mesh.quaternion.copy(rotation);
+    mesh.castShadow = mesh.receiveShadow = true;
+    mesh.raycast = () => undefined;
+    this.group.add(mesh);
+    return { volume, mesh, origin, rotation };
+  }
+
+  private showBrokenBrick(index: number, entry: BrokenBrick): void {
+    const positions: number[] = [], normals: number[] = [], colors: number[] = [];
+    for (const key of entry.volume.chunkKeys) {
+      const data = entry.volume.buildChunkMesh(key);
+      for (let i = 0; i < data.positions.length; i++) positions.push(data.positions[i]);
+      for (let i = 0; i < data.normals.length; i++) normals.push(data.normals[i]);
+      for (let i = 0; i < data.colors.length; i++) colors.push(data.colors[i]);
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    const face = new Float32Array(positions.length / 3), uv = new Float32Array(face.length * 2);
+    const patchAttribute = this.brickRefs[index]?.mesh.geometry.getAttribute('brickPatch');
+    const slot = this.brickRefs[index]?.instance ?? 0;
+    const px = patchAttribute?.getX(slot) ?? 0, py = patchAttribute?.getY(slot) ?? 0;
+    const pw = patchAttribute?.getZ(slot) ?? 1, ph = patchAttribute?.getW(slot) ?? 1;
+    for (let i = 0; i < face.length; i += 3) {
+      const front = [0, 1, 2].every(j => Math.abs(Math.abs(positions[(i + j) * 3 + 2]) - .12) < .006 && Math.abs(normals[(i + j) * 3 + 2]) > .7);
+      for (let j = 0; j < 3; j++) {
+        const k = i + j;
+        face[k] = front ? 1 : 0;
+        uv[k * 2] = px + (positions[k * 3] / entry.volume.width + .5) * pw;
+        uv[k * 2 + 1] = py + positions[k * 3 + 1] / entry.volume.height * ph;
+      }
+    }
+    geometry.setAttribute('brickFace', new THREE.BufferAttribute(face, 1));
+    geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    geometry.computeBoundingSphere();
+    entry.mesh.geometry.dispose(); entry.mesh.geometry = geometry;
+    this.ensureMortarCells();
+    const ref = this.brickRefs[index];
+    this.temp.makeScale(0, 0, 0);
+    ref?.mesh.setMatrixAt(ref.instance, this.temp);
+    if (ref) { ref.mesh.instanceMatrix.needsUpdate = true; ref.mesh.computeBoundingSphere(); }
+    this.mortarCells!.setMatrixAt(index, this.temp);
+    this.mortarCells!.instanceMatrix.needsUpdate = true;
+    this.mortarCells!.computeBoundingSphere();
   }
 
   strike(index: number, refreshCaps = true): boolean {
     if (!this.remaining[index]) return false;
+    const partial = this.broken.get(index);
+    if (partial) { partial.mesh.removeFromParent(); partial.mesh.geometry.dispose(); this.broken.delete(index); }
     this.ensureMortarCells();
     this.remaining[index] = 0;
     this.removedCount++;
@@ -148,6 +264,8 @@ export class MansionMasonryDemolition {
 
   reset(): void {
     if (!this.damaged) return;
+    for (const entry of this.broken.values()) { entry.mesh.removeFromParent(); entry.mesh.geometry.dispose(); }
+    this.broken.clear();
     const changed = new Set<THREE.InstancedMesh>();
     for (let index = 0; index < this.remaining.length; index++) {
       this.remaining[index] = this.originalHasBrick(index) ? 1 : 0;

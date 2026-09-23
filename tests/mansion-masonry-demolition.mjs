@@ -40,8 +40,14 @@ try {
     const target = wing.aimMasonry(camera);
     const contact = target ? game.fpsRig.contactMasonry(camera, target.point) : false;
     const before = wall.removedIndices().length;
-    game.performAction();
+    for (let hit = 0; hit < 6; hit++) game.performAction();
     const after = wall.removedIndices().length;
+    const locallyRemoved = wall.removedClayNodes;
+    const partialAfterHit = wall.partialDamageCount;
+    const partialDocument = game.levelEditor.document();
+    wing.restoreDemolition({});
+    game.levelEditor.applyDocument(partialDocument);
+    const partialRestored = wall.removedClayNodes;
     const capsAfterHit = wall.fractureCapCount;
     const player = game.player;
     player.wallWorkEnabled = false;
@@ -105,7 +111,9 @@ try {
     game.fpsRig.visible = false;
     game.renderer.render();
     return { target:target?.wall.group.name ?? null, distance:target?.distance ?? null,
-      contact, armReach:target && game.fpsRig.canReachPoint(camera,target.point,.12),
+      contact, locallyRemoved, partialAfterHit, partialRestored,
+      partialSaved:partialDocument.masonryDamage?.[wall.group.name]?.length ?? 0,
+      armReach:target && game.fpsRig.canReachPoint(camera,target.point,.12),
       gripReach:game.fpsRig.gripsReachable(camera,game.fpsRig.tools.get('hammer')),
       status:game.fpsRig.contactStatus, before, after, capsAfterHit, capsRestored, capsReset,
       blockedZ, openZ, intactZ, cleared, restored,
@@ -116,8 +124,11 @@ try {
   });
   assert.equal(result.target, 'Courtyard north fired-clay enclosure');
   assert.equal(result.contact, true, `Hammer contact failed: ${JSON.stringify(result)}`);
-  assert(result.after > result.before, `Masonry did not break: ${JSON.stringify(result)}`);
-  assert(result.capsAfterHit > 0 && result.capsRestored > 0 && result.capsReset === 0,
+  assert(result.after === result.before && result.locallyRemoved > 0 && result.partialAfterHit === 1,
+    `Hammer must locally fracture a brick without removing it: ${JSON.stringify(result)}`);
+  assert(result.partialSaved === 1 && result.partialRestored === result.locallyRemoved,
+    `Local damage did not survive Studio document round trip: ${JSON.stringify(result)}`);
+  assert(result.capsAfterHit === 0 && result.capsRestored > 0 && result.capsReset === 0,
     `Exposed hollow-clay cut faces did not track demolition and reset: ${JSON.stringify(result)}`);
   assert(result.crossStrike && result.crossCaps > 0 && result.crossCapsReset === 0,
     `Perpendicular wall cut faces did not track demolition and reset: ${JSON.stringify(result)}`);

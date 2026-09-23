@@ -11,7 +11,7 @@ import { MansionSurroundings } from './MansionSurroundings';
 import { BrickWall } from './BrickWall';
 import { hollowClayWallEnds } from './HollowClayEnd';
 import { laidClayGeometry } from './LaidClayDamage';
-import { MansionMasonryDemolition, type MasonryAim, type MasonryBrickInstance } from './MansionMasonryDemolition';
+import { MansionMasonryDemolition, type MasonryAim, type MasonryBrickInstance, type MansionBrickDamage } from './MansionMasonryDemolition';
 
 /** Traversable unfinished mansion shell, including the original work room. */
 export class MansionGroundWing extends THREE.Group {
@@ -492,8 +492,19 @@ export class MansionGroundWing extends THREE.Group {
 
   demolitionSnapshot(): Record<string, number[]> {
     const result: Record<string, number[]> = {};
-    for (const [id, wall] of this.masonryDemolition) if (wall.damaged) result[id] = wall.removedIndices();
+    for (const [id, wall] of this.masonryDemolition) if (wall.removedIndices().length) result[id] = wall.removedIndices();
     return result;
+  }
+
+  masonryDamageSnapshot(): Record<string, MansionBrickDamage[]> {
+    const result: Record<string, MansionBrickDamage[]> = {};
+    for (const [id, wall] of this.masonryDemolition) if (wall.partialDamageCount) result[id] = wall.damageSnapshot();
+    return result;
+  }
+
+  restoreMasonryDamage(snapshot: Record<string, MansionBrickDamage[]>): void {
+    for (const [id, entries] of Object.entries(snapshot))
+      if (Array.isArray(entries)) this.masonryDemolition.get(id)?.restoreDamage(entries);
   }
 
   restoreDemolition(snapshot: Record<string, number[]>): void {

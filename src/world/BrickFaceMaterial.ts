@@ -20,3 +20,10 @@ masonryFaceMaterial.colorNode = mix(photographed, clayInterior, siteClayReady.mu
 // A pressed-clay face has long horizontal ribs. Keep the material-specific
 // relief on the exposed face while physical mortar joints stay geometric.
 masonryFaceMaterial.normalNode = normalMap(sampleTexture(clayRibNormal, uv()), vec2(.75, .75));
+
+/** Damaged units retain their photographed original broad faces; newly opened
+ * clay and the longitudinal chambers use the material lattice's vertex color. */
+export const damagedMasonryMaterial = new MeshStandardNodeMaterial({ roughness: 1 });
+damagedMasonryMaterial.name = 'Photographed clay with true fractured interior';
+damagedMasonryMaterial.colorNode = mix(attribute('color', 'vec3'), sampleTexture(brickFace, uv()).rgb,
+  attribute('brickFace', 'float'));

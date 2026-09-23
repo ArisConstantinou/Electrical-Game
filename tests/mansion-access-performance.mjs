@@ -13,6 +13,7 @@ try {
   for (const scene of [
     { name:'released-intact', candidate:false, damaged:false },
     { name:'candidate-intact', candidate:true, damaged:false },
+    { name:'candidate-locally-fractured', candidate:true, damaged:false, local:true },
     { name:'candidate-damaged', candidate:true, damaged:true },
   ]) {
     const context = await browser.newContext({ viewport:{width:390,height:844}, deviceScaleFactor:2,
@@ -34,13 +35,18 @@ try {
     await page.waitForFunction(() => window.__wireTheHouse?.isReadyForStart, null, {timeout:120000});
     await page.locator('#apprentice-count').selectOption('0');
     await page.locator('#start-button').tap();
-    await page.evaluate(damaged => {
+    await page.evaluate(({damaged,local}) => {
       const game = window.__wireTheHouse;
-      game.player.camera.position.set(15.3, 1.65, 13.2);
+      game.player.camera.position.set(15.3, 1.65, local ? 15.0 : 13.2);
       game.player.yaw = Math.PI;
       game.player.wallWorkEnabled = false;
       game.selectedTool = 'hammer';
       game.fpsRig.show('hammer');
+      if (local) {
+        const hit=game.room.mansionWing.aimMasonry(game.renderer.camera);
+        for(let i=0;i<6;i++)hit?.wall.strikeAt(hit.index,game.renderer.camera);
+        game.player.camera.position.set(15.3, 1.65, 13.2);
+      }
       if (damaged) {
         const wall = game.room.mansionWing.masonryDemolition.get('Courtyard north fired-clay enclosure');
         for (let index=0; index<wall.original.length; index++) {
@@ -65,7 +71,7 @@ try {
         if(Math.abs(game.player.yaw-Math.PI)>.35) sign*=-1;
         game.input.mobileMove.y=-.35;
       },16);
-    }, scene.damaged);
+    }, scene);
     await page.waitForTimeout(500);
     await page.evaluate(()=>{window.__accessProfile.active=true;});
     await page.waitForTimeout(2200);

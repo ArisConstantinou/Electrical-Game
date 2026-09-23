@@ -15,7 +15,7 @@ export interface MasonryVolumeOptions {
   tileSize?: number; seed?: number; renderThickness?: number; material?: 'hollow-clay' | 'concrete';
   solidMaterial?: MaterialId;
   /** Explicit profile keeps older saved damage aligned with its original solids. */
-  hollowProfile?: 'horizontal-rounded' | 'rounded-five' | 'legacy-rectangular';
+  hollowProfile?: 'horizontal-rounded' | 'rounded-five' | 'legacy-rectangular' | 'single-horizontal-four-bore';
   maxConnectivityNodes?: number;
 }
 export interface MasonryImpactInput { point: Vec3; direction: Vec3; edge?: Vec3; energyJ?: number; chisel: 'pointed' | 'flat'; /** Flat cutting-edge width in metres, 10–50 mm. Pointed chisels ignore it. */ widthM?: number; seed?: number; /** Upward finishing stroke: preserve the locally established cavity backing. */ trim?: boolean }
@@ -153,6 +153,20 @@ export class MasonryVolume {
     if (this.options.solidMaterial !== undefined) return this.options.solidMaterial;
     if (this.options.material === 'concrete') return MaterialId.Concrete;
     const d = this.frontZ - p.z - renderThickness, clayDepth = this.depth - renderThickness;
+    if (this.options.hollowProfile === 'single-horizontal-four-bore') {
+      // A lazily fractured mansion unit has four bores running along its long
+      // axis. Keep its intact shell; the same material lattice and impact code
+      // used by the original work wall can then remove only contacted clay.
+      const shell = .012;
+      const localY = p.y, heightPitch = (this.height - shell * 2) / 2;
+      const depthPitch = (clayDepth - shell * 2) / 2;
+      if (d < shell || d > clayDepth - shell || localY < shell || localY > this.height - shell ||
+          p.x < -this.width / 2 + shell || p.x > this.width / 2 - shell) return MaterialId.Clay;
+      const boreY = ((localY - shell) % heightPitch + heightPitch) % heightPitch - heightPitch * .5;
+      const boreZ = ((d - shell) % depthPitch + depthPitch) % depthPitch - depthPitch * .5;
+      return (boreY / (heightPitch * .41)) ** 2 + (boreZ / (depthPitch * .43)) ** 2 < 1
+        ? MaterialId.Air : MaterialId.Clay;
+    }
     const pitchY = this.height / 23, pitchX = this.width / 21;
     const row = Math.floor(p.y / pitchY), localY = p.y - row * pitchY;
     const wallX = p.x + this.width / 2 - (row % 2 ? pitchX * .5 : 0);
@@ -528,7 +542,7 @@ export class MasonryVolume {
       const p = this.nodePosition(x, y, z), delta = { x: p.x - contact.point.x, y: p.y - contact.point.y, z: p.z - contact.point.z };
       if (trimFloorZ !== undefined && p.z <= trimFloorZ + this.hz + 1e-9) continue;
       const along = delta.x * direction.x + delta.y * direction.y + delta.z * direction.z;
-      const wallDepth = -delta.z;
+      const wallDepth = this.options.hollowProfile === 'single-horizontal-four-bore' ? along : -delta.z;
       const inPlateSlab = canPryPlate && wallDepth >= -.032 && wallDepth <= .024;
       // Most of the bounding cube lies outside both contact-facing slabs. Reject
       // it before querying brick bores, damage chunks or trigonometric fields.
