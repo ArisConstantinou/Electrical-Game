@@ -20,6 +20,8 @@ export class MobileControls {
   private useY = 0;
   private moveX = 0;
   private moveY = 0;
+  private lastMoveX = 0;
+  private lastMoveY = 0;
   private aimProfile: MobileAimProfile = 'normal';
   private aimInputMode: AimInputMode = 'stick';
   private movementStickMode: MovementStickMode = 'fixed';
@@ -34,7 +36,7 @@ export class MobileControls {
     surface.addEventListener('selectstart', event => event.preventDefault());
     surface.addEventListener('dragstart', event => event.preventDefault());
     addEventListener('blur', () => this.cancelActiveGestures());
-    addEventListener('resize', () => this.cancelActiveGestures());
+    addEventListener('resize', () => this.recenterActiveJoystick());
     addEventListener('orientationchange', () => this.cancelActiveGestures());
     document.addEventListener('visibilitychange', () => { if (document.hidden) this.cancelActiveGestures(); });
     let settingsOpen = surface.classList.contains('settings-open');
@@ -134,6 +136,16 @@ export class MobileControls {
   setAimInputMode(mode: AimInputMode): void { this.cancelActiveGestures(); this.aimInputMode = mode; }
   setMovementStickMode(mode: MovementStickMode): void { this.cancelActiveGestures(); this.movementStickMode = mode; }
 
+  /** Browser toolbars can resize the viewport without ending a finger press. */
+  private recenterActiveJoystick(): void {
+    if (this.joystickPointer === null || this.movementStickMode !== 'fixed') return;
+    const rect = this.surface.querySelector<HTMLElement>('#joystick')?.getBoundingClientRect();
+    if (!rect) return;
+    this.moveX = rect.left + rect.width / 2;
+    this.moveY = rect.top + rect.height / 2;
+    this.updateMovement(this.lastMoveX, this.lastMoveY);
+  }
+
   /** Cancellation discards a pending cast; ordinary USE release still casts. */
   cancelActiveGestures(): void {
     this.releaseAction(true);
@@ -195,8 +207,9 @@ export class MobileControls {
       const center = joystick?.getBoundingClientRect();
       this.moveX = this.movementStickMode === 'fixed' && center ? center.left + center.width / 2 : event.clientX;
       this.moveY = this.movementStickMode === 'fixed' && center ? center.top + center.height / 2 : event.clientY;
+      this.lastMoveX = event.clientX; this.lastMoveY = event.clientY;
       this.capture(joystick ?? this.surface, event.pointerId); this.input.resetMobileMove();
-      if (this.movementStickMode === 'fixed') this.updateMovement(event);
+      if (this.movementStickMode === 'fixed') this.updateMovement(event.clientX, event.clientY);
     } else if (this.lookPointer === null) {
       this.lookPointer = event.pointerId; this.lookX = event.clientX; this.lookY = event.clientY;
       this.capture(this.surface, event.pointerId);
@@ -212,7 +225,8 @@ export class MobileControls {
     if (event.pointerType === 'mouse') return;
     if (event.pointerId === this.joystickPointer) {
       event.preventDefault();
-      this.updateMovement(event);
+      this.lastMoveX = event.clientX; this.lastMoveY = event.clientY;
+      this.updateMovement(event.clientX, event.clientY);
     } else if (event.pointerId === this.lookActionPointer) {
       event.preventDefault();
       const action = this.surface.querySelector<HTMLElement>('#look-joystick');
@@ -268,10 +282,10 @@ export class MobileControls {
     const thumb = this.surface.querySelector<HTMLElement>('#look-joystick-thumb'); if (thumb) thumb.style.transform = 'translate(-50%, -50%)';
     this.releaseCapture(pointer);
   }
-  private updateMovement(event: PointerEvent): void {
+  private updateMovement(clientX: number, clientY: number): void {
     const joystick = this.surface.querySelector<HTMLElement>('#joystick');
     const radius = Math.max(1, (joystick?.getBoundingClientRect().width ?? 112) / 2);
-    let x = event.clientX - this.moveX, y = event.clientY - this.moveY;
+    let x = clientX - this.moveX, y = clientY - this.moveY;
     const length = Math.hypot(x, y); if (length > radius) { x *= radius / length; y *= radius / length; }
     const raw = Math.min(1, length / radius), amount = raw <= .08 ? 0 : ((raw - .08) / .92) ** 1.35;
     this.input.mobileMove = { x: length > 0 ? x / Math.min(length, radius) * amount : 0, y: length > 0 ? y / Math.min(length, radius) * amount : 0 };

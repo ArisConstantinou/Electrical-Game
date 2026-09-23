@@ -1,24 +1,39 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import { blockPointerLock } from './browser-safety.mjs';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile, stat } from 'node:fs/promises';
+import { resolve, extname } from 'node:path';
 
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const results = [];
 await mkdir('artifacts/site-pro-04/review/three-touch', { recursive: true });
 try {
+  const base = process.env.QA_BASE ?? 'http://127.0.0.1:5365/Electrical-Game/';
   for (const [name, viewport] of [
     ['portrait', { width: 390, height: 844 }],
     ['landscape', { width: 844, height: 390 }],
     ['tablet', { width: 820, height: 1180 }],
-  ]) {
+  ].filter(([name]) => !process.argv.includes('--portrait-only') || name === 'portrait')) {
     const context = await browser.newContext({ viewport, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
     await blockPointerLock(context);
+    if (process.argv.includes('--dist')) {
+      const dist = resolve('dist');
+      const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml',
+        '.webp': 'image/webp', '.png': 'image/png', '.jpg': 'image/jpeg', '.glb': 'model/gltf-binary', '.woff2': 'font/woff2' };
+      await context.route('https://arisconstantinou.github.io/Electrical-Game/**', async route => {
+        const path = resolve(dist, decodeURIComponent(new URL(route.request().url()).pathname.slice('/Electrical-Game/'.length)) || 'index.html');
+        if (!path.startsWith(dist)) return route.abort();
+        try {
+          if (!(await stat(path)).isFile()) return route.abort();
+          await route.fulfill({ status: 200, contentType: mime[extname(path)] ?? 'application/octet-stream', body: await readFile(path) });
+        } catch { return route.abort(); }
+      });
+    }
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     try {
-      await page.goto('http://127.0.0.1:5365/Electrical-Game/?renderer=webgl');
+      await page.goto(`${base}?renderer=webgl`);
       await page.waitForFunction(() => window.__wireTheHouse?.isReadyForStart, null, { timeout: 120000 });
       await page.locator('#apprentice-count').selectOption('0');
       await page.locator('#start-button').tap();
@@ -68,10 +83,37 @@ try {
       assert(active.litres > initial.litres, `${name}: held hose must produce real water while both sticks move`);
       assert.equal(active.renderError, '');
       assert.equal(active.pointerLock, false);
+      await page.evaluate(() => dispatchEvent(new Event('resize')));
+      await page.waitForTimeout(120);
+      const afterResize = await page.evaluate(() => ({
+        move: { ...window.__wireTheHouse.input.mobileMove }, look: { ...window.__wireTheHouse.input.mobileLook },
+        held: window.__wireTheHouse.input.actionHeld,
+      }));
+      assert(afterResize.held && Math.abs(afterResize.move.x) > .1 && Math.abs(afterResize.look.x) > .1,
+        `${name}: a browser viewport resize must not cancel held MOVE+AIM+USE: ${JSON.stringify(afterResize)}`);
+      if (name === 'portrait') {
+        await page.setViewportSize({ width: viewport.width, height: viewport.height - 44 });
+        await page.waitForTimeout(120);
+        const afterViewport = await page.evaluate(() => ({
+          move: { ...window.__wireTheHouse.input.mobileMove }, look: { ...window.__wireTheHouse.input.mobileLook },
+          held: window.__wireTheHouse.input.actionHeld,
+          joystick: document.querySelector('#joystick').getBoundingClientRect().toJSON(),
+        }));
+        console.log(JSON.stringify({ viewportResize: afterViewport }));
+        assert(afterViewport.held && Math.abs(afterViewport.move.x) > .1 && Math.abs(afterViewport.look.x) > .1,
+          `portrait: toolbar-height change must preserve active MOVE+AIM+USE: ${JSON.stringify(afterViewport)}`);
+      }
       await page.screenshot({ path: `artifacts/site-pro-04/review/three-touch/${name}.jpg`, type: 'jpeg', quality: 82 });
       await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
       await page.waitForTimeout(100);
-      assert.equal(await page.evaluate(() => window.__wireTheHouse.input.actionHeld), false);
+      const released = await page.evaluate(() => ({
+        held: window.__wireTheHouse.input.actionHeld,
+        move: { ...window.__wireTheHouse.input.mobileMove },
+        look: { ...window.__wireTheHouse.input.mobileLook },
+      }));
+      assert.equal(released.held, false);
+      assert.deepEqual(released.move, { x: 0, y: 0 });
+      assert.deepEqual(released.look, { x: 0, y: 0 });
       assert.deepEqual(errors, []);
       results.push({ name, controls, movementMetres: Math.hypot(active.position[0] - initial.position[0], active.position[2] - initial.position[2]),
         yawRadians: active.yaw - initial.yaw, waterLitres: active.litres - initial.litres });

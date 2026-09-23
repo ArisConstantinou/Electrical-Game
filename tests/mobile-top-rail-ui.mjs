@@ -31,7 +31,9 @@ try {
     const name=`${viewport.width}x${viewport.height}`;
     await page.screenshot({path:`output/mobile-top-rail-ui/${name}-closed.png`});
     const closedRail=await page.locator('#mobile-top-rail').boundingBox();
-    assert(closedRail&&closedRail.width<=34,'collapsed top rail still obscures the view');
+    assert(closedRail&&closedRail.width<=44,'collapsed top rail still obscures the view');
+    const closedArrow=await page.locator('#worker-bar-handle svg').boundingBox();
+    assert(closedArrow&&Math.abs(closedArrow.x+closedArrow.width/2-closedRail.x-closedRail.width/2)<1,'closed arrow is off-center');
     assert.equal(await page.locator('#site-pro-tools').isVisible(),false);
     assert.equal(await page.evaluate(()=>window.__wireTheHouse.movementStickMode),'fixed');
     const closed=await page.locator('#joystick').boundingBox();
@@ -50,6 +52,7 @@ try {
     assert.equal(await page.locator('#game-shell').getAttribute('data-tools-open'),'true');
     assert(Math.abs(worker['mobile-tool-slider'].y-worker['site-pro-tools'].y)<12);
     assert(Math.abs(worker['site-pro-tools'].y-worker['settings-toggle'].y)<1);
+    assert(worker['settings-toggle'].x+worker['settings-toggle'].w<=worker['worker-bar-handle'].x,'settings overlaps the arrow end cap');
     assert.equal(worker['tool-quick-controls'].parent,'mobile-tool-slider');
     await page.screenshot({path:`output/mobile-top-rail-ui/${name}-worker.png`});
     const colorBefore=await page.locator('#quick-spray-color b').textContent();
@@ -63,7 +66,7 @@ try {
     await page.screenshot({path:`output/mobile-top-rail-ui/${name}-inspector.png`});
     await page.locator('#inspector-bar-handle').tap();
     assert.equal(await page.locator('#game-shell').getAttribute('data-inspector-open'),'false');
-    assert.equal(await page.locator('#mobile-top-rail').evaluate(el=>el.getBoundingClientRect().width<=34),true);
+    assert.equal(await page.locator('#mobile-top-rail').evaluate(el=>el.getBoundingClientRect().width<=44),true);
     assert.deepEqual(errors,[]);
     results.push({viewport,worker,joystickBase:closed,movedInput:held.move,errors});
     await context.close();

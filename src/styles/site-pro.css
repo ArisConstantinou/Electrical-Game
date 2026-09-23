@@ -393,39 +393,27 @@ html, body { background: #151a1d; }
   #game-shell {
     --top-rail-width:min(82vw, 520px);
     --top-rail-edge:calc((100vw - var(--top-rail-width)) / 2);
-    --top-rail-y:max(8px, env(safe-area-inset-top));
+    --top-rail-y:env(safe-area-inset-top);
   }
   #mobile-top-rail {
     position:absolute; z-index:7; top:var(--top-rail-y);
     left:var(--top-rail-edge); width:var(--top-rail-width); height:54px;
     box-sizing:border-box; pointer-events:none;
-    background:#ffdf35; border:0;
-    clip-path:polygon(0 0,100% 0,100% 76%,calc(100% - 14px) 100%,14px 100%,0 76%);
+    background:linear-gradient(115deg,#1b3029f5,#192a25f5);
+    border:1px solid #ffdf35; border-radius:0 0 11px 11px;
     box-shadow:0 5px 14px #0008;
   }
-  #mobile-top-rail::before {
-    content:''; position:absolute; inset:1px;
-    background:linear-gradient(115deg,#1b3029f5,#192a25f5);
-    clip-path:polygon(0 0,100% 0,100% 75%,calc(100% - 13px) 100%,13px 100%,0 75%);
-  }
-  #mobile-top-rail::after {
-    content:''; position:absolute; top:7px; bottom:8px; right:143px;
-    width:1px; background:#ffdc3266;
-  }
   #game-shell[data-tools-open="false"][data-inspector-open="false"] #mobile-top-rail {
-    left:auto; right:var(--top-rail-edge); width:33px;
-    clip-path:polygon(0 0,100% 0,100% 82%,calc(100% - 8px) 100%,8px 100%,0 82%);
+    left:auto; right:var(--top-rail-edge); width:42px; height:44px;
   }
-  #game-shell[data-tools-open="false"][data-inspector-open="false"] #mobile-top-rail::before {
-    clip-path:polygon(0 0,100% 0,100% 81%,calc(100% - 7px) 100%,7px 100%,0 81%);
-  }
-  #game-shell[data-tools-open="false"][data-inspector-open="false"] #mobile-top-rail::after {display:none;}
   #worker-bar-handle, #inspector-bar-handle {
     top:var(--top-rail-y); left:auto; right:var(--top-rail-edge);
-    width:33px; height:54px; border:0;
+    width:42px; height:54px; border:0;
     border-radius:0; background:transparent;
     box-shadow:none;
   }
+  #game-shell[data-tools-open="false"] #worker-bar-handle,
+  #game-shell[data-inspector-open="false"] #inspector-bar-handle {height:44px;}
   #worker-bar-handle svg, #inspector-bar-handle svg {
     display:block; width:20px; height:20px;
     fill:none; stroke:#ffdf35; stroke-width:2.5;
@@ -445,9 +433,9 @@ html, body { background: #151a1d; }
     color:#ffdf36; background:#203129; box-shadow:none;
     z-index:19;
   }
-  #site-pro-tools {right:calc(var(--top-rail-edge) + 117px);}
-  #site-pro-coordinator {right:calc(var(--top-rail-edge) + 77px);}
-  #settings-toggle {right:calc(var(--top-rail-edge) + 37px);}
+  #site-pro-tools {right:calc(var(--top-rail-edge) + 124px);}
+  #site-pro-coordinator {right:calc(var(--top-rail-edge) + 84px);}
+  #settings-toggle {right:calc(var(--top-rail-edge) + 44px);}
   #site-pro-tools[aria-pressed="true"], #site-pro-coordinator[aria-pressed="true"] {
     border-color:#ffdf36; color:#18271f; background:#ffdf36;
   }
@@ -461,7 +449,7 @@ html, body { background: #151a1d; }
   #game-shell[data-tool-selector="horizontal"][data-tools-open="true"] #mobile-tool-slider {
     position:absolute; z-index:18; display:flex;
     top:calc(var(--top-rail-y) + 4px); bottom:auto;
-    left:calc(var(--top-rail-edge) + 7px); right:calc(var(--top-rail-edge) + 157px);
+    left:calc(var(--top-rail-edge) + 7px); right:calc(var(--top-rail-edge) + 164px);
     width:auto; height:46px; padding:0; gap:3px;
     border:0; border-radius:0; background:transparent; box-shadow:none;
     overflow-x:auto; overflow-y:hidden; touch-action:pan-x;
@@ -504,7 +492,7 @@ html, body { background: #151a1d; }
   }
   #game-shell[data-inspector-open="true"] #apprentice-controls:not([hidden]) {
     top:calc(var(--top-rail-y) + 4px); bottom:auto;
-    left:calc(var(--top-rail-edge) + 7px); right:calc(var(--top-rail-edge) + 157px);
+    left:calc(var(--top-rail-edge) + 7px); right:calc(var(--top-rail-edge) + 164px);
     width:auto; height:46px; min-height:46px; padding:0;
     border:0; border-radius:0; background:transparent; box-shadow:none;
   }
