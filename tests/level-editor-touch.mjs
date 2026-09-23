@@ -83,17 +83,16 @@ try {
   const cameraBefore = await cameraState();
   const orbitPoint = await page.evaluate(() => {
     const e = window.__wireTheHouse.levelEditor;
-    for (const [x, y] of [[330, 470], [330, 300], [35, 460], [280, 500]]) {
+    for (const [x, y] of [[330, 470], [330, 300], [35, 460], [280, 500], [25, 250], [365, 220]]) {
       if (document.elementFromPoint(x, y)?.id !== 'game-canvas') continue;
       e.pointerRay({ clientX: x, clientY: y });
-      if (!e.raycaster.intersectObjects([e.gizmo.object], true).length) return { x, y };
+      if (!e.raycaster.intersectObjects([...e.selectedObjects], true).length) return { x, y };
     }
     throw new Error('No uncovered empty canvas point available for orbit gesture');
   });
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ ...orbitPoint, id: 1 }] });
-  // TOP begins exactly above the floor. A diagonal orbit gesture introduces
-  // polar tilt and yaw together; horizontal-only yaw is visually undefined
-  // at that pole and must not be mistaken for a failed touch gesture.
+  // The 3D editor opens at an angle. Drag only outside the selected wall,
+  // otherwise the touch gesture edits the wall instead of orbiting.
   for (let step = 1; step <= 6; step++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: orbitPoint.x + step * 7, y: orbitPoint.y + step * 7, id: 1 }] });
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await page.waitForTimeout(300);

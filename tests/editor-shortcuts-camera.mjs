@@ -80,13 +80,44 @@ try {
   mobile.on('pageerror', error => errors.push(error.message));
   await mobile.goto('http://127.0.0.1:5365/Electrical-Game/?mansion=preview&editor=1&renderer=webgl');
   await mobile.waitForFunction(() => window.__wireTheHouse?.levelEditor?.active, null, { timeout: 120_000 });
+  const mobileCameraBefore = await mobile.evaluate(() => window.__wireTheHouse.levelEditor.camera.position.toArray());
+  const touch = await mobile.context().newCDPSession(mobile);
+  await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 320, y: 240, id: 1 }] });
+  for (let step = 1; step <= 6; step++) await touch.send('Input.dispatchTouchEvent', {
+    type: 'touchMove', touchPoints: [{ x: 320 - step * 7, y: 240 + step * 6, id: 1 }],
+  });
+  await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await mobile.waitForTimeout(250);
+  const mobileCameraAfter = await mobile.evaluate(() => window.__wireTheHouse.levelEditor.camera.position.toArray());
+  assert(Math.hypot(...mobileCameraAfter.map((value, index) => value - mobileCameraBefore[index])) > .1,
+    'Mobile one-finger drag must rotate the 3D camera');
+  const mobileWallCount = () => mobile.evaluate(() => [...window.__wireTheHouse.room.mansionWing.editableWalls.keys()]
+    .filter(name => name.startsWith('Editor brick-wall')).length);
   await openEditorBuild(mobile);
   await mobile.locator('#level-add-brick').tap();
+  assert.equal(await mobileWallCount(), 1);
   await openEditorDetails(mobile);
   await mobile.locator('#level-copy').scrollIntoViewIfNeeded();
   assert(await mobile.locator('#level-copy').isVisible());
   assert(await mobile.locator('#level-paste').isVisible());
   assert(await mobile.locator('#level-delete').isVisible());
+  await mobile.locator('#level-copy').tap();
+  await mobile.locator('#level-paste').tap();
+  assert.equal(await mobileWallCount(), 2);
+  await openEditorDetails(mobile);
+  await mobile.locator('#level-undo').tap();
+  assert.equal(await mobileWallCount(), 1);
+  await mobile.locator('#level-redo').tap();
+  assert.equal(await mobileWallCount(), 2);
+  await mobile.locator('#level-delete').tap();
+  assert.equal(await mobileWallCount(), 1);
+  await openEditorDetails(mobile);
+  await mobile.locator('#level-undo').tap();
+  assert.equal(await mobileWallCount(), 2);
+  await mobile.locator('.level-editor__history-log summary').tap();
+  await mobile.locator('#level-history-list button').nth(1).tap();
+  assert.equal(await mobileWallCount(), 1);
+  await openEditorDetails(mobile);
   await mobile.screenshot({ path: fileURLToPath(new URL('mobile-actions.png', output)) });
   assert.deepEqual(errors, []);
   await mobile.close();

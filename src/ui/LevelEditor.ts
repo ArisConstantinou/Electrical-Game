@@ -189,7 +189,9 @@ export class LevelEditor {
     this.topOrbit.update();
     this.gizmo = new TransformControls(this.camera, canvas);
     this.gizmo.setSize(.34);
-    this.gizmo.addEventListener('dragging-changed', event => { this.orbit.enabled = this.active && !event.value; });
+    this.gizmo.addEventListener('dragging-changed', event => {
+      if (this.nativeGizmoVisible()) this.orbit.enabled = this.active && !event.value;
+    });
     this.gizmo.addEventListener('objectChange', () => { if (this.gizmo.object === this.selectionPivot) this.applyPivotDelta(); this.syncLiveEquipment(); this.invalidateEditorShadows(); this.refreshFields(); });
     this.gizmo.addEventListener('mouseUp', () => { this.snapWallEnds(); this.refreshFields(); this.recordHistory(); });
     this.gizmo.getHelper().visible = false;
@@ -518,7 +520,7 @@ export class LevelEditor {
       if (this.pinchZoom && this.editorTouches.size === 0) {
         this.pinchZoom = null;
         this.orbit.enabled = this.active;
-        this.gizmo.enabled = true;
+        this.gizmo.enabled = this.nativeGizmoVisible();
       }
     };
     document.addEventListener('pointerup', endEditorTouch, true);
@@ -528,7 +530,7 @@ export class LevelEditor {
         // The first touch may land on a selected wall. Hand control to OrbitControls
         // when a second finger arrives, so pinch remains possible over that wall.
         this.touchDrag = null;
-        this.gizmo.enabled = true;
+        this.gizmo.enabled = this.nativeGizmoVisible();
         this.orbit.enabled = this.active;
         this.topOrbit.enabled = false;
         return;
@@ -744,7 +746,7 @@ export class LevelEditor {
     this.touchDrag = null;
     this.orbit.enabled = this.active;
     this.topOrbit.enabled = false;
-    this.gizmo.enabled = true;
+    this.gizmo.enabled = this.nativeGizmoVisible();
     if (drag.mode === 'translate') {
       const object = this.gizmo.object === this.selectionPivot ? this.selectionPivot : this.selected ?? (this.markerSelection === 'player' ? this.playerMarker : this.apprenticeMarker);
       if (object && this.el<HTMLInputElement>('#level-snap').checked) {
@@ -844,7 +846,7 @@ export class LevelEditor {
     if (!this.wallEndpointDrag || this.wallEndpointDrag.pointerId !== event.pointerId) return;
     this.wallEndpointDrag = null;
     this.orbit.enabled = this.active;
-    this.gizmo.enabled = true;
+    this.gizmo.enabled = this.nativeGizmoVisible();
     this.snapWallEnds();
     this.refreshFields();
     this.recordHistory();
@@ -1286,6 +1288,7 @@ export class LevelEditor {
     this.enableEditorShadowCache();
     this.enableEditorRaycasts();
     this.gizmo.getHelper().visible = this.nativeGizmoVisible();
+    this.gizmo.enabled = this.nativeGizmoVisible();
     this.syncHighlights(this.selectedObjects);
     this.updateStartMarkerVisibility();
     this.resize();
@@ -1693,6 +1696,7 @@ export class LevelEditor {
       this.gizmo.attach(this.selectionPivot);
     } else this.gizmo.detach();
     this.gizmo.getHelper().visible = this.nativeGizmoVisible();
+    this.gizmo.enabled = this.nativeGizmoVisible();
     if (this.selectionAnchor) this.syncHighlights([]);
     this.syncHighlights(members);
     this.setFieldsMode('position');
@@ -1834,6 +1838,7 @@ export class LevelEditor {
     }
     this.gizmo.attach(which === 'player' ? this.playerMarker : this.apprenticeMarker);
     this.gizmo.getHelper().visible = this.nativeGizmoVisible();
+    this.gizmo.enabled = this.nativeGizmoVisible();
     this.setToolMode('translate');
     this.setFieldsMode('position');
     this.setSnap();
