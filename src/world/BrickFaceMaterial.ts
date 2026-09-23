@@ -3,10 +3,9 @@ import { attribute, mix, normalMap, texture as sampleTexture, uv, vec2 } from 't
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import { clayRibNormal, clayRibShade, siteClayImage, siteClayReady } from './BrickRibbing';
 
-// Poly Haven "Red Brick" by Rob Tuytel, CC0: https://polyhaven.com/a/red_brick
-// Physical clay units choose mortar-free photographed patches; the geometry
-// and backing material supply the mortar joints instead of painting them twice.
-const brickFace = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}assets/masonry/red-brick-polyhaven-1k.jpg`);
+// The reference-derived atlas has independent broad faces; geometry supplies
+// each real mortar joint rather than sampling it from a texture.
+const brickFace = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}assets/masonry/human-laid-brick-face-atlas.png`);
 brickFace.colorSpace = THREE.SRGBColorSpace;
 brickFace.anisotropy = 8;
 brickFace.wrapS = brickFace.wrapT = THREE.RepeatWrapping;
@@ -17,7 +16,7 @@ const patch = attribute<'vec4'>('brickPatch', 'vec4');
 const photoUv = uv().mul(patch.zw).add(patch.xy);
 const photographed = sampleTexture(brickFace, photoUv).rgb;
 const clayInterior = sampleTexture(siteClayImage, vec2(uv().x, uv().y.mul(.66).add(.32))).rgb;
-masonryFaceMaterial.colorNode = mix(photographed, clayInterior, siteClayReady.mul(.62)).mul(clayRibShade);
+masonryFaceMaterial.colorNode = mix(photographed, clayInterior, siteClayReady.mul(.25)).mul(clayRibShade);
 // A pressed-clay face has long horizontal ribs. Keep the material-specific
 // relief on the exposed face while physical mortar joints stay geometric.
 masonryFaceMaterial.normalNode = normalMap(sampleTexture(clayRibNormal, uv()), vec2(.75, .75));

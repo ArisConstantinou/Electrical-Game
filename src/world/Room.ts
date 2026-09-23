@@ -365,7 +365,7 @@ export class Room extends THREE.Group {
     geometry.setAttribute('brickPatch', new THREE.InstancedBufferAttribute(patchRects, 4));
     const bricks = new THREE.InstancedMesh(geometry, masonryFaceMaterial, columns * rows * instancesPerUnit);
     bricks.name = this.mansionPreview ? 'Staggered rear clay courses around structural opening' : 'Full staggered rear clay courses';
-    bricks.userData.textureSource = 'red-brick-polyhaven-1k.jpg';
+    bricks.userData.textureSource = 'human-laid-brick-face-atlas.png';
     bricks.userData.studioEntityId = 'world:rear-exposed-masonry';
     const matrix = new THREE.Matrix4(), position = new THREE.Vector3(), rotation = new THREE.Quaternion(), scale = new THREE.Vector3(), tint = new THREE.Color();
     for (let row = 0; row < rows; row++) for (let column = 0; column < columns; column++) {

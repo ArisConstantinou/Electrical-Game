@@ -177,7 +177,7 @@ try {
       };
     });
     assert(masonry.front && masonry.rightPractice && masonry.left > 300 && masonry.right > 400 && masonry.rear >= 480, `${device.name}: missing fired-clay wall: ${JSON.stringify(masonry)}`);
-    assert(masonry.source.includes('red-brick-polyhaven-1k.jpg') && !masonry.rearPlaster && !masonry.leftWindowBlocked, `${device.name}: wrong material or window obstruction: ${JSON.stringify(masonry)}`);
+    assert(masonry.source.includes('human-laid-brick-face-atlas.png') && !masonry.rearPlaster && !masonry.leftWindowBlocked, `${device.name}: wrong material or window obstruction: ${JSON.stringify(masonry)}`);
     assert(masonry.uniqueClayFaces >= 60 && masonry.validClayCrops, `${device.name}: clay faces repeat or sample outside the source: ${JSON.stringify(masonry)}`);
     report.cases.push({ device: device.name, view: 'four-masonry-walls', state: masonry });
     await context.close();

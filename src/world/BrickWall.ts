@@ -18,11 +18,11 @@ export interface MasonryImpact {
   points: THREE.Vector3[]; kind: MasonryImpactKind; brickSize: THREE.Vector3; seed: number; destroyed: boolean;
   fragments: MasonryFragment[]; removedVolume: number;
 }
-// Poly Haven "Red Brick" by Rob Tuytel, CC0: https://polyhaven.com/a/red_brick
-// Each exposed physical clay unit samples one mortar-free photographed face.
+// Generated from the user's fired-clay construction references. Each exposed
+// physical unit selects one face without photographic mortar joints.
 const brickImageReady = uniform(0);
 const identityMatrix = new THREE.Matrix4();
-const brickImage = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}assets/masonry/red-brick-polyhaven-1k.jpg`, () => { brickImageReady.value = 1; });
+const brickImage = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}assets/masonry/human-laid-brick-face-atlas.png`, () => { brickImageReady.value = 1; });
 brickImage.colorSpace = THREE.SRGBColorSpace;
 brickImage.anisotropy = 8;
 brickImage.wrapS = brickImage.wrapT = THREE.RepeatWrapping;
@@ -40,7 +40,7 @@ const edgeDistance = min(min(brickLocalUv.x, brickLocalUv.x.oneMinus()), min(bri
 const edgeShade = smoothstep(0, .075, edgeDistance).mul(.13).add(.87);
 const photographedClay = sampleTexture(brickImage, uv()).rgb.mul(masonryColor.r.div(.49));
 const clayInterior = sampleTexture(siteClayImage, vec2(brickLocalUv.x, brickLocalUv.y.mul(.66).add(.32))).rgb;
-const finishedClay = mix(photographedClay, clayInterior, siteClayReady.mul(.62)).mul(edgeShade).mul(clayRibShade);
+const finishedClay = mix(photographedClay, clayInterior, siteClayReady.mul(.25)).mul(edgeShade).mul(clayRibShade);
 // A face mask keeps real mortar joints, internal chambers and broken edges on
 // their own rough clay/mortar colors in both WebGPU and the WebGL backend.
 wallMaterial.colorNode = mix(mix(rawMasonry, finishedClay, attribute<'float'>('brickFace', 'float').mul(brickImageReady)),laserTint,laserBand);
@@ -124,7 +124,7 @@ export class BrickWall extends THREE.Group {
     base.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
     base.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
     base.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-    this.addBrickSurfaceAttributes(base);
+    this.addBrickSurfaceAttributes(base, true);
     base.setIndex(indices);
     base.index!.setUsage(THREE.DynamicDrawUsage);
     base.computeBoundingSphere();
@@ -359,14 +359,15 @@ export class BrickWall extends THREE.Group {
     return geometry;
   }
 
-  private addBrickSurfaceAttributes(geometry: THREE.BufferGeometry): void {
+  private addBrickSurfaceAttributes(geometry: THREE.BufferGeometry, pristine = false): void {
     const positions = geometry.getAttribute('position'), normals = geometry.getAttribute('normal'), colors = geometry.getAttribute('color');
     const coordinates = new Float32Array(positions.count * 2), localCoordinates = new Float32Array(positions.count * 2), faces = new Float32Array(positions.count);
     const pitchX = this.volume.width / 21, course = this.volume.height / 23;
     for (let i = 0; i < positions.count; i += 3) {
       const originalPlane = [0, 1, 2].every(j => {
         const z = positions.getZ(i + j);
-        return Math.abs(z - this.volume.frontZ) < 1e-5 || Math.abs(z - (this.volume.frontZ - this.volume.depth)) < 1e-5;
+        return Math.abs(z - this.volume.frontZ) < (pristine ? .0025 : 1e-5)
+          || Math.abs(z - (this.volume.frontZ - this.volume.depth)) < 1e-5;
       });
       const clay = colors.getX(i) > colors.getY(i) * 2;
       const face = Number(clay && originalPlane && Math.abs(normals.getZ(i)) > .999);
