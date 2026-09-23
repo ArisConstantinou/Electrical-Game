@@ -81,7 +81,10 @@ matching close-camera comparison is `brick-normal-before.png` and
 `brick-normal-after.png`. It adds surface relief under raking light, although
 the room still has much less geometry, natural wear and prop density than the
 approved concept. The main destructible work wall uses a separate shader and
-has not yet received this normal response.
+has not received this normal response. A same-camera close-wall trial there
+changed the sampled wall region by less than one RGB level on average, so its
+extra normal texture sample was rejected. The next work-wall pass needs a
+visible geometry, mortar and edge-wear solution rather than another subtle map.
 
 ## Integration boundary
 
