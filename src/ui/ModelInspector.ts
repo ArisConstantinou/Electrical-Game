@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { WorkerBody } from '../player/WorkerBody';
 import { FPSRig, RIG_TOOLS, type RigTool } from '../player/FPSRig';
+import { createDistributionBoardVisual } from '../electrical/DistributionBoardVisual';
 import type { Game } from '../core/Game';
 import '../styles/model-inspector.css';
 
@@ -39,6 +40,7 @@ export class ModelInspector {
   private aimMode=false;
   private statsTime=0;
   private openButton=document.createElement('button');
+  private readonly boardReferences:THREE.Group[]=[];
 
   constructor(private game:Game){
     this.scene.background=new THREE.Color('#dfe7ea');
@@ -94,7 +96,7 @@ export class ModelInspector {
     this.el('#model-play').addEventListener('click',()=>{this.playing=!this.playing;this.el('#model-play').textContent=this.playing?'PAUSE':'PLAY';this.el('#model-play').setAttribute('aria-pressed',String(this.playing));});
     this.el('#model-restart').addEventListener('click',()=>{this.elapsed=0;if(this.worker)this.worker.resetPreviewMotion();this.updatePose(0);});
     this.el<HTMLInputElement>('#model-speed').addEventListener('input',e=>{this.speed=Number((e.target as HTMLInputElement).value);this.el('#model-speed-value').textContent=`${this.speed}×`;});
-    for(const [id,direction] of [['front',new THREE.Vector3(0,.05,-1)],['back',new THREE.Vector3(0,.05,1)],['side',new THREE.Vector3(1,.05,0)],['fit',new THREE.Vector3(.15,.08,-1)]] as const)this.el(`#model-${id}`).addEventListener('click',()=>this.fit(direction));
+    for(const [id,direction] of [['front',new THREE.Vector3(0,.05,-1)],['back',new THREE.Vector3(0,.05,1)],['side',new THREE.Vector3(1,.05,0)],['fit',new THREE.Vector3(.15,.08,-1)]] as const)this.el(`#model-${id}`).addEventListener('click',()=>this.fit(this.isBoardReference()&&id!=='side'?direction.clone().multiply(new THREE.Vector3(1,1,-1)):direction));
     // Capture before gameplay listeners: text entry/orbiting must never use a tool.
     addEventListener('keydown',e=>{if(!this.active)return;if(e.code==='Escape'){e.preventDefault();this.close();e.stopImmediatePropagation();return;}const typing=e.target instanceof Element&&e.target.closest('input,select,textarea');if(e.code==='KeyC'&&!typing){e.preventDefault();this.faceFront();e.stopImmediatePropagation();return;}if(!this.live||typing){e.stopImmediatePropagation();return;}if(e.code==='Space'){e.preventDefault();if(!e.repeat)this.use(true,false);}},true);
   }
@@ -115,7 +117,9 @@ export class ModelInspector {
     this.game.hud.shell.querySelector<HTMLButtonElement>('#settings-toggle')?.focus();
   }
   private buildLibrary():void{
+    if(this.boardReferences.length===0)this.boardReferences.push(createDistributionBoardVisual('first-fix'),createDistributionBoardVisual('second-fix'));
     this.entries=[{id:'character',label:'Χαρακτήρας · ζωντανές στάσεις',path:'CHARACTER'}];
+    for(const board of this.boardReferences)this.entries.push({id:board.uuid,label:board.name,path:`ELECTRICAL REFERENCES / ${board.name}`,source:board});
     const visit=(o:THREE.Object3D,path:string):boolean=>{
       if(o===this.game.workerBody)return false;
       const label=o.name||`${o.type} ${o.id}`,next=path?`${path} / ${label}`:label;
@@ -184,7 +188,8 @@ export class ModelInspector {
     if(tool==='laser')this.rig.poseLaser(this.poseCamera);else this.rig.poseArms(this.poseCamera);
     this.worker.update(dt,this.poseCamera,{eyeHeight:crouch?.95:1.65,pitch:-.25,yaw:0,velocity},this.rig,tool,this.stance==='press',false);this.worker.overview=true;
   }
-  private fit(direction=new THREE.Vector3(.15,.08,-1)):void{
+  private isBoardReference():boolean{return this.boardReferences.some(board=>board.uuid===this.selected);}
+  private fit(direction=this.isBoardReference()?new THREE.Vector3(.15,.08,1):new THREE.Vector3(.15,.08,-1)):void{
     // Discard pending orbit inertia before an explicit FRONT/RESET command.
     const damping=this.controls.enableDamping;this.controls.enableDamping=false;this.controls.update();
     this.controls.enableDamping=damping;direction=direction.clone();
@@ -193,7 +198,7 @@ export class ModelInspector {
     const box=new THREE.Box3().setFromObject(root),center=box.getCenter(new THREE.Vector3()),size=box.getSize(new THREE.Vector3());
     if(box.isEmpty()||!Number.isFinite(size.length()))return;
     const radius=Math.max(.025,size.length()/2),fov=THREE.MathUtils.degToRad(this.camera.fov),angle=Math.min(fov,2*Math.atan(Math.tan(fov/2)*this.camera.aspect));
-    const distance=radius/Math.sin(angle/2)*1.12;this.controls.target.copy(center);if(this.live)direction.applyAxisAngle(new THREE.Vector3(0,1,0),this.game.workerBody.rotation.y);this.camera.position.copy(center).addScaledVector(direction.normalize(),distance);this.camera.near=Math.max(.002,distance/1000);this.camera.far=Math.max(200,distance*5);this.camera.updateProjectionMatrix();this.controls.update();
+    const distance=radius/Math.sin(angle/2)*(this.isBoardReference()?.79:1.12);this.controls.target.copy(center);if(this.live)direction.applyAxisAngle(new THREE.Vector3(0,1,0),this.game.workerBody.rotation.y);this.camera.position.copy(center).addScaledVector(direction.normalize(),distance);this.camera.near=Math.max(.002,distance/1000);this.camera.far=Math.max(200,distance*5);this.camera.updateProjectionMatrix();this.controls.update();
   }
   private resize():void{
     const rect=this.el('#model-orbit').getBoundingClientRect(),canvas=this.game.renderer.webgl.domElement.getBoundingClientRect(),w=rect.width,h=rect.height;
@@ -217,7 +222,7 @@ export class ModelInspector {
     if(this.live){this.followTarget.copy(this.game.workerBody.position);this.el('#model-title').textContent='Πραγματικός χαρακτήρας · LIVE GAMEPLAY';this.el<HTMLSelectElement>('#model-live-tool').value=this.game.selectedTool;this.fit();}
     else if(this.active){this.fit();this.el('#model-title').textContent=this.entries.find(e=>e.id===this.selected)?.label??'';}
   }
-  faceFront():void{this.fit(new THREE.Vector3(0,.05,-1));}
+  faceFront():void{this.fit(new THREE.Vector3(0,.05,this.isBoardReference()?1:-1));}
   beforeWorld(_dt:number):void{if(this.live){this.game.input.actionHeld=this.heldUse||this.heldInteract||this.game.input.pressed('KeyE');this.game.input.interactionHeld=this.heldInteract||this.game.input.pressed('KeyE');}}
   afterWorld(dt:number):void{
     if(!this.active||!this.live)return;

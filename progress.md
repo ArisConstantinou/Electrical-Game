@@ -1449,3 +1449,8 @@ Original prompt for this task: Selecting BOX should show an initial box in the l
 
 - Converted the 1G/2G back panel into a molded, open shell with one/two actual cable apertures beneath the retained entry lips and screw mounts. The openings reveal the current first-fix chase; no cable or second-fix work has been implied.
 - TypeScript, Vite, real raycast through the entry holes, box-fit/mortar/overlap preflight, and desktop plus 390×844 Chrome captures passed. The rear mesh has 176/340 triangles rather than 12 with no added draw call. Same-camera box photos are under `artifacts/visual-overhaul/box-*-entry-*`; differing held-hand appearance from the earlier baseline is unrelated to the openings. DB interior, finished faceplates, wired states and physical mobile remain open.
+
+## 2026-09-23 · Full visual overhaul, DB stage reference sample
+
+- The new photographs distinguish the bare recessed DB from the later open board with DIN rails, device rows, terminal bars and visible conductors. An inspector-only visual sample now provides both stages under 3D MODELS → ALL ASSETS. The later sample is 13,204 triangles, batched from 307 source pieces to 16 meshes, and is created only on inspector open. No ratings, live circuits or DB placement are implied.
+- Browser captures of both stages and a 390×844 viewport, asset-list selection, TypeScript and Vite build passed with no browser errors. See `artifacts/visual-overhaul/db-reference-*`. Direct comparison with the supplied photographs shows this is still a structural sample: plastic/device surfaces, cable terminations, plaster edge and surrounding room need further art work. It is not a finished DB or gameplay integration. Physical mobile performance and the complete visual goal remain open.

@@ -294,6 +294,35 @@ with the detail meshes both hidden and shown, but this was not a same-build
 before/after panel benchmark or a physical-device result. DB, wired box states,
 plaster transitions and final electrical finish remain open.
 
+## Twelfth isolated implementation: staged distribution-board visual reference
+
+The user's new photographs distinguish an empty recessed enclosure from a
+later opened board with mounted devices, rails, terminal strips and visible
+conductors. They also show 1G/2G boxes before and after plaster, both low
+socket and high switch positions, and the molded internal screw posts and cable
+entries. Those are different construction stages, not simultaneous fittings
+on every bare-brick wall.
+
+`DistributionBoardVisual.ts` now makes two inspectable samples, first-fix and
+second-fix, under **3D MODELS → ALL ASSETS**. The shell has a shallow irregular
+plaster cut, side returns, fixings and lower conduit entries. The later view
+adds three DIN rails, two rows of separate device bodies, mounting levers,
+terminal bars and visible brown/blue/earth-colour runs. The samples have no
+circuit assignment, electrical simulation or claimed protective ratings.
+They are built only when the model inspector opens and are not installed in
+the playable first-fix room; a DB location and the actual circuit design have
+not yet been approved. Geometry batching reduces the later visual from 307
+source pieces to 16 render meshes (13,204 triangles) and the empty enclosure
+from 32 source pieces to 6 meshes (1,116 triangles).
+
+The sample is reviewable at `db-reference-{empty,fitted}-desktop.png` and
+`db-reference-fitted-mobile-viewport.png`, with checks in
+`db-reference-check.json`. The present result is a structural blockout for
+stage/placement and still lacks the reference photo's close-up finish,
+device-specific details, convincing wire termination, enclosure deformation
+and wall integration. It must be refined before it is treated as a final
+visual model or added to gameplay.
+
 ## Integration boundary
 
 Do not promote this branch or replace the 5365 listener while the active
