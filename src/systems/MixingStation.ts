@@ -51,6 +51,7 @@ export class MixingStation {
   private readonly prompt:HTMLElement;
   private readonly finish:HTMLButtonElement;
   private readonly toolbelt:HTMLElement;
+  private mixingToolsVisible=false;
   private readonly readout:HTMLElement;
   private readonly feedback:HTMLElement;
   private readonly meter:HTMLProgressElement;
@@ -137,7 +138,7 @@ export class MixingStation {
     this.prompt=document.createElement('div');this.prompt.id='mixing-world-prompt';this.prompt.hidden=true;
     this.finish=document.createElement('button');this.finish.id='mixing-finish';this.finish.type='button';this.finish.innerHTML='<b>FINISH</b><small>Ο ΠΥΛΟΣ ΕΙΝΑΙ ΕΤΟΙΜΟΣ</small>';this.finish.hidden=true;
     this.toolbelt=document.createElement('nav');this.toolbelt.id='mixing-toolbelt';this.toolbelt.setAttribute('aria-label','Εργαλεία παρασκευής πυλού');this.toolbelt.hidden=true;
-    this.toolbelt.innerHTML='<button type="button" data-mix-equip="water"><b>💧</b><span>ΝΕΡΟ</span></button><button type="button" data-mix-equip="trowel"><b>◢</b><span>ΜΙΣΤΡΙ ΜΙΞΗΣ</span></button><button type="button" data-mix-equip="shovel"><b>♠</b><span>ΦΤΥΑΡΙ</span></button><button type="button" data-mix-equip="mixer"><b>⚙</b><span>ΜΙΞΕΡ</span></button>';
+    this.toolbelt.innerHTML='<button type="button" data-mix-equip="water" aria-label="Νερό"><b>💧</b><span>ΝΕΡΟ</span></button><button type="button" data-mix-equip="trowel" aria-label="Μιστρί μίξης"><b>◢</b><span>ΜΙΣΤΡΙ ΜΙΞΗΣ</span></button><button type="button" data-mix-equip="shovel" aria-label="Φτυάρι"><b>♠</b><span>ΦΤΥΑΡΙ</span></button><button type="button" data-mix-equip="mixer" aria-label="Μίκσερ"><b>⚙</b><span>ΜΙΞΕΡ</span></button>';
     this.toolbelt.insertAdjacentHTML('beforeend','<button type="button" id="mixing-put-down" aria-label="Άφησε το εργαλείο"><b>↓</b><span>ΑΦΗΣΕ</span></button>');
     this.toolbelt.querySelector('#mixing-put-down')!.addEventListener('click',()=>this.chooseTool('hands'));
     this.toolbelt.insertAdjacentHTML('beforeend','<button type="button" id="mixing-stance" aria-label="Σκύψε για εργασία στη σύκλα" aria-pressed="false"><b>↧</b><span>ΣΚΥΨΕ</span></button>');
@@ -535,6 +536,9 @@ export class MixingStation {
     this.receipt.update(this.workingBatch,this.game.started&&this.active,dt,this.destination==='drum'?this.drum.running?`Μπετονιέρα σε λειτουργία · ${Math.round(this.drum.batch.mixProgress*100)}%`:this.drum.batch.ready?'Έτοιμο · FINISH για χρήση':'20 L νερό · 18 μιστριές τσιμέντο · 36 φτυαριές άμμο':this.recipeHint(),this.destination==='drum'?'ΣΤΗ ΜΠΕΤΟΝΙΕΡΑ':'ΣΤΗ ΣΥΚΛΑ');
     const aimed=this.aimedObject();this.updateToolHighlights(aimed);const prompt=this.promptFor(aimed),interactAvailable=Boolean(prompt);this.prompt.hidden=!prompt;this.prompt.textContent=prompt;
     const mixingUiAvailable=!this.apprenticeLease&&!this.wheelbarrow.busy&&stageNearby&&(!this.game.boxAssemblyActive||interactAvailable);
+    if(mixingUiAvailable&&!this.mixingToolsVisible&&matchMedia('(pointer:coarse), (max-width:760px)').matches)
+      window.dispatchEvent(new CustomEvent('wirehouse:mixing-tools-enter'));
+    this.mixingToolsVisible=mixingUiAvailable;
     this.toolbelt.hidden=!mixingUiAvailable;
     this.game.hud.shell.classList.toggle('mixing-stage',mixingUiAvailable);
     this.game.hud.shell.classList.toggle('mixing-target',interactAvailable);

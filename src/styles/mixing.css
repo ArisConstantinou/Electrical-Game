@@ -40,3 +40,23 @@
 @media(pointer:coarse){.mixing-target #mixing-world-prompt{display:none!important}}
 @media(max-height:540px){#mixing-panel{left:8px;bottom:78px;width:300px;max-width:42vw}#mixing-world-prompt{top:42%;font-size:14px}#mixing-finish{bottom:82px;left:63%}#mixing-toolbelt{left:8px;right:8px;transform:none;justify-content:center}}
 @media(max-height:540px) and (min-width:540px){.mixing-stage #mixing-world-prompt{left:calc(50% + 150px);max-width:calc(100% - 330px)}}
+@media (pointer:coarse), (max-width:760px) {
+  #game-shell.mixing-stage[data-tools-open="false"] #mixing-toolbelt {display:none}
+  #game-shell.mixing-stage[data-tools-open="true"] #mixing-toolbelt:not([hidden]) {
+    position:absolute; z-index:18; top:calc(var(--top-rail-y) + 4px); bottom:auto;
+    left:calc(var(--top-rail-edge) + 7px); right:calc(var(--top-rail-edge) + 164px);
+    width:auto; height:46px; padding:0; gap:3px; transform:none;
+    overflow-x:auto; overflow-y:hidden; touch-action:pan-x;
+    border:0; border-radius:0; background:transparent; box-shadow:none;
+  }
+  #game-shell.mixing-stage[data-tools-open="true"] #mixing-toolbelt button {
+    flex:0 0 40px; width:40px; min-width:40px; height:44px; min-height:44px; padding:0;
+    border:0; border-radius:50%; background:transparent; color:#ffdf36;
+  }
+  #game-shell.mixing-stage #mixing-toolbelt b {
+    box-sizing:border-box; display:grid; place-items:center; width:32px; height:32px; margin:auto;
+    border:1px solid #c9d2b9a8; border-radius:50%; background:#22332a; font-size:20px;
+  }
+  #game-shell.mixing-stage #mixing-toolbelt button[aria-pressed="true"] b {border-color:#ffdf36;background:#ffdf36;color:#203127}
+  #game-shell.mixing-stage #mixing-toolbelt span {display:none}
+}

@@ -512,6 +512,9 @@ export class HUD {
     toolsToggle.addEventListener('click', () => {if(suppressToolsClick){suppressToolsClick=false;return;}toggleTools();});
     setToolsOpen(false);
     setInspectorOpen(false);
+    window.addEventListener('wirehouse:mixing-tools-enter',()=>{
+      if(this.shell.dataset.bottomRole==='worker'&&this.shell.dataset.boxAssembly!=='true')setToolsOpen(true);
+    });
     window.addEventListener('wirehouse:select-tool', () => {setToolsOpen(false);setBottomRole('worker');});
     window.addEventListener('wirehouse:coordinator-close',()=>setBottomRole('worker'));
     window.addEventListener('wirehouse:coordinator-entered',()=>{setToolsOpen(false);setBottomRole('coordinator');setInspectorOpen(true);});
