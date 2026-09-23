@@ -130,10 +130,12 @@ export class PlayerController {
       this.velocity.z=(this.camera.position.z-previousZ)/dt;
     }
     const radius = GAME_CONFIG.player.radius;
+    // The mansion's original side walls now own their movable collision.
+    // Keep only a broad site limit here so a saved wall position is reachable.
     this.camera.position.x = this.emptySite
       ? THREE.MathUtils.clamp(this.camera.position.x, -3.5 + radius, 26.5 - radius)
       : this.mansionPreview
-      ? THREE.MathUtils.clamp(this.camera.position.x, -GAME_CONFIG.room.width / 2 + radius, 18 - radius)
+      ? THREE.MathUtils.clamp(this.camera.position.x, -18 + radius, 18 - radius)
       : THREE.MathUtils.clamp(this.camera.position.x, -GAME_CONFIG.room.width / 2 + radius, GAME_CONFIG.room.width / 2 - radius);
     // The masonry facade stands inside the room's architectural bounds.
     // Apply body clearance independently of tool bracing and view direction:

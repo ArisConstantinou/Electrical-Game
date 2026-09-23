@@ -219,8 +219,10 @@ export class MansionGroundWing extends THREE.Group {
       pivot.userData.levelEditorLabel = `${object.name || 'Site part'}${count > 1 ? ` · ${count}` : ''}`;
       const structuralColumn = locked.has(object) && typeof object.userData.studioEntityId === 'string' &&
         object.userData.studioEntityId.startsWith('world:column:');
-      const structuralRightWall = locked.has(object) && object.userData.studioEntityId === 'world:right-concrete-wall';
-      pivot.userData.levelEditorLocked = locked.has(object) && !structuralColumn && !structuralRightWall;
+      const structuralSideWall = locked.has(object) &&
+        (object.userData.studioEntityId === 'world:right-concrete-wall' ||
+          object.userData.studioEntityId === 'world:left-concrete-wall');
+      pivot.userData.levelEditorLocked = locked.has(object) && !structuralColumn && !structuralSideWall;
       pivot.userData.levelEditorGround = /\b(?:ground|terrain|soil|floor)\b/i.test(object.name);
       pivot.userData.baseSize = [Math.max(size.x, .01), Math.max(size.y, .01), Math.max(size.z, .01)];
       pivot.userData.studioEntityId = `mansion:${id}`;
@@ -228,8 +230,8 @@ export class MansionGroundWing extends THREE.Group {
       pivot.position.copy(parent.worldToLocal(centre.clone()));
       pivot.attach(object);
       this.editableAssets.set(id, pivot);
-      if (structuralColumn || structuralRightWall) {
-        if (structuralRightWall) {
+      if (structuralColumn || structuralSideWall) {
+        if (object.userData.studioEntityId === 'world:right-concrete-wall') {
           const oldIndex = this.obstacles.findIndex(item => item.id === 'mansion-room-east');
           if (oldIndex >= 0) this.obstacles.splice(oldIndex, 1);
         }
@@ -237,7 +239,7 @@ export class MansionGroundWing extends THREE.Group {
           minZ: bounds.min.z, maxZ: bounds.max.z, minFloorY: bounds.min.y, maxFloorY: bounds.max.y };
         this.obstacles.push(obstacle);
         this.editableAssetColliders.set(pivot, { obstacle, matrix: new THREE.Matrix4().makeScale(0, 0, 0), source: object,
-          segment: structuralRightWall ? { length: size.z, halfWidth: size.x / 2 } : undefined });
+          segment: structuralSideWall ? { length: size.z, halfWidth: size.x / 2 } : undefined });
       }
     }
   }
