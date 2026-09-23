@@ -1,0 +1,135 @@
+{
+  "passed": true,
+  "isolatedDist": true,
+  "cases": [
+    {
+      "tool": "spray",
+      "station": false,
+      "visible": true,
+      "legacyMeshes": 0,
+      "maxGripReachErrorM": 0
+    },
+    {
+      "tool": "hammer",
+      "station": false,
+      "visible": true,
+      "legacyMeshes": 0,
+      "maxGripReachErrorM": 0.00834278056714322
+    },
+    {
+      "tool": "fitting",
+      "station": false,
+      "visible": true,
+      "legacyMeshes": 0,
+      "maxGripReachErrorM": 5.3756581237738575e-08
+    },
+    {
+      "tool": "level",
+      "station": false,
+      "visible": true,
+      "legacyMeshes": 0,
+      "maxGripReachErrorM": 7.930095784253039e-08
+    },
+    {
+      "tool": "spring",
+      "station": false,
+      "visible": true,
+      "legacyMeshes": 0,
+      "maxGripReachErrorM": 6.193056647966269e-08
+    },
+    {
+      "tool": "cutter",
+      "station": false,
+      "visible": true,
+      "legacyMeshes": 0,
+      "maxGripReachErrorM": 1.0112190256407372e-07
+    },
+    {
+      "tool": "trowel",
+      "station": false,
+      "visible": true,
+      "legacyMeshes": 0,
+      "maxGripReachErrorM": 6.503125251288689e-08
+    },
+    {
+      "tool": "hose",
+      "station": false,
+      "visible": true,
+      "legacyMeshes": 0,
+      "maxGripReachErrorM": 2.949071818465762e-08
+    },
+    {
+      "tool": "measure",
+      "station": false,
+      "visible": true,
+      "legacyMeshes": 0,
+      "maxGripReachErrorM": 0.024816213332937948
+    },
+    {
+      "tool": "drill",
+      "station": false,
+      "visible": true,
+      "legacyMeshes": 0,
+      "maxGripReachErrorM": 5.389472570088281e-08
+    },
+    {
+      "tool": "driver",
+      "station": false,
+      "visible": true,
+      "legacyMeshes": 0,
+      "maxGripReachErrorM": 5.209314843726764e-08
+    },
+    {
+      "tool": "laser",
+      "station": false,
+      "visible": true,
+      "legacyMeshes": 0,
+      "maxGripReachErrorM": 7.512297280951206e-08
+    },
+    {
+      "tool": "water",
+      "station": true,
+      "visible": true,
+      "legacyMeshes": 0,
+      "maxGripReachErrorM": 5.836085318489184e-08
+    },
+    {
+      "tool": "trowel",
+      "station": true,
+      "visible": true,
+      "legacyMeshes": 0,
+      "maxGripReachErrorM": 1.2092641941312035e-07
+    },
+    {
+      "tool": "shovel",
+      "station": true,
+      "visible": true,
+      "legacyMeshes": 0,
+      "maxGripReachErrorM": 1.6456939776965337e-07
+    },
+    {
+      "tool": "mixer",
+      "station": true,
+      "visible": true,
+      "legacyMeshes": 0,
+      "maxGripReachErrorM": 1.55970182924302e-07
+    },
+    {
+      "tool": "hands",
+      "station": true,
+      "visible": true,
+      "legacyMeshes": 0,
+      "maxGripReachErrorM": 0
+    },
+    {
+      "tool": "spray",
+      "station": false,
+      "visible": true,
+      "legacyMeshes": 0,
+      "maxGripReachErrorM": 0
+    }
+  ],
+  "pageErrors": [],
+  "glbSHA256": "1b481277d37f3a28769f7a715d27dc534b7e61e2e3c574c5ae3ff9c606279078",
+  "sourceGeometryWeightsSHA256": "aa510f8878c5322503a3f8175e726f86904c6fbc3001e4dde774a61fec60ff76"
+}

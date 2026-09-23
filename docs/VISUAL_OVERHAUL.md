@@ -112,6 +112,32 @@ Matching isolated browser screenshots: `box-B-before.png`, `box-B-after.png`,
 `box-C-gameplay-mobile.png` is a normal player view. The source and visual
 metadata are in `capture-box-detail.mjs` and `box-detail-check.json`.
 
+## Fourth isolated implementation: articulated work gloves
+
+The existing anatomical worker now wears dark woven work gloves in every pose.
+The colour and OpenGL normal use Poly Haven's CC0 Denim Fabric 06 as a textile
+proxy. An earlier glove-atlas crop stretched visibly at close range and was
+rejected. `scripts/build-visual-gloves.py` assigns the tileable scan to 5,496
+hand faces in the editable Blender source, ending at the original wrist loop.
+The original hand vertices,
+deformation weights and 52-joint rig have identical SHA-256 fingerprints before
+and after. The exported GLB keeps two meshes, one skeleton and all 24 existing
+locomotion clips. It grew from 12.9 MB to 14.9 MB; the embedded normal map and
+texture account for most of that change.
+
+The isolated game rendered spray and drill before/after at matching desktop
+and portrait camera poses: `glove-{before,candidate}-{spray,drill}-{desktop,mobile}.png`.
+`glove-{before,candidate}-hand-close.png` checks the wrist transition and
+visible hand surface from outside the first-person camera.
+The candidate passed the 18-state worker/tool browser test using the isolated
+production build. Twenty-one measured wrist reach errors were identical to
+the original. The new material changes rendered body-mesh bounds by material
+partition, so per-primitive bounds cannot be treated as a changed silhouette.
+Short headless Chrome frame intervals varied widely between runs; they do not
+prove a performance gain or phone parity. A full character close-up and real
+mobile GPU check remain necessary for final acceptance. Source and rights are
+recorded in `assets/source/WORKER_SOURCES.md`.
+
 ## Integration boundary
 
 Do not promote this branch or replace the 5365 listener while the active
