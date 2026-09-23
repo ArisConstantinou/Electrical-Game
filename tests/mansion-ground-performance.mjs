@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 import { chromium } from 'playwright';
 import { blockPointerLock } from './browser-safety.mjs';
 
 const selected = process.argv.includes('--focus') ? new Set(['released-room', 'preview-same-room-pose', 'preview-new-foyer', 'preview-third-floor-terrace']) : null;
-const out = selected ? 'output/mansion-performance-focus.json' : 'artifacts/site-pro-04/performance/mansion-ground-preview.json';
-await mkdir('artifacts/site-pro-04/performance', { recursive: true });
+const out = process.env.QA_PERF_OUTPUT ?? (selected ? 'output/mansion-performance-focus.json' : 'artifacts/site-pro-04/performance/mansion-ground-preview.json');
+const isolatedRoot = process.env.QA_DIST_ROOT ? path.resolve(process.env.QA_DIST_ROOT) : null;
+await mkdir(path.dirname(out), { recursive: true });
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const report = { environment: '390x844 DPR3 Chrome WebGL mobile emulation on Windows host; not physical phone', cases: [], errors: [] };
 try {
@@ -26,9 +28,19 @@ try {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
     await blockPointerLock(context);
     const page = await context.newPage();
+    if (isolatedRoot) await page.route('http://127.0.0.1:5365/Electrical-Game/**', async route => {
+      const relative = decodeURIComponent(new URL(route.request().url()).pathname).slice('/Electrical-Game/'.length) || 'index.html';
+      const file = path.resolve(isolatedRoot, relative);
+      if (!file.startsWith(isolatedRoot + path.sep)) return route.abort();
+      try {
+        const extension = path.extname(file).toLowerCase();
+        await route.fulfill({ status: 200, body: await readFile(file), contentType: ({ '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webp': 'image/webp', '.jpg': 'image/jpeg', '.png': 'image/png', '.glb': 'model/gltf-binary', '.gltf': 'model/gltf+json', '.bin': 'application/octet-stream', '.svg': 'image/svg+xml' })[extension] || 'application/octet-stream' });
+      } catch { await route.fulfill({ status: 404, body: `Missing isolated asset: ${relative}` }); }
+    });
     page.on('pageerror', error => report.errors.push(`${scene.name}: ${error.message}`));
     await page.goto(`http://127.0.0.1:5365/Electrical-Game/?renderer=webgl${scene.suffix}`);
     await page.locator('#start-button').waitFor({ state: 'visible', timeout: 120000 });
+    await page.waitForFunction(() => !document.querySelector('#start-button')?.disabled, null, { timeout: 120000 });
     await page.locator('#apprentice-count').selectOption('0');
     await page.locator('#start-button').tap();
     await page.waitForFunction(() => window.__wireTheHouse?.started, null, { timeout: 120000 });

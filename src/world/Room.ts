@@ -421,20 +421,17 @@ export class Room extends THREE.Group {
   private addConstructionJoints(): void {
     const width = GAME_CONFIG.room.width, depth = GAME_CONFIG.room.depth;
     const sections: Array<{position: THREE.Vector3; size: THREE.Vector3}> = [];
-    // Drying-shrinkage cuts in the screed, and the darker margin at the wall
-    // make the floor read as a poured surface inside a built enclosure.
-    for (const x of [-1.27, 1.27]) sections.push({position: new THREE.Vector3(x, .0015, 0), size: new THREE.Vector3(.003, .002, depth - .06)});
-    for (const z of [-1.2, 1.2]) sections.push({position: new THREE.Vector3(0, .0015, z), size: new THREE.Vector3(width - .06, .002, .003)});
+    // The unfinished screed is poured as one field. The previous four full
+    // length, equally spaced cuts read like manufactured floor tiles.
     for (const x of [-width / 2 + .015, width / 2 - .015]) sections.push({position: new THREE.Vector3(x, .002, 0), size: new THREE.Vector3(.022, .004, depth)});
     for (const z of [-depth / 2 + .015, depth / 2 - .015]) sections.push({position: new THREE.Vector3(0, .002, z), size: new THREE.Vector3(width, .004, .022)});
     const cuts = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), matteMaterial(0x756d60), sections.length);
     const transform = new THREE.Matrix4();
     for (const [index, section] of sections.entries()) cuts.setMatrixAt(index, transform.compose(section.position, new THREE.Quaternion(), section.size));
-    cuts.name = 'Screed joints and wall perimeter gap';
+    cuts.name = 'Screed wall perimeter gap';
     cuts.raycast = () => undefined;
     cuts.computeBoundingSphere();
     this.add(cuts);
-
   }
 
   private addWallHeadContact(): void {
