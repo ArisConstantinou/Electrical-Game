@@ -25,5 +25,6 @@ masonryFaceMaterial.normalNode = normalMap(sampleTexture(clayRibNormal, uv()), v
  * clay and the longitudinal chambers use the material lattice's vertex color. */
 export const damagedMasonryMaterial = new MeshStandardNodeMaterial({ roughness: 1 });
 damagedMasonryMaterial.name = 'Photographed clay with true fractured interior';
-damagedMasonryMaterial.colorNode = mix(attribute('color', 'vec3'), sampleTexture(brickFace, uv()).rgb,
-  attribute('brickFace', 'float'));
+damagedMasonryMaterial.colorNode = mix(attribute('color', 'vec3'),
+  mix(sampleTexture(brickFace, uv()).rgb, clayInterior, siteClayReady.mul(.25)).mul(clayRibShade),
+  attribute('brickFace', 'float')).mul(attribute('brickTint', 'vec3'));

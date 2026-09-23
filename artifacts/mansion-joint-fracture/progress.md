@@ -1,0 +1,9 @@
+# Mansion joint fracture — 2026-09-24
+
+The 5365 baseline was the integrated `ef51f21` checkout. Three pointed impacts 11 mm from the Courtyard north wall head joint removed 18 clay nodes from the directly targeted unit and zero from its neighbor. `before-live.png` and `before-live.json` record that state; the new joint test failed on this baseline.
+
+The candidate carries the finite impact footprint into up to three adjacent laid units when the hit is within 38 mm of their actual bounds. It preserves the original fired-clay lattice and the Studio damage save format. The damaged broad face now uses the intact atlas blend and instance tint, avoiding a whole-face color jump as the first chip appears. `after-candidate.png` and `after-candidate.json` record the same camera and three hits. `before-close.png` and `after-close.png` are unedited matching crops (600×400 at 383,170).
+
+Candidate checks: direct unit 18 removed nodes, neighbor 5, two partial units, zero whole units removed. A centered hit leaves adjacent units intact; a bed-joint hit reaches the next course. The actual hammer action damaged both adjacent units, as did a perpendicular wall. Studio save/restore preserved both. TypeScript, Vite build, `mansion-joint-fracture`, `mansion-partial-retirement`, `mansion-masonry-demolition`, and desktop/mobile-emulated `mansion-hammer-input` passed.
+
+The 12-hit headless desktop-host microbench measured a first joint hit at about 0.7 ms median / 0.9 ms p95 on the live baseline versus 1.3 ms median / 2.5 ms p95 on the candidate. This is a bounded CPU sample, not physical mobile or end-to-end FPS proof. The change couples nearby units at the contact point; it does not make all mansion walls one continuous destructive volume.

@@ -149,7 +149,8 @@ export class MansionMasonryDemolition {
     this.inverse.copy(this.group.matrixWorld).invert();
     const origin = camera.getWorldPosition(new THREE.Vector3()).applyMatrix4(this.inverse)
       .sub(entry.origin).applyQuaternion(entry.rotation.clone().invert());
-    const direction = camera.getWorldDirection(new THREE.Vector3()).applyQuaternion(entry.rotation.clone().invert());
+    const wallDirection = camera.getWorldDirection(new THREE.Vector3()).transformDirection(this.inverse);
+    const direction = wallDirection.clone().applyQuaternion(entry.rotation.clone().invert());
     const contact = entry.volume.raycast(origin, direction, 2.4);
     if (!contact) { if (!this.broken.has(index)) { entry.mesh.removeFromParent(); entry.mesh.geometry.dispose(); } return false; }
     const result = entry.volume.impact({ point: contact.point, direction, chisel: 'pointed', energyJ: 5 });
@@ -158,6 +159,8 @@ export class MansionMasonryDemolition {
       return false;
     }
     this.broken.set(index, entry);
+    this.fractureAcrossJoint(index, new THREE.Vector3(contact.point.x, contact.point.y, contact.point.z)
+      .applyQuaternion(entry.rotation).add(entry.origin), wallDirection);
     // The four hollow bores are air from the start. A threshold based on the
     // bounding box discarded a visibly substantial clay shell at 48% of that
     // box, making a struck brick suddenly disappear. Retire it only when its
@@ -166,6 +169,43 @@ export class MansionMasonryDemolition {
       return this.strike(index);
     if (entry.volume.removedNodeCount) this.showBrokenBrick(index, entry);
     return true;
+  }
+
+  /** A pointed impact has a finite footprint. Continue that same material
+   * fracture into adjacent fired-clay units only where the footprint reaches
+   * their real laid edge; no random brick-level damage or whole-unit removal. */
+  private fractureAcrossJoint(index: number, wallPoint: THREE.Vector3, wallDirection: THREE.Vector3): void {
+    const row = Math.floor(index / this.columns), col = index % this.columns;
+    const coordinate = this.alongX ? wallPoint.x : wallPoint.z;
+    let affected = 0;
+    for (let r = Math.max(0, row - 1); r <= Math.min(this.rows - 1, row + 1); r++)
+      for (let c = Math.max(0, col - 2); c <= Math.min(this.columns - 1, col + 2); c++) {
+        const neighbor = r * this.columns + c;
+        if (neighbor === index || !this.remaining[neighbor]) continue;
+        this.original[neighbor].decompose(this.position, this.rotation, this.scale);
+        const width = this.alongX ? this.scale.x : this.scale.z;
+        const dx = Math.max(0, Math.abs(coordinate - (this.alongX ? this.position.x : this.position.z)) - width / 2);
+        const dy = Math.max(0, Math.abs(wallPoint.y - this.position.y) - this.scale.y / 2);
+        const distance = Math.hypot(dx, dy);
+        if (distance >= .038) continue;
+        const fresh = !this.broken.has(neighbor);
+        const entry = this.broken.get(neighbor) ?? this.createBrokenBrick(neighbor);
+        const inverseRotation = entry.rotation.clone().invert();
+        const point = wallPoint.clone().sub(entry.origin).applyQuaternion(inverseRotation);
+        point.x = THREE.MathUtils.clamp(point.x, -entry.volume.width / 2 + .009, entry.volume.width / 2 - .009);
+        point.y = THREE.MathUtils.clamp(point.y, .009, entry.volume.height - .009);
+        const direction = wallDirection.clone().applyQuaternion(inverseRotation);
+        const result = entry.volume.impact({ point, direction, chisel: 'pointed',
+          energyJ: 1.4 + 2.2 * (1 - distance / .038) });
+        if (!result.contact || (!result.removedNodes && !result.stats.weakenedNodes)) {
+          if (fresh) { entry.mesh.removeFromParent(); entry.mesh.geometry.dispose(); }
+          continue;
+        }
+        this.broken.set(neighbor, entry);
+        if (entry.volume.removedNodeCount >= entry.originalSolidNodes * .94) this.strike(neighbor);
+        else if (entry.volume.removedNodeCount) this.showBrokenBrick(neighbor, entry);
+        if (++affected === 3) return;
+      }
   }
 
   restoreDamage(entries: readonly MansionBrickDamage[]): void {
@@ -213,8 +253,12 @@ export class MansionMasonryDemolition {
     geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     const face = new Float32Array(positions.length / 3), uv = new Float32Array(face.length * 2);
-    const patchAttribute = this.brickRefs[index]?.mesh.geometry.getAttribute('brickPatch');
-    const slot = this.brickRefs[index]?.instance ?? 0;
+    const tint = new Float32Array(face.length * 3);
+    const ref = this.brickRefs[index];
+    const patchAttribute = ref?.mesh.geometry.getAttribute('brickPatch');
+    const slot = ref?.instance ?? 0;
+    const color = ref?.mesh.instanceColor;
+    const tone = [color?.getX(slot) ?? 1, color?.getY(slot) ?? 1, color?.getZ(slot) ?? 1];
     const px = patchAttribute?.getX(slot) ?? 0, py = patchAttribute?.getY(slot) ?? 0;
     const pw = patchAttribute?.getZ(slot) ?? 1, ph = patchAttribute?.getW(slot) ?? 1;
     for (let i = 0; i < face.length; i += 3) {
@@ -224,14 +268,15 @@ export class MansionMasonryDemolition {
         face[k] = front ? 1 : 0;
         uv[k * 2] = px + (positions[k * 3] / entry.volume.width + .5) * pw;
         uv[k * 2 + 1] = py + positions[k * 3 + 1] / entry.volume.height * ph;
+        tint.set(tone, k * 3);
       }
     }
     geometry.setAttribute('brickFace', new THREE.BufferAttribute(face, 1));
+    geometry.setAttribute('brickTint', new THREE.BufferAttribute(tint, 3));
     geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
     geometry.computeBoundingSphere();
     entry.mesh.geometry.dispose(); entry.mesh.geometry = geometry;
     this.ensureMortarCells();
-    const ref = this.brickRefs[index];
     this.temp.makeScale(0, 0, 0);
     ref?.mesh.setMatrixAt(ref.instance, this.temp);
     if (ref) { ref.mesh.instanceMatrix.needsUpdate = true; ref.mesh.computeBoundingSphere(); }

@@ -1,0 +1,73 @@
+{
+  "result": {
+    "index": 316,
+    "neighbor": 317,
+    "first": true,
+    "second": true,
+    "third": true,
+    "primaryNodes": 18,
+    "neighborNodes": 0,
+    "partialBricks": 1,
+    "removedBricks": 0,
+    "renderError": ""
+  },
+  "further": {
+    "center": {
+      "partialBricks": 1,
+      "neighboringDamage": 0
+    },
+    "bed": {
+      "partialBricks": 1,
+      "otherRowDamage": 0
+    },
+    "tool": {
+      "partialBricks": 1,
+      "primaryNodes": 50,
+      "neighborNodes": 0,
+      "damaged": [
+        [
+          316,
+          50
+        ]
+      ]
+    },
+    "perpendicular": {
+      "primaryNodes": 16,
+      "neighborNodes": 0,
+      "partialBricks": 1,
+      "targetIndex": 87,
+      "strikes": [
+        true,
+        true,
+        true
+      ],
+      "camera": [
+        20,
+        1.6304347515106201,
+        9.147428564667702
+      ],
+      "initialDistance": 0.7699999999999996,
+      "edgeDistance": 0.7699999999999996,
+      "edgeIndex": 87,
+      "instance": [
+        0,
+        1.6304347515106201,
+        0,
+        0.23000000417232513,
+        0.12443478405475616,
+        0.31685712933540344
+      ]
+    },
+    "restored": {
+      "primaryNodes": 16,
+      "neighborNodes": 0,
+      "partialBricks": 1
+    },
+    "profile": {
+      "hitMedianMs": 0.7000000476837158,
+      "hitP95Ms": 0.8999999761581421
+    },
+    "renderError": ""
+  },
+  "errors": []
+}

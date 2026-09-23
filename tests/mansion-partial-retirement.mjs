@@ -97,13 +97,13 @@ try {
   await writeFile(resolve(out, live ? 'before-profile.json' : 'candidate-profile.json'), JSON.stringify({ result, profile, restored, errors }, null, 2));
   assert(result.afterCarve / result.originalSolidNodes > .5 && result.oldBoxFraction > .48 && result.remainingFraction > .1,
     `Fixture did not leave a visible clay remnant past the old whole-box threshold: ${JSON.stringify(result)}`);
-  assert(result.accepted && result.removedBricks === 0 && result.partialBricks === 1 && !result.renderError && !errors.length,
+  assert(result.accepted && result.removedBricks === 0 && result.partialBricks >= 1 && !result.renderError && !errors.length,
     `Substantial surviving clay was replaced by an empty brick slot: ${JSON.stringify({ result, profile, errors })}`);
   assert(result.mortarInstances === result.expectedMortarInstances && result.bedHeight <= .017 && result.headWidth <= .009,
     `Mortar must remain thin bed and head joints, not a solid block behind each brick: ${JSON.stringify(result)}`);
   assert(result.crossMortarInstances === result.expectedCrossMortarInstances && result.crossBedHeight <= .017 && result.crossHeadWidth <= .009,
     `Perpendicular walls also need thin joints: ${JSON.stringify(result)}`);
-  assert(restored.partialBricks === 1 && restored.removedClayNodes === result.removedClayNodes && restored.removedBricks === 0 && !restored.renderError,
+  assert(restored.partialBricks === result.partialBricks && restored.removedClayNodes === result.removedClayNodes && restored.removedBricks === 0 && !restored.renderError,
     `The retained fractured unit did not survive Studio save and restore: ${JSON.stringify(restored)}`);
   console.log(JSON.stringify({ live, result, profile, restored, errors }));
 } finally { await browser.close(); }
