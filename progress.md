@@ -1,5 +1,14 @@
 Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web game named WIRE THE HOUSE, based on real Cyprus residential first-fix practices, editable in Web Game Studio, playable on desktop/mobile, deployed to arisconstantinou/Electrical-Game via GitHub Pages, and ending at FIRST FIX COMPLETE without cable pulling.
 
+## 2026-09-23 · Full visual overhaul (in progress)
+
+- New approved scope: upgrade the complete game's visual quality toward the supplied atmospheric references while retaining its Cypriot construction-site setting. The user confirmed that earlier concept images should be reused; `Site Pro 04` and mansion concept images are already present.
+- Protected the active 5365 `codex/site-pro-04-mansion` listener and its extensive unrelated dirty work. Created isolated `codex/full-visual-upgrade` from recorded live commit `aabc0f3`; uncommitted live changes are not included.
+- Captured live gameplay before the change and visually inspected it. Added two small CC0 Poly Haven normal maps for the existing scanned screed and plaster, and wired shared photographed site materials to use restrained normal detail. TypeScript and production build passed. The isolated built game rendered default and mansion entries without browser errors using request interception at the same 5365 origin. The isolated entry is older than the dirty live runtime, so its screenshot is not a valid direct before/after of the live page.
+- Full scope, visual acceptance and integration boundary are recorded in `docs/VISUAL_OVERHAUL.md`. Next: continue with a final-quality representative workroom scene, then cover all listed areas; reconcile active source changes before promotion, and run matching runtime visual and performance comparisons. Do not claim the full upgrade finished from this material pass.
+- Added a detailed temporary electrician workbench under the window with CC0 scanned timber, separate fittings and batched static geometry. Same-camera before/after screenshots were visually inspected in the isolated runtime. Browser checks passed 0.28 m body clearance, mansion Level Editor inclusion, no page errors, and a short 90-frame headless Chrome comparison with unchanged median/p95 frame intervals. The result is a first prop, not the final visual target or physical-device performance proof.
+- Inspected a 390 × 844 portrait screenshot of the same bench. It is visible below the window, while the mixing toolbar and touch controls remain on screen. This is viewport emulation on Windows, not a physical phone test.
+
 ## 2026-09-22 · Site Pro 04 mobile concepts and live floor framing
 
 - Published five mobile Level Editor UI concepts as 25 separate 780 × 1748 JPEG screens at commit `5dbc1dd` on `codex/site-pro-04-mansion`. The user selected Concept 01 Dock Nest and it is now the implemented mobile/tablet editor UI: the bottom dock collapses to a small arc and each tab opens a temporary sheet.

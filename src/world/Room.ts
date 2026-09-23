@@ -10,6 +10,8 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { ExteriorCourtyard } from './ExteriorCourtyard';
 import { createClaySoffitPreview } from './ClaySoffitPreview';
 import { MansionGroundWing } from './MansionGroundWing';
+import { createWorksiteBench } from './WorksiteBench';
+import type { PlayerObstacle } from '../player/EquipmentCollision';
 
 /** Constant-time hit on a raised clay face; backing remains hittable in joints. */
 const setBrickFaceRaycast = (
@@ -36,6 +38,12 @@ export class Room extends THREE.Group {
   readonly referenceWalls: THREE.Object3D[] = [];
   readonly exterior: ExteriorCourtyard;
   readonly mansionWing: MansionGroundWing | null;
+  readonly worksiteBench: THREE.Group;
+  private readonly benchMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
+  private readonly benchObstacle: PlayerObstacle = {
+    id: 'temporary-electrician-bench', minX: 0, maxX: 0, minZ: 0, maxZ: 0,
+    minFloorY: 0, maxFloorY: 1.2,
+  };
 
   constructor(scene: THREE.Scene, private readonly mansionPreview = false) {
     super();
@@ -173,6 +181,8 @@ export class Room extends THREE.Group {
     this.addFloorReturns();
     this.addContactPatina();
     this.addSiteSupplies();
+    this.worksiteBench = createWorksiteBench();
+    this.add(this.worksiteBench);
 
     // Fired-clay shells leave thin angular plates, not round gravel. Share one
     // mesh/draw call for the existing 26 pieces and keep their floor positions.
@@ -211,6 +221,22 @@ export class Room extends THREE.Group {
   }
 
   update(dt: number): void { this.exterior.update(dt); this.mansionWing?.update(dt); }
+
+  /** Follow Level Editor moves without recomputing every mesh bound per frame. */
+  worksiteBenchObstacles(): PlayerObstacle[] {
+    this.worksiteBench.updateWorldMatrix(true, true);
+    if (!this.benchMatrix.equals(this.worksiteBench.matrixWorld)) {
+      this.benchMatrix.copy(this.worksiteBench.matrixWorld);
+      const bounds = new THREE.Box3().setFromObject(this.worksiteBench, true);
+      this.benchObstacle.minX = bounds.min.x;
+      this.benchObstacle.maxX = bounds.max.x;
+      this.benchObstacle.minZ = bounds.min.z;
+      this.benchObstacle.maxZ = bounds.max.z;
+      this.benchObstacle.minFloorY = bounds.min.y;
+      this.benchObstacle.maxFloorY = bounds.max.y;
+    }
+    return this.worksiteBench.visible ? [this.benchObstacle] : [];
+  }
 
   private addSideBrickCourses(side: THREE.Group, wallX: number, hasOpening: boolean): void {
     const pitch = GAME_CONFIG.room.depth / 20, course = GAME_CONFIG.room.height / 23, gap = .006;

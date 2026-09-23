@@ -1,0 +1,15 @@
+{
+  "contacts": [
+    "temporary-electrician-bench"
+  ],
+  "clearance": 0.2799999999999998,
+  "obstacle": {
+    "id": "temporary-electrician-bench",
+    "minX": -3.5800000119209288,
+    "maxX": -2.979999988079071,
+    "minZ": 1.1210000109672547,
+    "maxZ": 2.4189999890327454,
+    "minFloorY": 1.4305114426349519e-8,
+    "maxFloorY": 1.1269999742507935
+  }
+}

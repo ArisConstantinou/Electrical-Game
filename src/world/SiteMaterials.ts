@@ -10,13 +10,15 @@ const photographed: Partial<Record<Surface, string>> = new URLSearchParams(locat
   concrete: 'concrete',
   plaster: 'plastered_wall_03',
 };
-function photographedTexture(surface: Surface, repeatX: number, repeatY: number): THREE.Texture {
-  const key = `${surface}:${repeatX}:${repeatY}`;
+function photographedTexture(surface: Surface, repeatX: number, repeatY: number, kind: 'albedo' | 'normal' = 'albedo'): THREE.Texture {
+  const key = `${surface}:${repeatX}:${repeatY}:${kind}`;
   const cached = materialTextures.get(key);
   if (cached) return cached;
-  const image = textureLoader.load(`${import.meta.env.BASE_URL}assets/site-materials/${photographed[surface]}-albedo-512.webp`);
-  image.name = `${surface} albedo 512 CC0`;
-  image.colorSpace = THREE.SRGBColorSpace;
+  const filename = kind === 'albedo' ? `${photographed[surface]}-albedo-512.webp`
+    : `${surface === 'floor' ? 'concrete_floor' : photographed[surface]}-normal-512.webp`;
+  const image = textureLoader.load(`${import.meta.env.BASE_URL}assets/site-materials/${filename}`);
+  image.name = `${surface} ${kind} 512 CC0`;
+  if (kind === 'albedo') image.colorSpace = THREE.SRGBColorSpace;
   image.wrapS = image.wrapT = THREE.RepeatWrapping;
   image.repeat.set(repeatX, repeatY);
   image.anisotropy = 4;
@@ -74,6 +76,9 @@ export function siteMaterial(surface: Surface, color: number, repeatX = 1, repea
       name: `Scanned ${surface} surface`,
       color,
       map: photographedTexture(surface, repeatX, repeatY),
+      normalMap: photographedTexture(surface, repeatX, repeatY, 'normal'),
+      normalScale: new THREE.Vector2(surface === 'plaster' ? .32 : surface === 'floor' ? .16 : .28,
+        surface === 'plaster' ? .32 : surface === 'floor' ? .16 : .28),
       roughness: surface === 'concrete' ? .92 : .97,
       metalness: 0,
     });
@@ -128,7 +133,14 @@ export function siteProScreedMaterial(): THREE.MeshStandardMaterial {
     siteProScreedTexture.repeat.set(2, 1.9);
     siteProScreedTexture.anisotropy = 4;
   }
-  return new THREE.MeshStandardMaterial({ name: 'Site Pro poured screed', map: siteProScreedTexture, roughness: .98, metalness: 0 });
+  return new THREE.MeshStandardMaterial({
+    name: 'Site Pro poured screed',
+    map: siteProScreedTexture,
+    normalMap: photographedTexture('floor', 2, 1.9, 'normal'),
+    normalScale: new THREE.Vector2(.16, .16),
+    roughness: .98,
+    metalness: 0,
+  });
 }
 
 export const matteMaterial = (color: number, roughness = .92): THREE.MeshStandardMaterial => new THREE.MeshStandardMaterial({ color, roughness, metalness: 0 });
