@@ -104,7 +104,8 @@ export class HUD {
               <small>FLOATING places MOVE under your thumb; FIXED keeps it at the corner. Drag the right side to look. Hold USE and drag to aim while moving; a third AIM finger is optional.</small>
             </div>
           </section>
-          <aside id="desktop-key-guide" class="hud-card" aria-label="Keyboard and mouse controls">
+          <button id="desktop-key-guide-toggle" type="button" aria-label="Show keyboard controls" aria-expanded="false" aria-controls="desktop-key-guide" title="Show keyboard controls"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="7" width="26" height="18" rx="3"/><path d="M8 13h2m4 0h2m4 0h2M8 18h2m4 0h2m4 0h2M11 22h10"/></svg><span>KEYS</span></button>
+          <aside id="desktop-key-guide" class="hud-card" aria-label="Keyboard and mouse controls" hidden>
             <div><kbd>WASD</kbd><span>MOVE</span><kbd>MOUSE</kbd><span>LOOK</span><kbd>SHIFT</kbd><span>FAST</span><kbd>H</kbd><span>CROUCH / STAND</span></div>
             <div><kbd>LMB</kbd><span>USE / HOLD</span><kbd>E</kbd><span>INTERACT</span><kbd>WHEEL</kbd><span>SWITCH TOOL</span></div>
             <div><kbd>1–9</kbd><span>SELECT TOOL</span><kbd>9 / M</kbd><span>MEASURE / MARK</span><kbd>C</kbd><span>FULL BODY VIEW</span></div>
@@ -446,6 +447,14 @@ export class HUD {
     window.addEventListener('wirehouse:coordinator-close',()=>setBottomRole('worker'));
     window.addEventListener('wirehouse:coordinator-entered',()=>{setToolsOpen(false);setBottomRole('coordinator');});
     const settingsToggle = root.querySelector<HTMLButtonElement>('#settings-toggle');
+    const keyGuideToggle = root.querySelector<HTMLButtonElement>('#desktop-key-guide-toggle')!;
+    const keyGuide = root.querySelector<HTMLElement>('#desktop-key-guide')!;
+    keyGuideToggle.addEventListener('click', () => {
+      keyGuide.hidden = !keyGuide.hidden;
+      keyGuideToggle.setAttribute('aria-expanded', String(!keyGuide.hidden));
+      keyGuideToggle.setAttribute('aria-label', keyGuide.hidden ? 'Show keyboard controls' : 'Hide keyboard controls');
+      keyGuideToggle.title = keyGuide.hidden ? 'Show keyboard controls' : 'Hide keyboard controls';
+    });
     const settingsPanel = root.querySelector<HTMLElement>('#settings-panel');
     const setSettingsOpen = (open: boolean): void => {
       settingsPanel?.classList.toggle('open', open);

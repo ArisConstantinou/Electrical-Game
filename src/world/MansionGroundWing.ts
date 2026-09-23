@@ -19,7 +19,7 @@ export class MansionGroundWing extends THREE.Group {
   private originalRoomFloor: THREE.Group | null = null;
   private readonly editableWallColliders = new Map<THREE.Group, { obstacle: PlayerObstacle; matrix: THREE.Matrix4 }>();
   private readonly editableAssetColliders = new Map<THREE.Group, { obstacle: PlayerObstacle; matrix: THREE.Matrix4; source?: THREE.Object3D;
-    segment?: { length: number; halfWidth: number } }>();
+    segment?: { length: number; halfWidth: number; alongX?: boolean } }>();
   private readonly corner = new THREE.Vector3();
   private readonly inverseSurfaceMatrix = new THREE.Matrix4();
   private emptyTemplate = false;
@@ -222,6 +222,8 @@ export class MansionGroundWing extends THREE.Group {
       const structuralSideWall = locked.has(object) &&
         (object.userData.studioEntityId === 'world:right-concrete-wall' ||
           object.userData.studioEntityId === 'world:left-concrete-wall');
+      const workWall = locked.has(object) && object instanceof BrickWall &&
+        object.userData.studioEntityId === 'world:brick-wall';
       pivot.userData.levelEditorLocked = locked.has(object) && !structuralColumn && !structuralSideWall;
       pivot.userData.levelEditorGround = /\b(?:ground|terrain|soil|floor)\b/i.test(object.name);
       pivot.userData.baseSize = [Math.max(size.x, .01), Math.max(size.y, .01), Math.max(size.z, .01)];
@@ -230,7 +232,7 @@ export class MansionGroundWing extends THREE.Group {
       pivot.position.copy(parent.worldToLocal(centre.clone()));
       pivot.attach(object);
       this.editableAssets.set(id, pivot);
-      if (structuralColumn || structuralSideWall) {
+      if (structuralColumn || structuralSideWall || workWall) {
         if (object.userData.studioEntityId === 'world:right-concrete-wall') {
           const oldIndex = this.obstacles.findIndex(item => item.id === 'mansion-room-east');
           if (oldIndex >= 0) this.obstacles.splice(oldIndex, 1);
@@ -239,7 +241,8 @@ export class MansionGroundWing extends THREE.Group {
           minZ: bounds.min.z, maxZ: bounds.max.z, minFloorY: bounds.min.y, maxFloorY: bounds.max.y };
         this.obstacles.push(obstacle);
         this.editableAssetColliders.set(pivot, { obstacle, matrix: new THREE.Matrix4().makeScale(0, 0, 0), source: object,
-          segment: structuralSideWall ? { length: size.z, halfWidth: size.x / 2 } : undefined });
+          segment: structuralSideWall ? { length: size.z, halfWidth: size.x / 2 }
+            : workWall ? { length: object.volume.width, halfWidth: object.volume.depth / 2, alongX: true } : undefined });
       }
     }
   }
@@ -309,15 +312,24 @@ export class MansionGroundWing extends THREE.Group {
       asset.updateWorldMatrix(true, true);
       if (entry.matrix.equals(asset.matrixWorld)) continue;
       entry.matrix.copy(asset.matrixWorld);
-      const bounds = new THREE.Box3().setFromObject(entry.source ?? asset, true);
+      const source = entry.source;
+      if (source instanceof BrickWall) source.updateWorldMatrix(true, false);
+      const bounds = source instanceof BrickWall
+        ? new THREE.Box3(
+          new THREE.Vector3(-source.volume.width / 2, 0, source.volume.frontZ - source.volume.depth),
+          new THREE.Vector3(source.volume.width / 2, source.volume.height, source.volume.frontZ),
+        ).applyMatrix4(source.matrixWorld)
+        : new THREE.Box3().setFromObject(source ?? asset, true);
       const obstacle = entry.obstacle;
       obstacle.minX = bounds.min.x - .01; obstacle.maxX = bounds.max.x + .01;
       obstacle.minZ = bounds.min.z - .01; obstacle.maxZ = bounds.max.z + .01;
       obstacle.minFloorY = bounds.min.y - .2; obstacle.maxFloorY = bounds.max.y;
       if (entry.segment) {
-        const a = new THREE.Vector3(0, 0, -entry.segment.length / 2).applyMatrix4(asset.matrixWorld);
-        const b = new THREE.Vector3(0, 0, entry.segment.length / 2).applyMatrix4(asset.matrixWorld);
-        const widthScale = new THREE.Vector3().setFromMatrixScale(asset.matrixWorld).x;
+        const { length, alongX } = entry.segment;
+        const a = new THREE.Vector3(alongX ? -length / 2 : 0, 0, alongX ? 0 : -length / 2).applyMatrix4(asset.matrixWorld);
+        const b = new THREE.Vector3(alongX ? length / 2 : 0, 0, alongX ? 0 : length / 2).applyMatrix4(asset.matrixWorld);
+        const scale = new THREE.Vector3().setFromMatrixScale(asset.matrixWorld);
+        const widthScale = alongX ? scale.z : scale.x;
         const halfWidth = entry.segment.halfWidth * widthScale + .01;
         obstacle.segments = [{ ax: a.x, az: a.z, bx: b.x, bz: b.z, halfWidth }];
         obstacle.minX = Math.min(a.x, b.x) - halfWidth; obstacle.maxX = Math.max(a.x, b.x) + halfWidth;

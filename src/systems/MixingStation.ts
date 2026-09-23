@@ -100,6 +100,9 @@ export class MixingStation {
     // The preparation bay lives at the rear perimeter, leaving the full wall
     // approach and side-to-side working lane clear.
     m.group.position.set(0,0,2.10);game.renderer.scene.add(m.group);
+    // The mansion's open rear doorway joins this room to the passage. Keep
+    // the drum out of the doorway's center line so travel works both ways.
+    if (game.room.mansionWing) m.concreteMixer.position.x -= .7;
     this.wheelbarrow=new Wheelbarrow(m.wheelbarrow,game);
     this.bucketHome.copy(m.bucket.position);this.mixerHome.copy(m.mixer.position);this.mixerRotation.copy(m.mixer.rotation);
     game.renderer.camera.add(this.held);this.held.name='Mixing tools held in worker hands';

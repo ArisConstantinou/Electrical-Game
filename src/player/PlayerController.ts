@@ -137,10 +137,11 @@ export class PlayerController {
       : this.mansionPreview
       ? THREE.MathUtils.clamp(this.camera.position.x, -18 + radius, 18 - radius)
       : THREE.MathUtils.clamp(this.camera.position.x, -GAME_CONFIG.room.width / 2 + radius, GAME_CONFIG.room.width / 2 - radius);
-    // The masonry facade stands inside the room's architectural bounds.
-    // Apply body clearance independently of tool bracing and view direction:
-    // looking along the wall must not disable the player's collision barrier.
-    this.camera.position.z = THREE.MathUtils.clamp(this.camera.position.z, this.emptySite ? -6 + radius : GAME_CONFIG.room.wallFrontZ + radius,
+    // The original room uses its fixed facade limit. In the editable mansion,
+    // the work wall's live segment owns body collision, including after a move
+    // or rotation, so the old facade coordinate cannot become an invisible wall.
+    this.camera.position.z = THREE.MathUtils.clamp(this.camera.position.z,
+      this.emptySite ? -6 + radius : this.mansionPreview ? -18 + radius : GAME_CONFIG.room.wallFrontZ + radius,
       this.emptySite ? 22 - radius : this.mansionPreview ? 16 - radius : GAME_CONFIG.room.depth / 2 - radius);
     // Only adjacent 15 cm risers may change the floor height in one movement
     // step. This prevents entering the elevated return flight from ground level

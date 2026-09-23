@@ -158,10 +158,19 @@ export class Game {
     this.renderer.camera.add(this.fpsRig);
     this.renderer.scene.add(this.renderer.camera);
     this.workerBody=new WorkerBody(this.renderer.scene);
-    const mansionPreview = new URLSearchParams(location.search).get('mansion') === 'preview';
+    const sceneParams = new URLSearchParams(location.search);
+    const mansionPreview = sceneParams.get('mansion') !== 'basic';
+    root.querySelector('#start-level-current')!.textContent = mansionPreview ? 'MANSION SITE · PREVIEW' : 'ORIGINAL FIRST FIX ROOM';
     if (mansionPreview) this.renderer.scene.fog = new THREE.Fog(0xaab9bd, 22, 88);
     this.room = new Room(this.renderer.scene, mansionPreview);
     this.player.setMansionPreview(mansionPreview);
+    if (mansionPreview && sceneParams.get('template') !== 'blank' && !sceneParams.has('level') && sceneParams.get('editor') !== '1') {
+      // Start in the physical passage that joins the old work room to the foyer.
+      // Leave saved levels and the editor's own camera/start marker untouched.
+      this.player.camera.position.set(0, this.player.eyeHeight, 5.2);
+      this.player.yaw = Math.PI;
+      this.player.pitch = -0.08;
+    }
     if (this.room.mansionWing) this.player.setSurfaceProvider((x,z,currentFloor)=>this.room.mansionWing!.surfaceHeight(x,z,currentFloor));
     this.renderer.scene.add(this.room);
     this.hoseSupply=new HoseSupplyLine(this.renderer.scene,this.fpsRig.getObjectByName('FPS hose tool')!);
@@ -220,6 +229,7 @@ export class Game {
       const url = new URL(location.href);
       for (const key of ['mansion', 'renderer', 'editor', 'template', 'level']) url.searchParams.delete(key);
       if (choice === 'new') { url.searchParams.set('mansion', 'preview'); url.searchParams.set('renderer', 'webgl'); url.searchParams.set('template', 'blank'); url.searchParams.set('editor', '1'); }
+      else if (choice === 'basic') { url.searchParams.set('mansion', 'basic'); }
       else if (choice !== 'basic') { url.searchParams.set('mansion', 'preview'); url.searchParams.set('renderer', 'webgl'); url.searchParams.set('level', choice); }
       return url.toString();
     };
