@@ -9,6 +9,7 @@ import { createClaySoffitPreview } from './ClaySoffitPreview';
 import { MansionCourtyard } from './MansionCourtyard';
 import { MansionSurroundings } from './MansionSurroundings';
 import { BrickWall } from './BrickWall';
+import { MansionMasonryDemolition, type MasonryAim } from './MansionMasonryDemolition';
 
 /** Traversable unfinished mansion shell, including the original work room. */
 export class MansionGroundWing extends THREE.Group {
@@ -16,6 +17,7 @@ export class MansionGroundWing extends THREE.Group {
   readonly editableWalls = new Map<string, THREE.Group>();
   readonly editableSurfaces = new Map<string, THREE.Group>();
   readonly editableAssets = new Map<string, THREE.Group>();
+  readonly masonryDemolition = new Map<string, MansionMasonryDemolition>();
   private originalRoomFloor: THREE.Group | null = null;
   private readonly editableWallColliders = new Map<THREE.Group, { obstacle: PlayerObstacle; matrix: THREE.Matrix4 }>();
   private readonly editableAssetColliders = new Map<THREE.Group, { obstacle: PlayerObstacle; matrix: THREE.Matrix4; source?: THREE.Object3D;
@@ -63,6 +65,7 @@ export class MansionGroundWing extends THREE.Group {
     this.courtyard = new MansionCourtyard(oliveSource);
     this.add(this.courtyard);
     this.obstacles.push(...this.courtyard.obstacles);
+    for (const [id, wall] of this.courtyard.masonryDemolition) this.masonryDemolition.set(id, wall);
     this.surroundings = new MansionSurroundings(oliveSource, neighbourSource);
     this.add(this.surroundings);
     this.addStairCore();
@@ -123,6 +126,8 @@ export class MansionGroundWing extends THREE.Group {
       if (object.name.startsWith('B1 ')) pivot.userData.levelEditorFloor = 5;
       if (object.name.startsWith('B2 ')) pivot.userData.levelEditorFloor = 6;
       pivot.userData.levelEditorLabel = `${object.name}${count > 1 ? ` · ${count}` : ''}`;
+      const windowSill = /^Courtyard east window sill assembly (8|12)$/.exec(object.name);
+      if (windowSill) pivot.userData.levelEditorOpeningSill = true;
       bounds.getSize(size);
       pivot.userData.baseSize = [Math.max(size.x, .01), Math.max(size.y, .01), Math.max(size.z, .01)];
       pivot.userData.studioEntityId = `mansion:${id}`;
@@ -142,6 +147,12 @@ export class MansionGroundWing extends THREE.Group {
         pivot.add(pickProxy);
       }
       this.editableAssets.set(id, pivot);
+      if (windowSill) {
+        const obstacle = this.obstacles.find(item => item.id === `court-open-window-sill-${windowSill[1]}`);
+        if (obstacle) this.editableAssetColliders.set(pivot, {
+          obstacle, matrix: new THREE.Matrix4().makeScale(0, 0, 0), source: object,
+        });
+      }
       if (object.name.startsWith('B1 retaining ') || object.name.startsWith('B2 retaining ') ||
         /^(?:B1|B2) exposed frame column /.test(object.name)) {
         const obstacle = this.obstacles.find(item => item.id === object.name);
@@ -359,6 +370,12 @@ export class MansionGroundWing extends THREE.Group {
 
   obstaclesAt(floorY: number): PlayerObstacle[] {
     for (const [asset, entry] of this.editableAssetColliders) {
+      if (asset.userData.levelEditorHidden === true) {
+        entry.obstacle.segments = [];
+        entry.obstacle.minX = entry.obstacle.minZ = Infinity;
+        entry.obstacle.maxX = entry.obstacle.maxZ = -Infinity;
+        continue;
+      }
       asset.updateWorldMatrix(true, true);
       if (entry.matrix.equals(asset.matrixWorld)) continue;
       entry.matrix.copy(asset.matrixWorld);
@@ -392,6 +409,12 @@ export class MansionGroundWing extends THREE.Group {
     }
     for (const [wall, entry] of this.editableWallColliders) {
       const obstacle = entry.obstacle;
+      if (wall.userData.levelEditorHidden === true) {
+        obstacle.segments = [];
+        obstacle.minX = obstacle.minZ = Infinity;
+        obstacle.maxX = obstacle.maxZ = -Infinity;
+        continue;
+      }
       wall.updateWorldMatrix(true, false);
       if (entry.matrix.equals(wall.matrixWorld)) continue;
       entry.matrix.copy(wall.matrixWorld);
@@ -447,9 +470,53 @@ export class MansionGroundWing extends THREE.Group {
       this.corner.set(0, 3, 0).applyMatrix4(wall.matrixWorld);
       obstacle.maxFloorY = this.corner.y;
     }
+    for (const wall of this.masonryDemolition.values())
+      if (wall.group.userData.levelEditorHidden !== true) wall.updateGroundCollision();
     return this.obstacles.filter(obstacle =>
       (!this.emptyTemplate || obstacle.id.startsWith('Editor ')) &&
       floorY >= (obstacle.minFloorY ?? -Infinity) - .16 && floorY <= (obstacle.maxFloorY ?? Infinity) + .16);
+  }
+
+  aimMasonry(camera: THREE.Camera): MasonryAim | null {
+    let nearest: MasonryAim | null = null;
+    const eye = camera.getWorldPosition(new THREE.Vector3());
+    const view = camera.getWorldDirection(new THREE.Vector3());
+    for (const wall of this.masonryDemolition.values()) {
+      const hit = wall.aim(camera, 2.4, eye, view);
+      if (hit && (!nearest || hit.distance < nearest.distance)) nearest = hit;
+    }
+    return nearest;
+  }
+
+  demolitionSnapshot(): Record<string, number[]> {
+    const result: Record<string, number[]> = {};
+    for (const [id, wall] of this.masonryDemolition) if (wall.damaged) result[id] = wall.removedIndices();
+    return result;
+  }
+
+  restoreDemolition(snapshot: Record<string, number[]>): void {
+    for (const wall of this.masonryDemolition.values()) wall.reset();
+    for (const [id, indices] of Object.entries(snapshot))
+      if (Array.isArray(indices)) this.masonryDemolition.get(id)?.restoreRemoved(indices);
+  }
+
+  setEditorWallHidden(group: THREE.Group, hidden: boolean): void {
+    const entry = this.editableWallColliders.get(group);
+    if (!entry) return;
+    if ((group.userData.levelEditorHidden === true) === hidden) return;
+    group.userData.levelEditorHidden = hidden;
+    group.visible = !hidden;
+    entry.matrix.makeScale(0, 0, 0);
+    this.obstaclesAt(group.position.y);
+  }
+
+  setEditorAssetHidden(group: THREE.Group, hidden: boolean): void {
+    if (!group.userData.levelEditorOpeningSill) return;
+    if ((group.userData.levelEditorHidden === true) === hidden) return;
+    group.userData.levelEditorHidden = hidden;
+    group.visible = !hidden;
+    this.editableAssetColliders.get(group)?.matrix.makeScale(0, 0, 0);
+    this.obstaclesAt(group.position.y);
   }
 
   addEditorWall(id: string, kind: 'brick-wall' | 'concrete-wall', length = 3): THREE.Group {
@@ -494,6 +561,7 @@ export class MansionGroundWing extends THREE.Group {
   }
 
   removeEditorWall(group: THREE.Group): void {
+    this.masonryDemolition.delete(group.name);
     this.editableWalls.delete(group.name);
     this.editableWallColliders.delete(group);
     const index = this.obstacles.findIndex(item => item.id === group.name);
@@ -800,6 +868,7 @@ export class MansionGroundWing extends THREE.Group {
       minFloorY: baseY, maxFloorY: baseY + 3 };
     this.obstacles.push(obstacle);
     this.editableWallColliders.set(editable, { obstacle, matrix: new THREE.Matrix4().makeScale(0, 0, 0) });
+    this.masonryDemolition.set(name, new MansionMasonryDemolition(editable, bricks, backing, obstacle, length, alongX, columns, rows));
   }
 
   private castFrame(x: number, z: number): void {
@@ -840,15 +909,21 @@ export class MansionGroundWing extends THREE.Group {
   }
 
   private addCourtyardWindowBand(z0: number, z1: number): void {
+    // Keep the sill assembly together so the editor can remove or restore it
+    // with the same collision footprint, turning this bay into a doorway.
+    const sill = new THREE.Group();
+    sill.name = `Courtyard east window sill assembly ${z0}`;
+    this.add(sill);
     const mortar = siteMaterial('floor', 0x938b7f, .5, .5);
     for (const [name, y0, y1] of [
       ['sill masonry', 0, 1.04], ['head masonry', 2.43, 3],
     ] as const) {
+      const parent = name === 'sill masonry' ? sill : this;
       const backing = new THREE.Mesh(new THREE.BoxGeometry(.20, y1 - y0, z1 - z0), mortar);
       backing.name = `Courtyard east window ${name}`;
       backing.position.set(18, (y0 + y1) / 2, (z0 + z1) / 2);
       backing.castShadow = backing.receiveShadow = true;
-      this.add(backing);
+      parent.add(backing);
       const course = 3 / 23, rows = Math.ceil((y1 - y0) / course), cols = 6;
       const geometry = new THREE.BoxGeometry(1, 1, 1), patches = new Float32Array(rows * cols * 4);
       geometry.setAttribute('brickPatch', new THREE.InstancedBufferAttribute(patches, 4));
@@ -863,7 +938,7 @@ export class MansionGroundWing extends THREE.Group {
           new THREE.Vector3(.24, (y1 - y0) / rows - .006, (z1 - z0) / cols - .006)));
       }
       bricks.castShadow = bricks.receiveShadow = true;
-      bricks.computeBoundingSphere(); this.add(bricks);
+      bricks.computeBoundingSphere(); parent.add(bricks);
     }
     const concrete = siteMaterial('floor', 0xd6cfc4, .22, .25);
     for (const [label, y] of [['raw sill', 1.04], ['supported lintel', 2.43]] as const) {
@@ -871,7 +946,7 @@ export class MansionGroundWing extends THREE.Group {
       edge.name = `Courtyard ${label} at window ${z0}`;
       edge.position.set(18, y, (z0 + z1) / 2);
       edge.castShadow = edge.receiveShadow = true;
-      this.add(edge);
+      (label === 'raw sill' ? sill : this).add(edge);
     }
     this.obstacles.push({ id: `court-open-window-sill-${z0}`, minX: 17.86, maxX: 18.14, minZ: z0, maxZ: z1 });
   }

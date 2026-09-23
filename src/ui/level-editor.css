@@ -38,6 +38,7 @@
 #level-editor .level-editor__fields input{display:block;width:100%;min-width:0;min-height:38px;padding:6px;background:#f5f2eb;color:#1b2525;border:1px solid #89918f;border-radius:4px;font-size:14px}
 #level-editor.marker-selected .level-editor__fields label:has([data-size]){display:none}
 #level-delete{width:100%;margin-top:10px}
+#level-remove-sill{width:100%;margin-top:10px;background:#634832;border-color:#c99a64}
 #level-status{min-height:35px}
 #level-editor .level-editor__save,#level-editor .level-editor__bottom-nav,#level-editor .level-editor__wheel{display:none}
 #level-editor .level-editor__save{position:absolute}
@@ -174,7 +175,7 @@
 #level-fields-tabs{display:none}
 @media(max-width:1100px){
   #level-editor[data-tab=transform] .level-editor__inspector{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));align-content:start;gap:6px}
-  #level-editor .level-editor__inspector b,#level-editor .level-editor__inspector #level-kind,#level-editor #level-fields-tabs,#level-editor .level-editor__fields,#level-editor #level-delete,#level-editor #level-status{grid-column:1/-1}
+  #level-editor .level-editor__inspector b,#level-editor .level-editor__inspector #level-kind,#level-editor #level-fields-tabs,#level-editor .level-editor__fields,#level-editor #level-remove-sill,#level-editor #level-delete,#level-editor #level-status{grid-column:1/-1}
   #level-editor .level-editor__inspector #level-kind{margin:0}
   #level-editor .level-editor__inspector #level-focus{grid-column:1;margin:0;min-height:44px;font-size:0!important}
   #level-editor .level-editor__inspector #level-focus::after{content:'FOCUS';font-size:11px}
@@ -217,7 +218,7 @@
   #level-editor .level-editor__fields{order:3}
   #level-editor #level-group-edit{order:4}
   #level-editor #level-status{order:5}
-  #level-editor .level-editor__inspector b{position:sticky;top:0;z-index:2;padding:5px 7px;background:#213238;border:1px solid #526f76;border-radius:7px}
+  #level-editor .level-editor__inspector b{position:sticky;top:0;z-index:2;padding:5px 7px;background:#213238;color:#f6f4ef;border:1px solid #526f76;border-radius:7px}
   #level-editor[data-tab=select] aside{height:min(42vh,380px)}
 }
 

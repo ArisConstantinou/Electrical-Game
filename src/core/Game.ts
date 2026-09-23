@@ -618,7 +618,11 @@ export class Game {
     this.audio.setContinuous('trowel',mortarTool&&this.selectedTool==='trowel'&&this.input.actionHeld&&!this.mortar.throwFeedback.overheld,.7+this.mortar.charge*.3);
     this.audio.setContinuous('mixer',this.mixing.mixerRunning);
     setLaserProjection(this.laserLevel.activeHeightM);
-    if (this.selectedTool === 'hammer') this.fpsRig.contact(this.renderer.camera, this.room.brickWall);
+    if (this.selectedTool === 'hammer') {
+      const masonry = this.room.mansionWing?.aimMasonry(this.renderer.camera);
+      if (masonry) this.fpsRig.contactMasonry(this.renderer.camera, masonry.point);
+      else this.fpsRig.contact(this.renderer.camera, this.room.brickWall);
+    }
     else if(this.selectedTool==='trowel')this.fpsRig.poseTrowel(this.renderer.camera,this.mortar.throwFeedback.motion,dt,this.room.brickWall.volume.frontZ);
     else if(this.selectedTool==='measure')this.fpsRig.poseMeasure(this.renderer.camera,this.heightMeasure.target,this.heightMeasure.targetNormal);
     else if(this.selectedTool==='drill'||this.selectedTool==='driver')this.fpsRig.poseReferenceTool(this.renderer.camera,this.selectedTool,this.laserLevel.target,this.laserLevel.targetNormal,this.laserLevel.working,dt);
@@ -750,6 +754,17 @@ export class Game {
 
   private performAction(continuing = false): void {
     if(this.apprentice.ownsInput){if(this.apprentice.mode==='layout')this.apprentice.confirm();return;}
+    if (this.selectedTool === 'hammer') {
+      const masonry = this.room.mansionWing?.aimMasonry(this.renderer.camera);
+      if (masonry) {
+        if (this.fpsRig.contactMasonry(this.renderer.camera, masonry.point) && masonry.wall.strike(masonry.index)) {
+          this.fpsRig.strike();
+          this.fpsRig.toolAction = 1;
+          this.audio.play('hammer', .65);
+        }
+        return;
+      }
+    }
     if(['spring','cutter'].includes(this.selectedTool)){this.hud.notify('Πήγαινε στη μάτσα PVC και πάτησε E για χειροκίνητη προετοιμασία.',false,1800);return;}
     if(['measure','drill','driver'].includes(this.selectedTool))return;
     if(this.selectedTool==='fitting'&&!this.boxAssemblyActive)return;

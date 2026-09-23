@@ -4,10 +4,12 @@ import type { PlayerObstacle } from '../player/EquipmentCollision';
 import { brickFacePatch } from './BrickFacePatch';
 import { masonryFaceMaterial } from './BrickFaceMaterial';
 import { siteMaterial } from './SiteMaterials';
+import { MansionMasonryDemolition } from './MansionMasonryDemolition';
 
 /** A traversable open-air room, with reused live olive geometry rather than a backdrop. */
 export class MansionCourtyard extends THREE.Group {
   readonly obstacles: PlayerObstacle[] = [];
+  readonly masonryDemolition = new Map<string, MansionMasonryDemolition>();
   private readonly tree: THREE.Object3D | null;
   private windTime = 0;
 
@@ -113,8 +115,12 @@ export class MansionCourtyard extends THREE.Group {
     const columns = new THREE.InstancedMesh(columnGeometry, concrete, 7);
     columns.name = 'Continuous reinforced-concrete court edge columns';
     const matrix = new THREE.Matrix4();
-    for (const [i, [x, z]] of [[18, 6], [18, 10.9], [18, 16], [13.5, 16], [9, 16], [9, 6], [13.5, 6]].entries())
+    for (const [i, [x, z]] of [[18, 6], [18, 10.9], [18, 16], [13.5, 16], [9, 16], [9, 6], [13.5, 6]].entries()) {
       columns.setMatrixAt(i, matrix.makeTranslation(x, 3.3, z));
+      this.obstacles.push({ id: `court-structural-column-${i}`,
+        minX: x - .17, maxX: x + .17, minZ: z - .17, maxZ: z + .17,
+        minFloorY: 0, maxFloorY: 6.6 });
+    }
     columns.castShadow = columns.receiveShadow = true;
     columns.computeBoundingSphere(); this.add(columns);
     const frameMaterial = siteMaterial('floor', 0xd2cdc4, 1, .2);
@@ -148,10 +154,15 @@ export class MansionCourtyard extends THREE.Group {
       ceiling.castShadow = ceiling.receiveShadow = true; this.add(ceiling);
       for (const edge of [-1, 1]) {
         const returnZ = z + edge * 1.15;
+        const id = `recessed-room-side-${z}-${edge}`;
+        const group = new THREE.Group();
+        group.name = id;
+        group.position.set(19.53, 0, returnZ);
+        this.add(group);
         const backing = new THREE.Mesh(new THREE.BoxGeometry(3.1, 3, .18), mortar);
         backing.name = 'Mortar joints behind recessed-room side brickwork';
-        backing.position.set(19.53, 1.5, returnZ);
-        backing.castShadow = backing.receiveShadow = true; this.add(backing);
+        backing.position.set(0, 1.5, 0);
+        backing.castShadow = backing.receiveShadow = true; group.add(backing);
         const rows = 23, cols = 9, geometry = new THREE.BoxGeometry(1, 1, 1);
         const patches = new Float32Array(rows * cols * 4);
         geometry.setAttribute('brickPatch', new THREE.InstancedBufferAttribute(patches, 4));
@@ -162,17 +173,27 @@ export class MansionCourtyard extends THREE.Group {
           const index = row * cols + col;
           patches.set(brickFacePatch(row, col, z + edge), index * 4);
           courses.setMatrixAt(index, matrix.compose(
-            new THREE.Vector3(18 + (col + .5) * 3.06 / cols, (row + .5) * 3 / rows, returnZ),
+            new THREE.Vector3(-1.53 + (col + .5) * 3.06 / cols, (row + .5) * 3 / rows, 0),
             new THREE.Quaternion(), new THREE.Vector3(3.06 / cols - .006, 3 / rows - .006, .22),
           ));
         }
         courses.castShadow = courses.receiveShadow = true;
-        courses.computeBoundingSphere(); this.add(courses);
+        courses.computeBoundingSphere(); group.add(courses);
+        const obstacle: PlayerObstacle = { id,
+          minX: 17.98, maxX: 21.08, minZ: returnZ - .11, maxZ: returnZ + .11,
+          minFloorY: 0, maxFloorY: 3 };
+        this.obstacles.push(obstacle);
+        this.masonryDemolition.set(id, new MansionMasonryDemolition(group, courses, backing, obstacle, 3.06, true, cols, rows));
       }
+      const id = `recessed-room-back-${z}`;
+      const group = new THREE.Group();
+      group.name = id;
+      group.position.set(20.89, 0, z);
+      this.add(group);
       const backing = new THREE.Mesh(new THREE.BoxGeometry(.2, 3, 2.3), mortar);
       backing.name = 'Mortar backing of recessed room';
-      backing.position.set(21, 1.5, z);
-      backing.receiveShadow = true; this.add(backing);
+      backing.position.set(.11, 1.5, 0);
+      backing.receiveShadow = true; group.add(backing);
       const rows = 23, cols = 7, geometry = new THREE.BoxGeometry(1, 1, 1);
       const patches = new Float32Array(rows * cols * 4);
       geometry.setAttribute('brickPatch', new THREE.InstancedBufferAttribute(patches, 4));
@@ -182,11 +203,16 @@ export class MansionCourtyard extends THREE.Group {
       for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
         const i = row * cols + col;
         patches.set(brickFacePatch(row, col, z), i * 4);
-        bricks.setMatrixAt(i, matrix.compose(new THREE.Vector3(20.89, (row + .5) * 3 / rows, z - 1.13 + (col + .5) * 2.26 / cols),
+        bricks.setMatrixAt(i, matrix.compose(new THREE.Vector3(0, (row + .5) * 3 / rows, -1.13 + (col + .5) * 2.26 / cols),
           new THREE.Quaternion(), new THREE.Vector3(.23, 3 / rows - .006, 2.26 / cols - .006)));
       }
       bricks.castShadow = bricks.receiveShadow = true;
-      bricks.computeBoundingSphere(); this.add(bricks);
+      bricks.computeBoundingSphere(); group.add(bricks);
+      const obstacle: PlayerObstacle = { id,
+        minX: 20.78, maxX: 21.02, minZ: z - 1.18, maxZ: z + 1.18,
+        minFloorY: 0, maxFloorY: 3 };
+      this.obstacles.push(obstacle);
+      this.masonryDemolition.set(id, new MansionMasonryDemolition(group, bricks, backing, obstacle, 2.26, false, cols, rows));
     }
   }
 
