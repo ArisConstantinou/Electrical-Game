@@ -13,6 +13,12 @@ html, body { background: #151a1d; }
 #settings-close, #spray-controls button, #mobile-control-settings button { border-radius: 8px; }
 #reticle.active span { background: #ffdc32; }
 #interaction-prompt { border-left-color: #ffda28; border-radius: 7px; background: #182025ea; }
+#laser-panel { border: 1px solid #839094a6; border-top: 3px solid #ffda28; border-radius: 10px; background: linear-gradient(145deg, #1a2429f2, #11191de8); box-shadow: 0 7px 22px #0008; }
+#laser-panel[data-tool="drill"],#laser-panel[data-tool="driver"] { gap: 5px; }
+#laser-tool-title { color: #ffdf40; font: 800 14px/1.15 'Barlow Condensed', Arial, sans-serif; letter-spacing: .045em; }
+#laser-hint { color: #f0f2ee; font: 600 14px/1.28 'Barlow Condensed', Arial, sans-serif; }
+#laser-work-height[hidden],.laser-progress[hidden] { display: none; }
+#laser-progress-fill { background: #ffda28; }
 #mobile-interact { border-color: #ffda28; border-radius: 12px; color: #ffed87; background: #1a2226f2; }
 #mobile-interact[aria-pressed="true"] { color: #191c1e; background: #ffda28; }
 .tool-quick-button:active, .tool-quick-button[aria-pressed="true"] { border-color: #ffda28; background: #343b2a; }
@@ -44,6 +50,7 @@ html, body { background: #151a1d; }
 }
 
 @media (pointer:coarse), (max-width:760px) {
+  #laser-panel[data-tool="drill"],#laser-panel[data-tool="driver"] { top: max(72px, calc(env(safe-area-inset-top) + 72px)); left: 10px; width: min(205px, calc(100% - 180px)); padding: 9px 10px; }
   #top-hud { top: max(10px, env(safe-area-inset-top)); left: max(10px, env(safe-area-inset-left)); width: min(322px, calc(100% - 78px)); min-height: 54px; padding: 9px 12px; border-left-width: 3px; }
   #objective-compact { color: #fff; font-size: 16px; line-height: 20px; letter-spacing: .03em; }
   #top-hud .progress-track { height: 3px; background: #ffffff35; }
@@ -93,6 +100,10 @@ html, body { background: #151a1d; }
   #game-shell[data-bottom-role="coordinator"] #joystick,#game-shell[data-bottom-role="coordinator"] #look-joystick {bottom:calc(165px + env(safe-area-inset-bottom));}
   #game-shell[data-bottom-role="coordinator"] #mobile-stance-controls {bottom:calc(300px + env(safe-area-inset-bottom));}
   #game-shell[data-bottom-role="coordinator"] #site-pro-use {bottom:calc(315px + env(safe-area-inset-bottom));}
+}
+
+@media (pointer:coarse) and (orientation:landscape) and (max-height:520px) {
+  #laser-panel[data-tool="drill"],#laser-panel[data-tool="driver"] { top: max(12px, env(safe-area-inset-top)); left: max(12px, env(safe-area-inset-left)); width: min(240px, calc(100% - 180px)); }
 }
 
 @media (pointer:coarse) and (min-width:700px) {

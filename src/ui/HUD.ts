@@ -742,10 +742,15 @@ export class HUD {
   updateLaser(tool:RigTool,state:{phase:string;hint:string;heightM:number|null;progress:number;active:boolean;mounted:boolean}):void {
     const visible=['drill','driver','laser'].includes(tool),height=state.heightM===null?'—':`${state.heightM.toFixed(2)} m`;
     if(!this.displayChanged('laser',`${tool}:${state.phase}:${height}:${Math.round(state.progress*100)}:${state.active}:${state.mounted}`))return;
-    this.shell.querySelector<HTMLElement>('#laser-panel')!.hidden=!visible;
+    const panel=this.shell.querySelector<HTMLElement>('#laser-panel')!;
+    panel.hidden=!visible;
+    panel.dataset.tool=tool;
     this.shell.querySelector('#laser-tool-title')!.textContent=tool==='drill'?'DRILL FIXING HOLE':tool==='driver'?'FASTEN LASER':'LASER LEVEL';
-    this.shell.querySelector('#laser-work-height')!.textContent=height;
+    const heightOutput=this.shell.querySelector<HTMLOutputElement>('#laser-work-height')!;
+    heightOutput.textContent=height;
+    heightOutput.hidden=state.heightM===null;
     this.shell.querySelector('#laser-hint')!.textContent=state.hint;
+    this.shell.querySelector<HTMLElement>('.laser-progress')!.hidden=state.progress<=0;
     this.shell.querySelector<HTMLElement>('#laser-progress-fill')!.style.width=`${Math.round(state.progress*100)}%`;
     const button=this.shell.querySelector<HTMLButtonElement>('#laser-place')!;
     button.hidden=tool!=='laser';button.disabled=!['mount-ready','mounted','active'].includes(state.phase);

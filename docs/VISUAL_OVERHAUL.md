@@ -138,6 +138,25 @@ prove a performance gain or phone parity. A full character close-up and real
 mobile GPU check remain necessary for final acceptance. Source and rights are
 recorded in `assets/source/WORKER_SOURCES.md`.
 
+## Fifth isolated implementation: touch work card
+
+The drill and driver work card now uses the Site Pro graphite/yellow treatment
+and occupies only the space needed for its title and current instruction. A
+missing height value and an inactive progress bar no longer appear as empty UI.
+The laser retains its separate placement button and displays a height when one
+exists. This changes HUD presentation only; tool selection and use remain on
+their existing input paths.
+
+`capture-touch-hud.mjs` intercepts the isolated production build through the
+unchanged 5365 URL with real coarse-pointer/touch browser emulation. Matching
+390×844 portrait and 844×390 landscape screenshots are
+`touch-hud-{before,after}-{portrait,landscape}.png`, with measured panel bounds
+and errors in the two JSON reports. The portrait drill card fell from 121 to
+79 CSS pixels high; the landscape card fell from 102 to 61. In both after
+captures the top controls and thumb zones remain separate, the laser card and
+placement button are visible, and no page error was observed. This is Chrome
+emulation, not physical iPhone/Safari or final mobile performance proof.
+
 ## Integration boundary
 
 Do not promote this branch or replace the 5365 listener while the active
