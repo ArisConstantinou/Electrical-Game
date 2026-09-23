@@ -310,14 +310,20 @@ export function setMixerDirty(mixer: THREE.Group, dirty: boolean): void {
 }
 
 /**
- * Call once per rendered frame, progress in [0,1] and time in seconds. Set
- * models.fill.userData.dryIngredients = true after the first dry scoop (false for water only).
+ * Call once per rendered frame, progress in [0,1] and time in seconds. Idle
+ * surfaces retain their last geometry until an ingredient or scale changes.
+ * Set models.fill.userData.dryIngredients = true after the first dry scoop
+ * (false for water only).
  * No per-frame geometry/material allocations. Mixed paste retains folds when the paddle stops.
  */
 export function updateMixingSurface(models: Pick<MixingStationModels, 'fill'>, progress: number, spinning: boolean, time: number): void {
-  const fill = models.fill; if (!fill.visible) return;
+  const fill = models.fill;
+  if (!fill.visible) { fill.userData.surfaceState = undefined; return; }
   const mixed = THREE.MathUtils.clamp(progress, 0, 1), scale = Math.max(.01, fill.scale.x);
   const solids = !!fill.userData.dryIngredients;
+  const previous = fill.userData.surfaceState as { geometry:THREE.BufferGeometry; mixed:number; scale:number; height:number; solids:boolean; spinning:boolean } | undefined;
+  if (!spinning && previous && previous.geometry === fill.geometry && previous.mixed === mixed &&
+      previous.scale === scale && previous.height === fill.position.y && previous.solids === solids && !previous.spinning) return;
   const paste = solids ? .35 + mixed * .65 : 0;
   const mat = fill.material as THREE.MeshStandardMaterial;
   mat.roughness = solids ? .97 : .28;
@@ -351,4 +357,8 @@ export function updateMixingSurface(models: Pick<MixingStationModels, 'fill'>, p
       child.scale.z = .022 * remaining;
     }
   }
+  if (previous) {
+    previous.geometry = fill.geometry; previous.mixed = mixed; previous.scale = scale;
+    previous.height = fill.position.y; previous.solids = solids; previous.spinning = spinning;
+  } else fill.userData.surfaceState = { geometry:fill.geometry, mixed, scale, height:fill.position.y, solids, spinning };
 }
