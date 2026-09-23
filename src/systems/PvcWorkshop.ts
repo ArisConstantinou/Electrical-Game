@@ -105,7 +105,8 @@ export class PvcWorkshop {
   }
 
   constructor(private readonly game:Game){
-    game.renderer.scene.add(this.stock,this.preparedRoot,this.previewRoot,this.targetGuide,this.securingRoot);
+    game.renderer.scene.add(this.stock,this.previewRoot,this.targetGuide,this.securingRoot);
+    this.stock.addSiteObject(this.preparedRoot);
     this.targetGuide.name='PVC eligible box guide';this.targetGuide.visible=false;this.targetGuide.renderOrder=30;this.targetGuide.raycast=()=>{};
     const guideMaterial=this.targetGuide.material as THREE.LineBasicMaterial;guideMaterial.depthTest=false;guideMaterial.transparent=true;guideMaterial.opacity=.95;
     game.room.traverse(o=>{if(o.userData.studioEntityId==='world:site-spare-pvc')o.visible=false;});
@@ -213,13 +214,18 @@ export class PvcWorkshop {
     this.message=this.instruction('Άφησε τη σωλήνα στη μάτσα ή πάτησε ESC για παύση.','Άφησε τη σωλήνα στη μάτσα ή πάτησε ΠΙΣΩ για παύση.');return false;
   }
   private transition(phase:Phase):void{this.phase=phase;this.elapsed=0;this.message='';this.shapeKey='';if(phase!=='marking')this.markingActive=false;}
+  private stockPoint(x:number,y:number,z:number):THREE.Vector3{return this.stock.sitePoint(x,y,z);}
+  private setStockCamera():void{
+    this.cameraDestination.copy(this.stockPoint(2.20,.95,this.bend.mark-.35+.31));
+    this.cameraFocus.copy(this.stockPoint(2.20,.025,this.bend.mark-.35+(innerWidth<700?.20:0)));
+  }
   private setFocus(preserveInput=false):void{
     this.focused=true;this.game.mixing.setActive(false);this.game.mixing.releaseAutomaticStance();if(!preserveInput)this.game.input.resetTransientInput();
     const c=this.game.renderer.camera;
     if(this.target){
       if(this.phase.startsWith('fastener-'))this.setFastenerCamera();else this.setFitCamera();
     }else if(['marking','spreading'].includes(this.phase)){
-      this.cameraDestination.set(2.20,.95,this.bend.mark-.35+.31);this.cameraFocus.set(2.20,.025,this.bend.mark-.35+(innerWidth<700?.20:0));
+      this.setStockCamera();
     }else{
       this.cameraDestination.copy(c.position);this.cameraDestination.y=1.65;
       this.cameraFocus.copy(this.cameraDestination).add(v(0,0,-2).applyAxisAngle(v(0,1,0),this.game.player.yaw));this.cameraFocus.y=.75;
@@ -325,7 +331,8 @@ export class PvcWorkshop {
     if(this.phase!=='marking'||this.markingProgress>0)return;
     if(!Number.isFinite(value))return;
     this.bend=new PvcBend(Math.round(THREE.MathUtils.clamp(value,.25,2.6)*1000)/1000);
-    this.cameraDestination.z=this.bend.mark-.35+.31;this.cameraFocus.z=this.bend.mark-.35;
+    this.setStockCamera();
+    const camera=new THREE.PerspectiveCamera();camera.position.copy(this.cameraDestination);camera.lookAt(this.cameraFocus);this.targetRotation.copy(camera.quaternion);
   }
   private setCut(value:number):void{
     if(this.phase!=='fitting'||!Number.isFinite(value))return;
@@ -627,10 +634,10 @@ export class PvcWorkshop {
       if(this.phase==='spring'||this.phase==='inserting'){left.set(-.16,this.pipe.position.y,this.pipe.position.z);right.set(.16,this.pipe.position.y,this.pipe.position.z);}
     }
     if(this.marker.visible){
-      const point=v(1.94+Math.min(1,this.markingProgress)*.532,.043,-.35+this.bend.mark);this.marker.position.copy(c.worldToLocal(point));this.marker.rotation.z=-.25;right.copy(this.marker.position).add(v(0,.055,0));
+      const point=this.stockPoint(1.94+Math.min(1,this.markingProgress)*.532,.043,-.35+this.bend.mark);this.marker.position.copy(c.worldToLocal(point));this.marker.rotation.z=-.25;right.copy(this.marker.position).add(v(0,.055,0));
       this.marker.quaternion.copy(c.quaternion).invert().multiply(new THREE.Quaternion().setFromAxisAngle(v(0,0,1),-.25));
       right.copy(this.marker.position).add(v(0,.055,0).applyQuaternion(this.marker.quaternion));rightQ.copy(this.marker.quaternion);
-      left.copy(c.worldToLocal(v(1.87,.061,this.bend.mark-.35+.10)));
+      left.copy(c.worldToLocal(this.stockPoint(1.87,.061,this.bend.mark-.35+.10)));
       leftQ.copy(c.quaternion).invert().multiply(new THREE.Quaternion().setFromUnitVectors(v(0,1,0),v(0,0,1)));
       // Camera is close enough to reach the marked strip; the stroke position
       // remains real world geometry, independent of the marking HUD.
@@ -724,7 +731,7 @@ export class PvcWorkshop {
     if(!this.liveMeasure.hidden){
       const marking=this.phase==='marking',fit=Boolean(this.target);
       let point:THREE.Vector3;
-      if(marking)point=v(2.64,.055,this.bend.mark-.35);
+      if(marking)point=this.stockPoint(2.64,.055,this.bend.mark-.35);
       else if(fit)point=this.target!.boxGroup.getWorldPosition(v()).add(v(.17,-.06,.10));
       else point=this.pipe.localToWorld(v(this.bend.at(this.bend.mark).x+.20,this.bend.at(this.bend.mark).y,0));
       point.project(this.game.renderer.camera);

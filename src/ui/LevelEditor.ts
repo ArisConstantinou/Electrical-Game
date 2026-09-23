@@ -244,7 +244,7 @@ export class LevelEditor {
     if (!wing) return;
     // These are the live gameplay objects, not visual clones. MixingStation
     // derives its interaction targets and collision boxes from their matrices.
-    const equipment = [...this.game.mixing.models.group.children, this.game.mixing.wheelbarrow.model.group];
+    const equipment = [...this.game.mixing.models.group.children, this.game.mixing.wheelbarrow.model.group, this.game.pvc.stock];
     for (const object of equipment) {
       if (!(object instanceof THREE.Group) || !object.name || wing.editableAssets.has(object.name)) continue;
       const bounds = new THREE.Box3().setFromObject(object);
@@ -252,6 +252,7 @@ export class LevelEditor {
       const size = bounds.getSize(new THREE.Vector3());
       object.userData.levelEditorKind = 'asset';
       object.userData.levelEditorLabel = object.name.replaceAll('-', ' ');
+      if (object === this.game.pvc.stock) object.userData.levelEditorScaleLocked = true;
       object.userData.baseSize = [size.x, size.y, size.z].map((value, axis) =>
         Math.max(value / Math.max(Math.abs(object.scale.getComponent(axis)), .001), .01));
       wing.editableAssets.set(object.name, object);
@@ -574,6 +575,7 @@ export class LevelEditor {
     this.el('#level-details-toggle').setAttribute('aria-expanded', String(open));
   }
   private setToolMode(mode: 'translate' | 'rotate' | 'scale'): void {
+    if (mode === 'scale' && [...this.selectedObjects].some(item => item.userData.levelEditorScaleLocked)) return;
     this.gizmo.setMode(mode);
     this.el('#level-halo-handle').setAttribute('aria-label', `Drag element to ${mode === 'translate' ? 'move' : mode === 'rotate' ? 'rotate' : 'resize'}`);
     for (const [id, value] of [['#level-translate', 'translate'], ['#level-rotate', 'rotate'], ['#level-scale', 'scale']] as const)
@@ -1476,6 +1478,7 @@ export class LevelEditor {
     this.markerSelection = null;
     this.panel.classList.remove('marker-selected');
     const members = [...this.selectedObjects];
+    if (this.gizmo.mode === 'scale' && members.some(object => object.userData.levelEditorScaleLocked)) this.setToolMode('translate');
     this.selected = members.length === 1 ? members[0] : null;
     const size = this.selected?.userData.baseSize as number[] | undefined;
     this.selectionAnchor = this.selected && hitPoint && size && this.usesSurfaceAnchor(size) ? hitPoint.clone() : null;
@@ -1648,24 +1651,26 @@ export class LevelEditor {
     this.syncSelectionAnchorFromObject();
     const object = this.selectedObjects.size > 1 ? this.selectionPivot : this.selected ?? (this.markerSelection === 'player' ? this.playerMarker : this.markerSelection === 'apprentice' ? this.apprenticeMarker : null);
     const locked = [...this.selectedObjects].some(item => item.userData.levelEditorLocked);
+    const scaleLocked = [...this.selectedObjects].some(item => item.userData.levelEditorScaleLocked);
     this.panel.querySelectorAll<HTMLInputElement>('[data-axis],[data-size],#level-yaw').forEach(field => {
-      field.disabled = locked || !object;
+      field.disabled = locked || !object || scaleLocked && field.hasAttribute('data-size');
       if (!object) field.value = '';
     });
     for (const id of ['#level-translate', '#level-rotate', '#level-scale']) this.el<HTMLButtonElement>(id).disabled = locked || !object;
+    this.el<HTMLButtonElement>('#level-scale').disabled ||= scaleLocked;
     const wallSelected = Boolean(this.selected && this.selectedObjects.size === 1 && this.game.room.mansionWing?.editableWalls.has(this.selected.name));
     this.panel.classList.toggle('wall-selected', wallSelected);
     this.el('#level-wall-tools').hidden = !wallSelected;
     if (wallSelected) this.el<HTMLSelectElement>('#level-wall-material').value = this.selected!.userData.levelEditorKind as WallKind;
     else if (this.wallPathActive) this.setWallPathActive(false);
     this.el<HTMLButtonElement>('#level-focus').disabled = !object;
-    this.el<HTMLButtonElement>('[data-fields-tab="size"]').disabled = Boolean(this.markerSelection) || this.selectedObjects.size > 1;
+    this.el<HTMLButtonElement>('[data-fields-tab="size"]').disabled = Boolean(this.markerSelection) || this.selectedObjects.size > 1 || scaleLocked;
     const group = this.activeGroupId ? this.groups.get(this.activeGroupId) : null;
     this.el('#level-group-edit').hidden = !group;
     if (group && document.activeElement !== this.el('#level-group-name')) this.el<HTMLInputElement>('#level-group-name').value = group.name;
     if (!object) { this.el('#level-name').textContent = 'Select an element'; this.el('#level-kind').textContent = 'Tap a structure in the scene or list.'; this.el<HTMLButtonElement>('#level-delete').disabled = true; this.haloElement.hidden = true; return; }
     this.el('#level-name').textContent = group ? group.name : this.selectedObjects.size > 1 ? `${this.selectedObjects.size} elements selected` : this.markerSelection === 'apprentice' ? `Apprentice ${this.apprenticeIndex} start` : this.selected ? this.displayName(this.selected) : object.name;
-    this.el('#level-kind').textContent = locked ? 'RUNTIME-LINKED · Selection only until gameplay collision is connected' : this.selectedObjects.size > 1 ? group ? `${this.selectedObjects.size} grouped elements · move, rotate or scale together` : 'Move, rotate or scale together · GROUP ITEMS to save selection' : this.markerSelection ? 'Spawn position · metres' : `${this.selected!.userData.levelEditorKind === 'asset' ? 'SITE ASSET' : this.selected!.userData.levelEditorKind === 'stair' ? 'STAIRS' : this.selected!.userData.levelEditorKind === 'floor' ? 'FLOOR SLAB' : this.selected!.userData.levelEditorKind === 'brick-wall' ? 'BRICK WALL' : 'CONCRETE WALL'} · live geometry`;
+    this.el('#level-kind').textContent = locked ? 'RUNTIME-LINKED · Selection only until gameplay collision is connected' : scaleLocked ? 'PVC STOCK · move or rotate · physical 3 m pipe length fixed' : this.selectedObjects.size > 1 ? group ? `${this.selectedObjects.size} grouped elements · move, rotate or scale together` : 'Move, rotate or scale together · GROUP ITEMS to save selection' : this.markerSelection ? 'Spawn position · metres' : `${this.selected!.userData.levelEditorKind === 'asset' ? 'SITE ASSET' : this.selected!.userData.levelEditorKind === 'stair' ? 'STAIRS' : this.selected!.userData.levelEditorKind === 'floor' ? 'FLOOR SLAB' : this.selected!.userData.levelEditorKind === 'brick-wall' ? 'BRICK WALL' : 'CONCRETE WALL'} · live geometry`;
     const base = this.baseSize();
     for (const axis of ['x', 'y', 'z'] as const) {
       this.el<HTMLInputElement>(`[data-axis="${axis}"]`).value = object.position[axis].toFixed(2);
@@ -1691,6 +1696,7 @@ export class LevelEditor {
   }
   private applyFields(): void {
     if ([...this.selectedObjects].some(item => item.userData.levelEditorLocked)) return;
+    const scaleLocked = [...this.selectedObjects].some(item => item.userData.levelEditorScaleLocked);
     const object = this.selectedObjects.size > 1 ? this.selectionPivot : this.selected ?? (this.markerSelection === 'player' ? this.playerMarker : this.markerSelection === 'apprentice' ? this.apprenticeMarker : null);
     if (!object) return;
     const base = this.baseSize();
@@ -1698,7 +1704,7 @@ export class LevelEditor {
       const value = Number(this.el<HTMLInputElement>(`[data-axis="${axis}"]`).value);
       const size = Number(this.el<HTMLInputElement>(`[data-size="${axis}"]`).value);
       if (Number.isFinite(value)) object.position[axis] = value;
-      if (this.selected && Number.isFinite(size) && size > 0)
+      if (this.selected && !scaleLocked && Number.isFinite(size) && size > 0)
         object.scale[axis] = Math.sign(object.scale[axis] || 1) * size / base[['x', 'y', 'z'].indexOf(axis)];
     }
     const yaw = Number(this.el<HTMLInputElement>('#level-yaw').value);
@@ -1888,7 +1894,7 @@ export class LevelEditor {
         if (!asset) continue;
         asset.position.fromArray(record.position);
         asset.rotation.y = record.rotationY;
-        asset.scale.fromArray(record.scale);
+        if (!asset.userData.levelEditorScaleLocked) asset.scale.fromArray(record.scale);
       }
       this.game.mixing.wheelbarrow.syncEditorPlacement();
       this.game.mixing.syncEditorRestPositions();

@@ -51,6 +51,7 @@ export class PvcTube extends THREE.Mesh<THREE.BufferGeometry,THREE.MeshStandardM
   }
 }
 export class PvcStock extends THREE.Group{
+  private readonly contents=new THREE.Group();
   readonly pipes:THREE.Group[]=[];readonly straps:THREE.Mesh[]=[];
   readonly bundleRoots:THREE.Group[]=[];
   readonly bundleRemaining=Array<number>(PVC_BUNDLE_COUNT).fill(PVC.count);
@@ -106,7 +107,14 @@ export class PvcStock extends THREE.Group{
     part(this.ruler,new THREE.BoxGeometry(.026,.003,3),new THREE.MeshStandardMaterial({color:0xe7bc52,roughness:.65}),'3 m measuring tape');
     for(let i=0;i<=60;i++){const tick=part(this.ruler,new THREE.BoxGeometry(i%10===0?.025:.013,.001,.001),new THREE.MeshBasicMaterial({color:0x182020}),'5 cm tape graduation',[0,.002,-1.5+i*.05]);if(i%10===0){const t=label(`${i*5} cm`,.16,.026);t.rotation.x=-Math.PI/2;t.position.set(-.06,.006,tick.position.z);this.ruler.add(t);}}
     this.ruler.position.set(1.84,.028,1.15);this.ruler.visible=false;this.add(this.ruler);this.layout(0);
+    // Keep authored site coordinates inside this child while the editor pivot
+    // sits on the physical bundle instead of at the origin of the room.
+    for(const child of [...this.children])if(child!==this.bundleHighlight)this.contents.add(child);
+    this.contents.position.copy(STOCK_CENTER).negate();this.position.copy(STOCK_CENTER);this.add(this.contents);
   }
+  addSiteObject(object:THREE.Object3D):void{this.contents.add(object);}
+  sitePoint(x:number,y:number,z:number):THREE.Vector3{return this.contents.localToWorld(new THREE.Vector3(x,y,z));}
+  siteWorldToLocal(point:THREE.Vector3):THREE.Vector3{return this.contents.worldToLocal(point);}
   setBundleRemaining(index:number,count:number):void{
     if(!Number.isInteger(index)||index<0||index>=PVC_BUNDLE_COUNT)throw new RangeError('Unknown PVC bundle');
     const remaining=Math.max(0,Math.min(PVC.count,Math.floor(count)));this.bundleRemaining[index]=remaining;
@@ -115,7 +123,7 @@ export class PvcStock extends THREE.Group{
   }
   bundleCenter(index:number):THREE.Vector3{
     if(!Number.isInteger(index)||index<0||index>=PVC_BUNDLE_COUNT)throw new RangeError('Unknown PVC bundle');
-    return new THREE.Vector3(STOCK_CENTER.x,STOCK_CENTER.y,index===0?STOCK_CENTER.z:RESERVE_BUNDLE_Z[index-1]);
+    return this.sitePoint(STOCK_CENTER.x,STOCK_CENTER.y,index===0?STOCK_CENTER.z:RESERVE_BUNDLE_Z[index-1]);
   }
   bundleAt(camera:THREE.Camera,maxDistance=4.2):{index:number;point:THREE.Vector3}|null{
     camera.updateMatrixWorld(true);this.updateMatrixWorld(true);this.bundleRay.setFromCamera(new THREE.Vector2(),camera);
@@ -127,7 +135,8 @@ export class PvcStock extends THREE.Group{
   highlightBundle(index:number|null):void{
     this.bundleHighlight.visible=index!==null;
     if(index===null)return;
-    this.bundleBox.setFromObject(this.bundleRoots[index]);this.bundleBox.expandByScalar(.015);this.bundleHighlight.updateMatrixWorld(true);
+    this.bundleBox.setFromObject(this.bundleRoots[index]);this.updateWorldMatrix(true,false);
+    this.bundleBox.applyMatrix4(this.matrixWorld.clone().invert());this.bundleBox.expandByScalar(.015);this.bundleHighlight.updateMatrixWorld(true);
   }
   layout(progress:number):void{
     this.spread=progress;

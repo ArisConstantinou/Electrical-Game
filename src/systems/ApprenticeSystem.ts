@@ -168,7 +168,7 @@ export class ApprenticeSystem {
     const arrow=new THREE.Mesh(new THREE.ConeGeometry(.075,.19,3),new THREE.MeshBasicMaterial({color:0xffdf72,depthWrite:false}));
     arrow.rotation.z=-Math.PI/2;arrow.position.set(.27,.04,0);this.groundMarker.add(arrow);
     this.groundMarker.name='Apprentice destination arc';this.groundMarker.visible=false;scene.add(this.groundMarker);
-    this.pipeYard=new ApprenticePipeYard(game.pvc.stock);scene.add(this.pipeYard);
+    this.pipeYard=new ApprenticePipeYard(game.pvc.stock);game.pvc.stock.addSiteObject(this.pipeYard);
     this.body=new WorkerBody(scene,{detail:this.mobileView?'apprentice':'full',castShadow:!this.mobileView});this.body.name='Apprentice 1';this.body.overview=true;
     this.ready=this.body.ready;
     this.camera.position.set(.8,1.65,1.25);this.camera.add(this.rig);scene.add(this.camera);
@@ -593,14 +593,15 @@ export class ApprenticeSystem {
     if(this.crew.slice(0,this.count-1).some(mate=>mate.isBlocked)){
       this.phase='blocked';this.blockedFrom='pipe';this.message='Μία μάτσα δεν έχει αρκετό PVC ή η διαδρομή κόπηκε · ΣΥΝΕΧΕΙΑ ή ΑΚΥΡΩΣΗ';return;
     }
-    const pvc=this.game.pvc,centre=pvc.stock.bundleCenter(job.bundle);
+    const pvc=this.game.pvc,centre=pvc.stock.bundleCenter(job.bundle),localCentre=pvc.stock.siteWorldToLocal(centre.clone());
     if(job.step==='claim'){
       if(!pvc.claimForApprentice()){this.waiting=true;this.message='Περιμένω να ελευθερωθεί η μάτσα PVC';return;}
       job.step='approach';job.elapsed=0;this.path=[];
     }
     if(job.step==='approach'){
       this.camera.position.y=THREE.MathUtils.damp(this.camera.position.y,job.kind==='socket'?.95:1.70,5,dt);
-      if(!this.moveTo({x:3.15,z:centre.z-.10},dt))return;
+      const approach=pvc.stock.sitePoint(localCentre.x-.31,localCentre.y,localCentre.z-.10);
+      if(!this.moveTo({x:approach.x,z:approach.z},dt))return;
       job.step='cut';job.elapsed=0;this.holdWorkTool('cutter');
     }
     if(job.step==='wait-crew'){
@@ -609,7 +610,9 @@ export class ApprenticeSystem {
     }
     const needed=APPRENTICE_PIPE_LENGTH_M[job.kind]+.003;
     const source=this.pipeBatch.remnants[job.bundle].findIndex(length=>length+1e-9>=needed);
-    this.pipeCutTarget.set(source<0?centre.x-.025:centre.x-.14,APPRENTICE_PIPE_LENGTH_M[job.kind],source<0?centre.z:centre.z-.085-source*.022);
+    this.pipeCutTarget.copy(pvc.stock.sitePoint(
+      localCentre.x+(source<0?-.025:-.14),APPRENTICE_PIPE_LENGTH_M[job.kind],
+      localCentre.z+(source<0?0:-.085-source*.022)));
     this.camera.position.y=THREE.MathUtils.damp(this.camera.position.y,job.kind==='socket'?.95:1.70,7,dt);
     this.camera.lookAt(this.pipeCutTarget);this.camera.updateMatrixWorld(true);
     if(job.step==='cut'){

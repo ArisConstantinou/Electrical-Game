@@ -15,8 +15,8 @@ export class ApprenticePipeYard extends THREE.Group {
     }
   }
   cuttingPoint(bundle:number,kind:ApprenticePipeKind):THREE.Vector3{
-    const centre=this.stock.bundleCenter(bundle),length=APPRENTICE_PIPE_LENGTH_M[kind];
-    return new THREE.Vector3(centre.x-.18,Math.min(length,1.42),centre.z-.055);
+    const centre=this.stock.siteWorldToLocal(this.stock.bundleCenter(bundle)),length=APPRENTICE_PIPE_LENGTH_M[kind];
+    return this.stock.sitePoint(centre.x-.18,Math.min(length,1.42),centre.z-.055);
   }
   addCut(receipt:ApprenticeCutReceipt):void{
     const set=this.finished.get(receipt.kind)!;if(set.count>=APPRENTICE_PIPE_TARGET)throw new Error('Cut rack full');
@@ -27,7 +27,7 @@ export class ApprenticePipeYard extends THREE.Group {
     set.barrels.count=set.count;set.ends.count=set.count*2;set.barrels.instanceMatrix.needsUpdate=set.ends.instanceMatrix.needsUpdate=true;
     const key=`${receipt.bundle}:${receipt.source}`;let remnant=this.remnants.get(key);
     if(!remnant){remnant=new THREE.Mesh(new THREE.CylinderGeometry(.01,.01,1,10,1,true),pvcMaterial);remnant.name='Retained uncut PVC remnant';remnant.castShadow=true;this.add(remnant);this.remnants.set(key,remnant);}
-    const centre=this.stock.bundleCenter(receipt.bundle);
+    const centre=this.stock.siteWorldToLocal(this.stock.bundleCenter(receipt.bundle));
     remnant.visible=receipt.remainingM>.02;remnant.position.set(centre.x-.14,Math.max(.001,receipt.remainingM)/2,centre.z-.085-receipt.source*.022);remnant.scale.y=Math.max(.001,receipt.remainingM);
   }
   get telemetry(){return{socket:this.finished.get('socket')!.count,switch:this.finished.get('switch')!.count,visibleRemnants:[...this.remnants.values()].filter(p=>p.visible).length};}
