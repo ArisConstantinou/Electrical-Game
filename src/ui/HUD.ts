@@ -69,7 +69,7 @@ export class HUD {
             <div class="chisel-orientation-values"><div><strong><span id="chisel-edge-label">EDGE</span> <output id="chisel-edge-degrees">0°</output></strong><span id="chisel-live-width">50 mm</span></div><div class="chisel-aim-values"><span id="chisel-live-tilt">TILT 15° ↓</span><span id="chisel-requested-tilt" hidden></span><span id="chisel-live-side">SIDE 15° →</span></div><div class="hammer-view-buttons" role="group" aria-label="Hammer screen side"><button id="hammer-view-left" type="button" aria-label="Hold hammer on the left" aria-pressed="false">TOOL LEFT</button><button id="hammer-view-right" type="button" aria-label="Hold hammer on the right" aria-pressed="true">TOOL RIGHT</button></div></div>
           </aside>
           <button id="settings-toggle" type="button" aria-label="Open settings" aria-expanded="false" aria-controls="settings-panel">
-            <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M27 4a8 8 0 0 0-9 10L5 27l-2-2 13-13A8 8 0 0 0 27 4l-5 5-4-1-1-4z"/><circle cx="7" cy="24" r="1"/></svg>
+            <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M13 2h6l1 4 3 1 4-2 3 5-3 3v6l3 3-3 5-4-2-3 1-1 4h-6l-1-4-3-1-4 2-3-5 3-3v-6l-3-3 3-5 4 2 3-1z"/><circle cx="16" cy="16" r="5"/></svg>
           </button>
           <div id="settings-scrim" aria-hidden="true"></div>
           <section id="settings-panel" class="hud-card" aria-label="Game settings" aria-hidden="true">
@@ -95,7 +95,7 @@ export class HUD {
             <button type="button" id="work-height">CROUCH · LOW WORK</button><small id="mortar-hint"></small>
             </details>
             <div id="mobile-control-settings" aria-label="Mobile aim settings">
-              <button id="movement-stick-mode" type="button" aria-label="Change movement joystick style"><span>MOVE JOYSTICK</span><b>FLOATING</b></button>
+              <button id="movement-stick-mode" type="button" aria-label="Change movement joystick style"><span>MOVE JOYSTICK</span><b>FIXED</b></button>
               <button id="aim-input-mode" type="button" aria-label="Change aim input style"><span>AIM INPUT</span><b>DRAG</b></button>
               <button id="tool-selector-layout" type="button" aria-label="Change mobile tool selector" aria-pressed="false"><span>TOOL SELECTOR</span><b>HORIZONTAL</b></button>
               <small>Horizontal strip is the default. Wheel groups the same tools into two rings.</small>
@@ -357,6 +357,16 @@ export class HUD {
     this.shell = root.querySelector('#game-shell')!;
     try { this.shell.dataset.toolSelector = localStorage.getItem('wirehouse:tool-selector') === 'wheel' ? 'wheel' : 'horizontal'; }
     catch { this.shell.dataset.toolSelector = 'horizontal'; }
+    const toolSlider = root.querySelector<HTMLElement>('#mobile-tool-slider')!;
+    const quickControls = root.querySelector<HTMLElement>('#tool-quick-controls')!;
+    const aimControls = root.querySelector<HTMLElement>('#aim-quick-controls')!;
+    const mobileControls = root.querySelector<HTMLElement>('#mobile-controls')!;
+    const placeQuickControls = (): void => {
+      // The horizontal picker and its contextual controls share one scrollable
+      // row. Keep the optional wheel's existing detached controls intact.
+      (this.shell.dataset.toolSelector === 'horizontal' ? toolSlider : mobileControls).append(quickControls, aimControls);
+    };
+    placeQuickControls();
     this.objective = root.querySelector('#objective')!;
     this.prompt = root.querySelector('#interaction-prompt')!;
     this.progress = root.querySelector('#mission-progress')!;
@@ -385,6 +395,7 @@ export class HUD {
     updateToolLayout();
     toolLayout.addEventListener('click', () => {
       this.shell.dataset.toolSelector = this.shell.dataset.toolSelector === 'wheel' ? 'horizontal' : 'wheel';
+      placeQuickControls();
       updateToolLayout();
       try { localStorage.setItem('wirehouse:tool-selector', this.shell.dataset.toolSelector); } catch { /* Private browsing can block storage. */ }
     });
@@ -398,6 +409,10 @@ export class HUD {
     });
     const toolsToggle = root.querySelector<HTMLButtonElement>('#site-pro-tools')!;
     const coordinatorToggle = root.querySelector<HTMLButtonElement>('#site-pro-coordinator')!;
+    const topRail = document.createElement('div');
+    topRail.id = 'mobile-top-rail';
+    topRail.setAttribute('aria-hidden', 'true');
+    root.querySelector('#mobile-tool-slider')!.before(topRail);
     const workerHandle = document.createElement('button');
     workerHandle.id = 'worker-bar-handle'; workerHandle.type = 'button';
     workerHandle.setAttribute('aria-controls', 'mobile-tool-slider');
@@ -412,7 +427,7 @@ export class HUD {
       this.shell.dataset.inspectorOpen=String(open);
       coordinatorToggle.setAttribute('aria-expanded',String(open));
       coordinatorToggle.setAttribute('aria-label',open?'Close inspector commands':'Open inspector commands');
-      inspectorHandle.textContent=open?'›':'‹';
+      inspectorHandle.textContent=open?'⌄':'⌃';
       inspectorHandle.setAttribute('aria-expanded',String(open));
       inspectorHandle.setAttribute('aria-label',open?'Hide inspector tools':'Show inspector tools');
       const inspectorPanel=this.shell.querySelector<HTMLElement>('#apprentice-controls');
@@ -447,7 +462,7 @@ export class HUD {
       toolsToggle.setAttribute('aria-expanded', String(open));
       toolsToggle.setAttribute('aria-label', open ? 'Close worker tools' : 'Open worker tools');
       toolsToggle.querySelector('span')!.textContent = 'WORKER';
-      workerHandle.textContent=open?'‹':'›';
+      workerHandle.textContent=open?'⌄':'⌃';
       workerHandle.setAttribute('aria-expanded',String(open));
       workerHandle.setAttribute('aria-label',open?'Hide worker tools':'Show worker tools');
     };

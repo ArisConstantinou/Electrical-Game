@@ -106,8 +106,16 @@ export class Game {
   wallAssistEnabled = true;
   aimInputMode: AimInputMode = 'stick';
   movementStickMode: 'floating' | 'fixed' = (() => {
-    try { return localStorage.getItem('wirehouse:movement-stick-mode') === 'fixed' ? 'fixed' : 'floating'; }
-    catch { return 'floating'; }
+    try {
+      // The old release defaulted to a floating base. Migrate that preference
+      // once so an existing phone does not keep moving the visible joystick.
+      if (localStorage.getItem('wirehouse:movement-stick-mode-version') !== '2') {
+        localStorage.setItem('wirehouse:movement-stick-mode-version', '2');
+        localStorage.setItem('wirehouse:movement-stick-mode', 'fixed');
+        return 'fixed';
+      }
+      return localStorage.getItem('wirehouse:movement-stick-mode') === 'floating' ? 'floating' : 'fixed';
+    } catch { return 'fixed'; }
   })();
   started = false;
   private readonly chasing: ChasingSystem;

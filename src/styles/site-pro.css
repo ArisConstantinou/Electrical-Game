@@ -176,6 +176,7 @@ html, body { background: #151a1d; }
   #game-shell[data-tools-open="true"] #aim-quick-controls { top: max(62px, env(safe-area-inset-top)); bottom: auto; }
 }
 
+
 /* Thumb actions orbit the movement and look pads; the world stays visible. */
 @media (pointer:coarse), (max-width:760px) {
   #game-shell { --orbit-stick-size: clamp(104px, 29vw, 130px); --orbit-stick-bottom: 105px; --orbit-action-size: 48px; }
@@ -384,4 +385,147 @@ html, body { background: #151a1d; }
     top:calc(max(6px, env(safe-area-inset-top)) + 128px);
   }
   #game-shell[data-tool-selector="wheel"][data-tools-open="true"] #mobile-tool-slider {top:auto;bottom:calc(55px + env(safe-area-inset-bottom));}
+}
+
+/* Concept 03: one folding top rail. The role buttons and selected-tool
+   controls occupy the same row as the tool icons; only the rail scrolls. */
+@media (pointer:coarse), (max-width:760px) {
+  #game-shell {
+    --top-rail-width:min(82vw, 520px);
+    --top-rail-edge:calc((100vw - var(--top-rail-width)) / 2);
+    --top-rail-y:max(8px, env(safe-area-inset-top));
+  }
+  #mobile-top-rail {
+    position:absolute; z-index:7; top:var(--top-rail-y);
+    left:var(--top-rail-edge); width:var(--top-rail-width); height:54px;
+    box-sizing:border-box; pointer-events:none;
+    background:#ffdf35; border:0;
+    clip-path:polygon(0 0,100% 0,100% 76%,calc(100% - 14px) 100%,14px 100%,0 76%);
+    box-shadow:0 5px 14px #0008;
+  }
+  #mobile-top-rail::before {
+    content:''; position:absolute; inset:0 1px 1px;
+    background:linear-gradient(115deg,#1b3029f5,#192a25f5);
+    clip-path:polygon(0 0,100% 0,100% 75%,calc(100% - 14px) 100%,14px 100%,0 75%);
+  }
+  #mobile-top-rail::after {
+    content:''; position:absolute; top:7px; bottom:8px; right:143px;
+    width:1px; background:#ffdc3266;
+  }
+  #game-shell[data-tools-open="false"][data-inspector-open="false"] #mobile-top-rail {
+    left:auto; right:var(--top-rail-edge); width:33px;
+    clip-path:polygon(0 0,100% 0,100% 82%,calc(100% - 8px) 100%,8px 100%,0 82%);
+  }
+  #game-shell[data-tools-open="false"][data-inspector-open="false"] #mobile-top-rail::before {
+    clip-path:polygon(0 0,100% 0,100% 81%,calc(100% - 8px) 100%,8px 100%,0 81%);
+  }
+  #game-shell[data-tools-open="false"][data-inspector-open="false"] #mobile-top-rail::after {display:none;}
+  #worker-bar-handle, #inspector-bar-handle {
+    top:var(--top-rail-y); left:auto; right:var(--top-rail-edge);
+    width:33px; height:54px; border:0; border-left:1px solid #ffdc3277;
+    border-radius:0 0 5px 5px; background:transparent;
+    box-shadow:none; font-size:0;
+  }
+  #worker-bar-handle::before, #inspector-bar-handle::before {
+    content:''; display:block; width:9px; height:9px;
+    border-right:2px solid #ffdf35; border-bottom:2px solid #ffdf35;
+    transform:translateY(-2px) rotate(45deg);
+  }
+  #game-shell[data-tools-open="false"] #worker-bar-handle::before,
+  #game-shell[data-inspector-open="false"] #inspector-bar-handle::before {
+    transform:translateY(2px) rotate(225deg);
+  }
+  #worker-bar-handle:focus-visible, #inspector-bar-handle:focus-visible,
+  #site-pro-tools:focus-visible, #site-pro-coordinator:focus-visible,
+  #settings-toggle:focus-visible {outline:2px solid #fff;outline-offset:-3px;}
+  #site-pro-tools, #site-pro-coordinator, #settings-toggle {
+    top:calc(var(--top-rail-y) + 8px); bottom:auto;
+    width:38px; height:38px; min-width:38px; min-height:38px;
+    border:1px solid #d7dcbaaa; border-radius:50%;
+    color:#ffdf36; background:#203129; box-shadow:none;
+    z-index:19;
+  }
+  #site-pro-tools {right:calc(var(--top-rail-edge) + 117px);}
+  #site-pro-coordinator {right:calc(var(--top-rail-edge) + 77px);}
+  #settings-toggle {right:calc(var(--top-rail-edge) + 37px);}
+  #site-pro-tools[aria-pressed="true"], #site-pro-coordinator[aria-pressed="true"] {
+    border-color:#ffdf36; color:#18271f; background:#ffdf36;
+  }
+  #site-pro-tools::before, #site-pro-coordinator::before {width:22px;height:22px;}
+  #settings-toggle svg {width:22px;height:22px;}
+  #game-shell[data-tools-open="false"][data-inspector-open="false"]
+    :is(#site-pro-tools,#site-pro-coordinator,#settings-toggle) {display:none;}
+  #game-shell.settings-open :is(#mobile-top-rail,#site-pro-tools,#site-pro-coordinator,#worker-bar-handle,#inspector-bar-handle) {visibility:hidden;}
+  #game-shell.settings-open #settings-toggle {display:grid;visibility:visible;z-index:15;}
+
+  #game-shell[data-tool-selector="horizontal"][data-tools-open="true"] #mobile-tool-slider {
+    position:absolute; z-index:18; display:flex;
+    top:calc(var(--top-rail-y) + 4px); bottom:auto;
+    left:calc(var(--top-rail-edge) + 7px); right:calc(var(--top-rail-edge) + 157px);
+    width:auto; height:46px; padding:0; gap:3px;
+    border:0; border-radius:0; background:transparent; box-shadow:none;
+    overflow-x:auto; overflow-y:hidden; touch-action:pan-x;
+    scroll-snap-type:none;
+    mask-image:linear-gradient(90deg,#000 0%,#000 90%,transparent 100%);
+  }
+  #game-shell[data-tool-selector="horizontal"] #mobile-tool-slider > button[data-tool] {
+    flex:0 0 39px; width:39px; min-width:39px; height:44px; min-height:44px;
+    padding:0; gap:0; color:#ffdf36; text-shadow:none;
+  }
+  #game-shell[data-tool-selector="horizontal"] #mobile-tool-slider > button[data-tool] svg {
+    box-sizing:border-box; width:32px; height:32px; padding:5px;
+    border:1px solid #c9d2b9a8; border-radius:50%; background:#22332a;
+    box-shadow:none; stroke-width:2;
+  }
+  #game-shell[data-tool-selector="horizontal"] #mobile-tool-slider > button[data-tool].selected svg {
+    border-color:#ffdf36; background:#ffdf36; color:#203127;
+  }
+  #game-shell[data-tool-selector="horizontal"] #mobile-tool-slider > button[data-tool] span {display:none;}
+  #game-shell[data-tool-selector="horizontal"][data-tools-open="true"] #mobile-tool-slider :is(#tool-quick-controls,#aim-quick-controls) {
+    display:contents; position:static; width:auto; height:auto;
+    background:transparent; border:0; box-shadow:none;
+  }
+  #game-shell[data-tool-selector="horizontal"] #mobile-tool-slider .tool-quick-button {
+    flex:0 0 64px; width:64px; min-width:64px; height:44px; min-height:44px;
+    max-height:44px; padding:2px; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:0;
+    border:0; border-radius:5px; background:transparent; box-shadow:none;
+    color:#ffdf36; text-shadow:none;
+  }
+  #game-shell[data-tool-selector="horizontal"] #mobile-tool-slider .tool-quick-button[hidden] {display:none;}
+  #game-shell[data-tool-selector="horizontal"] #mobile-tool-slider .tool-quick-button svg {
+    flex:none; width:21px; height:21px; padding:0; border:0;
+    border-radius:0; background:transparent; box-shadow:none; stroke:#ffdf36;
+  }
+  #game-shell[data-tool-selector="horizontal"] #mobile-tool-slider .tool-quick-button span {display:none;}
+  #game-shell[data-tool-selector="horizontal"] #mobile-tool-slider .tool-quick-button b {
+    color:#fff1a4; font-size:12px; line-height:14px; max-width:62px;
+    overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
+  }
+  #game-shell[data-inspector-open="true"] #apprentice-controls:not([hidden]) {
+    top:calc(var(--top-rail-y) + 4px); bottom:auto;
+    left:calc(var(--top-rail-edge) + 7px); right:calc(var(--top-rail-edge) + 157px);
+    width:auto; height:46px; min-height:46px; padding:0;
+    border:0; border-radius:0; background:transparent; box-shadow:none;
+  }
+  #apprentice-controls .apprentice-actions {gap:3px;}
+  #apprentice-controls .apprentice-actions button {
+    flex:0 0 40px; width:40px; min-width:40px; height:44px; min-height:44px;
+    padding:0; font-size:0; line-height:0; border:0; border-radius:50%;
+    background:transparent; color:#ffdf36;
+  }
+  #apprentice-controls .apprentice-actions svg {
+    box-sizing:border-box; width:32px; height:32px; padding:5px;
+    border:1px solid #c9d2b9a8; border-radius:50%; background:#22332a;
+  }
+  #apprentice-controls .apprentice-actions button.selected svg {border-color:#ffdf36;background:#ffdf36;color:#203127;}
+  #game-shell[data-tools-open="true"] #tool-quick-controls,
+  #game-shell[data-tools-open="true"] #aim-quick-controls {top:auto;bottom:auto;}
+}
+
+@media (pointer:coarse) and (max-height:520px) {
+  #game-shell {--top-rail-y:max(4px, env(safe-area-inset-top));}
+}
+@media (pointer:coarse) and (max-width:360px) {
+  #game-shell {--top-rail-width:92vw;}
 }

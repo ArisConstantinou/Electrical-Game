@@ -22,7 +22,7 @@ export class MobileControls {
   private moveY = 0;
   private aimProfile: MobileAimProfile = 'normal';
   private aimInputMode: AimInputMode = 'stick';
-  private movementStickMode: MovementStickMode = 'floating';
+  private movementStickMode: MovementStickMode = 'fixed';
   private readonly captures = new Map<number, HTMLElement>();
 
   constructor(private readonly surface: HTMLElement, private readonly input: Input, private readonly player: PlayerController, _selectedToolIsContinuous: () => boolean) {

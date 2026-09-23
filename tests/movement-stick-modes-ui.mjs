@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import { mkdir } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
+import { resolve, extname } from 'node:path';
 import { blockPointerLock } from './browser-safety.mjs';
 
 const url = process.argv[2] ?? 'http://127.0.0.1:5365/Electrical-Game/';
@@ -12,6 +14,16 @@ try {
   for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }, { width: 820, height: 1180 }]) {
     const context = await browser.newContext({ viewport, isMobile: true, hasTouch: true });
     await blockPointerLock(context);
+    if (process.argv.includes('--dist')) {
+      const dist = resolve('dist');
+      const mime = {'.html':'text/html','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.webp':'image/webp','.png':'image/png','.jpg':'image/jpeg','.glb':'model/gltf-binary','.woff2':'font/woff2'};
+      await context.route('https://arisconstantinou.github.io/Electrical-Game/**', async route => {
+        const path = resolve(dist, decodeURIComponent(new URL(route.request().url()).pathname.slice('/Electrical-Game/'.length)) || 'index.html');
+        if (!path.startsWith(dist)) return route.abort();
+        try { if (!(await stat(path)).isFile()) return route.abort(); await route.fulfill({status:200,contentType:mime[extname(path)]??'application/octet-stream',body:await readFile(path)}); }
+        catch { await route.abort(); }
+      });
+    }
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
@@ -19,6 +31,11 @@ try {
     await page.waitForFunction(() => window.__wireTheHouse?.renderer.renderCamera);
     await page.locator('#start-button').tap();
     await page.waitForFunction(() => window.__wireTheHouse.started);
+    assert.equal(await page.evaluate(() => window.__wireTheHouse.movementStickMode), 'fixed', 'Movement stick must start anchored');
+    await page.locator('#worker-bar-handle').tap();
+    await page.locator('#settings-toggle').tap();
+    await page.locator('#movement-stick-mode').tap();
+    await page.locator('#settings-close').tap();
     const cdp = await context.newCDPSession(page);
     const points = new Map();
     const send = async (type, id, x, y) => {
