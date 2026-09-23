@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import type { PlayerObstacle } from '../player/EquipmentCollision';
-import { brickFacePatch } from './BrickFacePatch';
+import { brickFacePatch, brickFaceTone } from './BrickFacePatch';
 import { masonryFaceMaterial } from './BrickFaceMaterial';
 import { siteMaterial, siteSmoothConcreteMaterial } from './SiteMaterials';
 import { curvedWallGeometry, type CurvedWallShape } from './CurvedWallGeometry';
@@ -779,24 +779,24 @@ export class MansionGroundWing extends THREE.Group {
       const halfStart = row % 2 === 1 && col === 0;
       const origin = row % 2 === 1 ? (col - 1) * pitch + pitch / 2 : col * pitch;
       const hand = (salt: number) => ((Math.imul(row + salt * 17, 73856093) ^ Math.imul(col + salt * 29, 19349663)) >>> 0) % 101 / 100;
-      const leftJoint = gap / 2 + (hand(1) - .5) * .003;
-      const rightJoint = gap / 2 + (hand(2) - .5) * .003;
+      const leftJoint = gap / 2 + (hand(1) - .5) * .005;
+      const rightJoint = gap / 2 + (hand(2) - .5) * .005;
       const start = halfStart ? leftJoint : origin + leftJoint;
       const end = Math.min(length - rightJoint, halfStart ? pitch / 2 - rightJoint : origin + pitch - rightJoint);
       const span = Math.max(0, end - start);
       if (span < .005) continue;
       const coordinate = -length / 2 + (start + end) / 2;
-      const relief = ((row * 17 + col * 11) % 7 - 3) * .00055;
-      const bottom = row * course + gap / 2 + (hand(3) - .5) * .003;
-      const top = (row + 1) * course - gap / 2 + (hand(4) - .5) * .003;
+      const relief = (hand(5) - .5) * .007;
+      const bottom = row * course + gap / 2 + (hand(3) - .5) * .005;
+      const top = (row + 1) * course - gap / 2 + (hand(4) - .5) * .005;
       const position = new THREE.Vector3(alongX ? coordinate : relief, (bottom + top) / 2, alongX ? relief : coordinate);
       const size = new THREE.Vector3(alongX ? span : .24, span ? top - bottom : 0, alongX ? .24 : span);
       const wear = (Math.imul(row + 1, 2246822519) ^ Math.imul(col + 1, 3266489917) ^ wallSeed) >>> 0;
       const variant = wear % 100 < 4 ? 3 : wear % 100 < 14 ? 2 : wear % 100 < 24 ? 1 : 0;
       const batch = batches[variant];
       batch.matrices.push(matrix.compose(position, quaternion, size).clone());
-      const warmth = ((row * 19 + col * 31) % 13) / 12;
-      batch.colors.push(tint.setRGB(.90 + warmth * .16, .88 + warmth * .15, .85 + warmth * .14).clone());
+      const tone = brickFaceTone(row, col, alongX ? 6 : 7);
+      batch.colors.push(tint.setRGB(tone[0], tone[1], tone[2]).clone());
       batch.patches.push(...brickFacePatch(row, col, alongX ? 6 : 7));
     }
     for (const [index, batch] of batches.entries()) {

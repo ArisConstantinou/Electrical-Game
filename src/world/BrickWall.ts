@@ -7,7 +7,7 @@ import { laserBand, laserTint, laserEmission } from '../systems/LaserProjection'
 import type { InstallationDefinition } from '../data/installationRules';
 import type { InstallationPoint } from '../electrical/InstallationPoint';
 import { MasonryVolume, type MasonryFragment, type MasonryVolumeOptions } from './MasonryVolume';
-import { brickFacePatch } from './BrickFacePatch';
+import { brickFacePatch, brickFaceTone } from './BrickFacePatch';
 import { clayRibNormal, clayRibShade, siteClayImage, siteClayReady } from './BrickRibbing';
 
 export type SprayMode = 'dots' | 'live';
@@ -38,7 +38,8 @@ const edgeDistance = min(min(brickLocalUv.x, brickLocalUv.x.oneMinus()), min(bri
 // the intact volume wall the same eased edge read as the reference brickwork.
 // The work surface and fractured geometry remain at their exact hit positions.
 const edgeShade = smoothstep(0, .075, edgeDistance).mul(.13).add(.87);
-const photographedClay = sampleTexture(brickImage, uv()).rgb.mul(masonryColor.r.div(.49));
+const photographedClay = sampleTexture(brickImage, uv()).rgb.mul(masonryColor.r.div(.49))
+  .mul(attribute<'vec3'>('brickTone', 'vec3'));
 const clayInterior = sampleTexture(siteClayImage, vec2(brickLocalUv.x, brickLocalUv.y.mul(.66).add(.32))).rgb;
 const finishedClay = mix(photographedClay, clayInterior, siteClayReady.mul(.25)).mul(edgeShade).mul(clayRibShade);
 // A face mask keeps real mortar joints, internal chambers and broken edges on
@@ -362,6 +363,7 @@ export class BrickWall extends THREE.Group {
   private addBrickSurfaceAttributes(geometry: THREE.BufferGeometry, pristine = false): void {
     const positions = geometry.getAttribute('position'), normals = geometry.getAttribute('normal'), colors = geometry.getAttribute('color');
     const coordinates = new Float32Array(positions.count * 2), localCoordinates = new Float32Array(positions.count * 2), faces = new Float32Array(positions.count);
+    const tones = new Float32Array(positions.count * 3);
     const pitchX = this.volume.width / 21, course = this.volume.height / 23;
     for (let i = 0; i < positions.count; i += 3) {
       const originalPlane = [0, 1, 2].every(j => {
@@ -378,6 +380,7 @@ export class BrickWall extends THREE.Group {
       const column = Math.floor((centreX + this.volume.width / 2 - stagger) / pitchX);
       const left = -this.volume.width / 2 + column * pitchX + stagger;
       const patch = brickFacePatch(row, column);
+      const tone = brickFaceTone(row, column);
       for (let j = 0; j < 3; j++) {
         const localU = (positions.getX(i + j) - left) / pitchX;
         const localV = (positions.getY(i + j) - row * course) / course;
@@ -386,11 +389,13 @@ export class BrickWall extends THREE.Group {
         localCoordinates[(i + j) * 2] = localU;
         localCoordinates[(i + j) * 2 + 1] = localV;
         faces[i + j] = face;
+        tones.set(tone, (i + j) * 3);
       }
     }
     geometry.setAttribute('uv', new THREE.BufferAttribute(coordinates, 2));
     geometry.setAttribute('brickLocalUv', new THREE.BufferAttribute(localCoordinates, 2));
     geometry.setAttribute('brickFace', new THREE.BufferAttribute(faces, 1));
+    geometry.setAttribute('brickTone', new THREE.BufferAttribute(tones, 3));
   }
 
   canFitBoxes(point: InstallationPoint): boolean {
