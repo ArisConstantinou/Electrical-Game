@@ -18,7 +18,8 @@ export class MansionGroundWing extends THREE.Group {
   readonly editableAssets = new Map<string, THREE.Group>();
   private originalRoomFloor: THREE.Group | null = null;
   private readonly editableWallColliders = new Map<THREE.Group, { obstacle: PlayerObstacle; matrix: THREE.Matrix4 }>();
-  private readonly editableAssetColliders = new Map<THREE.Group, { obstacle: PlayerObstacle; matrix: THREE.Matrix4; source?: THREE.Object3D }>();
+  private readonly editableAssetColliders = new Map<THREE.Group, { obstacle: PlayerObstacle; matrix: THREE.Matrix4; source?: THREE.Object3D;
+    segment?: { length: number; halfWidth: number } }>();
   private readonly corner = new THREE.Vector3();
   private readonly inverseSurfaceMatrix = new THREE.Matrix4();
   private emptyTemplate = false;
@@ -218,7 +219,8 @@ export class MansionGroundWing extends THREE.Group {
       pivot.userData.levelEditorLabel = `${object.name || 'Site part'}${count > 1 ? ` · ${count}` : ''}`;
       const structuralColumn = locked.has(object) && typeof object.userData.studioEntityId === 'string' &&
         object.userData.studioEntityId.startsWith('world:column:');
-      pivot.userData.levelEditorLocked = locked.has(object) && !structuralColumn;
+      const structuralRightWall = locked.has(object) && object.userData.studioEntityId === 'world:right-concrete-wall';
+      pivot.userData.levelEditorLocked = locked.has(object) && !structuralColumn && !structuralRightWall;
       pivot.userData.levelEditorGround = /\b(?:ground|terrain|soil|floor)\b/i.test(object.name);
       pivot.userData.baseSize = [Math.max(size.x, .01), Math.max(size.y, .01), Math.max(size.z, .01)];
       pivot.userData.studioEntityId = `mansion:${id}`;
@@ -226,11 +228,16 @@ export class MansionGroundWing extends THREE.Group {
       pivot.position.copy(parent.worldToLocal(centre.clone()));
       pivot.attach(object);
       this.editableAssets.set(id, pivot);
-      if (structuralColumn) {
+      if (structuralColumn || structuralRightWall) {
+        if (structuralRightWall) {
+          const oldIndex = this.obstacles.findIndex(item => item.id === 'mansion-room-east');
+          if (oldIndex >= 0) this.obstacles.splice(oldIndex, 1);
+        }
         const obstacle: PlayerObstacle = { id, minX: bounds.min.x, maxX: bounds.max.x,
           minZ: bounds.min.z, maxZ: bounds.max.z, minFloorY: bounds.min.y, maxFloorY: bounds.max.y };
         this.obstacles.push(obstacle);
-        this.editableAssetColliders.set(pivot, { obstacle, matrix: new THREE.Matrix4().makeScale(0, 0, 0), source: object });
+        this.editableAssetColliders.set(pivot, { obstacle, matrix: new THREE.Matrix4().makeScale(0, 0, 0), source: object,
+          segment: structuralRightWall ? { length: size.z, halfWidth: size.x / 2 } : undefined });
       }
     }
   }
@@ -305,6 +312,15 @@ export class MansionGroundWing extends THREE.Group {
       obstacle.minX = bounds.min.x - .01; obstacle.maxX = bounds.max.x + .01;
       obstacle.minZ = bounds.min.z - .01; obstacle.maxZ = bounds.max.z + .01;
       obstacle.minFloorY = bounds.min.y - .2; obstacle.maxFloorY = bounds.max.y;
+      if (entry.segment) {
+        const a = new THREE.Vector3(0, 0, -entry.segment.length / 2).applyMatrix4(asset.matrixWorld);
+        const b = new THREE.Vector3(0, 0, entry.segment.length / 2).applyMatrix4(asset.matrixWorld);
+        const widthScale = new THREE.Vector3().setFromMatrixScale(asset.matrixWorld).x;
+        const halfWidth = entry.segment.halfWidth * widthScale + .01;
+        obstacle.segments = [{ ax: a.x, az: a.z, bx: b.x, bz: b.z, halfWidth }];
+        obstacle.minX = Math.min(a.x, b.x) - halfWidth; obstacle.maxX = Math.max(a.x, b.x) + halfWidth;
+        obstacle.minZ = Math.min(a.z, b.z) - halfWidth; obstacle.maxZ = Math.max(a.z, b.z) + halfWidth;
+      }
     }
     for (const [wall, entry] of this.editableWallColliders) {
       const obstacle = entry.obstacle;
