@@ -8,7 +8,6 @@ import { addLighting } from './Lighting';
 import { matteMaterial, siteMaterial, siteProScreedMaterial } from './SiteMaterials';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { ExteriorCourtyard } from './ExteriorCourtyard';
-import { createClaySoffitPreview } from './ClaySoffitPreview';
 import { MansionGroundWing } from './MansionGroundWing';
 import { createWorksiteBench } from './WorksiteBench';
 import type { PlayerObstacle } from '../player/EquipmentCollision';
@@ -98,17 +97,13 @@ export class Room extends THREE.Group {
     ceilingMaterial.emissive.set(0x827366);
     ceilingMaterial.emissiveIntensity = .28;
     const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
-    const clayCeiling = new URLSearchParams(location.search).get('ceiling') !== 'concrete';
-    // The clay units occupy an 18 cm structural layer above the wall heads.
-    // Keep the poured slab on top of that layer, clear of the exposed underside.
-    ceiling.position.set(0, GAME_CONFIG.room.height + 0.08 + (clayCeiling ? .18 : 0), .10);
+    // The exposed underside is cast concrete, bearing directly on the masonry
+    // wall heads. No fired-clay blocks are used overhead in this building.
+    ceiling.position.set(0, GAME_CONFIG.room.height + 0.08, .10);
     ceiling.name = 'Concrete slab ceiling';
     ceiling.userData.studioEntityId = 'world:ceiling';
     ceiling.receiveShadow = true;
     this.add(ceiling);
-    if (clayCeiling) {
-      this.add(createClaySoffitPreview(GAME_CONFIG.room.width, GAME_CONFIG.room.depth, GAME_CONFIG.room.height));
-    }
 
     // Mortar backing stays solid for contact and measurement. Individually
     // raised clay courses on all side-wall segments match the primary wall.
@@ -295,7 +290,7 @@ export class Room extends THREE.Group {
     geometry.setAttribute('brickPatch', new THREE.InstancedBufferAttribute(patchRects, 4));
     const bricks = new THREE.InstancedMesh(geometry, masonryFaceMaterial, pieces.length);
     bricks.name = hasOpening ? 'Left fired-clay courses cut around unglazed opening' : 'Right fired-clay courses';
-    const matrix = new THREE.Matrix4(), rotation = new THREE.Quaternion(), position = new THREE.Vector3(), scale = new THREE.Vector3();
+    const matrix = new THREE.Matrix4(), rotation = new THREE.Quaternion(), position = new THREE.Vector3(), scale = new THREE.Vector3(), tint = new THREE.Color();
     for (const [index, piece] of pieces.entries()) {
       const row = Math.floor(piece.y / course), offset = (row % 2) * pitch / 2;
       const column = Math.floor((piece.z - zMin - offset) / pitch);
@@ -309,6 +304,8 @@ export class Room extends THREE.Group {
       position.set(wallX + (wallX < 0 ? .120 : -.120), piece.y, piece.z);
       scale.set(.020, piece.height, piece.length);
       bricks.setMatrixAt(index, matrix.compose(position, rotation, scale));
+      const warmth = ((row * 19 + column * 31) % 13 + 13) % 13 / 12;
+      bricks.setColorAt(index, tint.setRGB(.90 + warmth * .16, .88 + warmth * .15, .85 + warmth * .14));
     }
     bricks.castShadow = bricks.receiveShadow = true;
     const inward = wallX < 0 ? 1 : -1;
@@ -370,7 +367,7 @@ export class Room extends THREE.Group {
     bricks.name = this.mansionPreview ? 'Staggered rear clay courses around structural opening' : 'Full staggered rear clay courses';
     bricks.userData.textureSource = 'red-brick-polyhaven-1k.jpg';
     bricks.userData.studioEntityId = 'world:rear-exposed-masonry';
-    const matrix = new THREE.Matrix4(), position = new THREE.Vector3(), rotation = new THREE.Quaternion(), scale = new THREE.Vector3();
+    const matrix = new THREE.Matrix4(), position = new THREE.Vector3(), rotation = new THREE.Quaternion(), scale = new THREE.Vector3(), tint = new THREE.Color();
     for (let row = 0; row < rows; row++) for (let column = 0; column < columns; column++) {
       const index = (row * columns + column) * instancesPerUnit;
       const left = -GAME_CONFIG.room.width / 2 + column * brickWidth + (row % 2) * brickWidth / 2;
@@ -390,6 +387,8 @@ export class Room extends THREE.Group {
         scale.set(width, width > 0 ? course - gap : 0, width > 0 ? .020 : 0);
         matrix.compose(position, rotation, scale);
         bricks.setMatrixAt(index + part, matrix);
+        const warmth = ((row * 19 + column * 31 + part * 7) % 13) / 12;
+        bricks.setColorAt(index + part, tint.setRGB(.90 + warmth * .16, .88 + warmth * .15, .85 + warmth * .14));
       }
     }
     bricks.castShadow = bricks.receiveShadow = true;

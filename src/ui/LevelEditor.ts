@@ -1023,6 +1023,10 @@ export class LevelEditor {
     const room = this.game.room;
     const wing = room.mansionWing;
     if (!wing) return;
+    // Floor filtering belongs to the open editor. Its constructor chooses a
+    // default top-view floor while hidden; applying that cutaway to gameplay
+    // removes the garage and upper ceilings before the player enters them.
+    if (!this.active) { this.applyTemplateVisibility(); return; }
     this.restoreTopCutaway();
     for (const object of [...room.children, ...wing.children]) {
       if (!this.originalVisibility.has(object)) this.originalVisibility.set(object, object.visible);

@@ -233,6 +233,47 @@ smoke exposed existing fitting-tool assertions based on the old single-object
 grip and hidden CSS text; it cannot yet be used as an all-tools pass. This is a
 specific model improvement, not full tool/hand or physical-mobile acceptance.
 
+## Tenth isolated implementation: laid masonry and concrete undersides
+
+The supplied construction photographs establish separate material rules: laid
+walls use ribbed terracotta blocks with four longitudinal bores, staggered
+courses, varied mortar thickness and occasional handling damage; supported
+room ceilings and opening lintels are concrete rather than overhead bricks.
+The newer cut-opening photographs add rough mortar and plaster over the exposed
+ends. The protected live 5365 checkout remains unchanged while this branch is
+reviewed through production-build interception on that same URL.
+
+The original room and mansion garage/upper rooms now have continuous concrete
+undersides. A Level Editor startup visibility bug that hid gameplay roofs was
+fixed; opening and closing the editor restores them. The mansion's laid units
+vary in color, position and joint size; about 19% have small closed 3D corner
+chips and 4% have a larger broken corner. The exposed wall ends now show the
+actual 2×2 bores with recessed interiors and varied mortar at the cut edge.
+Physical wall contact, collision and demolition remain owned by the existing
+wall systems. This is still visually less irregular than the supplied real
+construction, particularly at the plaster transition and in the original work
+room's dynamic destructible wall.
+
+The first chip trial left dark open slots, and a second trial exposed a grey
+material assignment. Those trials were discarded; the final closed extruded
+shape was inspected in the same mansion camera. See `wall-ceiling-before-*`,
+`wall-ceiling-after-*` and the capture script and JSON in
+`artifacts/visual-overhaul/`. The original before room-wall shot includes a hand
+while the after inspection hides the FPS rig; compare the central clay face.
+TypeScript, Vite, desktop/mobile original-room tours and the mansion editor
+roof cycle passed. A single end-view frame reported 194 calls and 1.03 million
+triangles; the garage ceiling view reported 294 calls and 1.17 million triangles.
+Those are desktop-host counts without a same-state baseline, frame-time series
+or physical-phone measurement. The capture does not establish final whole-game
+visual or performance acceptance.
+
+The subsequent electrical references show recessed DB and switch/socket boxes
+at different build stages: molded mounting bosses, actual cable entries,
+fasteners, DIN rails, breaker rows, terminal bars, wire routing and surrounding
+plaster damage. Current 1G/2G models have only partial molded detail and
+decorative knockout rings, while no modeled DB exists yet. These remain
+required visual and interaction slices rather than completed work.
+
 ## Integration boundary
 
 Do not promote this branch or replace the 5365 listener while the active

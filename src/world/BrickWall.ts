@@ -1,14 +1,14 @@
 /// <reference types="vite/client" />
 import * as THREE from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
-import { attribute, dot, floor, fract, min, mix, positionWorld, sin, smoothstep, texture as sampleTexture, uniform, uv, vec2 } from 'three/tsl';
+import { attribute, dot, floor, fract, min, mix, normalMap, positionWorld, sin, smoothstep, texture as sampleTexture, uniform, uv, vec2 } from 'three/tsl';
 import { GAME_CONFIG } from '../data/gameConfig';
 import { laserBand, laserTint, laserEmission } from '../systems/LaserProjection';
 import type { InstallationDefinition } from '../data/installationRules';
 import type { InstallationPoint } from '../electrical/InstallationPoint';
 import { MasonryVolume, type MasonryFragment, type MasonryVolumeOptions } from './MasonryVolume';
 import { brickFacePatch } from './BrickFacePatch';
-import { clayRibShade, siteClayImage, siteClayReady } from './BrickRibbing';
+import { clayRibNormal, clayRibShade, siteClayImage, siteClayReady } from './BrickRibbing';
 
 export type SprayMode = 'dots' | 'live';
 export type MasonryImpactKind = 'chase-chip' | 'demolish-chip' | 'demolish-crack' | 'demolish-spall' | 'demolish-split' | 'demolish-break';
@@ -40,10 +40,12 @@ const edgeDistance = min(min(brickLocalUv.x, brickLocalUv.x.oneMinus()), min(bri
 const edgeShade = smoothstep(0, .075, edgeDistance).mul(.13).add(.87);
 const photographedClay = sampleTexture(brickImage, uv()).rgb.mul(masonryColor.r.div(.49));
 const clayInterior = sampleTexture(siteClayImage, vec2(brickLocalUv.x, brickLocalUv.y.mul(.66).add(.32))).rgb;
-const finishedClay = mix(photographedClay, clayInterior, siteClayReady.mul(.42)).mul(edgeShade).mul(clayRibShade);
+const finishedClay = mix(photographedClay, clayInterior, siteClayReady.mul(.62)).mul(edgeShade).mul(clayRibShade);
 // A face mask keeps real mortar joints, internal chambers and broken edges on
 // their own rough clay/mortar colors in both WebGPU and the WebGL backend.
 wallMaterial.colorNode = mix(mix(rawMasonry, finishedClay, attribute<'float'>('brickFace', 'float').mul(brickImageReady)),laserTint,laserBand);
+wallMaterial.normalNode = normalMap(sampleTexture(clayRibNormal, brickLocalUv),
+  vec2(.75, .75).mul(attribute<'float'>('brickFace', 'float')));
 wallMaterial.emissiveNode=laserEmission;
 type MeshData = ReturnType<MasonryVolume['buildChunkMesh']>;
 

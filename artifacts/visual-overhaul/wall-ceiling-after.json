@@ -1,0 +1,268 @@
+[
+  {
+    "view": "room-wall",
+    "state": {
+      "camera": [
+        0,
+        1.65,
+        -1.55
+      ],
+      "roofs": [],
+      "exposedEnds": false,
+      "clayBatches": {
+        "sound": 0,
+        "light": 0,
+        "broken": 0
+      },
+      "roomSlabY": 3.08,
+      "roomClayCeiling": false,
+      "mansionClayCeilings": 0,
+      "mansionConcreteSoffits": 0,
+      "render": {
+        "calls": 83,
+        "triangles": 739105,
+        "geometries": 740,
+        "textures": 136
+      },
+      "renderError": ""
+    },
+    "editorCycle": null,
+    "errors": []
+  },
+  {
+    "view": "room-ceiling",
+    "state": {
+      "camera": [
+        0,
+        1.65,
+        -0.4
+      ],
+      "roofs": [],
+      "exposedEnds": false,
+      "clayBatches": {
+        "sound": 0,
+        "light": 0,
+        "broken": 0
+      },
+      "roomSlabY": 3.08,
+      "roomClayCeiling": false,
+      "mansionClayCeilings": 0,
+      "mansionConcreteSoffits": 0,
+      "render": {
+        "calls": 83,
+        "triangles": 799339,
+        "geometries": 740,
+        "textures": 136
+      },
+      "renderError": ""
+    },
+    "editorCycle": null,
+    "errors": []
+  },
+  {
+    "view": "garage-ceiling",
+    "state": {
+      "camera": [
+        13.5,
+        1.65,
+        1.25
+      ],
+      "roofs": [
+        {
+          "name": "Continuous cast garage roof panel around existing L1 floor",
+          "at": [
+            10.75,
+            3.21,
+            -1.75
+          ],
+          "visible": true
+        },
+        {
+          "name": "Continuous cast garage roof panel around existing L1 floor",
+          "at": [
+            10.75,
+            3.21,
+            5.25
+          ],
+          "visible": true
+        },
+        {
+          "name": "Continuous cast garage roof panel around existing L1 floor",
+          "at": [
+            15.25,
+            3.21,
+            1.25
+          ],
+          "visible": true
+        },
+        {
+          "name": "L1 room slab prepared for L2",
+          "at": [
+            9.5,
+            6.5,
+            2.25
+          ],
+          "visible": true
+        }
+      ],
+      "exposedEnds": true,
+      "clayBatches": {
+        "sound": 9407,
+        "light": 2273,
+        "broken": 470
+      },
+      "roomSlabY": 0,
+      "roomClayCeiling": false,
+      "mansionClayCeilings": 0,
+      "mansionConcreteSoffits": 14,
+      "render": {
+        "calls": 294,
+        "triangles": 1167981,
+        "geometries": 1177,
+        "textures": 288
+      },
+      "renderError": ""
+    },
+    "editorCycle": {
+      "before": true,
+      "during": false,
+      "after": true,
+      "editorClosed": true
+    },
+    "errors": []
+  },
+  {
+    "view": "upper-ceiling",
+    "state": {
+      "camera": [
+        9.5,
+        4.9,
+        2.25
+      ],
+      "roofs": [
+        {
+          "name": "Continuous cast garage roof panel around existing L1 floor",
+          "at": [
+            10.75,
+            3.21,
+            -1.75
+          ],
+          "visible": true
+        },
+        {
+          "name": "Continuous cast garage roof panel around existing L1 floor",
+          "at": [
+            10.75,
+            3.21,
+            5.25
+          ],
+          "visible": true
+        },
+        {
+          "name": "Continuous cast garage roof panel around existing L1 floor",
+          "at": [
+            15.25,
+            3.21,
+            1.25
+          ],
+          "visible": true
+        },
+        {
+          "name": "L1 room slab prepared for L2",
+          "at": [
+            9.5,
+            6.5,
+            2.25
+          ],
+          "visible": true
+        }
+      ],
+      "exposedEnds": true,
+      "clayBatches": {
+        "sound": 9407,
+        "light": 2273,
+        "broken": 470
+      },
+      "roomSlabY": 0,
+      "roomClayCeiling": false,
+      "mansionClayCeilings": 0,
+      "mansionConcreteSoffits": 14,
+      "render": {
+        "calls": 262,
+        "triangles": 1094330,
+        "geometries": 1177,
+        "textures": 288
+      },
+      "renderError": ""
+    },
+    "editorCycle": null,
+    "errors": []
+  },
+  {
+    "view": "mansion-block-end",
+    "state": {
+      "camera": [
+        16.7,
+        1.55,
+        8.7
+      ],
+      "roofs": [
+        {
+          "name": "Continuous cast garage roof panel around existing L1 floor",
+          "at": [
+            10.75,
+            3.21,
+            -1.75
+          ],
+          "visible": true
+        },
+        {
+          "name": "Continuous cast garage roof panel around existing L1 floor",
+          "at": [
+            10.75,
+            3.21,
+            5.25
+          ],
+          "visible": true
+        },
+        {
+          "name": "Continuous cast garage roof panel around existing L1 floor",
+          "at": [
+            15.25,
+            3.21,
+            1.25
+          ],
+          "visible": true
+        },
+        {
+          "name": "L1 room slab prepared for L2",
+          "at": [
+            9.5,
+            6.5,
+            2.25
+          ],
+          "visible": true
+        }
+      ],
+      "exposedEnds": true,
+      "clayBatches": {
+        "sound": 9407,
+        "light": 2273,
+        "broken": 470
+      },
+      "roomSlabY": 0,
+      "roomClayCeiling": false,
+      "mansionClayCeilings": 0,
+      "mansionConcreteSoffits": 14,
+      "render": {
+        "calls": 194,
+        "triangles": 1028848,
+        "geometries": 1177,
+        "textures": 288
+      },
+      "renderError": ""
+    },
+    "editorCycle": null,
+    "errors": []
+  }
+]
