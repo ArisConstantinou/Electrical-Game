@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { PvcBend, PVC } from './PvcBend';
 import type { PvcPreset } from './PvcPresets';
+import { batchStaticShadows } from '../world/StaticShadowBatch';
 export const pvcMaterial=new THREE.MeshStandardMaterial({color:0xe1e2d8,roughness:.57});
 const STOCK_CENTER=new THREE.Vector3(3.46,.02,1.15);
 const STOCK_LEAN=.095;
@@ -73,6 +74,9 @@ export class PvcStock extends THREE.Group{
       part(group,pipeG,pvcMaterial,'3 m PVC length',[0,1.5,0]);
       for(const y of [0,3]){const end=part(group,endG,pvcMaterial,'Open pipe end',[0,y,0]);end.rotation.x=Math.PI/2;}
       const mark=part(group,new THREE.CylinderGeometry(.0103,.0103,.005,10,1,true),new THREE.MeshStandardMaterial({color:0x15191b,roughness:.85}),'Permanent marker ring');mark.visible=false;this.marks.push(mark);
+      // The three rigid pieces move together when the bundle opens. Preserve
+      // their visible meshes and picking while drawing one shadow per pipe.
+      batchStaticShadows(group,group.children);
     }
     const bandMaterial=new THREE.MeshStandardMaterial({color:0x1b7e78,roughness:.45});
     for(const y of [.4,1.5,2.6]){
