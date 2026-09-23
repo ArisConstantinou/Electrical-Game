@@ -41,7 +41,12 @@ try {
           }
           const vertex = n => new editor.camera.position.constructor()
             .fromBufferAttribute(positions, index ? index.getX(n) : n).applyMatrix4(world);
-          for (let triangle = 0; triangle < Math.min((index?.count ?? positions.count) / 3, 24); triangle++) {
+          // Sample across the complete surface. A simulated pile begins with
+          // almost-flat edge triangles that deliberately ignore shovel rays.
+          const triangleCount = Math.floor((index?.count ?? positions.count) / 3);
+          const sampleCount = Math.min(triangleCount, 64);
+          for (let sample = 0; sample < sampleCount; sample++) {
+            const triangle = Math.floor((sample + .5) * triangleCount / sampleCount);
             const a = vertex(triangle * 3), b = vertex(triangle * 3 + 1), c = vertex(triangle * 3 + 2);
             const normal = b.clone().sub(a).cross(c.clone().sub(a));
             if (normal.lengthSq() < 1e-10) continue;

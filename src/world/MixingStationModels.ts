@@ -255,7 +255,9 @@ export function createMixingStationModels(): MixingStationModels {
   // Keep the middle aisle clear for the worker and a wheelbarrow.
   const concreteMixer=createConcreteMixer();concreteMixer.position.set(-.55,0,.73);concreteMixer.rotation.y=0;concreteMixer.scale.x=-1;group.add(concreteMixer);
   const { bucket, fill } = bucketModel(0x344b37, 'mixing-garden-bucket'); bucket.position.set(.90,0,.08);group.add(bucket);
-  const sand = sandMound(); sand.position.set(-2.40, 0, 0); group.add(sand);
+  const sand = sandMound();
+  const sandRoot = new THREE.Group(); sandRoot.name = 'mixing-sand-pile';
+  sandRoot.position.set(-2.40, 0, 0); sandRoot.add(sand); group.add(sandRoot);
   const sacks = Array.from({ length: 3 }, (_, i) => { const sack = cementSack(i); sack.position.set(2.05 + i * .28, i === 1 ? .19 : 0, .65); sack.rotation.y = -.10 + i * .17; group.add(sack); return sack; });
   const shovel = createShovelModel(); shovel.position.set(-1.55, .13, -.25); shovel.rotation.set(-.13, -.3, -.32); group.add(shovel);
   // Park the paddle inside the green mixing bucket, above its base. This is

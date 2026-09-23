@@ -176,6 +176,42 @@ try {
   });
   assert(Math.abs(wheelScaleRestored - wheelAfterScale.scaleX) < .011,
     'Wheelbarrow size must survive Save/Load and simulation');
+  const sandName = await page.evaluate(() => {
+    const game = window.__wireTheHouse, editor = game.levelEditor, sand = game.mixing.models.sand;
+    editor.setFloorIndex(0);
+    editor.setViewMode('2d');
+    const center = sand.getWorldPosition(new sand.position.constructor()).add(new sand.position.constructor(0, .2, 0));
+    editor.orbit.target.copy(center);
+    editor.camera.position.copy(center).add(new center.constructor(0, 1.65, .01));
+    editor.camera.lookAt(center);
+    editor.orbit.update();
+    return sand.parent.name;
+  });
+  await page.mouse.click(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2);
+  assert.equal(await page.evaluate(() => window.__wireTheHouse.levelEditor.selected?.name), sandName,
+    'The simulated sand pile must select by clicking its visible surface');
+  const sandBefore = await page.evaluate(() => {
+    const game = window.__wireTheHouse, root = game.mixing.models.sand.parent;
+    return { x: root.position.x, obstacle: game.mixing.collisionObstacles().find(item => item.id === 'sand-pile')?.minX };
+  });
+  await page.locator('[data-axis="x"]').fill(String(sandBefore.x + .15));
+  await page.locator('[data-axis="x"]').dispatchEvent('change');
+  const sandAfter = await page.evaluate(() => {
+    const game = window.__wireTheHouse, sand = game.mixing.models.sand;
+    const beforeKg = sand.remainingKg;
+    sand.scoop(0, 0, .5);
+    return { x: sand.parent.position.x,
+      obstacle: game.mixing.collisionObstacles().find(item => item.id === 'sand-pile')?.minX,
+      scoopedKg: beforeKg - sand.remainingKg };
+  });
+  assert(Math.abs(sandAfter.x - sandBefore.x - .15) < .011 &&
+    Math.abs(sandAfter.obstacle - sandBefore.obstacle - .15) < .011 && sandAfter.scoopedKg > 0,
+    'Sand collision and shovel simulation must follow the editor placement');
+  await page.locator('#level-save').click();
+  await page.reload();
+  await page.waitForFunction(() => window.__wireTheHouse?.levelEditor?.active, null, { timeout: 45000 });
+  assert(Math.abs(await page.evaluate(() => window.__wireTheHouse.mixing.models.sand.parent.position.x) - sandAfter.x) < .011,
+    'Sand pile placement must survive Save/Load');
   const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   await blockPointerLock(mobile);
   const touchPage = await mobile.newPage();
@@ -210,10 +246,35 @@ try {
   const output = new URL('../artifacts/site-pro-04/review/level-editor-selection/', import.meta.url);
   await mkdir(output, { recursive: true });
   await touchPage.screenshot({ path: fileURLToPath(new URL('mixer-selected-mobile.png', output)) });
+  await touchPage.evaluate(() => {
+    const game = window.__wireTheHouse, editor = game.levelEditor, sand = game.mixing.models.sand;
+    editor.setFloorIndex(0);
+    editor.setViewMode('2d');
+    const center = sand.getWorldPosition(new sand.position.constructor()).add(new sand.position.constructor(0, .2, 0));
+    editor.orbit.target.copy(center);
+    editor.camera.position.copy(center).add(new center.constructor(0, 1.65, .01));
+    editor.camera.lookAt(center);
+    editor.orbit.update();
+  });
+  await touchPage.touchscreen.tap(mobileCanvas.x + mobileCanvas.width / 2, mobileCanvas.y + mobileCanvas.height / 2);
+  assert.equal(await touchPage.evaluate(() => window.__wireTheHouse.levelEditor.selected?.name), sandName,
+    'Portrait tap must select the actual sand pile, not the ground below it');
+  await touchPage.evaluate(() => {
+    const game = window.__wireTheHouse, editor = game.levelEditor, sand = game.mixing.models.sand;
+    editor.setViewMode('3d');
+    const center = sand.getWorldPosition(new sand.position.constructor()).add(new sand.position.constructor(0, .2, 0));
+    editor.orbit.target.copy(center);
+    editor.camera.position.copy(center).add(new center.constructor(1.5, 1.2, -2.25));
+    editor.camera.lookAt(center);
+    editor.orbit.update();
+  });
+  await touchPage.waitForTimeout(100);
+  await touchPage.screenshot({ path: fileURLToPath(new URL('sand-selected-mobile.png', output)) });
   await mobile.close();
   console.log(JSON.stringify({ selected, mobileSelected, before, moved, mirroredScale, restored,
     wheelName, wheelBefore, wheelMoved, wheelYaw, wheelRestored, wheelYawAfterPhysics,
-    toolBefore, toolAfterUpdate, toolRestored, wheelBeforeScale, wheelAfterScale, wheelScaleRestored }));
+    toolBefore, toolAfterUpdate, toolRestored, wheelBeforeScale, wheelAfterScale, wheelScaleRestored,
+    sandName, sandBefore, sandAfter }));
 } finally {
   await browser.close();
   if (slotId) await rm(new URL(`../.studio/levels/${slotId}.json`, import.meta.url), { force: true });
