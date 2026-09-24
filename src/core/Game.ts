@@ -367,6 +367,8 @@ export class Game {
     addEventListener('wirehouse:graphics-lost',()=>{this.suspendLifecycle();if(!document.hidden)queueMicrotask(()=>void this.resumeLifecycle());});
     this.hud.onStart(() => {
       this.started = true;
+      if (matchMedia('(pointer: fine)').matches)
+        window.dispatchEvent(new Event('wirehouse:request-desktop-look-lock'));
       if(this.apprentice.count>=1){
         this.mixing.wheelbarrow.beginEmpty();
       }

@@ -409,21 +409,39 @@ export class FPSRig extends THREE.Group {
     this.selectedTool = 'hammer';
     const hammer = this.tools.get('hammer')!;
     const eye = camera.getWorldPosition(new THREE.Vector3());
-    const normal = eye.clone().sub(point);
-    normal.y = 0;
-    if (normal.lengthSq() < 1e-5) normal.copy(camera.getWorldDirection(new THREE.Vector3())).negate().setY(0);
-    normal.normalize();
-    const right = new THREE.Vector3(0, 1, 0).cross(normal).normalize();
-    const up = normal.clone().cross(right).normalize();
-    const orientation = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(right, up, normal));
+    if (eye.distanceTo(point) > 1.25) {
+      this.restHammer(camera);
+      this.contactStatus = 'out-of-reach';
+      this.reachReason = 'Move closer to the masonry.';
+      return false;
+    }
+    const { forward, right } = this.bodyFrame(camera);
+    const forwardDistance = point.clone().sub(eye).dot(forward);
+    // At arm's-length contact the full 75 cm steel bit cannot fit between the
+    // eye and the facade. Keep the motor in a stable viewmodel stance and let
+    // the bit enter the wall visually; the actual strike still uses `point`.
+    const visualPoint = point.clone().addScaledVector(forward, Math.max(0, 1.0 - forwardDistance));
+    const motorGoal = eye.clone().addScaledVector(forward, .35)
+      .addScaledVector(right, this.hammerGripBlend < .5 ? .20 : -.20);
+    motorGoal.y -= .22;
+    const towardTip = visualPoint.clone().sub(motorGoal).normalize();
+    const orientation = new THREE.Quaternion().setFromUnitVectors(this.tipAnchor.clone().normalize(), towardTip);
     hammer.quaternion.copy(this.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(orientation));
-    hammer.position.copy(this.worldToLocal(point.clone())).sub(this.tipAnchor.clone().applyQuaternion(hammer.quaternion));
+    hammer.position.copy(this.worldToLocal(visualPoint)).sub(this.tipAnchor.clone().applyQuaternion(hammer.quaternion));
     hammer.updateWorldMatrix(true, true);
+    // The target can recede into a hollow brick during a held strike. Keep the
+    // motor and both wrists within their arm workspaces while the chisel bit
+    // reaches into the cut; never leave the tool floating at the raycast point.
+    this.constrainHeldTool(camera);
     this.poseArms(camera);
     this.chiselTipWorld.copy(hammer.localToWorld(this.tipAnchor.clone()));
     // The 75 cm chisel reaches past the wrist. Judge the actual tool grips,
     // not shoulder-to-wall distance, which rejects every normal work stance.
     const reachable = this.gripsReachable(camera, hammer);
+    if (!reachable) {
+      this.restHammer(camera);
+      this.chiselTipWorld.copy(hammer.localToWorld(this.tipAnchor.clone()));
+    }
     this.reachable = reachable;
     this.chiselInAir = !reachable;
     this.contactStatus = reachable ? 'ready' : 'out-of-reach';
@@ -1147,9 +1165,16 @@ export class FPSRig extends THREE.Group {
     this.pointedTip.rotation.x = -Math.PI/2;
     place(this.pointedTip,.02,.005,-.699); this.pointedTip.visible=false;
     group.add(chisel, chiselTip, this.pointedTip);
-    // The wall must occlude parts of the bit inside solid shell/ribs. The other
-    // handheld tools retain their established overlay rendering.
-    group.traverse(object=>{ if(object instanceof THREE.Mesh) for(const m of Array.isArray(object.material)?object.material:[object.material]) {m.depthTest=true;m.depthWrite=true;m.transparent=false;} });
+    // Keep the held motor and hands visible when the player works close to a
+    // wall. Only the steel bit is depth tested so material can still hide its
+    // tip as it enters the brick. Clone materials shared with world props.
+    group.traverse(object=>{
+      if(!(object instanceof THREE.Mesh))return;
+      const bit=object===chisel||object===chiselTip||object===this.pointedTip;
+      const prepare=(source:THREE.Material)=>{const copy=source.clone();copy.depthTest=bit;copy.depthWrite=bit;copy.transparent=false;return copy;};
+      object.material=Array.isArray(object.material)?object.material.map(prepare):prepare(object.material);
+      object.renderOrder=bit?20:21;
+    });
     return group;
   }
 }

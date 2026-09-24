@@ -8,7 +8,7 @@ const cement = new THREE.Color('#84796c');
 const wetCement = new THREE.Color('#605a52');
 export const hollowClayEndMaterial = new THREE.MeshStandardMaterial({ name: 'Rough hollow clay cut and mortar', vertexColors: true, roughness: 1, side: THREE.DoubleSide });
 
-function makeEnd(variant: number): THREE.BufferGeometry {
+function makeEnd(variant: number, torn = false): THREE.BufferGeometry {
   const shape = new THREE.Shape();
   // Broken outer shell: independent missing corners and small web chips make
   // the exposed section read as fired clay rather than a factory-cut tile.
@@ -85,6 +85,32 @@ function makeEnd(variant: number): THREE.BufferGeometry {
     const y = -.44 + i * .22, x = ((i * 7 + variant * 3) % 3 - 1) * .24;
     triangle([x - .035, y, .014], [x + .042, y + .013, .014], [x + .008, y + .043, .014], i % 2 ? cement : wetCement);
   }
+  if (torn) {
+    // The original fired-clay face is shortened behind this cap. Uneven lips
+    // extend back into the opening, leaving visible missing bites along BOTH
+    // outer faces instead of a straight, untouched brick edge.
+    for (const outer of [-.5, .5]) for (let section = 0; section < 6; section++) {
+      if ((section * 5 + variant * 3 + (outer > 0 ? 1 : 0)) % 7 === 0) continue;
+      const y0 = -.5 + section / 6, y1 = y0 + 1 / 6;
+      const tip0 = .010 + ((section * 11 + variant * 7 + (outer > 0 ? 3 : 0)) % 9) * .005;
+      const tip1 = .010 + ((section * 7 + variant * 13 + (outer > 0 ? 5 : 0)) % 10) * .005;
+      const edgeColor = section % 4 === 0 ? clayShadow : clay;
+      quad([outer, y0, 0], [outer, y1, 0], [outer, y1, tip1], [outer, y0, tip0], edgeColor);
+      const inward = outer > 0 ? -.038 : .038;
+      quad([outer, y0, tip0], [outer, y1, tip1], [outer + inward, y1 - .012, tip1 * .72],
+        [outer + inward, y0 + .009, tip0 * .70], clayShadow);
+    }
+    for (const outer of [-.504, .504]) for (let chip = 0; chip < 3; chip++) {
+      const y = -.37 + chip * .34 + variant * .021;
+      const inset = .032 + ((chip * 7 + variant * 5 + (outer > 0 ? 2 : 0)) % 5) * .009;
+      // Shallow scars reach onto the formerly intact photographed face. Their
+      // unequal outlines are tied to the cut, not mirrored across the gap.
+      triangle([outer, y - .055, -.003], [outer, y + .061, -inset],
+        [outer, y + .018, .012], clayShadow);
+      triangle([outer, y - .041, -.008], [outer, y + .039, -inset * .73],
+        [outer, y + .002, -.001], clay);
+    }
+  }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
@@ -93,6 +119,7 @@ function makeEnd(variant: number): THREE.BufferGeometry {
 }
 
 export const hollowClayEndShapes = [makeEnd(0), makeEnd(1), makeEnd(2)];
+export const brokenClayEndShapes = [makeEnd(0, true), makeEnd(1, true), makeEnd(2, true)];
 
 export function hollowClayWallEnds(length: number, rows: number, course: number, gap: number, alongX: boolean, wallName: string): THREE.Group {
   const group = new THREE.Group();

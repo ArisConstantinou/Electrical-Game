@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { PlayerObstacle } from '../player/EquipmentCollision';
-import { hollowClayEndMaterial, hollowClayEndShapes } from './HollowClayEnd';
+import { brokenClayEndShapes, hollowClayEndMaterial } from './HollowClayEnd';
 import { MasonryVolume, MaterialId, type MasonrySave, type MasonryRayHit } from './MasonryVolume';
 import { damagedMasonryMaterial } from './BrickFaceMaterial';
 import { MansionBreakoutRubble } from './MansionBreakoutRubble';
@@ -631,7 +631,7 @@ export class MansionMasonryDemolition {
    * actually removed. Static wall ends use the same clay cut geometry. */
   private updateFractureCaps(): void {
     if (!this.fractureCaps) {
-      this.fractureCaps = hollowClayEndShapes.map((shape, variant) => {
+      this.fractureCaps = brokenClayEndShapes.map((shape, variant) => {
         const mesh = new THREE.InstancedMesh(shape, hollowClayEndMaterial, this.remaining.length * 2);
         mesh.name = `${this.group.name} broken four-chamber ends ${variant}`;
         mesh.count = 0;
@@ -676,7 +676,7 @@ export class MansionMasonryDemolition {
         else cutPosition.z += side * (scale.z / 2 - depth + .004);
         cutRotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0),
           this.alongX ? side * Math.PI / 2 : side > 0 ? 0 : Math.PI);
-        cutScale.set(this.alongX ? scale.z : scale.x, scale.y, 1);
+        cutScale.set(this.alongX ? scale.z : scale.x, scale.y, THREE.MathUtils.clamp(depth / .10, .6, 1.2));
         const variant = ((Math.imul(index + 1, 2246822519) ^ Math.imul(side + 2, 3266489917)) >>> 0) % 3;
         const mesh = this.fractureCaps[variant], slot = counts[variant]++;
         mesh.setMatrixAt(slot, matrix.compose(cutPosition, cutRotation, cutScale));

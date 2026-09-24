@@ -7,10 +7,9 @@ export class DesktopControls {
   private wheelDirection = 0;
   private wheelDistance = 0;
   private wheelSelected = false;
-  private freeMouseX: number | null = null;
-  private freeMouseY: number | null = null;
 
   constructor(surface: HTMLElement, private readonly lockTarget: HTMLElement, player: PlayerController, input: Input) {
+    addEventListener('wirehouse:request-desktop-look-lock', () => this.requestLock(false));
     let primaryDown = false;
     let wasPointerLocked = document.pointerLockElement === this.lockTarget;
     const exitBoxAssembly = ():void => {
@@ -22,6 +21,7 @@ export class DesktopControls {
     surface.addEventListener('pointerdown', event => {
       if ((event.pointerType && event.pointerType !== 'mouse') || (event.target as Element).closest('button,input,select,textarea,label,a,summary,#settings-panel')) return;
       if (!document.querySelector('#start-screen')?.classList.contains('hidden') || surface.classList.contains('settings-open') || surface.classList.contains('model-open')) return;
+      if (event.button === 0 && document.pointerLockElement !== this.lockTarget) this.requestLock(false);
       if(surface.dataset.apprenticeMode && surface.dataset.apprenticeMode !== 'off'){
         if(event.button===0&&!primaryDown){
           event.preventDefault();primaryDown=true;input.actionHeld=true;input.actionRequested=true;
@@ -34,6 +34,7 @@ export class DesktopControls {
         input.actionRequested = false;
         if(surface.dataset.boxAssembly==='true')window.dispatchEvent(new CustomEvent('wirehouse:box-place-assembly'));
         else window.dispatchEvent(new CustomEvent('wirehouse:exit-leveling'));
+        if (document.pointerLockElement !== this.lockTarget) this.requestLock(false);
         return;
       }
       if (event.button !== 0) return;
@@ -81,19 +82,6 @@ export class DesktopControls {
       if (!this.isPlausibleMovement(event.movementX, event.movementY)) return;
       player.look(event.movementX, event.movementY);
     });
-    // Desktop look stays inside the canvas while the system pointer remains
-    // free. Leaving and re-entering starts a fresh delta, avoiding a camera
-    // jump after using Settings or another Chrome tab.
-    this.lockTarget.addEventListener('mousemove', event => {
-      if(document.pointerLockElement || !document.querySelector('#start-screen')?.classList.contains('hidden') ||
-        surface.classList.contains('settings-open') || surface.classList.contains('model-open'))return;
-      if(this.freeMouseX!==null&&this.freeMouseY!==null){
-        const dx=event.clientX-this.freeMouseX,dy=event.clientY-this.freeMouseY;
-        if(this.isPlausibleMovement(dx,dy))player.look(dx,dy);
-      }
-      this.freeMouseX=event.clientX;this.freeMouseY=event.clientY;
-    });
-    this.lockTarget.addEventListener('mouseleave',()=>{this.freeMouseX=this.freeMouseY=null;});
     surface.addEventListener('wheel', event => {
       // Settings scroll, sideways touchpad motion and pinch zoom are not tool
       // selections. In particular deltaY=0 must never become a +1 cycle.
@@ -157,6 +145,23 @@ export class DesktopControls {
         else void surface.requestFullscreen();
       }
     });
+  }
+
+  requestLock(preferRawInput = true): void {
+    if (document.pointerLockElement === this.lockTarget) return;
+    if (!preferRawInput) {
+      void this.lockTarget.requestPointerLock()?.catch(() => {});
+      return;
+    }
+    try {
+      const request = this.lockTarget.requestPointerLock({ unadjustedMovement: true });
+      if (request) void request.catch(error => {
+        if (error instanceof DOMException && error.name === 'NotSupportedError') void this.lockTarget.requestPointerLock()?.catch(() => {});
+      });
+    } catch (error) {
+      if (error instanceof DOMException && error.name !== 'NotSupportedError') return;
+      void this.lockTarget.requestPointerLock()?.catch(() => {});
+    }
   }
 
   private isPlausibleMovement(deltaX: number, deltaY: number): boolean {

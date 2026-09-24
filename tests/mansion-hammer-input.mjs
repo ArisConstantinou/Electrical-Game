@@ -29,6 +29,7 @@ try {
   await page.locator('#site-pro-desktop-tools [data-tool="hammer"]').click();
   await page.evaluate(()=>{
     const game=window.__wireTheHouse;
+    game.hammerMode='demolish';
     game.renderer.camera.position.set(15.3,game.player.eyeHeight,15.0);
     game.player.yaw=Math.PI;
     game.player.pitch=0;
@@ -39,14 +40,19 @@ try {
   await page.mouse.move(683,384);
   await page.mouse.down();
   await page.evaluate(()=>window.advanceTime(520));
+  const halfway=await page.evaluate(name=>{const g=window.__wireTheHouse;return {nodes:g.room.mansionWing.masonryDemolition.get(name).removedClayNodes,held:g.input.actionHeld,status:g.fpsRig.contactStatus,cooldown:g.actionCooldown,aim:g.room.mansionWing.aimMasonry(g.renderer.camera)?.index??null};},wallName);
+  await page.evaluate(()=>{const g=window.__wireTheHouse;g.renderer.camera.position.x+=.28;});
+  await page.evaluate(()=>window.advanceTime(520));
   await page.mouse.up();
   const result=await page.evaluate(name=>{
     const game=window.__wireTheHouse,wall=game.room.mansionWing.masonryDemolition.get(name);
     return {removed:wall.removedIndices().length,partial:wall.partialDamageCount,nodes:wall.removedClayNodes,tool:game.selectedTool,contact:game.fpsRig.contactStatus,
+      gripReach:game.fpsRig.gripsReachable(game.renderer.camera,game.fpsRig.tools.get('hammer')),
       position:game.renderer.camera.position.toArray(),renderError:game.renderer.renderError};
   },wallName);
   assert.equal(result.tool,'hammer');
   assert(result.nodes>before && result.partial>0,`Held mouse did not locally fracture courtyard masonry: ${JSON.stringify(result)}`);
+  assert(result.nodes>halfway.nodes && result.gripReach,`Held hammer stopped or detached from hands before release: ${JSON.stringify({halfway,...result})}`);
   assert.equal(result.removed,0,'A single held strike must not remove whole bricks');
   assert.equal(result.renderError,'');
   assert.deepEqual(errors,[]);
