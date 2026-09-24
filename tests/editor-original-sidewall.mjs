@@ -19,7 +19,9 @@ try {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('http://127.0.0.1:5365/Electrical-Game/?mansion=preview&editor=1&renderer=webgl');
-  await page.waitForFunction(() => window.__wireTheHouse?.levelEditor?.active, null, { timeout: 120000 });
+  await page.waitForFunction(() => window.__wireTheHouse?.levelEditor?.active &&
+    window.__wireTheHouse.levelEditor.panel?.isConnected, null, { timeout: 120000 });
+  await page.waitForSelector('#level-editor', { state: 'attached', timeout: 120000 });
   await openEditorTab(page, 'select');
   await page.locator('#level-view-quick [data-level-view="3d"]').click();
   await page.locator('.level-editor__bottom-nav [data-editor-tab="select"]').click();
@@ -27,7 +29,8 @@ try {
     const game = window.__wireTheHouse, editor = game.levelEditor, wing = game.room.mansionWing;
     const wall = [...wing.editableAssets.values()].find(item => item.userData.levelEditorLabel === 'Right concrete wall');
     if (!wall) throw new Error('Original right wall is not registered');
-    const centre = wall.getWorldPosition(new wall.position.constructor());
+    const centre = wall.children[0].children.find(object => object.isMesh && !object.isInstancedMesh)
+      .getWorldPosition(new wall.position.constructor());
     editor.orbit.target.copy(centre);
     editor.camera.position.copy(centre).add(new centre.constructor(-1.6, .1, 0));
     editor.camera.lookAt(centre);
@@ -52,7 +55,8 @@ try {
     await page.evaluate(id => {
       const game = window.__wireTheHouse, editor = game.levelEditor;
       const wall = game.room.mansionWing.editableAssets.get(id);
-      const centre = wall.getWorldPosition(new wall.position.constructor());
+      const centre = wall.children[0].children.find(object => object.isMesh && !object.isInstancedMesh)
+        .getWorldPosition(new wall.position.constructor());
       editor.orbit.target.copy(centre);
       editor.camera.position.copy(centre).add(new centre.constructor(-6, 11, -9));
       editor.camera.lookAt(centre);
@@ -97,6 +101,44 @@ try {
     assert(moved.contacts.includes(before.id), 'Player must collide with the moved, rotated wall');
     await showWall();
     await page.screenshot({ path: fileURLToPath(new URL('after-moved.png', output)) });
+    const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    await blockPointerLock(mobile);
+    const mobilePage = await mobile.newPage();
+    mobilePage.on('pageerror', error => errors.push(`mobile: ${error.message}`));
+    await mobilePage.goto('http://127.0.0.1:5365/Electrical-Game/?mansion=preview&editor=1&renderer=webgl');
+    await mobilePage.waitForFunction(() => window.__wireTheHouse?.levelEditor?.active &&
+      window.__wireTheHouse.levelEditor.panel?.isConnected, null, { timeout: 120000 });
+    await openEditorTab(mobilePage, 'select');
+    await mobilePage.locator('#level-view-quick [data-level-view="3d"]').click();
+    await mobilePage.locator('.level-editor__bottom-nav [data-editor-tab="select"]').click();
+    await mobilePage.evaluate(id => {
+      const game = window.__wireTheHouse, editor = game.levelEditor;
+      const wall = game.room.mansionWing.editableAssets.get(id);
+      const centre = wall.children[0].children.find(object => object.isMesh && !object.isInstancedMesh)
+        .getWorldPosition(editor.orbit.target);
+      editor.camera.position.copy(centre).add(new centre.constructor(-1.6, .1, 0));
+      editor.camera.lookAt(centre);
+      editor.orbit.update();
+    }, before.id);
+    await mobilePage.waitForTimeout(100);
+    const mobileRect = await mobilePage.locator('#game-canvas').boundingBox();
+    assert(mobileRect);
+    await mobilePage.touchscreen.tap(mobileRect.x + mobileRect.width / 2, mobileRect.y + mobileRect.height / 2);
+    assert.equal(await mobilePage.evaluate(() => window.__wireTheHouse.levelEditor.selected?.name), before.id,
+      'Portrait tap must reach the original side wall');
+    await mobilePage.evaluate(id => {
+      const game = window.__wireTheHouse, editor = game.levelEditor;
+      const wall = game.room.mansionWing.editableAssets.get(id);
+      const centre = wall.children[0].children.find(object => object.isMesh && !object.isInstancedMesh)
+        .getWorldPosition(new wall.position.constructor());
+      editor.orbit.target.copy(centre);
+      editor.camera.position.copy(centre).add(new centre.constructor(-5, 9, -7));
+      editor.camera.lookAt(centre);
+      editor.orbit.update();
+    }, before.id);
+    await mobilePage.waitForTimeout(120);
+    await mobilePage.screenshot({ path: fileURLToPath(new URL('after-mobile-tap.png', output)) });
+    await mobile.close();
     await saveEditorLevel(page);
     await page.waitForFunction(() => new URL(location.href).searchParams.has('level'));
     slotId = new URL(page.url()).searchParams.get('level');
@@ -111,40 +153,6 @@ try {
     assert(Math.abs(restored.x - moved.x) < .011 && Math.abs(restored.yaw - moved.yaw) < .011);
     assert(Math.abs(restored.minX - moved.obstacle.minX) < .02 && restored.segment,
       'Rotated physical wall must survive save/reload');
-    const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
-    await blockPointerLock(mobile);
-    const mobilePage = await mobile.newPage();
-    mobilePage.on('pageerror', error => errors.push(`mobile: ${error.message}`));
-    await mobilePage.goto('http://127.0.0.1:5365/Electrical-Game/?mansion=preview&editor=1&renderer=webgl');
-    await mobilePage.waitForFunction(() => window.__wireTheHouse?.levelEditor?.active, null, { timeout: 120000 });
-    await openEditorTab(mobilePage, 'select');
-    await mobilePage.locator('#level-view-quick [data-level-view="3d"]').click();
-    await mobilePage.locator('.level-editor__bottom-nav [data-editor-tab="select"]').click();
-    await mobilePage.evaluate(id => {
-      const game = window.__wireTheHouse, editor = game.levelEditor;
-      const centre = game.room.mansionWing.editableAssets.get(id).getWorldPosition(editor.orbit.target);
-      editor.camera.position.copy(centre).add(new centre.constructor(-1.6, .1, 0));
-      editor.camera.lookAt(centre);
-      editor.orbit.update();
-    }, before.id);
-    await mobilePage.waitForTimeout(100);
-    const mobileRect = await mobilePage.locator('#game-canvas').boundingBox();
-    assert(mobileRect);
-    await mobilePage.touchscreen.tap(mobileRect.x + mobileRect.width / 2, mobileRect.y + mobileRect.height / 2);
-    assert.equal(await mobilePage.evaluate(() => window.__wireTheHouse.levelEditor.selected?.name), before.id,
-      'Portrait tap must reach the original side wall');
-    await mobilePage.evaluate(id => {
-      const game = window.__wireTheHouse, editor = game.levelEditor;
-      const wall = game.room.mansionWing.editableAssets.get(id);
-      const centre = wall.getWorldPosition(new wall.position.constructor());
-      editor.orbit.target.copy(centre);
-      editor.camera.position.copy(centre).add(new centre.constructor(-5, 9, -7));
-      editor.camera.lookAt(centre);
-      editor.orbit.update();
-    }, before.id);
-    await mobilePage.waitForTimeout(120);
-    await mobilePage.screenshot({ path: fileURLToPath(new URL('after-mobile-tap.png', output)) });
-    await mobile.close();
     assert.deepEqual(errors, []);
     console.log(JSON.stringify({ before, initial, moved, restored, errors }));
   }

@@ -71,14 +71,14 @@ try {
   });
   const right = await inspect(1.5, -1.1, -Math.PI / 2, 'Right');
   const rightFrames = await frameSample();
-  await page.locator('#game-canvas').screenshot({ path: resolve(out, live ? 'before-right.png' : 'candidate-right.png') });
+  await page.locator('#game-canvas').screenshot({ path: resolve(out, live ? 'live-right.png' : 'candidate-right.png') });
   const left = await inspect(-1.5, -.9, Math.PI / 2, 'Left');
-  await page.locator('#game-canvas').screenshot({ path: resolve(out, live ? 'before-left.png' : 'candidate-left.png') });
+  await page.locator('#game-canvas').screenshot({ path: resolve(out, live ? 'live-left.png' : 'candidate-left.png') });
   await page.setViewportSize({ width: 390, height: 844 });
   const mobile = await inspect(1.5, -1.1, -Math.PI / 2, 'Right');
   const mobileFrames = await frameSample();
-  await page.locator('#game-canvas').screenshot({ path: resolve(out, live ? 'before-mobile.png' : 'candidate-mobile.png') });
-  await writeFile(resolve(out, live ? 'before-live.json' : 'candidate.json'), JSON.stringify({ right, rightFrames, left, mobile, mobileFrames, errors }, null, 2));
+  await page.locator('#game-canvas').screenshot({ path: resolve(out, live ? 'live-mobile.png' : 'candidate-mobile.png') });
+  await writeFile(resolve(out, live ? 'live.json' : 'candidate.json'), JSON.stringify({ right, rightFrames, left, mobile, mobileFrames, errors }, null, 2));
   assert([right, left, mobile].every(wall => wall.chipCounts.length === 3 &&
     wall.chipCounts.reduce((a, b) => a + b, 0) > 15 && wall.reliefRange > .001 && !wall.renderError),
   `Side walls still have uniform factory geometry: ${JSON.stringify({ right, left, mobile })}`);

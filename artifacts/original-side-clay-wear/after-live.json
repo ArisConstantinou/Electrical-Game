@@ -1,0 +1,71 @@
+{
+  "right": {
+    "side": "Right",
+    "baseCount": 471,
+    "visibleBase": 355,
+    "chipCounts": [
+      50,
+      51,
+      15
+    ],
+    "chipTriangles": [
+      68,
+      60,
+      76
+    ],
+    "reliefRange": 0.005000114440917969,
+    "draws": 534,
+    "triangles": 1727176,
+    "geometries": 989,
+    "renderError": ""
+  },
+  "rightFrames": {
+    "medianMs": 16.69999999999709,
+    "p95Ms": 16.80000000000291
+  },
+  "left": {
+    "side": "Left",
+    "baseCount": 426,
+    "visibleBase": 328,
+    "chipCounts": [
+      31,
+      49,
+      18
+    ],
+    "chipTriangles": [
+      68,
+      60,
+      76
+    ],
+    "reliefRange": 0.005000114440917969,
+    "draws": 834,
+    "triangles": 2529922,
+    "geometries": 1011,
+    "renderError": ""
+  },
+  "mobile": {
+    "side": "Right",
+    "baseCount": 471,
+    "visibleBase": 355,
+    "chipCounts": [
+      50,
+      51,
+      15
+    ],
+    "chipTriangles": [
+      68,
+      60,
+      76
+    ],
+    "reliefRange": 0.005000114440917969,
+    "draws": 1115,
+    "triangles": 3242868,
+    "geometries": 1047,
+    "renderError": ""
+  },
+  "mobileFrames": {
+    "medianMs": 16.69999999999709,
+    "p95Ms": 16.80000000000291
+  },
+  "errors": []
+}
