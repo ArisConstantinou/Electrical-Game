@@ -430,8 +430,8 @@ html, body { background: #151a1d; }
     fill:none; stroke:#ffdf35; stroke-width:2.5;
     stroke-linecap:round; stroke-linejoin:round;
   }
-  #game-shell[data-tools-open="false"] #worker-bar-handle svg,
-  #game-shell[data-inspector-open="false"] #inspector-bar-handle svg {
+  #game-shell[data-tools-open="true"] #worker-bar-handle svg,
+  #game-shell[data-inspector-open="true"] #inspector-bar-handle svg {
     transform:rotate(180deg);
   }
   #worker-bar-handle:focus-visible, #inspector-bar-handle:focus-visible,
@@ -460,7 +460,7 @@ html, body { background: #151a1d; }
   #game-shell[data-tool-selector="horizontal"][data-tools-open="true"] #mobile-tool-slider {
     position:absolute; z-index:18; display:flex;
     top:calc(var(--top-rail-y) + 4px); bottom:auto;
-    left:calc(var(--top-rail-edge) + 7px); right:calc(var(--top-rail-edge) + 164px);
+    left:calc(var(--top-rail-edge) + 7px); right:calc(var(--top-rail-edge) + 174px);
     width:auto; height:46px; padding:0; gap:3px;
     border:0; border-radius:0; background:transparent; box-shadow:none;
     overflow-x:auto; overflow-y:hidden; touch-action:pan-x;
