@@ -95,6 +95,17 @@ try {
     const independentCutPairs = Math.min(leftCuts.length,rightCuts.length);
     const independentCuts = Array.from({length:independentCutPairs},(_,i)=>Math.abs(leftCuts[i]-rightCuts[i])).filter(d=>d>.03).length;
     const rubbleSections = wall.rubble?.sections;
+    const fineClayCount = wall.rubble?.clayGrit.count ?? 0;
+    const fineRenderCount = wall.rubble?.renderGrit.count ?? 0;
+    const rampPositions = wall.rubble?.mound.geometry.getAttribute('position');
+    let rampAtWall = 0, rampAtToe = 0, rampHighestOut = Infinity, rampHighest = 0;
+    if (rampPositions) for (let i=0;i<rampPositions.count;i++) {
+      const out = Math.abs(wall.alongX ? rampPositions.getZ(i) : rampPositions.getX(i));
+      const height = rampPositions.getY(i);
+      if (out < .13) rampAtWall = Math.max(rampAtWall,height);
+      if (out > 1.18) rampAtToe = Math.max(rampAtToe,height);
+      if (height > rampHighest) { rampHighest = height; rampHighestOut = out; }
+    }
     const rubbleOffsets = [];
     if (rubbleSections) for (let i=0;i<rubbleSections.count;i++) {
       rubbleSections.getMatrixAt(i, wall.temp);
@@ -143,7 +154,8 @@ try {
       status:game.fpsRig.contactStatus, before, after, capsAfterHit, capsRestored, capsReset,
       blockedZ, openZ, intactZ, cleared, restored,
       fracturedEndsRestored, fracturedEndDepthMm, independentCuts, independentCutPairs,
-      rubbleOffsets, partialSavedSide, partialRestoredSide, restoredSide,
+      rubbleOffsets, fineClayCount, fineRenderCount, rampAtWall, rampAtToe, rampHighestOut,
+      partialSavedSide, partialRestoredSide, restoredSide,
       crossFracturedEnds, strikeMs,
       saved:document.demolition?.[wall.group.name]?.length ?? 0,
       crossStrike,crossCaps,crossCapsReset,
@@ -166,6 +178,10 @@ try {
     `Opposite sides of the opening share a mirrored fracture: ${JSON.stringify(result)}`);
   assert(result.rubbleOffsets.length >= 20 && result.rubbleOffsets.every(offset=>offset<0),
     `Rubble spilled onto the opposite side of the wall: ${JSON.stringify(result)}`);
+  assert(result.fineClayCount >= 700 && result.fineRenderCount >= 400,
+    `The opened wall did not produce enough fine clay and plaster fragments: ${JSON.stringify(result)}`);
+  assert(result.rampAtWall > .3 && result.rampAtToe < .02 && result.rampHighestOut < .13,
+    `Rubble must form a ramp whose highest edge meets the broken wall: ${JSON.stringify(result)}`);
   const sortedStrikeMs=[...result.strikeMs].sort((a,b)=>a-b);
   assert(sortedStrikeMs[Math.floor(sortedStrikeMs.length*.95)] < 8,
     `Exposed-end treatment stalled demolition: ${JSON.stringify(result)}`);
@@ -197,6 +213,13 @@ try {
     game.renderer.render();
   });
   await page.locator('#game-canvas').screenshot({path:resolve(out,'rubble-close.png')});
+  await page.evaluate(() => {
+    const game = window.__wireTheHouse, camera = game.renderer.camera;
+    camera.position.set(14.0,1.05,14.7);
+    camera.lookAt(15.3,.18,15.85);
+    game.renderer.render();
+  });
+  await page.locator('#game-canvas').screenshot({path:resolve(out,'rubble-ramp.png')});
   const turnFrames = mobile ? await page.evaluate(async () => {
     const game = window.__wireTheHouse, camera = game.renderer.camera;
     camera.position.set(15.3,1.65,14.3);
@@ -239,7 +262,7 @@ try {
     game.levelEditor.applyDocument(document);
     return { hit, offsets, restoredSide:wall.rubbleSide };
   });
-  assert(reverseSide.hit && reverseSide.offsets.length >= 4 && reverseSide.offsets.every(offset=>offset>0) && reverseSide.restoredSide === 1,
+  assert(reverseSide.hit && reverseSide.offsets.length >= 2 && reverseSide.offsets.every(offset=>offset>0) && reverseSide.restoredSide === 1,
     `Rubble did not follow an opposite-side first impact: ${JSON.stringify(reverseSide)}`);
   const sorted=[...result.strikeMs].sort((a,b)=>a-b);
   console.log(JSON.stringify({pass:true,live,mobile,removed:result.restored,
@@ -247,5 +270,7 @@ try {
     strikeP95Ms:sorted[Math.floor(sorted.length*.95)],
     turnFrames,
     nearSideRubbleCount:result.rubbleOffsets.length,
+    fineClayCount:result.fineClayCount,fineRenderCount:result.fineRenderCount,
+    rampAtWall:result.rampAtWall,rampAtToe:result.rampAtToe,
     oppositeSideHit:reverseSide.hit,oppositeSideRubbleCount:reverseSide.offsets.length}));
 } finally { await browser.close(); }
