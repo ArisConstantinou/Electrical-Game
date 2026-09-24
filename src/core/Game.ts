@@ -714,7 +714,9 @@ export class Game {
     if(present)this.mortar.flushWetGeometry(64,3);
     if(present)this.chasing.flushFragmentRendering(2048,.5);
     if(this.roomWater.surface.visible&&!this.roomWater.waterProActive&&!this.waterProTask&&!this.waterProFailed)void this.activateWaterPro();
-    if(this.waterProTask)return;
+    // The native finite water surface remains usable while the optional
+    // optical renderer loads its GPU resources and textures. Its attachment
+    // swaps the surface only after creation has completed.
     if (present && this.renderer.render()) {
       const workReticle = !this.apprentice.ownsInput && this.selectedTool === 'hammer' && this.fpsRig.reachable
         ? this.fpsRig.chiselTipWorld.clone().project(this.renderer.renderCamera) : null;
@@ -1145,7 +1147,6 @@ export class Game {
     this.animationFrame=null;
     if(this.lifecyclePaused||document.hidden)return;
     if(!this.started&&!this.levelEditor.active&&!this.modelInspector.active)return;
-    if(this.waterProTask){this.animationFrame=requestAnimationFrame(this.loop);return;}
     // Water's depth, reflection and final colour passes share the live scene.
     // Moving its camera/arms between those passes caused alternating tool
     // positions and shadows. Keep elapsed time until the next accepted frame;
