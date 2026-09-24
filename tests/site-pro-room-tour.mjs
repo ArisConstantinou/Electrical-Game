@@ -26,6 +26,7 @@ const views = [
   { name: 'floor-detail', x: 0, z: -.25, yaw: Math.PI, pitch: -.83 },
   { name: 'supplies', x: 0, z: -.35, yaw: -2.28, pitch: -.39 },
   { name: 'left-room', x: 0, z: -.35, yaw: 2.28, pitch: -.16 },
+  { name: 'mixer-close', x: -1.25, z: 1.6, yaw: Math.PI, pitch: -.34 },
   { name: 'open-left-window', x: -1.45, z: 2.0, yaw: Math.PI / 2, pitch: -.04 },
   { name: 'near-open-window', x: -2.90, z: 2.0, yaw: Math.PI / 2, pitch: -.04 },
   { name: 'neighbour-through-opening', x: -2.90, z: 2.0, yaw: 1.1, pitch: -.04 },
@@ -70,11 +71,24 @@ try {
           yaw: game.player.yaw,
           pitch: game.player.pitch,
           error: game.renderer.renderError,
+          drawCalls: game.renderer.webgl.info.render.calls,
+          triangles: game.renderer.webgl.info.render.triangles,
+          textures: game.renderer.webgl.info.memory.textures,
         };
       }, view);
       await page.waitForTimeout(250);
       assert.equal(state.error, '', `${device.name}/${view.name}: render error`);
       await page.screenshot({ path: `${output}/${device.name}-${view.name}.png` });
+      if (view.name === 'mixer-close') state.frameProfile = await page.evaluate(async () => {
+        const times = [];
+        for (let i = 0; i < 110; i++) await new Promise(resolve => requestAnimationFrame(now => {
+          times.push(now);
+          resolve();
+        }));
+        const intervals = times.slice(11).map((time, index) => time - times[index + 10]).sort((a, b) => a - b);
+        return { medianMs: intervals[Math.floor(intervals.length * .5)],
+          p95Ms: intervals[Math.floor(intervals.length * .95)], samples: intervals.length };
+      });
       report.cases.push({ device: device.name, view: view.name, state });
     }
     const rearContact = await page.evaluate(() => {

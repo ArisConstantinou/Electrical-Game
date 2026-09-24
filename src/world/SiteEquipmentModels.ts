@@ -15,6 +15,12 @@ const curedMortarScan = new THREE.TextureLoader().load(`${import.meta.env.BASE_U
 curedMortarScan.colorSpace = THREE.SRGBColorSpace;
 curedMortarScan.wrapS = curedMortarScan.wrapT = THREE.RepeatWrapping;
 curedMortarScan.anisotropy = 4;
+const wornMixerDrumScan = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}assets/site-materials/mixer-drum-worn-orange.webp`);
+wornMixerDrumScan.colorSpace = THREE.SRGBColorSpace;
+wornMixerDrumScan.wrapS = wornMixerDrumScan.wrapT = THREE.RepeatWrapping;
+// Lathe UVs devote half their V range to each side of the folded shell.
+wornMixerDrumScan.repeat.set(1, 2);
+wornMixerDrumScan.anisotropy = 8;
 function wornPowderCoat(color:number, withVertexColor=false):MeshStandardNodeMaterial {
   const base = new THREE.Color(color);
   const material = new MeshStandardNodeMaterial({roughness:.76,metalness:.18});
@@ -159,7 +165,7 @@ export function createWheelbarrow():WheelbarrowModel {
 }
 
 export function createConcreteMixer():THREE.Group {
-  const root=group('orange-drum-concrete-mixer'),orange=paint(0xd95622,.72,.18),dark=paint(0x252928,.74,.25),steel=paint(0x919792,.49,.62),interior=paint(0x8b2810,.78,.16);
+  const root=group('orange-drum-concrete-mixer'),orange=paint(0xae542d,.84,.12),dark=paint(0x252928,.74,.25),steel=paint(0x919792,.49,.62),interior=paint(0x8b2810,.78,.16);
   const frame=group('mixer-stand');root.add(frame);
   // Front telescopic foot, rear axle tripod, and bolted rectangular-tube frame.
   bar(frame,'front-upright',[-.41,.02,-.22],[-.41,1.075,-.22],.030,dark,true);
@@ -187,7 +193,8 @@ export function createConcreteMixer():THREE.Group {
   // Vertex tint keeps the whole drum in one draw, including its interior.
   for(let i=0;i<=64;i++)for(let j=0;j<profile.length;j++)colors.push(...new THREE.Color(j<=11?0xffffff:0x883f25).toArray());
   shell.geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
-  shell.material=wornPowderCoat(0xd95622,true);
+  shell.material=new THREE.MeshStandardMaterial({name:'Worn orange steel with cured mortar and exposed oxidation',
+    map:wornMixerDrumScan,vertexColors:true,roughness:.86,metalness:.12,side:THREE.DoubleSide});
   addMixerMortarWear(drum);
   torus(drum,'rolled-open-mouth',.247,.009,orange,[0,.367,0]);
   torus(drum,'welded-shell-seam',.348,.005,orange,[0,-.025,0]);
