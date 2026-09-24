@@ -378,6 +378,7 @@ export class Game {
     this.assets.markLoaded('procedural-core');
     const startButton = root.querySelector<HTMLButtonElement>('#start-button')!;
     const startButtonLabel = root.querySelector<HTMLElement>('#start-button-label')!;
+    const startScreen = root.querySelector<HTMLElement>('#start-screen')!;
     const startLoadPercent = root.querySelector<HTMLOutputElement>('#start-load-percent')!;
     const loadingIcons = Array.from(root.querySelectorAll<SVGElement>('.start-loading-icons svg'));
     const iconOrder = loadingIcons.map((_, index) => index);
@@ -391,6 +392,7 @@ export class Game {
       const percent = Math.round(++preparedStages / 8 * 100);
       startLoadPercent.value = `${percent}%`;
       startLoadPercent.setAttribute('aria-label', `Site preparation ${percent}%`);
+      startScreen.style.setProperty('--load-progress', `${percent}%`);
     };
     startButton.disabled = true;
     const observePreparation = (task: Promise<void>): Promise<void> => task.then(markPrepared);
@@ -417,7 +419,6 @@ export class Game {
       if (!missingSelectedLevel && params.get('editor') !== '1') {
         // A one-pixel shader warmup leaves the full-size colour/shadow passes
         // cold. On WebGL the first live view otherwise blocks after Start.
-        startButtonLabel.textContent = 'PREPARING FIRST VIEW';
         await new Promise<void>(resolve => setTimeout(resolve, 0));
         this.renderer.render();
         await this.renderer.waitForFrame();
@@ -437,6 +438,11 @@ export class Game {
       const editorButton = root.querySelector<HTMLButtonElement>('#start-level-editor');
       if (editorButton) editorButton.disabled = missingSelectedLevel;
       startButtonLabel.textContent = missingSelectedLevel ? 'CHOOSE LEVEL IN LOAD' : 'START WORK';
+      if (!missingSelectedLevel) {
+        startLoadPercent.value = 'READY';
+        startLoadPercent.dataset.state = 'ready';
+        startLoadPercent.setAttribute('aria-label', 'Site ready');
+      }
       (missingSelectedLevel ? root.querySelector<HTMLButtonElement>('#start-load') : startButton)?.focus({ preventScroll: true });
     });
   }
