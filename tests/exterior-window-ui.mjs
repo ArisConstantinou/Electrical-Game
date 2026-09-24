@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 import { blockPointerLock } from './browser-safety.mjs';
 
 const url = process.argv[2] ?? 'http://127.0.0.1:5365/Electrical-Game/?renderer=webgl';
 const out = process.argv[3] ?? 'output/exterior-window-ui';
+const isolatedRoot = process.env.QA_DIST_ROOT ? path.resolve(process.env.QA_DIST_ROOT) : null;
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const report = { url, cases: [], errors: [], passed: false };
@@ -19,6 +21,18 @@ try {
     await blockPointerLock(context);
     const page = await context.newPage();
     page.on('pageerror', error => report.errors.push(`${device.name}: ${error.message}`));
+    if (isolatedRoot) await page.route('http://127.0.0.1:5365/Electrical-Game/**', async route => {
+      const relative = decodeURIComponent(new URL(route.request().url()).pathname).slice('/Electrical-Game/'.length) || 'index.html';
+      const file = path.resolve(isolatedRoot, relative);
+      if (!file.startsWith(isolatedRoot + path.sep)) return route.abort();
+      try {
+        const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json',
+          '.webp': 'image/webp', '.jpg': 'image/jpeg', '.png': 'image/png', '.glb': 'model/gltf-binary',
+          '.gltf': 'model/gltf+json', '.bin': 'application/octet-stream', '.svg': 'image/svg+xml' };
+        await route.fulfill({ status: 200, body: await readFile(file),
+          contentType: mime[path.extname(file).toLowerCase()] ?? 'application/octet-stream' });
+      } catch { await route.fulfill({ status: 404, body: `Missing isolated asset: ${relative}` }); }
+    });
     await page.goto(url);
     await page.waitForFunction(() => window.__wireTheHouse?.room?.exterior, undefined, { timeout: 120000 });
     await page.selectOption('#apprentice-count', '0');
@@ -43,6 +57,7 @@ try {
       game.heightMeasure.update(camera, false, () => true);
       const tree = room.exterior.getObjectByName('Olive tree outside unfinished opening');
       const building = room.exterior.getObjectByName('Offset adjacent residential block');
+      const firedClay = building.getObjectByName('Human-laid fired-clay infill around open neighbouring bays');
       const treePoint = tree.localToWorld(camera.position.clone().set(.04, 2.1, 0));
       const buildingPoint = building.localToWorld(camera.position.clone().set(-11.15, 2.1, 2.05));
       const screen = (x, z) => {
@@ -56,7 +71,8 @@ try {
       const windRange = Math.max(...windAngles) - Math.min(...windAngles);
       pose(-1.45, 2, Math.PI / 2);
       await game.renderer.waitForFrame();
-      return { parts, hole, solid, near, shifted, windRange, renderError: game.renderer.renderError,
+      return { parts, hole, solid, near, shifted, windRange, firedClayCount: firedClay?.count ?? 0,
+        renderError: game.renderer.renderError,
         outsideMeshes: room.exterior.children.length, hasGlass: room.exterior.getObjectByName('glass') !== undefined };
     });
     assert(state.parts.length >= 6 && state.parts.some(name => name.includes('sill')) && state.parts.some(name => name.includes('lintel')));
@@ -65,6 +81,7 @@ try {
     assert(Math.abs(state.near.tree - state.shifted.tree) > .02, `${device.name}: near olive tree has no camera parallax`);
     assert(state.windRange > .005, `${device.name}: courtyard foliage has no motion`);
     assert(state.outsideMeshes >= 6 && !state.hasGlass && state.renderError === '');
+    assert(state.firedClayCount > 300, `${device.name}: exposed clay infill missing`);
     await page.screenshot({ path: `${out}/${device.name}-open-left-window.png` });
     report.cases.push({ device: device.name, state });
     await context.close();

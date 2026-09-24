@@ -482,3 +482,29 @@ before/after in all four poses; p95 varied between runs (the released room
 measured 21.6 ms before and 31.5 ms after, while the same preview room measured
 20.9 ms before and 20.0 ms after). This single pair cannot establish a stable
 frame-time gain or regression, and is not physical-device evidence.
+
+## Neighbouring open-bay masonry, 2026-09-24
+
+The unfinished block beyond the mansion field showed the **back** of its
+recessed window surfaces, so from the playable field both openings looked
+like dark, flat rectangles. The duplicate building is now turned toward that
+approach while its facade stays in the same world position. The workroom's
+original view retains its existing building orientation. Both views now show
+the real 1.5 m bay depth, slab edges and balcony rail.
+
+The facade's exposed infill has individually staggered fired-clay faces using
+the game's existing photographed masonry atlas, with varied color, slight
+placement irregularity and recessed light mortar joints. The existing concrete
+columns, lintels and slab stay visible. This is a **distant decorative
+neighbour**, not a change to the breakable game walls or their collision.
+
+Same-pose desktop and 390×844 Chrome-emulated portrait images are in
+`artifacts/neighbour-clay/before/` and `artifacts/neighbour-clay/after/`;
+the latter also records the default workroom window. The four-viewport
+`tests/exterior-window-ui.mjs` route still detects the true opening and
+solid wall separately, checks tree parallax/wind, and now asserts the clay
+infill exists. Candidate field capture loaded without render/page errors at
+827 desktop and 813 portrait draw calls (before 825 and 812) and about
+2.80M / 2.69M visible triangles (before about 2.79M / 2.68M). Short host
+frame samples vary and do not prove phone performance. The full mansion
+exterior, all floors and environmental quality remain incomplete.

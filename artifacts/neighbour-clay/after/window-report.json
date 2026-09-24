@@ -1,0 +1,135 @@
+{
+  "url": "http://127.0.0.1:5365/Electrical-Game/?renderer=webgl",
+  "cases": [
+    {
+      "device": "portrait",
+      "state": {
+        "parts": [
+          "Solid wall before window opening",
+          "Solid wall after window opening",
+          "Solid cast sill below opening",
+          "Solid lintel above opening",
+          "Raw concrete opening sill with exterior drip edge",
+          "Structural exposed concrete window lintel",
+          "Left fired-clay courses cut around unglazed opening",
+          "Left physically chipped clay units 1",
+          "Left physically chipped clay units 2",
+          "Left physically chipped clay units 3"
+        ],
+        "hole": "no-wall",
+        "solid": "ready",
+        "near": {
+          "tree": -0.4224411725884049,
+          "building": 0.6749706030243836
+        },
+        "shifted": {
+          "tree": -0.17900049685949368,
+          "building": 0.7967159637820973
+        },
+        "windRange": 0.014483433708725818,
+        "firedClayCount": 928,
+        "renderError": "",
+        "outsideMeshes": 12,
+        "hasGlass": false
+      }
+    },
+    {
+      "device": "landscape",
+      "state": {
+        "parts": [
+          "Solid wall before window opening",
+          "Solid wall after window opening",
+          "Solid cast sill below opening",
+          "Solid lintel above opening",
+          "Raw concrete opening sill with exterior drip edge",
+          "Structural exposed concrete window lintel",
+          "Left fired-clay courses cut around unglazed opening",
+          "Left physically chipped clay units 1",
+          "Left physically chipped clay units 2",
+          "Left physically chipped clay units 3"
+        ],
+        "hole": "no-wall",
+        "solid": "ready",
+        "near": {
+          "tree": -0.15511961985811137,
+          "building": 0.24784796120844874
+        },
+        "shifted": {
+          "tree": -0.0657286524822506,
+          "building": 0.2925526332566569
+        },
+        "windRange": 0.01480185501272401,
+        "firedClayCount": 928,
+        "renderError": "",
+        "outsideMeshes": 12,
+        "hasGlass": false
+      }
+    },
+    {
+      "device": "tablet-portrait",
+      "state": {
+        "parts": [
+          "Solid wall before window opening",
+          "Solid wall after window opening",
+          "Solid cast sill below opening",
+          "Solid lintel above opening",
+          "Raw concrete opening sill with exterior drip edge",
+          "Structural exposed concrete window lintel",
+          "Left fired-clay courses cut around unglazed opening",
+          "Left physically chipped clay units 1",
+          "Left physically chipped clay units 2",
+          "Left physically chipped clay units 3"
+        ],
+        "hole": "no-wall",
+        "solid": "ready",
+        "near": {
+          "tree": -0.422441172588405,
+          "building": 0.6749706030243837
+        },
+        "shifted": {
+          "tree": -0.1790004968594937,
+          "building": 0.7967159637820973
+        },
+        "windRange": 0.014445725979581932,
+        "firedClayCount": 928,
+        "renderError": "",
+        "outsideMeshes": 12,
+        "hasGlass": false
+      }
+    },
+    {
+      "device": "desktop",
+      "state": {
+        "parts": [
+          "Solid wall before window opening",
+          "Solid wall after window opening",
+          "Solid cast sill below opening",
+          "Solid lintel above opening",
+          "Raw concrete opening sill with exterior drip edge",
+          "Structural exposed concrete window lintel",
+          "Left fired-clay courses cut around unglazed opening",
+          "Left physically chipped clay units 1",
+          "Left physically chipped clay units 2",
+          "Left physically chipped clay units 3"
+        ],
+        "hole": "no-wall",
+        "solid": "ready",
+        "near": {
+          "tree": -0.18873615015780482,
+          "building": 0.3015599836160731
+        },
+        "shifted": {
+          "tree": -0.0799729449821207,
+          "building": 0.35595276580677065
+        },
+        "windRange": 0.014549543132705038,
+        "firedClayCount": 928,
+        "renderError": "",
+        "outsideMeshes": 12,
+        "hasGlass": false
+      }
+    }
+  ],
+  "errors": [],
+  "passed": true
+}

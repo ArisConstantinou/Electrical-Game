@@ -1,5 +1,11 @@
 Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web game named WIRE THE HOUSE, based on real Cyprus residential first-fix practices, editable in Web Game Studio, playable on desktop/mobile, deployed to arisconstantinou/Electrical-Game via GitHub Pages, and ending at FIRST FIX COMPLETE without cable pulling.
 
+## 2026-09-24 · Full visual goal: neighbouring open-bay infill
+
+- The mansion field saw the rear of the decorative neighbour's recessed bays as dark rectangles. The isolated candidate turns that clone toward the field without moving the facade or changing the original workroom's source view.
+- Individual staggered clay faces from the existing photo atlas replace a flat plaster appearance around the open bays. Same-pose desktop/portrait captures show a concrete-framed, depth-readable building. Four-viewport workroom window interactions passed; TypeScript and Vite build passed. See `artifacts/neighbour-clay/` and `docs/VISUAL_OVERHAUL.md`.
+- This is one environment slice. Main mansion massing, room-by-room construction, tools/characters/effects/UI, full device and performance acceptance remain open.
+
 ## 2026-09-24 · Full visual goal: first-fix floor offcuts
 
 - In isolated `codex/site-floor-debris` from integrated `3654ade`, replaced the original regular 26-chip row with clustered clay shell fragments, mortar crumbs and six broken four-chamber units. The first uniform orange candidate was rejected after visual inspection; the retained candidate uses photographed clay, varied angle/tone and the original Studio asset ID.

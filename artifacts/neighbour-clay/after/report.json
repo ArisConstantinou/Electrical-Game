@@ -1,0 +1,64 @@
+{
+  "url": "http://127.0.0.1:5365/Electrical-Game/?mansion=preview&renderer=webgl",
+  "servedFrom": "C:\\Users\\arz0r\\.codex\\worktrees\\mansion-neighbour-clay\\Electrical-Game\\dist",
+  "pose": {
+    "x": 21.8,
+    "y": 1.72,
+    "z": 3.1,
+    "yaw": -1.5707963267948966,
+    "pitch": -0.05
+  },
+  "cases": [
+    {
+      "device": "desktop",
+      "info": {
+        "shrubs": [
+          {
+            "name": "site-asset:separate-drought-tolerant-field-shrubs-at-varied-depths:1",
+            "visible": true
+          }
+        ],
+        "scanned": true,
+        "scanError": "",
+        "scanMeshes": 3,
+        "studioPivot": "mansion:site-asset:separate-drought-tolerant-field-shrubs-at-varied-depths:1",
+        "drawCalls": 827,
+        "triangles": 2802559,
+        "error": ""
+      },
+      "studioMotion": 0.25,
+      "profile": {
+        "frameP95Ms": 22.199999928474426,
+        "renderCpuP95Ms": 21.899999976158142,
+        "drawCalls": 827,
+        "triangles": 2802559
+      }
+    },
+    {
+      "device": "portrait",
+      "info": {
+        "shrubs": [
+          {
+            "name": "site-asset:separate-drought-tolerant-field-shrubs-at-varied-depths:1",
+            "visible": true
+          }
+        ],
+        "scanned": true,
+        "scanError": "",
+        "scanMeshes": 3,
+        "studioPivot": "mansion:site-asset:separate-drought-tolerant-field-shrubs-at-varied-depths:1",
+        "drawCalls": 813,
+        "triangles": 2687107,
+        "error": ""
+      },
+      "studioMotion": 0.25,
+      "profile": {
+        "frameP95Ms": 22.100000023841858,
+        "renderCpuP95Ms": 21.700000047683716,
+        "drawCalls": 813,
+        "triangles": 2687107
+      }
+    }
+  ],
+  "errors": []
+}

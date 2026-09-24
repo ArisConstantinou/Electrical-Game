@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { siteMaterial } from './SiteMaterials';
-import { brickFacePatch } from './BrickFacePatch';
+import { brickFacePatch, brickFaceTone } from './BrickFacePatch';
 import { masonryFaceMaterial } from './BrickFaceMaterial';
 
 function taperedBranch(points: THREE.Vector3[], segments: number, radius: number, sides: number): THREE.BufferGeometry {
@@ -214,6 +214,46 @@ export class ExteriorCourtyard extends THREE.Group {
     }
     for (const z of [-5.12, -.25, 5.12])
       block('Neighbouring reinforced-concrete pier', concrete, facadeX + .10, 2.68, z, .51, 5.36, .26);
+    // Unfinished neighbouring infill uses individual, staggered fired-clay
+    // units. The existing backing is mortar visible in the recessed joints;
+    // the two open bays stay physically open and retain their deep returns.
+    const clayMatrices: THREE.Matrix4[] = [], clayPatches: number[] = [], clayTints: THREE.Color[] = [];
+    const unit = new THREE.Matrix4(), unitColor = new THREE.Color();
+    const fillCourses = (baseY: number, bottom: number, height: number, spans: readonly [number, number][], seed: number) => {
+      const courseHeight = .119, pitch = .372, joint = .009;
+      const rows = Math.floor(height / courseHeight);
+      for (let row = 0; row < rows; row++) for (const [left, right] of spans) {
+        const offset = row % 2 ? pitch / 2 : 0;
+        for (let col = -1; col <= Math.ceil((right - left) / pitch); col++) {
+          const first = Math.max(left + joint / 2, left + col * pitch + offset + joint / 2);
+          const last = Math.min(right - joint / 2, left + (col + 1) * pitch + offset - joint / 2);
+          if (last - first < .035) continue;
+          const roughness = ((Math.imul(row + seed + 17, 73856093) ^ Math.imul(col + seed + 31, 19349663)) >>> 0) / 4294967295;
+          const y = baseY + bottom + row * courseHeight + courseHeight / 2 + (roughness - .5) * .003;
+          const z = (first + last) / 2;
+          clayMatrices.push(unit.makeScale(.038, courseHeight - joint, last - first).setPosition(facadeX + wallThickness / 2 + .011, y, z).clone());
+          clayPatches.push(...brickFacePatch(row, col, seed));
+          const tone = brickFaceTone(row, col, seed);
+          clayTints.push(unitColor.setRGB(tone[0], tone[1], tone[2]).clone());
+        }
+      }
+    };
+    for (const [storey, base] of [0, 2.64].entries()) {
+      fillCourses(base, 0, .84, [[-5.2, 5.2]], storey * 3 + 25);
+      fillCourses(base, .86, 1.30, [[-5.2, -3.63], [-1.47, .97], [3.13, 5.2]], storey * 3 + 26);
+      fillCourses(base, 2.17, .46, [[-5.2, 5.2]], storey * 3 + 27);
+    }
+    const firedClayGeometry = new THREE.BoxGeometry(1, 1, 1);
+    firedClayGeometry.setAttribute('brickPatch', new THREE.InstancedBufferAttribute(new Float32Array(clayPatches), 4));
+    const firedClay = new THREE.InstancedMesh(firedClayGeometry, masonryFaceMaterial, clayMatrices.length);
+    firedClay.name = 'Human-laid fired-clay infill around open neighbouring bays';
+    firedClay.receiveShadow = true;
+    firedClay.raycast = () => undefined;
+    clayMatrices.forEach((transform, index) => {
+      firedClay.setMatrixAt(index, transform);
+      firedClay.setColorAt(index, clayTints[index]);
+    });
+    firedClay.computeBoundingSphere(); neighbour.add(firedClay);
     block('Overhanging unfinished roof slab', concrete, facadeX + .28, 5.40, 0, 1.15, .23, facadeWidth + .42);
     // A short balcony sits in front of the upper floor and its steel rail has
     // depth and a shadow; it does not close the apertures with glass.

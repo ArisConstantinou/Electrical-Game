@@ -20,9 +20,16 @@ export class MansionSurroundings extends THREE.Group {
       const building = new THREE.LOD();
       building.name = 'Distant Cypriot unfinished residential block with open bays';
       const detailed = neighbourSource.clone(true);
-      detailed.position.set(0, 0, 0);
+      // The workroom sees this facade from +X. The outer field views its
+      // opposite side, where the recessed bays used to read as dark blocks.
+      // Turn the clone toward the field while keeping its facade in place.
+      detailed.rotation.y = Math.PI;
+      detailed.position.set(-22.3, 0, 0);
       building.addLevel(detailed, 0);
-      building.addLevel(this.makeDistantNeighbour(), 38);
+      const distant = this.makeDistantNeighbour();
+      distant.rotation.y = Math.PI;
+      distant.position.x = -22.3;
+      building.addLevel(distant, 38);
       building.position.set(45, 0, 3);
       building.scale.setScalar(1.18);
       building.traverse(object => { object.raycast = () => undefined; });
