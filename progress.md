@@ -1557,3 +1557,8 @@ Original prompt for this task: Selecting BOX should show an initial box in the l
 - On the live 5365 `codex/site-pro-visual-integration` checkout, the start button now keeps its action label during first-view warmup. The title accent and button shift from muted neutral to yellow with the eight actual preparation stages; a small line shows progress.
 - Once preparation completes, the button is enabled and displays a distinct READY badge. Desktop and mobile browser runs observed 0/25/38/50/75/100% colour progression, no `PREPARING FIRST VIEW`, no page errors or horizontal overflow, and successful entry into gameplay. Evidence: `artifacts/start-loading/after/` with matching `before/` screenshots.
 - The existing `tests/start-screen-ui.mjs` fails its desktop-centering assertion against the already-existing two-column layout (visible in the before screenshot). `npm run typecheck` cannot start because this checkout's shared `node_modules` junction currently lacks `tsc`; no dependencies were installed.
+
+## 2026-09-24 · Loading/ready headline correction
+
+- User clarified that the large central button word must read LOADING while disabled and READY when preparation finishes. The percentage remains beside LOADING; the small ready badge is hidden in favour of the 40 px desktop / 32 px mobile central READY label. The enabled button retains an accessible Start work label.
+- Browser checks at 1440×900 and 390×844 confirm both phases, click-to-game, no page errors and no horizontal overflow. The bundled game client also completed; screenshots and report are in `artifacts/start-loading/corrected/`.

@@ -437,8 +437,10 @@ export class Game {
       startButton.disabled = missingSelectedLevel;
       const editorButton = root.querySelector<HTMLButtonElement>('#start-level-editor');
       if (editorButton) editorButton.disabled = missingSelectedLevel;
-      startButtonLabel.textContent = missingSelectedLevel ? 'CHOOSE LEVEL IN LOAD' : 'START WORK';
+      startButtonLabel.textContent = missingSelectedLevel ? 'CHOOSE LEVEL IN LOAD' : 'READY';
       if (!missingSelectedLevel) {
+        startButton.dataset.ready = 'true';
+        startButton.setAttribute('aria-label', 'Ready. Start work');
         startLoadPercent.value = 'READY';
         startLoadPercent.dataset.state = 'ready';
         startLoadPercent.setAttribute('aria-label', 'Site ready');

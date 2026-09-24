@@ -52,6 +52,10 @@
 #start-screen .start-work-sequence svg { flex: none; width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
 #start-screen #start-button { order: 1; position: relative; display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; min-height: 72px; padding: 4px 14px; border: 2px solid color-mix(in srgb, #969680, #b29223 var(--load-progress)); border-radius: 6px; background: color-mix(in srgb, #cfccb5, #ffda28 var(--load-progress)); box-shadow: 0 5px 0 color-mix(in srgb, #777b69, #ae8a19 var(--load-progress)); color: #233125; font: 900 28px/1 Bahnschrift, 'Arial Narrow', Arial, sans-serif; letter-spacing: .12em; }
+#start-screen #start-button[data-preparing='true'] #start-button-label,
+#start-screen #start-button[data-ready='true'] #start-button-label { font-size: clamp(32px, 4vw, 40px); }
+#start-screen #start-button[data-ready='true'] #start-button-label { animation: start-ready-reveal .35s ease-out both; }
+#start-screen #start-button[data-ready='true'] .start-loading-indicator { display: none; }
 #start-screen #start-button[data-preparing='true']::after { content: ''; position: absolute; left: 0; bottom: 0; width: var(--load-progress); height: 4px; border-radius: 0 3px 3px 3px; background: #b68b12; }
 #start-screen #start-button .start-loading-indicator { position: absolute; right: 13px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; justify-content: flex-end; gap: 6px; min-width: 70px; }
 #start-screen #start-button .start-loading-icons { position: relative; display: block; flex: none; width: 25px; height: 25px; background: transparent; }
@@ -68,9 +72,8 @@
 #start-screen #start-button:focus-visible,
 #start-screen .start-card button:focus-visible { outline: 2px solid #315b4c; outline-offset: -5px; }
 #start-screen #start-load-percent { color: #284c3c; font: 900 16px/1 Bahnschrift, Arial, sans-serif; letter-spacing: .02em; }
-#start-screen #start-load-percent[data-state='ready'] { padding: 5px 7px; border-radius: 4px; background: #e2f2ce; color: #245039; animation: start-ready-reveal .35s ease-out both; }
 @keyframes start-ready-reveal { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: scale(1); } }
-@media (prefers-reduced-motion: reduce) { #start-screen #start-load-percent[data-state='ready'] { animation: none; } }
+@media (prefers-reduced-motion: reduce) { #start-screen #start-button[data-ready='true'] #start-button-label { animation: none; } }
 
 #start-screen .start-work-order { order: 3; margin-top: 15px; padding: 12px 13px; border: 1px solid #8ea298; border-radius: 5px; background: #f9f7ed; color: #213c36; }
 #start-screen .start-order-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; font: 900 12px/1.2 Bahnschrift, Arial, sans-serif; letter-spacing: .08em; }
