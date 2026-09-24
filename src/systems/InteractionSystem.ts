@@ -38,6 +38,10 @@ export class InteractionSystem {
       return { success: painted, message: !painted ? 'Aim the spray at brick.' : firstMark ? `Point ${point.definition.id}: free mark started.` : '' };
     }
     if (tool === 'hammer') {
+      if (this.hammerMode === 'chase') {
+        const hit = this.chasing.hit(camera, point);
+        return { success:hit, message: !hit ? 'Place the chisel against the masonry.' : point.stage === 'chased' ? 'Cavity clear. The back boxes fit.' : '' };
+      }
       const impact = this.chasing.freeHit(camera, continuing);
       if (impact) {
         if (point.stage === 'inspect' && impact.points[0]) point.placeAt(impact.points[0].x, impact.points[0].y);

@@ -40,7 +40,10 @@ damagedMasonryMaterial.name = 'Photographed clay with true fractured interior';
 const brokenUv = attribute<'vec2'>('brickLocalUv', 'vec2');
 const brokenEdge = min(min(brokenUv.x, brokenUv.x.oneMinus()), min(brokenUv.y, brokenUv.y.oneMinus()));
 const brokenMortar = smoothstep(mortarReach.sub(.008), mortarReach.add(.010), brokenEdge).oneMinus().mul(mortarCoverage);
-damagedMasonryMaterial.colorNode = mix(attribute('color', 'vec3'),
+const brokenColor = attribute<'vec3'>('color', 'vec3');
+const texturedBreak = mix(brokenColor, clayInterior,
+  smoothstep(.08, .2, brokenColor.r.sub(brokenColor.g)).mul(siteClayReady).mul(.42));
+damagedMasonryMaterial.colorNode = mix(texturedBreak,
   mix(mix(sampleTexture(brickFace, uv()).rgb, clayInterior, siteClayReady.mul(.25)).mul(clayRibShade),
     mortarPigment, brokenMortar),
   attribute('brickFace', 'float')).mul(attribute('brickTint', 'vec3'));

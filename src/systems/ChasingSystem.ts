@@ -91,6 +91,7 @@ export class ChasingSystem {
     if (this.strikeDebris(camera)) return true;
     const impact = this.wall.recessChaseAtAim(camera, point.definition.id);
     if (!impact) return false;
+    if (point.stage === 'inspect' && impact.points[0]) point.placeAt(impact.points[0].x, impact.points[0].y);
     point.chaseHits += 1;
     this.refreshProgress(point);
     this.spawnDebris(impact);

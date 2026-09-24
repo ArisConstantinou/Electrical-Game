@@ -40,6 +40,7 @@ try {
     camera.position.set(15.3, 1.65, 15.0);
     camera.rotation.set(0, Math.PI, 0);
     game.selectedTool = 'hammer';
+    game.hammerMode = 'demolish';
     game.fpsRig.show('hammer');
     const target = wing.aimMasonry(camera);
     const contact = target ? game.fpsRig.contactMasonry(camera, target.point) : false;

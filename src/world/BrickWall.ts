@@ -41,6 +41,8 @@ const edgeShade = smoothstep(0, .075, edgeDistance).mul(.13).add(.87);
 const photographedClay = sampleTexture(brickImage, uv()).rgb.mul(masonryColor.r.div(.49))
   .mul(attribute<'vec3'>('brickTone', 'vec3'));
 const clayInterior = sampleTexture(siteClayImage, vec2(brickLocalUv.x, brickLocalUv.y.mul(.66).add(.32))).rgb;
+const fracturedClay = mix(rawMasonry, clayInterior,
+  smoothstep(.08, .2, masonryColor.r.sub(masonryColor.g)).mul(siteClayReady).mul(.42));
 const finishedClay = mix(photographedClay, clayInterior, siteClayReady.mul(.25)).mul(edgeShade).mul(clayRibShade);
 // Mortar squeezed out by hand follows the joints, with gaps and grit instead
 // of a constant-width graphic line. The underlying breakable field is intact.
@@ -60,7 +62,7 @@ const mortarStain = smoothstep(.025, .11, edgeDistance).oneMinus()
 const laidFace = mix(finishedClay, roughMortar, mortarMask.mul(.90).add(mortarStain));
 // A face mask keeps real mortar joints, internal chambers and broken edges on
 // their own rough clay/mortar colors in both WebGPU and the WebGL backend.
-wallMaterial.colorNode = mix(mix(rawMasonry, laidFace, attribute<'float'>('brickFace', 'float').mul(brickImageReady)),laserTint,laserBand);
+wallMaterial.colorNode = mix(mix(fracturedClay, laidFace, attribute<'float'>('brickFace', 'float').mul(brickImageReady)),laserTint,laserBand);
 wallMaterial.normalNode = normalMap(sampleTexture(clayRibNormal, brickLocalUv),
   vec2(.75, .75).mul(attribute<'float'>('brickFace', 'float')));
 wallMaterial.emissiveNode=laserEmission;
@@ -262,20 +264,20 @@ export class BrickWall extends THREE.Group {
     return {points:fragments.map(f=>new THREE.Vector3(f.position.x,f.position.y,f.position.z)),kind:'demolish-split',brickSize:new THREE.Vector3(.05,.05,.02),seed:result.seed,destroyed:false,fragments,removedVolume:result.removedVolume};
   }
   recessChaseAtAim(camera: THREE.Camera, _pointId: string): MasonryImpact | null {
-    // CHASE uses the same physical contact; spray guides the player, never a cutter.
-    return this.strike(camera);
+    // Preserve the rear leaf while opening a physical box/conduit recess.
+    return this.strike(camera, .105);
   }
-  private strike(camera: THREE.Camera): MasonryImpact | null {
+  private strike(camera: THREE.Camera, maxDepthM?: number): MasonryImpact | null {
     let contact = this.contactProvider?.(camera) ?? null;
     if (!this.contactProvider) {
       const hit = this.aim(camera);
       if (hit) contact = {point: hit.point, direction: camera.getWorldDirection(new THREE.Vector3()), edge: new THREE.Vector3(Math.cos(this.chiselEdgeAngle), Math.sin(this.chiselEdgeAngle), 0), energyJ: this.chiselEnergyJ, chisel: this.chiselType};
     }
     if (!contact) return null;
-    return this.strikeContact(contact);
+    return this.strikeContact(contact, maxDepthM);
   }
   /** Independent workers submit physical contact without replacing the player's provider. */
-  strikeContact(contact: ChiselContact): MasonryImpact | null {
+  strikeContact(contact: ChiselContact, maxDepthM?: number): MasonryImpact | null {
     const start = performance.now();
     this.updateWorldMatrix(true, false);
     const transformed = !this.matrixWorld.equals(identityMatrix);
@@ -289,7 +291,7 @@ export class BrickWall extends THREE.Group {
     const edgeScale = transformed
       ? contact.edge.clone().applyMatrix3(new THREE.Matrix3().setFromMatrix4(inverse!)).length() / Math.max(1e-6, contact.edge.length())
       : 1;
-    const result = this.volume.impact({ ...localContact, widthM: (contact.widthM ?? this.chiselWidthM) * edgeScale, trim: this.chiselTiltDegrees < 0 });
+    const result = this.volume.impact({ ...localContact, widthM: (contact.widthM ?? this.chiselWidthM) * edgeScale, trim: this.chiselTiltDegrees < 0, maxDepthM });
     if (!result.contact) return null;
     this.lastResult = result;
     this.impactCount++;

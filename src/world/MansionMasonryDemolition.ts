@@ -4,6 +4,7 @@ import { hollowClayEndMaterial, hollowClayEndShapes } from './HollowClayEnd';
 import { MasonryVolume, MaterialId, type MasonrySave } from './MasonryVolume';
 import { damagedMasonryMaterial } from './BrickFaceMaterial';
 import { MansionBreakoutRubble } from './MansionBreakoutRubble';
+import type { MeshData } from './masonryMesher';
 
 export interface MasonryAim {
   wall: MansionMasonryDemolition;
@@ -17,7 +18,7 @@ export interface MasonryBrickInstance {
   instance: number;
 }
 export interface MansionBrickDamage { index: number; save: MasonrySave }
-interface BrokenBrick { volume: MasonryVolume; mesh: THREE.Mesh; origin: THREE.Vector3; rotation: THREE.Quaternion; originalSolidNodes: number }
+interface BrokenBrick { volume: MasonryVolume; mesh: THREE.Group; origin: THREE.Vector3; rotation: THREE.Quaternion; originalSolidNodes: number; chunkMeshes: Map<string, THREE.Mesh> }
 
 /** A light demolition layer for the authored fired-clay walls. The intact wall
  * keeps its original two draw calls; a hit swaps the solid backing for a
@@ -157,7 +158,7 @@ export class MansionMasonryDemolition {
 
   /** The original work wall's material lattice is allocated only for bricks
    * actually struck. The intact instanced wall stays cheap and unchanged. */
-  strikeAt(index: number, camera: THREE.Camera): boolean {
+  strikeAt(index: number, camera: THREE.Camera, mode: 'chase' | 'demolish' = 'demolish'): boolean {
     if (!this.remaining[index]) return false;
     let entry = this.broken.get(index);
     if (!entry) entry = this.createBrokenBrick(index);
@@ -168,30 +169,33 @@ export class MansionMasonryDemolition {
     const wallDirection = camera.getWorldDirection(new THREE.Vector3()).transformDirection(this.inverse);
     const direction = wallDirection.clone().applyQuaternion(entry.rotation.clone().invert());
     const contact = entry.volume.raycast(origin, direction, 2.4);
-    if (!contact) { if (!this.broken.has(index)) { entry.mesh.removeFromParent(); entry.mesh.geometry.dispose(); } return false; }
-    const result = entry.volume.impact({ point: contact.point, direction, chisel: 'pointed', energyJ: 5 });
+    if (!contact) { if (!this.broken.has(index)) this.disposeBrokenBrick(entry); return false; }
+    const maxDepthM = mode === 'chase' ? .105 : undefined;
+    const result = entry.volume.impact({ point: contact.point, direction,
+      chisel: mode === 'chase' ? 'flat' : 'pointed', widthM: mode === 'chase' ? .045 : undefined,
+      energyJ: mode === 'chase' ? 6 : 5, maxDepthM });
     if (!result.contact || (!result.removedNodes && !result.stats.weakenedNodes)) {
-      if (!this.broken.has(index)) { entry.mesh.removeFromParent(); entry.mesh.geometry.dispose(); }
+      if (!this.broken.has(index)) this.disposeBrokenBrick(entry);
       return false;
     }
-    this.firstBreakSide ??= (this.alongX ? wallCamera.z : wallCamera.x) < 0 ? -1 : 1;
+    if (mode === 'demolish') this.firstBreakSide ??= (this.alongX ? wallCamera.z : wallCamera.x) < 0 ? -1 : 1;
     this.broken.set(index, entry);
-    this.fractureAcrossJoint(index, new THREE.Vector3(contact.point.x, contact.point.y, contact.point.z)
-      .applyQuaternion(entry.rotation).add(entry.origin), wallDirection);
+    if (result.removedNodes) this.fractureAcrossJoint(index, new THREE.Vector3(contact.point.x, contact.point.y, contact.point.z)
+      .applyQuaternion(entry.rotation).add(entry.origin), wallDirection, maxDepthM);
     // The four hollow bores are air from the start. A threshold based on the
     // bounding box discarded a visibly substantial clay shell at 48% of that
     // box, making a struck brick suddenly disappear. Retire it only when its
     // actual original clay lattice is almost completely gone.
     if (entry.volume.removedNodeCount >= entry.originalSolidNodes * .94)
       return this.strike(index);
-    if (entry.volume.removedNodeCount) this.showBrokenBrick(index, entry);
+    if (result.removedNodes) this.showBrokenBrick(index, entry);
     return true;
   }
 
   /** A pointed impact has a finite footprint. Continue that same material
    * fracture into adjacent fired-clay units only where the footprint reaches
    * their real laid edge; no random brick-level damage or whole-unit removal. */
-  private fractureAcrossJoint(index: number, wallPoint: THREE.Vector3, wallDirection: THREE.Vector3): void {
+  private fractureAcrossJoint(index: number, wallPoint: THREE.Vector3, wallDirection: THREE.Vector3, maxDepthM?: number): void {
     const row = Math.floor(index / this.columns), col = index % this.columns;
     const coordinate = this.alongX ? wallPoint.x : wallPoint.z;
     let affected = 0;
@@ -212,16 +216,16 @@ export class MansionMasonryDemolition {
         point.x = THREE.MathUtils.clamp(point.x, -entry.volume.width / 2 + .009, entry.volume.width / 2 - .009);
         point.y = THREE.MathUtils.clamp(point.y, .009, entry.volume.height - .009);
         const direction = wallDirection.clone().applyQuaternion(inverseRotation);
-        const result = entry.volume.impact({ point, direction, chisel: 'pointed',
+        const result = entry.volume.impact({ point, direction, chisel: 'pointed', maxDepthM,
           energyJ: 1.4 + 2.2 * (1 - distance / .038) });
         if (!result.contact || (!result.removedNodes && !result.stats.weakenedNodes)) {
-          if (fresh) { entry.mesh.removeFromParent(); entry.mesh.geometry.dispose(); }
+          if (fresh) this.disposeBrokenBrick(entry);
           continue;
         }
         this.broken.set(neighbor, entry);
         if (entry.volume.removedNodeCount >= entry.originalSolidNodes * .94) this.strike(neighbor);
-        else if (entry.volume.removedNodeCount) this.showBrokenBrick(neighbor, entry);
-        if (++affected === 3) return;
+        else if (result.removedNodes) this.showBrokenBrick(neighbor, entry);
+        if (++affected === (maxDepthM === undefined ? 3 : 1)) return;
       }
   }
 
@@ -248,27 +252,45 @@ export class MansionMasonryDemolition {
     for (let y = 1; y <= volume.ny; y++) for (let x = 1; x <= volume.nx; x++)
       for (let z = 1; z <= volume.nz; z++)
         if (volume.baseMaterial(x, y, z) !== MaterialId.Air) originalSolidNodes++;
-    const mesh = new THREE.Mesh(new THREE.BufferGeometry(), damagedMasonryMaterial);
+    const mesh = new THREE.Group();
     mesh.name = `${this.group.name} locally fractured brick ${index}`;
     mesh.position.copy(origin); mesh.quaternion.copy(rotation);
-    mesh.castShadow = mesh.receiveShadow = true;
     mesh.raycast = () => undefined;
     this.group.add(mesh);
-    return { volume, mesh, origin, rotation, originalSolidNodes };
+    return { volume, mesh, origin, rotation, originalSolidNodes, chunkMeshes: new Map() };
   }
 
   private showBrokenBrick(index: number, entry: BrokenBrick): void {
-    const positions: number[] = [], normals: number[] = [], colors: number[] = [];
+    const dirty = new Set(entry.volume.takeDirtyChunks());
     for (const key of entry.volume.chunkKeys) {
-      const data = entry.volume.buildChunkMesh(key);
-      for (let i = 0; i < data.positions.length; i++) positions.push(data.positions[i]);
-      for (let i = 0; i < data.normals.length; i++) normals.push(data.normals[i]);
-      for (let i = 0; i < data.colors.length; i++) colors.push(data.colors[i]);
+      const old = entry.chunkMeshes.get(key);
+      if (old && !dirty.has(key)) continue;
+      const data = dirty.has(key) ? entry.volume.buildChunkMesh(key) : entry.volume.buildPristineChunkMesh(key);
+      const geometry = this.brokenChunkGeometry(data, index, entry);
+      if (old) { old.geometry.dispose(); old.geometry = geometry; }
+      else {
+        const mesh = new THREE.Mesh(geometry, damagedMasonryMaterial);
+        mesh.castShadow = mesh.receiveShadow = true;
+        mesh.raycast = () => undefined;
+        entry.mesh.add(mesh);
+        entry.chunkMeshes.set(key, mesh);
+      }
     }
+    this.ensureMortarCells();
+    if (this.chippedEnds.has(`${index}:-1`) || this.chippedEnds.has(`${index}:1`)) this.trimExposedJoint(index);
+    this.temp.makeScale(0, 0, 0);
+    const ref = this.brickRefs[index];
+    ref?.mesh.setMatrixAt(ref.instance, this.temp);
+    if (ref) { ref.mesh.instanceMatrix.needsUpdate = true; ref.mesh.computeBoundingSphere(); }
+    // Bed and head joints remain around a partly chipped unit.
+  }
+
+  private brokenChunkGeometry(data: MeshData, index: number, entry: BrokenBrick): THREE.BufferGeometry {
+    const positions = data.positions, normals = data.normals;
     const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
-    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(data.colors, 3));
     const face = new Float32Array(positions.length / 3), uv = new Float32Array(face.length * 2);
     const brickLocalUv = new Float32Array(face.length * 2);
     const tint = new Float32Array(face.length * 3);
@@ -298,20 +320,19 @@ export class MansionMasonryDemolition {
     geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
     geometry.setAttribute('brickLocalUv', new THREE.BufferAttribute(brickLocalUv, 2));
     geometry.computeBoundingSphere();
-    entry.mesh.geometry.dispose(); entry.mesh.geometry = geometry;
-    this.ensureMortarCells();
-    if (this.chippedEnds.has(`${index}:-1`) || this.chippedEnds.has(`${index}:1`)) this.trimExposedJoint(index);
-    this.temp.makeScale(0, 0, 0);
-    ref?.mesh.setMatrixAt(ref.instance, this.temp);
-    if (ref) { ref.mesh.instanceMatrix.needsUpdate = true; ref.mesh.computeBoundingSphere(); }
-    // Bed and head joints remain around a partly chipped unit; they are not
-    // a solid grey replacement brick behind its open chambers.
+    return geometry;
+  }
+
+  private disposeBrokenBrick(entry: BrokenBrick): void {
+    entry.mesh.removeFromParent();
+    for (const chunk of entry.chunkMeshes.values()) chunk.geometry.dispose();
+    entry.chunkMeshes.clear();
   }
 
   strike(index: number, refreshCaps = true): boolean {
     if (!this.remaining[index]) return false;
     const partial = this.broken.get(index);
-    if (partial) { partial.mesh.removeFromParent(); partial.mesh.geometry.dispose(); this.broken.delete(index); }
+    if (partial) { this.disposeBrokenBrick(partial); this.broken.delete(index); }
     this.chippedEnds.delete(`${index}:-1`);
     this.chippedEnds.delete(`${index}:1`);
     this.chippedDepths.delete(`${index}:-1`);
@@ -344,7 +365,7 @@ export class MansionMasonryDemolition {
 
   reset(): void {
     if (!this.damaged) return;
-    for (const entry of this.broken.values()) { entry.mesh.removeFromParent(); entry.mesh.geometry.dispose(); }
+    for (const entry of this.broken.values()) this.disposeBrokenBrick(entry);
     this.broken.clear();
     this.chippedEnds.clear();
     this.chippedDepths.clear();

@@ -1,5 +1,12 @@
 Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web game named WIRE THE HOUSE, based on real Cyprus residential first-fix practices, editable in Web Game Studio, playable on desktop/mobile, deployed to arisconstantinou/Electrical-Game via GitHub Pages, and ending at FIRST FIX COMPLETE without cable pulling.
 
+## 2026-09-24 · Bounded electrical chases in fired-clay walls
+
+- In isolated `codex/masonry-breakout-reference`, CHASE now cuts the actual clay lattice to a guarded 105 mm maximum from either face. DEMOLISH remains unbounded. The original workroom routes the hammer through its chase stage again; its existing box/conduit workflow remains available. Mansion hits cross real joints into nearby bricks and use a broad chisel in CHASE, with the intact back leaf and asymmetric broken edges visible.
+- Damaged mansion bricks rebuild only changed mesh chunks; exposed clay samples the existing clay texture instead of a flat light-orange color. The saved masonry state and full breakout/rubble state still round-trip. No visual effects were removed.
+- Candidate-only TypeScript/Vite build, original workroom portrait chase-depth test, mansion desktop/portrait chase test, desktop/portrait full-demolition test, and 180-frame portrait turn after chasing passed. Headless portrait p95 turn interval was 21.2 ms intact and 24.2 ms after a 9-brick channel in the matched final run. This is browser emulation; physical iPhone Safari remains unverified. Captures are under `output/mansion-masonry-chase/` and `output/workroom-chase-depth/`.
+- The sole 5365 listener still serves the integration checkout, not this candidate. Promotion/public release remains separate from candidate testing.
+
 ## 2026-09-24 · Full visual goal: neighbouring open-bay infill
 
 - The mansion field saw the rear of the decorative neighbour's recessed bays as dark rectangles. The isolated candidate turns that clone toward the field without moving the facade or changing the original workroom's source view.
