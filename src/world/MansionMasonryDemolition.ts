@@ -253,6 +253,7 @@ export class MansionMasonryDemolition {
     geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     const face = new Float32Array(positions.length / 3), uv = new Float32Array(face.length * 2);
+    const brickLocalUv = new Float32Array(face.length * 2);
     const tint = new Float32Array(face.length * 3);
     const ref = this.brickRefs[index];
     const patchAttribute = ref?.mesh.geometry.getAttribute('brickPatch');
@@ -266,14 +267,19 @@ export class MansionMasonryDemolition {
       for (let j = 0; j < 3; j++) {
         const k = i + j;
         face[k] = front ? 1 : 0;
-        uv[k * 2] = px + (positions[k * 3] / entry.volume.width + .5) * pw;
-        uv[k * 2 + 1] = py + positions[k * 3 + 1] / entry.volume.height * ph;
+        const localU = positions[k * 3] / entry.volume.width + .5;
+        const localV = positions[k * 3 + 1] / entry.volume.height;
+        uv[k * 2] = px + localU * pw;
+        uv[k * 2 + 1] = py + localV * ph;
+        brickLocalUv[k * 2] = localU;
+        brickLocalUv[k * 2 + 1] = localV;
         tint.set(tone, k * 3);
       }
     }
     geometry.setAttribute('brickFace', new THREE.BufferAttribute(face, 1));
     geometry.setAttribute('brickTint', new THREE.BufferAttribute(tint, 3));
     geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    geometry.setAttribute('brickLocalUv', new THREE.BufferAttribute(brickLocalUv, 2));
     geometry.computeBoundingSphere();
     entry.mesh.geometry.dispose(); entry.mesh.geometry = geometry;
     this.ensureMortarCells();
