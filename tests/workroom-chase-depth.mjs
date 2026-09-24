@@ -4,19 +4,19 @@ import { mkdir, readFile, stat } from 'node:fs/promises';
 import { extname, resolve } from 'node:path';
 import { blockPointerLock } from './browser-safety.mjs';
 
-const dist=resolve('dist'), browser=await chromium.launch({ channel:'chrome', headless:true });
+const live=process.argv.includes('--live'),dist=resolve('dist'), browser=await chromium.launch({ channel:'chrome', headless:true });
 try {
   const context=await browser.newContext({ viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true });
   await blockPointerLock(context);
   const mime={'.html':'text/html','.js':'text/javascript','.css':'text/css','.webp':'image/webp','.png':'image/png','.jpg':'image/jpeg','.glb':'model/gltf-binary','.svg':'image/svg+xml'};
-  await context.route('https://arisconstantinou.github.io/Electrical-Game/**',async route=>{
+  if(!live)await context.route('https://arisconstantinou.github.io/Electrical-Game/**',async route=>{
     const file=resolve(dist,decodeURIComponent(new URL(route.request().url()).pathname.slice('/Electrical-Game/'.length))||'index.html');
     if(!file.startsWith(`${dist}\\`))return route.abort();
     try{if(!(await stat(file)).isFile())return route.abort();await route.fulfill({status:200,contentType:mime[extname(file)]??'application/octet-stream',body:await readFile(file)});}
     catch{return route.abort();}
   });
   const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto('https://arisconstantinou.github.io/Electrical-Game/?renderer=webgl');
+  await page.goto(live?'http://127.0.0.1:5365/Electrical-Game/?renderer=webgl':'https://arisconstantinou.github.io/Electrical-Game/?renderer=webgl');
   await page.waitForFunction(()=>window.__wireTheHouse?.isReadyForStart,null,{timeout:120000});
   await page.locator('#apprentice-count').selectOption('0');await page.locator('#start-button').click();
   const out=resolve('output/workroom-chase-depth');await mkdir(out,{recursive:true});
