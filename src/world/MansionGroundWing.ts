@@ -503,6 +503,12 @@ export class MansionGroundWing extends THREE.Group {
     for (const [id, wall] of this.masonryDemolition) if (wall.removedIndices().length) result[id] = wall.removedIndices();
     return result;
   }
+  demolitionSideSnapshot(): Record<string, -1 | 1> {
+    const result: Record<string, -1 | 1> = {};
+    for (const [id, wall] of this.masonryDemolition)
+      if (wall.damaged && wall.rubbleSide !== null) result[id] = wall.rubbleSide;
+    return result;
+  }
 
   masonryDamageSnapshot(): Record<string, MansionBrickDamage[]> {
     const result: Record<string, MansionBrickDamage[]> = {};
@@ -515,8 +521,9 @@ export class MansionGroundWing extends THREE.Group {
       if (Array.isArray(entries)) this.masonryDemolition.get(id)?.restoreDamage(entries);
   }
 
-  restoreDemolition(snapshot: Record<string, number[]>): void {
+  restoreDemolition(snapshot: Record<string, number[]>, sides: Record<string, -1 | 1> = {}): void {
     for (const wall of this.masonryDemolition.values()) wall.reset();
+    for (const [id, side] of Object.entries(sides)) this.masonryDemolition.get(id)?.restoreRubbleSide(side);
     for (const [id, indices] of Object.entries(snapshot))
       if (Array.isArray(indices)) this.masonryDemolition.get(id)?.restoreRemoved(indices);
   }

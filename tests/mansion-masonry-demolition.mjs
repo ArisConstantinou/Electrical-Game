@@ -5,10 +5,14 @@ import { extname, resolve } from 'node:path';
 import { blockPointerLock } from './browser-safety.mjs';
 
 const live = process.argv.includes('--live');
+const mobile = process.argv.includes('--mobile');
 const dist = resolve('dist');
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 try {
-  const context = await browser.newContext({ viewport: { width: 1366, height: 768 } });
+  const context = await browser.newContext({
+    viewport: mobile ? { width: 390, height: 844 } : { width: 1366, height: 768 },
+    deviceScaleFactor: mobile ? 2 : 1, isMobile: mobile, hasTouch: mobile,
+  });
   await blockPointerLock(context);
   const mime = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.webp':'image/webp',
     '.png':'image/png', '.jpg':'image/jpeg', '.glb':'model/gltf-binary', '.svg':'image/svg+xml' };
@@ -45,9 +49,11 @@ try {
     const locallyRemoved = wall.removedClayNodes;
     const partialAfterHit = wall.partialDamageCount;
     const partialDocument = game.levelEditor.document();
+    const partialSavedSide = partialDocument.demolitionSides?.[wall.group.name] ?? null;
     wing.restoreDemolition({});
     game.levelEditor.applyDocument(partialDocument);
     const partialRestored = wall.removedClayNodes;
+    const partialRestoredSide = wall.rubbleSide;
     const capsAfterHit = wall.fractureCapCount;
     const player = game.player;
     player.wallWorkEnabled = false;
@@ -62,9 +68,14 @@ try {
     };
     const blockedZ = walk();
     const upperInitiallyVisible=wing.masonryDemolition.get('L1 east fired-clay corridor wall').group.visible;
+    const strikeMs = [];
     for (let i = 0; i < wall.original.length; i++) {
       const matrix = wall.original[i].elements;
-      if (Math.abs(matrix[12] - 1.8) < .76 && matrix[13] < 2.1) wall.strike(i);
+      if (Math.abs(matrix[12] - 1.8) < .76 && matrix[13] < 2.1) {
+        const start = performance.now();
+        wall.strike(i);
+        strikeMs.push(performance.now() - start);
+      }
     }
     wing.obstaclesAt(0);
     const openZ = walk();
@@ -75,7 +86,20 @@ try {
     const cleared = wall.removedIndices().length;
     game.levelEditor.applyDocument(document);
     const restored = wall.removedIndices().length;
+    const restoredSide = wall.rubbleSide;
     const capsRestored = wall.fractureCapCount;
+    const fracturedEndsRestored = wall.fracturedEndCount;
+    const fracturedEndDepthMm = wall.fracturedEndDepthMm;
+    const leftCuts = [...wall.chippedDepths].filter(([key])=>key.endsWith(':-1')).map(([,depth])=>depth);
+    const rightCuts = [...wall.chippedDepths].filter(([key])=>key.endsWith(':1')).map(([,depth])=>depth);
+    const independentCutPairs = Math.min(leftCuts.length,rightCuts.length);
+    const independentCuts = Array.from({length:independentCutPairs},(_,i)=>Math.abs(leftCuts[i]-rightCuts[i])).filter(d=>d>.03).length;
+    const rubbleSections = wall.rubble?.sections;
+    const rubbleOffsets = [];
+    if (rubbleSections) for (let i=0;i<rubbleSections.count;i++) {
+      rubbleSections.getMatrixAt(i, wall.temp);
+      rubbleOffsets.push(wall.alongX ? wall.temp.elements[14] : wall.temp.elements[12]);
+    }
     const targets = [
       ['recessed-room-back-9',20,1.65,9,-Math.PI/2],
       ['recessed-room-side-9--1',19.5,1.65,9,0],
@@ -95,6 +119,7 @@ try {
     const crossIndex = crossWall.columns * 3 + 3;
     const crossStrike = crossWall.strike(crossIndex);
     const crossCaps = crossWall.fractureCapCount;
+    const crossFracturedEnds = crossWall.fracturedEndCount;
     crossWall.reset();
     const crossCapsReset = crossWall.fractureCapCount;
     for (let index=0; index<wall.original.length; index++) wall.strike(index);
@@ -117,6 +142,9 @@ try {
       gripReach:game.fpsRig.gripsReachable(camera,game.fpsRig.tools.get('hammer')),
       status:game.fpsRig.contactStatus, before, after, capsAfterHit, capsRestored, capsReset,
       blockedZ, openZ, intactZ, cleared, restored,
+      fracturedEndsRestored, fracturedEndDepthMm, independentCuts, independentCutPairs,
+      rubbleOffsets, partialSavedSide, partialRestoredSide, restoredSide,
+      crossFracturedEnds, strikeMs,
       saved:document.demolition?.[wall.group.name]?.length ?? 0,
       crossStrike,crossCaps,crossCapsReset,
       wallCount:wing.masonryDemolition.size,upperInitiallyVisible,targets,fullyOpened,resetCollision,
@@ -128,10 +156,19 @@ try {
     `Hammer must locally fracture a brick without removing it: ${JSON.stringify(result)}`);
   assert(result.partialSaved === 1 && result.partialRestored === result.locallyRemoved,
     `Local damage did not survive Studio document round trip: ${JSON.stringify(result)}`);
-  assert(result.capsAfterHit === 0 && result.capsRestored > 0 && result.capsReset === 0,
-    `Exposed hollow-clay cut faces did not track demolition and reset: ${JSON.stringify(result)}`);
-  assert(result.crossStrike && result.crossCaps > 0 && result.crossCapsReset === 0,
-    `Perpendicular wall cut faces did not track demolition and reset: ${JSON.stringify(result)}`);
+  assert(result.partialSavedSide === -1 && result.partialRestoredSide === -1 && result.restoredSide === -1,
+    `First hammer side did not survive Studio document round trip: ${JSON.stringify(result)}`);
+  assert(result.capsAfterHit === 0 && result.fracturedEndsRestored > 0 && result.fracturedEndDepthMm > 0 && result.capsReset === 0,
+    `Exposed hollow-clay fracture did not track demolition and reset: ${JSON.stringify(result)}`);
+  assert(result.crossStrike && result.crossFracturedEnds > 0 && result.crossCapsReset === 0,
+    `Perpendicular wall fracture did not track demolition and reset: ${JSON.stringify(result)}`);
+  assert(result.independentCutPairs >= 10 && result.independentCuts >= 6,
+    `Opposite sides of the opening share a mirrored fracture: ${JSON.stringify(result)}`);
+  assert(result.rubbleOffsets.length >= 20 && result.rubbleOffsets.every(offset=>offset<0),
+    `Rubble spilled onto the opposite side of the wall: ${JSON.stringify(result)}`);
+  const sortedStrikeMs=[...result.strikeMs].sort((a,b)=>a-b);
+  assert(sortedStrikeMs[Math.floor(sortedStrikeMs.length*.95)] < 8,
+    `Exposed-end treatment stalled demolition: ${JSON.stringify(result)}`);
   assert(result.blockedZ < 15.8, `Intact wall did not block the player: ${JSON.stringify(result)}`);
   assert(result.openZ > 16.4, `Demolished doorway did not open: ${JSON.stringify(result)}`);
   assert(result.intactZ < 15.8, `Intact masonry/structural column did not block: ${JSON.stringify(result)}`);
@@ -143,8 +180,72 @@ try {
   assert(result.targets.every(item=>item.expected===item.actual),`Some wall faces cannot be targeted (L1 initially visible: ${result.upperInitiallyVisible}): ${JSON.stringify(result.targets)}`);
   assert.equal(result.errors, '');
   assert.deepEqual(errors, []);
-  const out = resolve('output/mansion-masonry-demolition');
+  const out = resolve(mobile ? 'output/mansion-masonry-demolition/mobile' : 'output/mansion-masonry-demolition');
   await mkdir(out, {recursive:true});
   await page.locator('#game-canvas').screenshot({path:resolve(out,'doorway.png')});
-  console.log(JSON.stringify({pass:true,live,result}));
+  await page.evaluate(() => {
+    const game = window.__wireTheHouse, camera = game.renderer.camera;
+    camera.position.set(15.3, 1.65, 14.3);
+    camera.rotation.set(-.43, Math.PI, 0);
+    game.renderer.render();
+  });
+  await page.locator('#game-canvas').screenshot({path:resolve(out,'rubble.png')});
+  await page.evaluate(() => {
+    const game = window.__wireTheHouse, camera = game.renderer.camera;
+    camera.position.set(15.3, .76, 14.85);
+    camera.rotation.set(-.52, Math.PI, 0);
+    game.renderer.render();
+  });
+  await page.locator('#game-canvas').screenshot({path:resolve(out,'rubble-close.png')});
+  const turnFrames = mobile ? await page.evaluate(async () => {
+    const game = window.__wireTheHouse, camera = game.renderer.camera;
+    camera.position.set(15.3,1.65,14.3);
+    const intervals = [];
+    let accepted = 0, previous = performance.now();
+    for (let frame=0;frame<120;frame++) {
+      await new Promise(resolve=>requestAnimationFrame(resolve));
+      const now = performance.now();
+      intervals.push(now-previous); previous=now;
+      camera.rotation.set(0,Math.PI+Math.sin(frame*.09)*.65,0);
+      if (game.renderer.render()) accepted++;
+      await game.renderer.waitForFrame();
+    }
+    intervals.sort((a,b)=>a-b);
+    return {accepted,p95Ms:intervals[Math.floor(intervals.length*.95)],maxMs:intervals.at(-1),error:game.renderer.renderError};
+  }) : null;
+  if (turnFrames) assert(turnFrames.accepted >= 100 && turnFrames.maxMs < 500 && !turnFrames.error,
+    `Mobile viewport stalled while turning after demolition: ${JSON.stringify(turnFrames)}`);
+  const reverseSide = await page.evaluate(() => {
+    const game = window.__wireTheHouse;
+    const wall = game.room.mansionWing.masonryDemolition.get('Courtyard north fired-clay enclosure');
+    wall.reset();
+    const camera = game.renderer.camera;
+    wall.group.updateWorldMatrix(true,false);
+    const cameraLocal = wall.position.clone().set(1.8,1.65,.9);
+    const aimLocal = wall.position.clone().set(1.8,1.65,0);
+    camera.position.copy(wall.group.localToWorld(cameraLocal));
+    camera.lookAt(wall.group.localToWorld(aimLocal));
+    const aim = wall.aim(camera);
+    const hit = aim ? wall.strikeAt(aim.index,camera) : false;
+    for (const index of [10,11,12,13]) wall.strike(index);
+    const sections = wall.rubble?.sections;
+    const offsets = [];
+    if (sections) for (let i=0;i<sections.count;i++) {
+      sections.getMatrixAt(i,wall.temp);
+      offsets.push(wall.alongX ? wall.temp.elements[14] : wall.temp.elements[12]);
+    }
+    const document = game.levelEditor.document();
+    game.room.mansionWing.restoreDemolition({});
+    game.levelEditor.applyDocument(document);
+    return { hit, offsets, restoredSide:wall.rubbleSide };
+  });
+  assert(reverseSide.hit && reverseSide.offsets.length >= 4 && reverseSide.offsets.every(offset=>offset>0) && reverseSide.restoredSide === 1,
+    `Rubble did not follow an opposite-side first impact: ${JSON.stringify(reverseSide)}`);
+  const sorted=[...result.strikeMs].sort((a,b)=>a-b);
+  console.log(JSON.stringify({pass:true,live,mobile,removed:result.restored,
+    asymmetricCuts:`${result.independentCuts}/${result.independentCutPairs}`,
+    strikeP95Ms:sorted[Math.floor(sorted.length*.95)],
+    turnFrames,
+    nearSideRubbleCount:result.rubbleOffsets.length,
+    oppositeSideHit:reverseSide.hit,oppositeSideRubbleCount:reverseSide.offsets.length}));
 } finally { await browser.close(); }

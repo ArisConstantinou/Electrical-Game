@@ -30,7 +30,7 @@ type SurfaceRecord = {
 };
 type AssetRecord = { id: string; position: [number, number, number]; rotationY: number; scale: [number, number, number]; hidden?: boolean };
 type GroupRecord = { id: string; name: string; members: string[] };
-type LevelDocument = { version: 1; name?: string; template?: 'mansion' | 'blank'; walls: WallRecord[]; surfaces: SurfaceRecord[]; assets?: AssetRecord[]; groups?: GroupRecord[]; demolition?: Record<string, number[]>; masonryDamage?: ReturnType<NonNullable<Game['room']['mansionWing']>['masonryDamageSnapshot']>; hiddenWalls?: string[]; playerStart: [number, number, number]; playerStartYaw: number; apprenticeStart: [number, number, number]; apprenticeStarts: [number, number, number][]; apprenticeStartYaws: number[] };
+type LevelDocument = { version: 1; name?: string; template?: 'mansion' | 'blank'; walls: WallRecord[]; surfaces: SurfaceRecord[]; assets?: AssetRecord[]; groups?: GroupRecord[]; demolition?: Record<string, number[]>; demolitionSides?: Record<string, -1 | 1>; masonryDamage?: ReturnType<NonNullable<Game['room']['mansionWing']>['masonryDamageSnapshot']>; hiddenWalls?: string[]; playerStart: [number, number, number]; playerStartYaw: number; apprenticeStart: [number, number, number]; apprenticeStarts: [number, number, number][]; apprenticeStartYaws: number[] };
 export type LevelSlot = { id: string; name: string; updatedAt: string; template: 'mansion' | 'blank' };
 const LEGACY_STORAGE_KEY = 'wirehouse:level-editor:mansion:v1';
 const MIGRATED_KEY = 'wirehouse:level-editor:legacy-imported:v1';
@@ -2142,7 +2142,7 @@ export class LevelEditor {
     }
     const hiddenWalls = [...this.game.room.mansionWing?.editableWalls.values() ?? []]
       .filter(wall => wall.userData.levelEditorHidden === true).map(wall => wall.name);
-    return { version: 1, template: this.template, walls, surfaces, assets, demolition: this.game.room.mansionWing?.demolitionSnapshot(), masonryDamage: this.game.room.mansionWing?.masonryDamageSnapshot(), hiddenWalls, groups: [...this.groups.values()].map(group => ({ ...group, members: [...group.members] })), playerStart: this.playerStart.toArray() as [number, number, number], playerStartYaw: this.playerStartYaw, apprenticeStart: this.apprenticeStart.toArray() as [number, number, number],
+    return { version: 1, template: this.template, walls, surfaces, assets, demolition: this.game.room.mansionWing?.demolitionSnapshot(), demolitionSides: this.game.room.mansionWing?.demolitionSideSnapshot(), masonryDamage: this.game.room.mansionWing?.masonryDamageSnapshot(), hiddenWalls, groups: [...this.groups.values()].map(group => ({ ...group, members: [...group.members] })), playerStart: this.playerStart.toArray() as [number, number, number], playerStartYaw: this.playerStartYaw, apprenticeStart: this.apprenticeStart.toArray() as [number, number, number],
       apprenticeStarts: Array.from({ length: 5 }, (_, offset) => this.apprenticeStarts.get(offset + 1)!.toArray() as [number, number, number]),
       apprenticeStartYaws: Array.from({ length: 5 }, (_, offset) => this.apprenticeStartYaws.get(offset + 1)!) };
   }
@@ -2213,7 +2213,8 @@ export class LevelEditor {
       this.setTemplateMode(data.template === 'blank' ? 'blank' : 'mansion');
       const wing = this.game.room.mansionWing;
       if (!wing) return;
-      wing.restoreDemolition(data.demolition && typeof data.demolition === 'object' ? data.demolition : {});
+      wing.restoreDemolition(data.demolition && typeof data.demolition === 'object' ? data.demolition : {},
+        data.demolitionSides && typeof data.demolitionSides === 'object' ? data.demolitionSides : {});
       wing.restoreMasonryDamage(data.masonryDamage && typeof data.masonryDamage === 'object' ? data.masonryDamage : {});
       const hiddenWalls = new Set(Array.isArray(data.hiddenWalls) ? data.hiddenWalls.filter(name => typeof name === 'string') : []);
       for (const wall of wing.editableWalls.values())

@@ -3,6 +3,7 @@ import type { PlayerObstacle } from '../player/EquipmentCollision';
 import { hollowClayEndMaterial, hollowClayEndShapes } from './HollowClayEnd';
 import { MasonryVolume, MaterialId, type MasonrySave } from './MasonryVolume';
 import { damagedMasonryMaterial } from './BrickFaceMaterial';
+import { MansionBreakoutRubble } from './MansionBreakoutRubble';
 
 export interface MasonryAim {
   wall: MansionMasonryDemolition;
@@ -26,6 +27,9 @@ export class MansionMasonryDemolition {
   private readonly original: THREE.Matrix4[] = [];
   private readonly remaining: Uint8Array;
   private readonly broken = new Map<number, BrokenBrick>();
+  private readonly chippedEnds = new Set<string>();
+  private readonly chippedDepths = new Map<string, number>();
+  private readonly shortenedBricks = new Set<number>();
   private readonly localBox: THREE.Box3;
   private readonly inverse = new THREE.Matrix4();
   private readonly localRay = new THREE.Ray();
@@ -36,6 +40,8 @@ export class MansionMasonryDemolition {
   private readonly rotation = new THREE.Quaternion();
   private mortarCells: THREE.InstancedMesh | null = null;
   private fractureCaps: THREE.InstancedMesh[] | null = null;
+  private rubble: MansionBreakoutRubble | null = null;
+  private firstBreakSide: -1 | 1 | null = null;
   private removedCount = 0;
   private collisionDirty = false;
   private readonly collisionMatrix = new THREE.Matrix4();
@@ -78,6 +84,16 @@ export class MansionMasonryDemolition {
   }
   get fractureCapCount(): number {
     return this.fractureCaps?.reduce((count, mesh) => count + mesh.count, 0) ?? 0;
+  }
+  get fracturedEndCount(): number { return this.chippedEnds.size; }
+  get fracturedEndDepthMm(): number {
+    let depth = 0;
+    for (const value of this.chippedDepths.values()) depth += value * 1000;
+    return depth;
+  }
+  get rubbleSide(): -1 | 1 | null { return this.firstBreakSide; }
+  restoreRubbleSide(side: unknown): void {
+    if (side === -1 || side === 1) this.firstBreakSide = side;
   }
   removedIndices(): number[] {
     const result: number[] = [];
@@ -147,8 +163,8 @@ export class MansionMasonryDemolition {
     if (!entry) entry = this.createBrokenBrick(index);
     this.group.updateWorldMatrix(true, false);
     this.inverse.copy(this.group.matrixWorld).invert();
-    const origin = camera.getWorldPosition(new THREE.Vector3()).applyMatrix4(this.inverse)
-      .sub(entry.origin).applyQuaternion(entry.rotation.clone().invert());
+    const wallCamera = camera.getWorldPosition(new THREE.Vector3()).applyMatrix4(this.inverse);
+    const origin = wallCamera.clone().sub(entry.origin).applyQuaternion(entry.rotation.clone().invert());
     const wallDirection = camera.getWorldDirection(new THREE.Vector3()).transformDirection(this.inverse);
     const direction = wallDirection.clone().applyQuaternion(entry.rotation.clone().invert());
     const contact = entry.volume.raycast(origin, direction, 2.4);
@@ -158,6 +174,7 @@ export class MansionMasonryDemolition {
       if (!this.broken.has(index)) { entry.mesh.removeFromParent(); entry.mesh.geometry.dispose(); }
       return false;
     }
+    this.firstBreakSide ??= (this.alongX ? wallCamera.z : wallCamera.x) < 0 ? -1 : 1;
     this.broken.set(index, entry);
     this.fractureAcrossJoint(index, new THREE.Vector3(contact.point.x, contact.point.y, contact.point.z)
       .applyQuaternion(entry.rotation).add(entry.origin), wallDirection);
@@ -211,7 +228,7 @@ export class MansionMasonryDemolition {
   restoreDamage(entries: readonly MansionBrickDamage[]): void {
     for (const item of entries) {
       if (!Number.isInteger(item.index) || !this.remaining[item.index] || !item.save || item.save.version !== 1) continue;
-      const entry = this.createBrokenBrick(item.index, item.save.seed);
+      const entry = this.broken.get(item.index) ?? this.createBrokenBrick(item.index, item.save.seed);
       entry.volume.restore(item.save);
       this.broken.set(item.index, entry);
       if (entry.volume.removedNodeCount) this.showBrokenBrick(item.index, entry);
@@ -283,6 +300,7 @@ export class MansionMasonryDemolition {
     geometry.computeBoundingSphere();
     entry.mesh.geometry.dispose(); entry.mesh.geometry = geometry;
     this.ensureMortarCells();
+    if (this.chippedEnds.has(`${index}:-1`) || this.chippedEnds.has(`${index}:1`)) this.trimExposedJoint(index);
     this.temp.makeScale(0, 0, 0);
     ref?.mesh.setMatrixAt(ref.instance, this.temp);
     if (ref) { ref.mesh.instanceMatrix.needsUpdate = true; ref.mesh.computeBoundingSphere(); }
@@ -294,6 +312,11 @@ export class MansionMasonryDemolition {
     if (!this.remaining[index]) return false;
     const partial = this.broken.get(index);
     if (partial) { partial.mesh.removeFromParent(); partial.mesh.geometry.dispose(); this.broken.delete(index); }
+    this.chippedEnds.delete(`${index}:-1`);
+    this.chippedEnds.delete(`${index}:1`);
+    this.chippedDepths.delete(`${index}:-1`);
+    this.chippedDepths.delete(`${index}:1`);
+    this.shortenedBricks.delete(index);
     this.ensureMortarCells();
     this.remaining[index] = 0;
     this.removedCount++;
@@ -323,6 +346,9 @@ export class MansionMasonryDemolition {
     if (!this.damaged) return;
     for (const entry of this.broken.values()) { entry.mesh.removeFromParent(); entry.mesh.geometry.dispose(); }
     this.broken.clear();
+    this.chippedEnds.clear();
+    this.chippedDepths.clear();
+    this.shortenedBricks.clear();
     const changed = new Set<THREE.InstancedMesh>();
     for (let index = 0; index < this.remaining.length; index++) {
       this.remaining[index] = this.originalHasBrick(index) ? 1 : 0;
@@ -341,6 +367,8 @@ export class MansionMasonryDemolition {
     this.mortarCells = null;
     for (const mesh of this.fractureCaps ?? []) mesh.removeFromParent();
     this.fractureCaps = null;
+    this.rubble?.update([], this.firstBreakSide ?? -1);
+    this.firstBreakSide = null;
     this.backing.visible = true;
     this.removedCount = 0;
     this.collisionDirty = false;
@@ -395,6 +423,60 @@ export class MansionMasonryDemolition {
       .applyMatrix4(this.group.matrixWorld);
   }
 
+  private trimExposedJoint(index: number, deferBounds = false): void {
+    if (!this.mortarCells) return;
+    this.original[index].decompose(this.position, this.rotation, this.scale);
+    const width = this.alongX ? this.scale.x : this.scale.z;
+    const height = this.scale.y;
+    const left = Math.min(width * .94, this.chippedDepths.get(`${index}:-1`) ?? 0);
+    const right = Math.min(width * .94, this.chippedDepths.get(`${index}:1`) ?? 0);
+    const remaining = Math.max(.008, width - left - right);
+    const bedHeight = Math.max(.005, Math.min(.016, 3 / this.rows - height));
+    const bedPosition = this.position.clone();
+    if (this.alongX) bedPosition.x += (left - right) / 2;
+    else bedPosition.z += (left - right) / 2;
+    bedPosition.y -= height / 2 + bedHeight / 2;
+    const bedScale = this.alongX ? new THREE.Vector3(remaining, bedHeight, .20)
+      : new THREE.Vector3(.20, bedHeight, remaining);
+    this.mortarCells.setMatrixAt(index * 2, this.temp.compose(bedPosition, this.rotation, bedScale));
+    this.mortarCells.setMatrixAt(index * 2 + 1, new THREE.Matrix4().makeScale(0, 0, 0));
+    this.mortarCells.instanceMatrix.needsUpdate = true;
+    if (!deferBounds) this.mortarCells.computeBoundingSphere();
+  }
+
+  /** Running-bond courses alternate by half a brick. A projecting intact end
+   * must lose more material than the neighboring recessed ends, otherwise a
+   * demolished opening becomes a perfectly repeated row of square teeth. */
+  private edgeOverhang(index: number, side: -1 | 1): number {
+    this.original[index].decompose(this.position, this.rotation, this.scale);
+    const at = (this.alongX ? this.position.x + side * this.scale.x / 2
+      : this.position.z + side * this.scale.z / 2);
+    const row = Math.floor(index / this.columns);
+    let overhang = 0;
+    for (const adjacentRow of [row - 1, row + 1]) {
+      if (adjacentRow < 0 || adjacentRow >= this.rows) continue;
+      for (let col = 0; col < this.columns; col++) {
+        const candidate = adjacentRow * this.columns + col;
+        const neighbor = candidate + side;
+        if (!this.remaining[candidate] || col + side < 0 || col + side >= this.columns ||
+            !this.originalHasBrick(neighbor) || this.remaining[neighbor]) continue;
+        this.original[candidate].decompose(this.position, this.rotation, this.scale);
+        const next = this.alongX ? this.position.x + side * this.scale.x / 2
+          : this.position.z + side * this.scale.z / 2;
+        if (Math.abs(at - next) < .35) overhang = Math.max(overhang, side * (at - next));
+      }
+    }
+    return Math.min(.24, overhang);
+  }
+
+  /** Each exposed course breaks independently. The side and laid brick index
+   * are part of the seed, so opposite jambs cannot inherit a mirrored cut. */
+  private edgeBreakNoise(index: number, side: -1 | 1): number {
+    let value = Math.imul(index + 1, 0x7feb352d) ^ Math.imul(side + 3, 0x846ca68b);
+    value = Math.imul(value ^ value >>> 16, 0x7feb352d);
+    return ((value ^ value >>> 15) >>> 0) / 4294967296;
+  }
+
   /** Expose the four longitudinal chambers only where a neighboring brick was
    * actually removed. Static wall ends use the same clay cut geometry. */
   private updateFractureCaps(): void {
@@ -411,20 +493,37 @@ export class MansionMasonryDemolition {
       });
     }
     const counts = [0, 0, 0];
+    const removedCenters: number[] = [];
     const position = new THREE.Vector3(), scale = new THREE.Vector3(), rotation = new THREE.Quaternion();
     const cutPosition = new THREE.Vector3(), cutRotation = new THREE.Quaternion();
     const cutScale = new THREE.Vector3(), matrix = new THREE.Matrix4(), tint = new THREE.Color();
+    let mortarChanged = false;
     for (let index = 0; index < this.remaining.length; index++) {
-      if (!this.remaining[index]) continue;
+      if (!this.remaining[index]) {
+        if (this.originalHasBrick(index)) {
+          this.original[index].decompose(position, rotation, scale);
+          removedCenters.push(this.alongX ? position.x : position.z);
+        }
+        continue;
+      }
       const column = index % this.columns;
       for (const side of [-1, 1]) {
         const neighbor = index + side;
         if (column + side < 0 || column + side >= this.columns ||
             !this.originalHasBrick(neighbor) || this.remaining[neighbor]) continue;
+        const edgeKey = `${index}:${side}`;
+        this.original[index].decompose(position, rotation, scale);
+        const width = this.alongX ? scale.x : scale.z;
+        const noise = this.edgeBreakNoise(index, side as -1 | 1);
+        const depth = THREE.MathUtils.clamp(.025 + this.edgeOverhang(index, side as -1 | 1) * .65 +
+          noise * .23, .018, width * .78);
+        this.chippedEnds.add(edgeKey);
+        this.chippedDepths.set(edgeKey, depth);
+        if (this.broken.has(index)) continue;
         this.original[index].decompose(position, rotation, scale);
         cutPosition.copy(position);
-        if (this.alongX) cutPosition.x += side * (scale.x / 2 + .004);
-        else cutPosition.z += side * (scale.z / 2 + .004);
+        if (this.alongX) cutPosition.x += side * (scale.x / 2 - depth + .004);
+        else cutPosition.z += side * (scale.z / 2 - depth + .004);
         cutRotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0),
           this.alongX ? side * Math.PI / 2 : side > 0 ? 0 : Math.PI);
         cutScale.set(this.alongX ? scale.z : scale.x, scale.y, 1);
@@ -434,7 +533,27 @@ export class MansionMasonryDemolition {
         const warmth = .88 + ((index * 7 + side * 3 + variant * 5) % 11) * .012;
         mesh.setColorAt(slot, tint.setRGB(warmth, warmth * .98, warmth * .96));
       }
+      if (!this.broken.has(index) && (this.chippedDepths.has(`${index}:-1`) || this.chippedDepths.has(`${index}:1`))) {
+        this.original[index].decompose(position, rotation, scale);
+        const left = this.chippedDepths.get(`${index}:-1`) ?? 0;
+        const right = this.chippedDepths.get(`${index}:1`) ?? 0;
+        if (this.alongX) { position.x += (left - right) / 2; scale.x = Math.max(.008, scale.x - left - right); }
+        else { position.z += (left - right) / 2; scale.z = Math.max(.008, scale.z - left - right); }
+        const ref = this.brickRefs[index];
+        ref?.mesh.setMatrixAt(ref.instance, matrix.compose(position, rotation, scale));
+        if (ref) ref.mesh.instanceMatrix.needsUpdate = true;
+        this.shortenedBricks.add(index);
+        this.trimExposedJoint(index, true);
+        mortarChanged = true;
+      }
     }
+    if (mortarChanged) this.mortarCells?.computeBoundingSphere();
+    const shortenedMeshes = new Set<THREE.InstancedMesh>();
+    for (const index of this.shortenedBricks) {
+      const ref = this.brickRefs[index];
+      if (ref) shortenedMeshes.add(ref.mesh);
+    }
+    for (const mesh of shortenedMeshes) mesh.computeBoundingSphere();
     for (let variant = 0; variant < this.fractureCaps.length; variant++) {
       const mesh = this.fractureCaps[variant];
       mesh.count = counts[variant];
@@ -442,6 +561,13 @@ export class MansionMasonryDemolition {
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       if (mesh.count) mesh.computeBoundingSphere();
     }
+    if (removedCenters.length) {
+      if (!this.rubble) {
+        this.rubble = new MansionBreakoutRubble(this.alongX);
+        this.group.add(this.rubble.group);
+      }
+      this.rubble.update(removedCenters, this.firstBreakSide ?? -1);
+    } else this.rubble?.update([], this.firstBreakSide ?? -1);
   }
 
   private ensureMortarCells(): void {

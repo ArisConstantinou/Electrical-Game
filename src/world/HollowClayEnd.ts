@@ -10,15 +10,32 @@ export const hollowClayEndMaterial = new THREE.MeshStandardMaterial({ name: 'Rou
 
 function makeEnd(variant: number): THREE.BufferGeometry {
   const shape = new THREE.Shape();
-  shape.moveTo(-.5, -.5); shape.lineTo(.5, -.5); shape.lineTo(.5, .5); shape.lineTo(-.5, .5); shape.closePath();
+  // Broken outer shell: independent missing corners and small web chips make
+  // the exposed section read as fired clay rather than a factory-cut tile.
+  const edge = [
+    [-.5, -.43 + variant * .015], [-.43 + variant * .025, -.5],
+    [-.10, -.5], [-.045, -.465 + variant * .011], [.13, -.5],
+    [.43 - variant * .012, -.5], [.5, -.41 + variant * .018],
+    [.5, -.12], [.462 - variant * .009, -.05], [.5, .21],
+    [.5, .42 - variant * .012], [.40 - variant * .017, .5],
+    [.08, .5], [.015, .468 - variant * .012], [-.24, .5],
+    [-.43 + variant * .011, .5], [-.5, .40 - variant * .012],
+    [-.5, .13], [-.46 + variant * .008, .04], [-.5, -.25],
+  ];
+  shape.moveTo(edge[0][0], edge[0][1]);
+  for (let i = 1; i < edge.length; i++) shape.lineTo(edge[i][0], edge[i][1]);
+  shape.closePath();
   const rings: { points: THREE.Vector2[]; cx: number; cy: number }[] = [];
   for (let row = 0; row < 2; row++) for (let col = 0; col < 2; col++) {
     const cx = col ? .25 : -.25, cy = row ? .25 : -.25;
     const points: THREE.Vector2[] = [], path = new THREE.Path();
-    for (let i = 0; i < 16; i++) {
-      const angle = -i * Math.PI / 8;
-      const nick = Math.sin(i * 13.1 + row * 9.3 + col * 5.7 + variant * 7.9) * (variant === 2 ? .095 : .045);
-      const point = new THREE.Vector2(cx + Math.cos(angle) * .15 * (1 + nick), cy + Math.sin(angle) * .18 * (1 + nick));
+    for (let i = 0; i < 12; i++) {
+      const angle = -i * Math.PI / 6;
+      const cosine = Math.cos(angle), sine = Math.sin(angle);
+      const nick = Math.sin(i * 13.1 + row * 9.3 + col * 5.7 + variant * 7.9) * .065;
+      const squaredX = Math.sign(cosine) * Math.sqrt(Math.abs(cosine));
+      const squaredY = Math.sign(sine) * Math.sqrt(Math.abs(sine));
+      const point = new THREE.Vector2(cx + squaredX * .157 * (1 + nick), cy + squaredY * .151 * (1 + nick));
       points.push(point);
       if (i === 0) path.moveTo(point.x, point.y); else path.lineTo(point.x, point.y);
     }
