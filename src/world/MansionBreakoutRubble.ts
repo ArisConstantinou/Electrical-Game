@@ -55,14 +55,14 @@ const bedCanvas = document.createElement('canvas');
 bedCanvas.width = bedCanvas.height = 512;
 const bedContext = bedCanvas.getContext('2d');
 if (!bedContext) throw new Error('Rubble material canvas unavailable');
-bedContext.fillStyle = '#87513d';
+bedContext.fillStyle = '#783e2e';
 bedContext.fillRect(0, 0, 512, 512);
 let bedSeed = 0x4b1d9a37;
 const bedRandom = (): number => {
   bedSeed = (Math.imul(bedSeed, 1664525) + 1013904223) >>> 0;
   return bedSeed / 4294967296;
 };
-const bedColors = ['#b96d4e', '#a75b40', '#c27b56', '#9c503a', '#ab9b8d', '#857e76'];
+const bedColors = ['#985039', '#89442f', '#a55a3e', '#78392a', '#9d9084', '#77716a'];
 for (let i = 0; i < 2800; i++) {
   const x = bedRandom() * 512, y = bedRandom() * 512;
   const size = i < 600 ? 4 + bedRandom() * 9 : 1 + bedRandom() * 4;
@@ -116,7 +116,7 @@ const gritChunk = makeGritGeometry(
   [.36, .43, .32, .40, .29, .44, .31],
   [-.35, -.28, -.40, -.30, -.42, -.32, -.39],
 );
-const clayGritMaterial = new THREE.MeshStandardMaterial({ color: 0xb3684a, roughness: 1, flatShading: true });
+const clayGritMaterial = new THREE.MeshStandardMaterial({ color: 0x985039, roughness: 1, flatShading: true });
 const renderGritMaterial = new THREE.MeshStandardMaterial({ color: 0xaaa196, roughness: 1, flatShading: true });
 
 /** Bounded, batched debris that follows saved/removed masonry without spawning
@@ -273,9 +273,9 @@ export class MansionBreakoutRubble {
           size * (shape === 'chunk' ? .65 + scatter(seed, 10) * .65 : .12 + scatter(seed, 10) * .27),
           size * (shape === 'sliver' ? .22 + scatter(seed, 11) * .38 : .55 + scatter(seed, 11) * .8));
         mesh.setMatrixAt(i, this.matrix.compose(this.position, this.rotation, this.scale));
-        const shade = .75 + scatter(seed, 12) * .42;
-        mesh.setColorAt(i, this.tint.setRGB(shade, shade * (.90 + scatter(seed, 13) * .12),
-          shade * (.86 + scatter(seed, 14) * .16)));
+        const shade = .89 + scatter(seed, 12) * .19;
+        mesh.setColorAt(i, this.tint.setRGB(shade, shade * (.96 + scatter(seed, 13) * .06),
+          shade * (.94 + scatter(seed, 14) * .08)));
       }
       mesh.instanceMatrix.needsUpdate = true;
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
