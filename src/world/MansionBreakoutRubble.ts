@@ -56,7 +56,32 @@ dust.vertexColors = true;
 dust.normalMap = null;
 dust.flatShading = true;
 dust.side = THREE.DoubleSide;
-const gritGeometry = new THREE.TetrahedronGeometry(1, 0);
+// Fine debris needs a broken, many-sided outline. A tetrahedron keeps a
+// triangular silhouette however much its instances are rotated or scaled.
+const gritGeometry = new THREE.BufferGeometry();
+{
+  const outline = [
+    [-.49, -.14], [-.36, -.43], [-.09, -.49], [.29, -.40], [.48, -.19],
+    [.45, .12], [.20, .43], [-.13, .47], [-.43, .27],
+  ];
+  const upper = [.29, .37, .25, .34, .22, .35, .27, .39, .24];
+  const lower = [-.25, -.19, -.32, -.23, -.35, -.20, -.30, -.22, -.34];
+  const vertices: number[] = [], indices: number[] = [];
+  for (const heights of [upper, lower]) for (let i = 0; i < outline.length; i++) {
+    vertices.push(outline[i][0], heights[i], outline[i][1]);
+  }
+  for (let i = 1; i < outline.length - 1; i++) {
+    indices.push(0, i + 1, i);
+    indices.push(outline.length, outline.length + i, outline.length + i + 1);
+  }
+  for (let i = 0; i < outline.length; i++) {
+    const next = (i + 1) % outline.length;
+    indices.push(i, next, outline.length + i, next, outline.length + next, outline.length + i);
+  }
+  gritGeometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+  gritGeometry.setIndex(indices);
+  gritGeometry.computeVertexNormals();
+}
 const clayGritMaterial = new THREE.MeshStandardMaterial({ color: 0xb3684a, roughness: 1, flatShading: true });
 const renderGritMaterial = new THREE.MeshStandardMaterial({ color: 0xaaa196, roughness: 1, flatShading: true });
 
