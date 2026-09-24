@@ -280,7 +280,11 @@ export class MansionGroundWing extends THREE.Group {
     }
   }
 
-  update(dt: number): void { this.courtyard.update(dt); this.surroundings.update(dt); }
+  update(dt: number): void {
+    this.courtyard.update(dt);
+    this.surroundings.update(dt);
+    for (const wall of this.masonryDemolition.values()) wall.update(dt);
+  }
 
   /** Underground work areas do not need to draw through their ground slabs.
    * Restore them before the editor takes its own per-floor visibility snapshot. */

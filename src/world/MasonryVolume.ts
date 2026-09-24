@@ -30,6 +30,8 @@ export interface MasonryImpactResult {
 interface Chunk { damage: Uint8Array; removed: Uint8Array; changes: number }
 export interface MasonrySave {
   version: 1; seed: number; sequence: number; options: MasonryVolumeOptions; removedVolume?: number;
+  /** Fired-clay wall joints are owned by the laid brick, outside this clay lattice. */
+  mortarRemoved?: number[];
   chunks: Array<{ key: string; edits: Array<[number, number, number]> }>;
   pendingSupport?: Array<{ starts: Vec3[]; x0: number; x1: number; y0: number; y1: number; trimFloorZ?: number; trimCeilingZ?: number }>;
 }

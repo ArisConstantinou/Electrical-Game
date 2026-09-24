@@ -447,6 +447,7 @@ html, body { background: #151a1d; }
   #site-pro-tools {right:calc(var(--top-rail-edge) + 124px);}
   #site-pro-coordinator {right:calc(var(--top-rail-edge) + 84px);}
   #settings-toggle {right:calc(var(--top-rail-edge) + 44px);}
+  #fps-counter {top:calc(var(--top-rail-y) + 58px);right:var(--top-rail-edge);}
   #site-pro-tools[aria-pressed="true"], #site-pro-coordinator[aria-pressed="true"] {
     border-color:#ffdf36; color:#18271f; background:#ffdf36;
   }

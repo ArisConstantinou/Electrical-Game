@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { siteClayImage } from './BrickRibbing';
 import { siteMaterial } from './SiteMaterials';
+import { MaterialId, type MasonryFragment } from './MasonryVolume';
 
 const scatter = (index: number, salt: number): number => {
   let h = Math.imul(index + 1, 0x7feb352d) ^ Math.imul(salt + 7, 0x846ca68b);
@@ -118,6 +119,10 @@ const gritChunk = makeGritGeometry(
 );
 const clayGritMaterial = new THREE.MeshStandardMaterial({ color: 0x985039, roughness: 1, flatShading: true });
 const renderGritMaterial = new THREE.MeshStandardMaterial({ color: 0xaaa196, roughness: 1, flatShading: true });
+interface FallingPiece { mesh: THREE.InstancedMesh; slot: number; position: THREE.Vector3; velocity: THREE.Vector3;
+  rotation: THREE.Quaternion; spin: THREE.Vector3; scale: THREE.Vector3; settled: boolean }
+interface FallingSection { group: THREE.Group; velocity: THREE.Vector3; spin: THREE.Vector3; age: number;
+  settled: boolean; dispose: () => void }
 
 /** Bounded, batched debris that follows saved/removed masonry without spawning
  * a simulated mesh for every small chip on mobile. */
@@ -133,12 +138,20 @@ export class MansionBreakoutRubble {
   private readonly renderChunks = new THREE.InstancedMesh(gritChunk, renderGritMaterial, 80);
   private readonly renderSlivers = new THREE.InstancedMesh(shard, renderGritMaterial, 60);
   private readonly mound = new THREE.Mesh(new THREE.BufferGeometry(), rubbleBed);
+  private readonly fallingClay = new THREE.InstancedMesh(shard, clay, 64);
+  private readonly fallingMortar = new THREE.InstancedMesh(shard, render, 24);
+  private readonly falling: FallingPiece[] = [];
+  private readonly fallingSections: FallingSection[] = [];
+  private clayCursor = 0;
+  private mortarCursor = 0;
   private moundBounds = '';
   private readonly matrix = new THREE.Matrix4();
   private readonly position = new THREE.Vector3();
   private readonly rotation = new THREE.Quaternion();
   private readonly scale = new THREE.Vector3();
   private readonly tint = new THREE.Color();
+  private readonly spinEuler = new THREE.Euler();
+  private readonly spinQuaternion = new THREE.Quaternion();
 
   constructor(private readonly alongX: boolean) {
     this.group.name = 'Fallen clay and plaster from opened masonry';
@@ -146,6 +159,11 @@ export class MansionBreakoutRubble {
     this.mound.receiveShadow = true;
     this.mound.raycast = () => undefined;
     this.group.add(this.mound);
+    for(const mesh of [this.fallingClay,this.fallingMortar]){
+      mesh.count=0;mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      mesh.castShadow=mesh.receiveShadow=true;mesh.frustumCulled=false;
+      mesh.raycast=()=>undefined;this.group.add(mesh);
+    }
     for (const mesh of [this.clayShards, this.renderShards, this.sections,
       this.clayGrit, this.clayChunks, this.claySlivers,
       this.renderGrit, this.renderChunks, this.renderSlivers]) {
@@ -158,9 +176,109 @@ export class MansionBreakoutRubble {
     }
   }
 
-  update(centers: readonly number[], impactSide: -1 | 1): void {
+  get fallingCount():number {
+    return this.falling.filter(piece=>!piece.settled).length + this.fallingSections.filter(piece=>!piece.settled).length;
+  }
+
+  /** Keep the actual fractured clay mesh for the visible fall, then retire it
+   * into the persistent rubble bed. No intact brick is made to vanish in place. */
+  adoptSection(group: THREE.Group, impactSide: -1 | 1, seed: number, dispose: () => void): void {
+    while (this.fallingSections.length >= 6) this.retireSection(this.fallingSections.shift()!);
+    this.group.add(group);
+    const random = (salt: number) => scatter(seed, salt);
+    const velocity = new THREE.Vector3((random(81) - .5) * .7, .1 + random(82) * .4,
+      (random(83) - .5) * .7);
+    if (this.alongX) velocity.z = impactSide * (.35 + random(84) * .45);
+    else velocity.x = impactSide * (.35 + random(84) * .45);
+    this.fallingSections.push({ group, velocity,
+      spin: new THREE.Vector3((random(85) - .5) * 3, (random(86) - .5) * 2, (random(87) - .5) * 3),
+      age: 0, settled: false, dispose });
+    this.group.visible = true;
+  }
+
+  private retireSection(section: FallingSection): void {
+    section.group.removeFromParent();
+    section.dispose();
+  }
+
+  /** A few real released fragments fall in front of the impacted face. The
+   * bounded instance pool stays small even after long demolition sessions. */
+  emit(fragments:readonly MasonryFragment[],origin:THREE.Vector3,rotation:THREE.Quaternion,impactSide:-1|1,seed:number):void{
+    const selected=[...fragments].filter(fragment=>fragment.volume>0)
+      .sort((a,b)=>b.volume-a.volume).slice(0,8);
+    for(let index=0;index<selected.length;index++){
+      const fragment=selected[index],grey=fragment.material===MaterialId.Mortar||fragment.material===MaterialId.Render||fragment.material===MaterialId.Concrete;
+      const mesh=grey?this.fallingMortar:this.fallingClay;
+      const cursor=grey?this.mortarCursor++:this.clayCursor++;
+      const slot=cursor%mesh.instanceMatrix.count;
+      mesh.count=Math.max(mesh.count,slot+1);
+      const prior=this.falling.findIndex(piece=>piece.mesh===mesh&&piece.slot===slot);
+      if(prior>=0)this.falling.splice(prior,1);
+      const random=(salt:number)=>scatter(seed+index*13,salt);
+      const position=new THREE.Vector3(fragment.position.x,fragment.position.y,fragment.position.z)
+        .applyQuaternion(rotation).add(origin);
+      const velocity=new THREE.Vector3((random(1)-.5)*.7,.3+random(2)*.7,(random(3)-.5)*.7);
+      if(this.alongX)velocity.z=impactSide*(.45+random(4)*.9);
+      else velocity.x=impactSide*(.45+random(4)*.9);
+      const piece:FallingPiece={mesh,slot,position,velocity,rotation:new THREE.Quaternion()
+        .setFromEuler(new THREE.Euler(random(5)*2,random(6)*3,random(7)*2)),
+        spin:new THREE.Vector3(random(8)*3,random(9)*4,random(10)*3),
+        scale:new THREE.Vector3(Math.max(.012,Math.min(.18,fragment.size.x)),
+          Math.max(.008,Math.min(.09,fragment.size.y)),Math.max(.008,Math.min(.14,fragment.size.z))),settled:false};
+      this.falling.push(piece);
+      mesh.setMatrixAt(slot,this.matrix.compose(piece.position,piece.rotation,piece.scale));
+      mesh.instanceMatrix.needsUpdate=true;
+    }
+    if(selected.length)this.group.visible=true;
+  }
+
+  step(dt:number):void{
+    const elapsed=Math.min(.05,Math.max(0,dt));
+    for(const piece of this.falling){
+      if(piece.settled)continue;
+      piece.velocity.y-=9.8*elapsed;
+      piece.position.addScaledVector(piece.velocity,elapsed);
+      piece.rotation.multiply(this.spinQuaternion.setFromEuler(this.spinEuler.set(
+        piece.spin.x*elapsed,piece.spin.y*elapsed,piece.spin.z*elapsed)));
+      const floor=piece.scale.y*.25;
+      if(piece.position.y<=floor){
+        piece.position.y=floor;
+        if(Math.abs(piece.velocity.y)<.45)piece.settled=true;
+        else piece.velocity.y=Math.abs(piece.velocity.y)*.16;
+        piece.velocity.x*=.55;piece.velocity.z*=.55;
+      }
+      piece.mesh.setMatrixAt(piece.slot,this.matrix.compose(piece.position,piece.rotation,piece.scale));
+      piece.mesh.instanceMatrix.needsUpdate=true;
+    }
+    for (let i = this.fallingSections.length - 1; i >= 0; i--) {
+      const section = this.fallingSections[i];
+      section.age += elapsed;
+      if (section.age > 3) { this.retireSection(section); this.fallingSections.splice(i, 1); continue; }
+      if (section.settled) continue;
+      section.velocity.y -= 9.8 * elapsed;
+      section.group.position.addScaledVector(section.velocity, elapsed);
+      section.group.quaternion.multiply(this.spinQuaternion.setFromEuler(this.spinEuler.set(
+        section.spin.x * elapsed, section.spin.y * elapsed, section.spin.z * elapsed)));
+      if (section.group.position.y <= .08) {
+        section.group.position.y = .08;
+        if (Math.abs(section.velocity.y) < .45) section.settled = true;
+        else section.velocity.y = Math.abs(section.velocity.y) * .12;
+        section.velocity.x *= .55; section.velocity.z *= .55;
+      }
+    }
+  }
+
+  clear():void{
+    for (const section of this.fallingSections) this.retireSection(section);
+    this.fallingSections.length = 0;
+    this.falling.length=0;this.clayCursor=this.mortarCursor=0;
+    this.fallingClay.count=this.fallingMortar.count=0;
+    this.update([],-1,0);
+  }
+
+  update(centers: readonly number[], impactSide: -1 | 1, volumeUnits=centers.length/4): void {
     if (!centers.length) {
-      this.group.visible = false;
+      this.group.visible = this.fallingClay.count>0||this.fallingMortar.count>0;
       for (const mesh of [this.clayShards, this.renderShards, this.sections,
         this.clayGrit, this.clayChunks, this.claySlivers,
         this.renderGrit, this.renderChunks, this.renderSlivers]) mesh.count = 0;
@@ -170,14 +288,15 @@ export class MansionBreakoutRubble {
     const minimum = Math.min(...centers), maximum = Math.max(...centers);
     const center = (minimum + maximum) * .5;
     const spread = Math.max(.2, Math.min(1.25, (maximum - minimum) * .5 + .23));
-    const peak = Math.min(.45, centers.length * .007);
+    const peak = Math.min(.45, volumeUnits * .055);
     const rampHeight = (along: number, outward: number): number => {
       const edge = THREE.MathUtils.clamp((spread - Math.abs(along - center)) / .24, 0, 1);
       const distance = THREE.MathUtils.clamp((Math.abs(outward) - .115) / .65, 0, 1);
       return peak * edge * (1 - distance) ** 1.28;
     };
-    const bounds = `${minimum}:${maximum}:${Math.floor(centers.length / 5)}:${impactSide}`;
-    if (bounds !== this.moundBounds) {
+    const bounds = `${minimum}:${maximum}:${Math.floor(volumeUnits*20)}:${impactSide}`;
+    const changed = bounds !== this.moundBounds;
+    if (changed) {
       this.moundBounds = bounds;
       const positions: number[] = [], uvs: number[] = [], indices: number[] = [];
       const columns = 36, depthSteps = 12, rowWidth = columns + 1;
@@ -206,7 +325,7 @@ export class MansionBreakoutRubble {
       this.mound.geometry = geometry;
     }
     const place = (mesh: THREE.InstancedMesh, count: number, kind: 'clay' | 'render' | 'section') => {
-      const previous = mesh.count;
+      const previous = changed ? 0 : mesh.count;
       mesh.count = count;
       if (previous >= count) return;
       const density = kind === 'clay' ? 9.3 : kind === 'render' ? 2.3 : .5;
@@ -247,12 +366,12 @@ export class MansionBreakoutRubble {
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       mesh.computeBoundingSphere();
     };
-    place(this.clayShards, Math.min(600, Math.ceil(centers.length * 9.3)), 'clay');
-    place(this.renderShards, Math.min(150, Math.ceil(centers.length * 2.3)), 'render');
-    place(this.sections, Math.min(32, Math.floor(centers.length * .5)), 'section');
+    place(this.clayShards, Math.min(600, Math.ceil(volumeUnits * 9.3)), 'clay');
+    place(this.renderShards, Math.min(150, Math.ceil(volumeUnits * 2.3)), 'render');
+    place(this.sections, Math.min(32, Math.floor(volumeUnits * .5)), 'section');
     const placeGrit = (mesh: THREE.InstancedMesh, count: number, density: number, salt: number,
       shape: 'flake' | 'chunk' | 'sliver') => {
-      const previous = mesh.count;
+      const previous = changed ? 0 : mesh.count;
       mesh.count = count;
       if (previous >= count) return;
       for (let i = previous; i < count; i++) {
@@ -281,11 +400,11 @@ export class MansionBreakoutRubble {
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       mesh.computeBoundingSphere();
     };
-    placeGrit(this.clayGrit, Math.min(260, Math.ceil(centers.length * 4)), 4, 1301, 'flake');
-    placeGrit(this.clayChunks, Math.min(160, Math.ceil(centers.length * 2.5)), 2.5, 1703, 'chunk');
-    placeGrit(this.claySlivers, Math.min(110, Math.ceil(centers.length * 1.6)), 1.6, 1987, 'sliver');
-    placeGrit(this.renderGrit, Math.min(100, Math.ceil(centers.length * 1.4)), 1.4, 2909, 'flake');
-    placeGrit(this.renderChunks, Math.min(80, Math.ceil(centers.length * 1.1)), 1.1, 3203, 'chunk');
-    placeGrit(this.renderSlivers, Math.min(60, Math.ceil(centers.length * .8)), .8, 3509, 'sliver');
+    placeGrit(this.clayGrit, Math.min(260, Math.ceil(volumeUnits * 4)), 4, 1301, 'flake');
+    placeGrit(this.clayChunks, Math.min(160, Math.ceil(volumeUnits * 2.5)), 2.5, 1703, 'chunk');
+    placeGrit(this.claySlivers, Math.min(110, Math.ceil(volumeUnits * 1.6)), 1.6, 1987, 'sliver');
+    placeGrit(this.renderGrit, Math.min(100, Math.ceil(volumeUnits * 1.4)), 1.4, 2909, 'flake');
+    placeGrit(this.renderChunks, Math.min(80, Math.ceil(volumeUnits * 1.1)), 1.1, 3203, 'chunk');
+    placeGrit(this.renderSlivers, Math.min(60, Math.ceil(volumeUnits * .8)), .8, 3509, 'sliver');
   }
 }

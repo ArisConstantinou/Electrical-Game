@@ -1577,3 +1577,10 @@ Original prompt for this task: Selecting BOX should show an initial box in the l
 
 - User clarified that the large central button word must read LOADING while disabled and READY when preparation finishes. The percentage remains beside LOADING; the small ready badge is hidden in favour of the 40 px desktop / 32 px mobile central READY label. The enabled button retains an accessible Start work label.
 - Browser checks at 1440×900 and 390×844 confirm both phases, click-to-game, no page errors and no horizontal overflow. The bundled game client also completed; screenshots and report are in `artifacts/start-loading/corrected/`.
+
+## 2026-09-24 · PC/mobile freezes and masonry demolition restoration
+
+- The newly added wall's CPU state removed bricks but their static instance-matrix GPU buffer kept the intact faces visible. Changed only the mutable masonry instances to dynamic upload. A live-canvas regression now proves the rendered face changes after removal, and the demolished opening can be seen through.
+- Mortar joints now break in short sections and survive a Studio document round trip. The impacted face produces bounded falling clay/plaster fragments and an accumulating mixed-size ramp pile on that side; a heavily damaged real brick section falls before retirement. Existing visual effects were left as they were.
+- Added a live FPS counter beneath desktop Settings or the tablet/phone top-rail handle, and desktop free-pointer mouse look. The pointer test verifies looking, Settings access, and no pointer lock.
+- Production build and masonry demolition/chase tests passed on the isolated worktree. Live port 5365 mobile-viewport demolition passed with no render error; full-scene WebGL samples across foyer, garage, courtyard and first floor had no long tasks during the measured 2.5-second steady windows. Startup profiling still observed isolated 1.4–1.5-second main-thread tasks, so physical iPhone and completely smooth loading remain unverified. Detailed JSON and captures are in ignored `output/performance/` and `output/mansion-masonry-demolition/`.

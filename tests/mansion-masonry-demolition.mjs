@@ -32,6 +32,53 @@ try {
   await page.waitForFunction(() => window.__wireTheHouse?.isReadyForStart, null, { timeout:120000 });
   await page.locator('#apprentice-count').selectOption('0');
   await page.locator('#start-button').click();
+  // Regression for a wall whose CPU instance matrix changed but whose static
+  // GPU buffer still rendered the intact photographed brick over the opening.
+  const visualProbe = await page.evaluate(async () => {
+    const game = window.__wireTheHouse, wall = game.room.mansionWing.masonryDemolition.get('Courtyard north fired-clay enclosure');
+    game.step = () => {};
+    const camera = game.renderer.camera;
+    camera.position.set(15.3, 1.65, 15.0);
+    camera.rotation.set(0, Math.PI, 0);
+    camera.updateMatrixWorld(true);
+    const target = game.room.mansionWing.aimMasonry(camera);
+    const projected = target.point.clone().project(camera);
+    game.renderer.render(); await game.renderer.waitForFrame();
+    return { index: target.index, x: Math.round((projected.x + 1) * innerWidth / 2),
+      y: Math.round((1 - projected.y) * innerHeight / 2), wall: wall.group.name };
+  });
+  const clip = { x: Math.max(0, visualProbe.x - 16), y: Math.max(0, visualProbe.y - 16), width: 32, height: 32 };
+  const intactPixels = await page.screenshot({ clip });
+  await page.evaluate(async index => {
+    const game = window.__wireTheHouse, wall = game.room.mansionWing.masonryDemolition.get('Courtyard north fired-clay enclosure');
+    wall.strike(index);
+    game.renderer.render(); await game.renderer.waitForFrame();
+  }, visualProbe.index);
+  const openedPixels = await page.screenshot({ clip });
+  assert(!intactPixels.equals(openedPixels), `Removed ${visualProbe.wall} brick still renders intact in the live canvas`);
+  await page.evaluate(async () => {
+    const game = window.__wireTheHouse;
+    game.room.mansionWing.masonryDemolition.get('Courtyard north fired-clay enclosure').reset();
+    game.renderer.render(); await game.renderer.waitForFrame();
+  });
+  const jointProbe = await page.evaluate(index => {
+    const game = window.__wireTheHouse, wall = game.room.mansionWing.masonryDemolition.get('Courtyard north fired-clay enclosure');
+    const camera = game.renderer.camera, center = camera.position.clone(), rotation = camera.quaternion.clone(), size = camera.position.clone();
+    wall.original[index].decompose(center, rotation, size);
+    center.applyMatrix4(wall.group.matrixWorld);
+    camera.position.set(center.x, center.y - size.y / 2 - .005, 15.0);
+    camera.rotation.set(0, Math.PI, 0);
+    const aim = game.room.mansionWing.aimMasonry(camera);
+    const hit = aim?.wall === wall && wall.strikeAt(aim.index, camera, 'demolish');
+    const removed = [...(wall.broken.get(index)?.mortarRemoved ?? [])].filter(Boolean).length;
+    const save = wall.damageSnapshot();
+    wall.reset(); wall.restoreDamage(save);
+    const restored = [...(wall.broken.get(index)?.mortarRemoved ?? [])].filter(Boolean).length;
+    wall.reset();
+    return { index, aimedIndex: aim?.index ?? null, hit, removed, restored };
+  }, visualProbe.index);
+  assert(jointProbe.hit && jointProbe.aimedIndex === visualProbe.index && jointProbe.removed === 1 && jointProbe.restored === 1,
+    `Mortar joint cannot be broken and restored: ${JSON.stringify(jointProbe)}`);
   const result = await page.evaluate(() => {
     const game = window.__wireTheHouse;
     game.step = () => {};
@@ -46,6 +93,11 @@ try {
     const contact = target ? game.fpsRig.contactMasonry(camera, target.point) : false;
     const before = wall.removedIndices().length;
     for (let hit = 0; hit < 6; hit++) game.performAction();
+    const fallingAfterHit = wall.rubble?.fallingCount ?? 0;
+    const fallingPiece = wall.rubble?.falling.find(piece => !piece.settled);
+    const fallingStartY = fallingPiece?.position.y ?? null;
+    for (let frame = 0; frame < 12; frame++) wall.rubble?.step(1 / 60);
+    const fallingEndY = fallingPiece?.position.y ?? null;
     const after = wall.removedIndices().length;
     const locallyRemoved = wall.removedClayNodes;
     const partialAfterHit = wall.partialDamageCount;
@@ -158,7 +210,7 @@ try {
     game.fpsRig.visible = false;
     game.renderer.render();
     return { target:target?.wall.group.name ?? null, distance:target?.distance ?? null,
-      contact, locallyRemoved, partialAfterHit, partialRestored,
+      contact, locallyRemoved, partialAfterHit, partialRestored, fallingAfterHit, fallingStartY, fallingEndY,
       partialSaved:partialDocument.masonryDamage?.[wall.group.name]?.length ?? 0,
       armReach:target && game.fpsRig.canReachPoint(camera,target.point,.12),
       gripReach:game.fpsRig.gripsReachable(camera,game.fpsRig.tools.get('hammer')),
@@ -178,6 +230,8 @@ try {
   assert.equal(result.contact, true, `Hammer contact failed: ${JSON.stringify(result)}`);
   assert(result.after === result.before && result.locallyRemoved > 0 && result.partialAfterHit === 1,
     `Hammer must locally fracture a brick without removing it: ${JSON.stringify(result)}`);
+  assert(result.fallingAfterHit > 0 && result.fallingEndY < result.fallingStartY,
+    `Hammer fragments did not visibly fall: ${JSON.stringify(result)}`);
   assert(result.partialSaved === 1 && result.partialRestored === result.locallyRemoved,
     `Local damage did not survive Studio document round trip: ${JSON.stringify(result)}`);
   assert(result.partialSavedSide === -1 && result.partialRestoredSide === -1 && result.restoredSide === -1,

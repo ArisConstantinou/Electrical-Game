@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import type { PlayerObstacle } from '../player/EquipmentCollision';
 import { hollowClayEndMaterial, hollowClayEndShapes } from './HollowClayEnd';
-import { MasonryVolume, MaterialId, type MasonrySave } from './MasonryVolume';
+import { MasonryVolume, MaterialId, type MasonrySave, type MasonryRayHit } from './MasonryVolume';
 import { damagedMasonryMaterial } from './BrickFaceMaterial';
 import { MansionBreakoutRubble } from './MansionBreakoutRubble';
 import type { MeshData } from './masonryMesher';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 export interface MasonryAim {
   wall: MansionMasonryDemolition;
@@ -18,7 +19,7 @@ export interface MasonryBrickInstance {
   instance: number;
 }
 export interface MansionBrickDamage { index: number; save: MasonrySave }
-interface BrokenBrick { volume: MasonryVolume; mesh: THREE.Group; origin: THREE.Vector3; rotation: THREE.Quaternion; originalSolidNodes: number; chunkMeshes: Map<string, THREE.Mesh> }
+interface BrokenBrick { volume: MasonryVolume; mesh: THREE.Group; origin: THREE.Vector3; rotation: THREE.Quaternion; originalSolidNodes: number; chunkMeshes: Map<string, THREE.Mesh>; mortarMesh: THREE.Mesh | null; mortarRemoved: Uint8Array }
 
 /** A light demolition layer for the authored fired-clay walls. The intact wall
  * keeps its original two draw calls; a hit swaps the solid backing for a
@@ -62,6 +63,8 @@ export class MansionMasonryDemolition {
     this.brickRefs = bricks instanceof THREE.InstancedMesh
       ? Array.from({ length: bricks.count }, (_, instance) => ({ mesh: bricks, instance }))
       : bricks;
+    for (const mesh of new Set(this.brickRefs.map(ref => ref?.mesh).filter((mesh): mesh is THREE.InstancedMesh => Boolean(mesh))))
+      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.remaining = new Uint8Array(this.brickRefs.length);
     for (let index = 0; index < this.brickRefs.length; index++) {
       const ref = this.brickRefs[index];
@@ -81,7 +84,8 @@ export class MansionMasonryDemolition {
   get partialDamageCount(): number { return this.broken.size; }
   get removedClayNodes(): number { let count = 0; for (const entry of this.broken.values()) count += entry.volume.removedNodeCount; return count; }
   damageSnapshot(): MansionBrickDamage[] {
-    return [...this.broken].map(([index, entry]) => ({ index, save: entry.volume.serialize() }));
+    return [...this.broken].map(([index, entry]) => ({ index,
+      save: { ...entry.volume.serialize(), mortarRemoved: [...entry.mortarRemoved] } }));
   }
   get fractureCapCount(): number {
     return this.fractureCaps?.reduce((count, mesh) => count + mesh.count, 0) ?? 0;
@@ -93,6 +97,15 @@ export class MansionMasonryDemolition {
     return depth;
   }
   get rubbleSide(): -1 | 1 | null { return this.firstBreakSide; }
+  get fallingFragmentCount(): number { return this.rubble?.fallingCount ?? 0; }
+  update(dt: number): void { this.rubble?.step(dt); }
+  private getRubble(): MansionBreakoutRubble {
+    if (!this.rubble) {
+      this.rubble = new MansionBreakoutRubble(this.alongX);
+      this.group.add(this.rubble.group);
+    }
+    return this.rubble;
+  }
   restoreRubbleSide(side: unknown): void {
     if (side === -1 || side === 1) this.firstBreakSide = side;
   }
@@ -145,11 +158,37 @@ export class MansionMasonryDemolition {
         if (score < bestDistance) { bestDistance = score; best = index; }
       }
     if (best < 0) return null;
+    // The bed joint belongs to the brick above it; the head joint belongs to
+    // the brick on its left. Aim at that owner so the struck mortar is updated
+    // with its supporting clay instead of chipping an unrelated neighbour.
+    this.original[best].decompose(this.position, this.rotation, this.scale);
+    const selectedRow = Math.floor(best / this.columns);
+    if (selectedRow < this.rows - 1 && this.localHit.y > this.position.y + this.scale.y / 2 - .018) {
+      for (let column = 0; column < this.columns; column++) {
+        const upper = (selectedRow + 1) * this.columns + column;
+        if (!this.remaining[upper]) continue;
+        this.original[upper].decompose(this.position, this.rotation, this.scale);
+        const middle = this.alongX ? this.position.x : this.position.z;
+        const half = (this.alongX ? this.scale.x : this.scale.z) / 2;
+        if (Math.abs(coordinate - middle) <= half + .012) { best = upper; break; }
+      }
+    }
+    this.original[best].decompose(this.position, this.rotation, this.scale);
+    const leftEdge = (this.alongX ? this.position.x - this.scale.x / 2 : this.position.z - this.scale.z / 2);
+    if (coordinate < leftEdge + .018) {
+      const owner = best - 1;
+      if (owner >= Math.floor(best / this.columns) * this.columns && this.remaining[owner]) {
+        this.original[owner].decompose(this.position, this.rotation, this.scale);
+        const rightEdge = this.alongX ? this.position.x + this.scale.x / 2 : this.position.z + this.scale.z / 2;
+        if (Math.abs(coordinate - rightEdge) < .025) best = owner;
+      }
+    }
     const broken = this.broken.get(best);
     if (!broken) return { wall: this, index: best, point, distance };
     const rayOrigin = this.localRay.origin.clone().sub(broken.origin).applyQuaternion(broken.rotation.clone().invert());
     const rayDirection = this.localRay.direction.clone().applyQuaternion(broken.rotation.clone().invert());
-    const contact = broken.volume.raycast(rayOrigin, rayDirection, maxDistance);
+    const contact = this.jointContact(broken, rayOrigin, rayDirection, maxDistance)?.contact
+      ?? broken.volume.raycast(rayOrigin, rayDirection, maxDistance);
     if (!contact) return null;
     const exact = new THREE.Vector3(contact.point.x, contact.point.y, contact.point.z)
       .applyQuaternion(broken.rotation).add(broken.origin).applyMatrix4(this.group.matrixWorld);
@@ -168,27 +207,39 @@ export class MansionMasonryDemolition {
     const origin = wallCamera.clone().sub(entry.origin).applyQuaternion(entry.rotation.clone().invert());
     const wallDirection = camera.getWorldDirection(new THREE.Vector3()).transformDirection(this.inverse);
     const direction = wallDirection.clone().applyQuaternion(entry.rotation.clone().invert());
-    const contact = entry.volume.raycast(origin, direction, 2.4);
+    const joint = this.jointContact(entry, origin, direction, 2.4);
+    const contact = joint?.contact ?? entry.volume.raycast(origin, direction, 2.4);
     if (!contact) { if (!this.broken.has(index)) this.disposeBrokenBrick(entry); return false; }
     const maxDepthM = mode === 'chase' ? .105 : undefined;
     const result = entry.volume.impact({ point: contact.point, direction,
-      chisel: mode === 'chase' ? 'flat' : 'pointed', widthM: mode === 'chase' ? .045 : undefined,
-      energyJ: mode === 'chase' ? 6 : 5, maxDepthM });
-    if (!result.contact || (!result.removedNodes && !result.stats.weakenedNodes)) {
+      chisel: 'flat', widthM: mode === 'chase' ? .045 : .075,
+      energyJ: mode === 'chase' ? 6 : 18, maxDepthM });
+    if (!joint && (!result.contact || (!result.removedNodes && !result.stats.weakenedNodes))) {
       if (!this.broken.has(index)) this.disposeBrokenBrick(entry);
       return false;
     }
-    if (mode === 'demolish') this.firstBreakSide ??= (this.alongX ? wallCamera.z : wallCamera.x) < 0 ? -1 : 1;
+    this.firstBreakSide ??= (this.alongX ? wallCamera.z : wallCamera.x) < 0 ? -1 : 1;
     this.broken.set(index, entry);
+    if (joint) {
+      entry.mortarRemoved[joint.segment] = 1;
+      this.ensureMortarCells();
+      this.updateDamagedMortar(index, entry);
+      const small = joint.segment < 8 ? entry.volume.width / 8 : .008;
+      const height = joint.segment < 8 ? .008 : entry.volume.height / 5;
+      this.getRubble().emit([{ position: contact.point, size: { x: small, y: height, z: .025 },
+        volume: small * height * .025, material: MaterialId.Mortar, detached: true }],
+      entry.origin, entry.rotation, this.firstBreakSide ?? -1, result.seed);
+    }
+    if (result.fragments.length) this.getRubble().emit(result.fragments, entry.origin, entry.rotation,
+      this.firstBreakSide ?? -1, result.seed);
     if (result.removedNodes) this.fractureAcrossJoint(index, new THREE.Vector3(contact.point.x, contact.point.y, contact.point.z)
       .applyQuaternion(entry.rotation).add(entry.origin), wallDirection, maxDepthM);
-    // The four hollow bores are air from the start. A threshold based on the
-    // bounding box discarded a visibly substantial clay shell at 48% of that
-    // box, making a struck brick suddenly disappear. Retire it only when its
-    // actual original clay lattice is almost completely gone.
-    if (entry.volume.removedNodeCount >= entry.originalSolidNodes * .94)
-      return this.strike(index);
     if (result.removedNodes) this.showBrokenBrick(index, entry);
+    // In breakout mode, the heavily fractured remainder falls as its actual
+    // current mesh. Chase cuts retain their backing and do not cross the wall.
+    if (mode === 'demolish' && entry.volume.removedNodeCount >= entry.originalSolidNodes * .55)
+      return this.strike(index, true, entry);
+    if (result.removedNodes) this.refreshRubble();
     return true;
   }
 
@@ -223,8 +274,10 @@ export class MansionMasonryDemolition {
           continue;
         }
         this.broken.set(neighbor, entry);
+        if (result.fragments.length) this.getRubble().emit(result.fragments, entry.origin, entry.rotation,
+          this.firstBreakSide ?? -1, result.seed);
         if (entry.volume.removedNodeCount >= entry.originalSolidNodes * .94) this.strike(neighbor);
-        else if (result.removedNodes) this.showBrokenBrick(neighbor, entry);
+        else if (result.removedNodes) { this.showBrokenBrick(neighbor, entry); this.refreshRubble(); }
         if (++affected === (maxDepthM === undefined ? 3 : 1)) return;
       }
   }
@@ -234,8 +287,11 @@ export class MansionMasonryDemolition {
       if (!Number.isInteger(item.index) || !this.remaining[item.index] || !item.save || item.save.version !== 1) continue;
       const entry = this.broken.get(item.index) ?? this.createBrokenBrick(item.index, item.save.seed);
       entry.volume.restore(item.save);
+      for (let part = 0; part < entry.mortarRemoved.length; part++)
+        entry.mortarRemoved[part] = item.save.mortarRemoved?.[part] === 1 ? 1 : 0;
       this.broken.set(item.index, entry);
       if (entry.volume.removedNodeCount) this.showBrokenBrick(item.index, entry);
+      else if (entry.mortarRemoved.some(Boolean)) { this.ensureMortarCells(); this.updateDamagedMortar(item.index, entry); }
     }
   }
 
@@ -257,7 +313,8 @@ export class MansionMasonryDemolition {
     mesh.position.copy(origin); mesh.quaternion.copy(rotation);
     mesh.raycast = () => undefined;
     this.group.add(mesh);
-    return { volume, mesh, origin, rotation, originalSolidNodes, chunkMeshes: new Map() };
+    return { volume, mesh, origin, rotation, originalSolidNodes, chunkMeshes: new Map(), mortarMesh: null,
+      mortarRemoved: new Uint8Array(13) };
   }
 
   private showBrokenBrick(index: number, entry: BrokenBrick): void {
@@ -277,12 +334,76 @@ export class MansionMasonryDemolition {
       }
     }
     this.ensureMortarCells();
+    this.updateDamagedMortar(index, entry);
     if (this.chippedEnds.has(`${index}:-1`) || this.chippedEnds.has(`${index}:1`)) this.trimExposedJoint(index);
     this.temp.makeScale(0, 0, 0);
     const ref = this.brickRefs[index];
     ref?.mesh.setMatrixAt(ref.instance, this.temp);
     if (ref) { ref.mesh.instanceMatrix.needsUpdate = true; ref.mesh.computeBoundingSphere(); }
-    // Bed and head joints remain around a partly chipped unit.
+  }
+
+  private jointContact(entry: BrokenBrick, origin: THREE.Vector3, direction: THREE.Vector3,
+    maxDistance: number): { contact: MasonryRayHit; segment: number } | null {
+    if (Math.abs(direction.z) < .01) return null;
+    const faceZ = origin.z >= 0 ? .11 : -.11;
+    const distance = (faceZ - origin.z) / direction.z;
+    if (distance < 0 || distance > maxDistance) return null;
+    const x = origin.x + direction.x * distance;
+    const y = origin.y + direction.y * distance;
+    const half = entry.volume.width / 2, height = entry.volume.height;
+    if (x < -half - .018 || x > half + .018 || y < -.022 || y > height + .022) return null;
+    const nearBed = y < .024;
+    const nearHead = x > half - .024;
+    if (!nearBed && !nearHead) return null;
+    const segment = nearBed ? Math.min(7, Math.max(0, Math.floor((x + half) / (2 * half) * 8)))
+      : 8 + Math.min(4, Math.max(0, Math.floor(y / height * 5)));
+    if (entry.mortarRemoved[segment]) return null;
+    const point = { x: THREE.MathUtils.clamp(x, -half + .018, half - .018),
+      y: THREE.MathUtils.clamp(y, .018, height - .018), z: faceZ };
+    return { segment, contact: { point, normal: { x: 0, y: 0, z: Math.sign(faceZ) }, distance, material: MaterialId.Mortar } };
+  }
+
+  /** The intact wall uses two mortar instances per brick. Once chipped, replace
+   * only that brick's joints with supported short pieces so a chase can cut
+   * through the mortar without leaving continuous grey bars in the opening. */
+  private updateDamagedMortar(index: number, entry: BrokenBrick): void {
+    const cells = this.mortarCells!;
+    this.temp.makeScale(0, 0, 0);
+    cells.setMatrixAt(index * 2, this.temp);
+    cells.setMatrixAt(index * 2 + 1, this.temp);
+    cells.instanceMatrix.needsUpdate = true;
+    const geometries: THREE.BufferGeometry[] = [];
+    const width = entry.volume.width, height = entry.volume.height;
+    const bedHeight = Math.max(.005, Math.min(.016, 3 / this.rows - height));
+    const add = (x: number, y: number, sx: number, sy: number) => {
+      const box = new THREE.BoxGeometry(sx, sy, .20);
+      box.translate(x, y, 0);
+      geometries.push(box);
+    };
+    for (let part = 0; part < 8; part++) {
+      if (entry.mortarRemoved[part]) continue;
+      const x = -width / 2 + width * (part + .5) / 8;
+      const supported = [-.105, .105].some(z => entry.volume.sampleMaterial(x, .009, z) !== MaterialId.Air);
+      if (supported) add(x, -bedHeight / 2, width / 8 - .001, bedHeight);
+    }
+    for (let part = 0; part < 5; part++) {
+      if (entry.mortarRemoved[8 + part]) continue;
+      const y = height * (part + .5) / 5;
+      const supported = [-.105, .105].some(z => entry.volume.sampleMaterial(width / 2 - .009, y, z) !== MaterialId.Air);
+      if (supported) add(width / 2 + .004, y, .008, height / 5 - .001);
+    }
+    const geometry = geometries.length ? mergeGeometries(geometries, false) : null;
+    for (const part of geometries) part.dispose();
+    if (entry.mortarMesh) {
+      entry.mortarMesh.geometry.dispose();
+      if (geometry) entry.mortarMesh.geometry = geometry;
+      else { entry.mortarMesh.removeFromParent(); entry.mortarMesh = null; }
+    } else if (geometry) {
+      entry.mortarMesh = new THREE.Mesh(geometry, this.backing.material);
+      entry.mortarMesh.receiveShadow = true;
+      entry.mortarMesh.raycast = () => undefined;
+      entry.mesh.add(entry.mortarMesh);
+    }
   }
 
   private brokenChunkGeometry(data: MeshData, index: number, entry: BrokenBrick): THREE.BufferGeometry {
@@ -327,12 +448,20 @@ export class MansionMasonryDemolition {
     entry.mesh.removeFromParent();
     for (const chunk of entry.chunkMeshes.values()) chunk.geometry.dispose();
     entry.chunkMeshes.clear();
+    entry.mortarMesh?.geometry.dispose();
   }
 
-  strike(index: number, refreshCaps = true): boolean {
+  strike(index: number, refreshCaps = true, fallingSection?: BrokenBrick): boolean {
     if (!this.remaining[index]) return false;
     const partial = this.broken.get(index);
-    if (partial) { this.disposeBrokenBrick(partial); this.broken.delete(index); }
+    if (partial) {
+      if (fallingSection === partial) {
+        const side = this.firstBreakSide ?? -1;
+        this.getRubble().adoptSection(partial.mesh, side, index * 2654435761,
+          () => this.disposeBrokenBrick(partial));
+      } else this.disposeBrokenBrick(partial);
+      this.broken.delete(index);
+    }
     this.chippedEnds.delete(`${index}:-1`);
     this.chippedEnds.delete(`${index}:1`);
     this.chippedDepths.delete(`${index}:-1`);
@@ -388,7 +517,7 @@ export class MansionMasonryDemolition {
     this.mortarCells = null;
     for (const mesh of this.fractureCaps ?? []) mesh.removeFromParent();
     this.fractureCaps = null;
-    this.rubble?.update([], this.firstBreakSide ?? -1);
+    this.rubble?.clear();
     this.firstBreakSide = null;
     this.backing.visible = true;
     this.removedCount = 0;
@@ -582,19 +711,33 @@ export class MansionMasonryDemolition {
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       if (mesh.count) mesh.computeBoundingSphere();
     }
-    if (removedCenters.length) {
-      if (!this.rubble) {
-        this.rubble = new MansionBreakoutRubble(this.alongX);
-        this.group.add(this.rubble.group);
-      }
-      this.rubble.update(removedCenters, this.firstBreakSide ?? -1);
-    } else this.rubble?.update([], this.firstBreakSide ?? -1);
+    this.refreshRubble(removedCenters);
+  }
+
+  private refreshRubble(removedCenters?: number[]): void {
+    const centers = removedCenters ?? [];
+    if (!removedCenters) for (let index = 0; index < this.remaining.length; index++) {
+      if (this.remaining[index] || !this.originalHasBrick(index)) continue;
+      this.original[index].decompose(this.position, this.rotation, this.scale);
+      centers.push(this.alongX ? this.position.x : this.position.z);
+    }
+    let volumeUnits = centers.length;
+    for (const [index, entry] of this.broken) {
+      if (!entry.volume.removedNodeCount) continue;
+      this.original[index].decompose(this.position, this.rotation, this.scale);
+      const unit = entry.volume.removedNodeCount / entry.originalSolidNodes;
+      volumeUnits += unit;
+      if (unit > .035) centers.push(this.alongX ? this.position.x : this.position.z);
+    }
+    if (centers.length) this.getRubble().update(centers, this.firstBreakSide ?? -1, volumeUnits);
+    else this.rubble?.update([], this.firstBreakSide ?? -1, 0);
   }
 
   private ensureMortarCells(): void {
     if (this.mortarCells) return;
     const geometry = new THREE.BoxGeometry(1, 1, 1);
     const cells = new THREE.InstancedMesh(geometry, this.backing.material, this.brickRefs.length * 2);
+    cells.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     cells.name = `${this.group.name} real bed and head mortar joints`;
     cells.castShadow = cells.receiveShadow = true;
     for (let index = 0; index < this.brickRefs.length; index++) {

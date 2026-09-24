@@ -71,6 +71,7 @@ export class HUD {
           <button id="settings-toggle" type="button" aria-label="Open settings" aria-expanded="false" aria-controls="settings-panel">
             <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M13 2h6l1 4 3 1 4-2 3 5-3 3v6l3 3-3 5-4-2-3 1-1 4h-6l-1-4-3-1-4 2-3-5 3-3v-6l-3-3 3-5 4 2 3-1z"/><circle cx="16" cy="16" r="5"/></svg>
           </button>
+          <output id="fps-counter" aria-label="Live frames per second">— FPS</output>
           <div id="settings-scrim" aria-hidden="true"></div>
           <section id="settings-panel" class="hud-card" aria-label="Game settings" aria-hidden="true">
             <header><div><span>GAME</span><strong>SETTINGS</strong></div><button id="settings-close" type="button" aria-label="Close settings">×</button></header>
@@ -689,6 +690,11 @@ export class HUD {
     this.shell.querySelector('#quick-hammer-side b')!.textContent=`${Math.abs(requestedSideDegrees)}° ${side==='left'?'L':side==='right'?'R':'C'}`;
     this.shell.querySelector('#chisel-side b')!.textContent=`${Math.abs(requestedSideDegrees)} deg ${side.toUpperCase()}`;
   }
+  updateFps(value:number):void {
+    const counter=this.shell.querySelector<HTMLOutputElement>('#fps-counter');
+    if(counter)counter.value=`${Math.max(0,Math.round(value))} FPS`;
+  }
+
   updateChiselOrientation(edgeDegrees:number,tiltDegrees:number,sideDegrees:number,widthM:number,requestedTiltDegrees=tiltDegrees):void {
     const edge=((edgeDegrees%360)+360)%360;
     const width=Math.round(widthM*1000),tilt=Math.round(tiltDegrees),side=Math.round(sideDegrees);

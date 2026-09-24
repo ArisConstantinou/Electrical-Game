@@ -122,6 +122,8 @@ export class Game {
   private readonly interaction: InteractionSystem;
   private lastTime = performance.now();
   private nextGameFrameAt=0;
+  private fpsWindowStart=performance.now();
+  private fpsFrames=0;
   private animationFrame:number|null=null;
   private loopReady=false;
   private waterProTask:Promise<void>|null=null;
@@ -135,7 +137,6 @@ export class Game {
   private hudSettingsKey = '';
   private readonly pendingSceneActions:Array<()=>void>=[];
   private readonly mobileControls: MobileControls;
-  private readonly desktopControls: DesktopControls;
 
   constructor(root: HTMLElement) {
     this.hud = new HUD(root);
@@ -224,7 +225,7 @@ export class Game {
     this.interaction.placementSystem=this.boxPlacement;
     this.leveling.placementSystem=this.boxPlacement;
     this.applySpraySettings();
-    this.desktopControls = new DesktopControls(this.hud.shell, this.renderer.webgl.domElement, this.player, this.input);
+    new DesktopControls(this.hud.shell, this.renderer.webgl.domElement, this.player, this.input);
     this.mobileControls = new MobileControls(
       this.hud.shell,
       this.input,
@@ -372,7 +373,6 @@ export class Game {
       // Worker owns the camera at launch on every device. Coordinator is
       // entered explicitly through its navigation control.
       this.apprentice.command('cancel');
-      if (matchMedia('(any-pointer: fine)').matches && !this.apprentice.ownsInput) this.desktopControls.requestLock(false);
       void this.resumeLifecycle();
     });
     addEventListener('wirehouse:model-inspector-open',()=>void this.resumeLifecycle());
@@ -1150,6 +1150,7 @@ export class Game {
       // water emission may catch up when the screen wakes.
       this.lastTime=performance.now();this.actionCooldown=0;this.lifecyclePaused=false;
       this.nextGameFrameAt=0;
+      this.fpsWindowStart=performance.now();this.fpsFrames=0;
       this.animationFrame=requestAnimationFrame(this.loop);
     }catch(error){
       this.renderer.renderError=String(error);
@@ -1167,8 +1168,8 @@ export class Game {
     // positions and shadows. Keep elapsed time until the next accepted frame;
     // keyboard/touch intent and mouse angles continue to accumulate meanwhile.
     if(this.renderer.framePending){this.animationFrame=requestAnimationFrame(this.loop);return;}
-    // Leave a slice of main-thread time for Chrome input and other tabs after
-    // a costly frame. Cheap scenes still run at the display's RAF cadence.
+    // Leave recovery time only after a genuinely overloaded frame. A steady
+    // 20 ms scene must not be throttled from ~50 to ~40 FPS.
     if(time<this.nextGameFrameAt){this.animationFrame=requestAnimationFrame(this.loop);return;}
     const frameStart=performance.now();
     const elapsed = Math.max(0,Math.min((time - this.lastTime) / 1000,.25));
@@ -1181,7 +1182,12 @@ export class Game {
       this.step(dt,dt,remaining<=1e-8);
     }
     const workMs=performance.now()-frameStart;
-    this.nextGameFrameAt=performance.now()+Math.min(8,Math.max(2,workMs*.15));
+    this.nextGameFrameAt=performance.now()+(workMs>32?Math.min(18,workMs-24):0);
+    this.fpsFrames++;
+    if(time-this.fpsWindowStart>=500){
+      this.hud.updateFps(this.fpsFrames*1000/(time-this.fpsWindowStart));
+      this.fpsWindowStart=time;this.fpsFrames=0;
+    }
     this.animationFrame=requestAnimationFrame(this.loop);
   };
 }
