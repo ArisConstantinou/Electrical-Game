@@ -121,6 +121,7 @@ export class Game {
   private readonly chasing: ChasingSystem;
   private readonly interaction: InteractionSystem;
   private lastTime = performance.now();
+  private nextGameFrameAt=0;
   private animationFrame:number|null=null;
   private loopReady=false;
   private waterProTask:Promise<void>|null=null;
@@ -173,6 +174,7 @@ export class Game {
     root.querySelector('#start-level-current')!.textContent = mansionPreview ? 'MANSION SITE · PREVIEW' : 'ORIGINAL FIRST FIX ROOM';
     if (mansionPreview) this.renderer.scene.fog = new THREE.Fog(0xaab9bd, 22, 88);
     this.room = new Room(this.renderer.scene, mansionPreview);
+    this.renderer.optimizeSiteInstances(this.room);
     this.player.setMansionPreview(mansionPreview);
     if (mansionPreview && sceneParams.get('template') !== 'blank' && !sceneParams.has('level') && sceneParams.get('editor') !== '1') {
       // Start in the physical passage that joins the old work room to the foyer.
@@ -387,9 +389,11 @@ export class Game {
       [iconOrder[index], iconOrder[swap]] = [iconOrder[swap], iconOrder[index]];
     }
     loadingIcons.forEach((icon, index) => { icon.style.animationDelay = `${iconOrder[index] * .85}s`; });
+    const viewStages=mansionPreview&&this.room.mansionWing&&sceneParams.get('template')!=='blank'&&
+      !sceneParams.has('level')&&sceneParams.get('editor')!=='1'?2:0;
     let preparedStages = 0;
     const markPrepared = (): void => {
-      const percent = Math.round(++preparedStages / 8 * 100);
+      const percent = Math.round(++preparedStages / (8+viewStages) * 100);
       startLoadPercent.value = `${percent}%`;
       startLoadPercent.setAttribute('aria-label', `Site preparation ${percent}%`);
       startScreen.style.setProperty('--load-progress', `${percent}%`);
@@ -416,6 +420,9 @@ export class Game {
           : 'SAVED LEVEL UNAVAILABLE';
       } else if (params.get('template') === 'blank') root.querySelector('#start-level-current')!.textContent = 'NEW SITE · UNSAVED';
       markPrepared();
+      if(viewStages&&this.room.mansionWing){
+        await this.renderer.prepareSiteViews(this.room.mansionWing.children,[0,-Math.PI/2],this.player.pitch,markPrepared);
+      }
       if (!missingSelectedLevel && params.get('editor') !== '1') {
         // A one-pixel shader warmup leaves the full-size colour/shadow passes
         // cold. On WebGL the first live view otherwise blocks after Start.
@@ -1142,6 +1149,7 @@ export class Game {
       // Phone lock time is not simulation time: no queued strikes, throws or
       // water emission may catch up when the screen wakes.
       this.lastTime=performance.now();this.actionCooldown=0;this.lifecyclePaused=false;
+      this.nextGameFrameAt=0;
       this.animationFrame=requestAnimationFrame(this.loop);
     }catch(error){
       this.renderer.renderError=String(error);
@@ -1159,6 +1167,10 @@ export class Game {
     // positions and shadows. Keep elapsed time until the next accepted frame;
     // keyboard/touch intent and mouse angles continue to accumulate meanwhile.
     if(this.renderer.framePending){this.animationFrame=requestAnimationFrame(this.loop);return;}
+    // Leave a slice of main-thread time for Chrome input and other tabs after
+    // a costly frame. Cheap scenes still run at the display's RAF cadence.
+    if(time<this.nextGameFrameAt){this.animationFrame=requestAnimationFrame(this.loop);return;}
+    const frameStart=performance.now();
     const elapsed = Math.max(0,Math.min((time - this.lastTime) / 1000,.25));
     this.lastTime = time;
     // Preserve simulation time on slow GPUs using bounded physics steps, with
@@ -1168,6 +1180,8 @@ export class Game {
       const dt=Math.min(remaining,.05);remaining-=dt;
       this.step(dt,dt,remaining<=1e-8);
     }
+    const workMs=performance.now()-frameStart;
+    this.nextGameFrameAt=performance.now()+Math.min(8,Math.max(2,workMs*.15));
     this.animationFrame=requestAnimationFrame(this.loop);
   };
 }

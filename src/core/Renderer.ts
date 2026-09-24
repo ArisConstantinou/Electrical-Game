@@ -44,6 +44,7 @@ export class Renderer {
   private pendingSize:{width:number;height:number}|null=null;
   private lastRenderTime=performance.now();
   private readonly materialCache=new WeakMap<THREE.Material,THREE.Material>();
+  private readonly optimizedInstances=new WeakSet<THREE.Object3D>();
   private mortarSurface:THREE.Texture|null=null;
   private readonly gazeEuler=new THREE.Euler(0,0,0,'YXZ');
   private readonly gazeQuaternion=new THREE.Quaternion();
@@ -86,7 +87,13 @@ export class Renderer {
       this.contextLost=false;this.resolveContextRestored?.();this.resolveContextRestored=null;this.contextRestored=null;
     });
     this.resize();
-    this.ready=this.gpu.init().then(()=>undefined);
+    this.ready=this.gpu.init().then(()=>this.configureSceneInstancing(this.gpu));
+  }
+
+  /** Register the authored site before the optional water renderer adds its
+   * own meshes. This keeps the vendor's rendering path untouched. */
+  optimizeSiteInstances(root:THREE.Object3D):void{
+    root.traverse(object=>{if(object instanceof THREE.InstancedMesh)this.optimizedInstances.add(object);});
   }
 
   private bindDeviceLoss():void{
@@ -135,7 +142,7 @@ export class Renderer {
     this.gpu.setPixelRatio(Math.min(devicePixelRatio,GAME_CONFIG.renderer.maxPixelRatio));
     this.gpu.shadowMap.enabled=true;this.gpu.shadowMap.type=THREE.PCFShadowMap;
     this.gpu.outputColorSpace=THREE.SRGBColorSpace;this.gpu.toneMapping=THREE.ACESFilmicToneMapping;this.gpu.toneMappingExposure=1.05;
-    this.bindDeviceLoss();await this.gpu.init();this.deviceLost=false;this.resize();
+    this.bindDeviceLoss();await this.gpu.init();this.configureSceneInstancing(this.gpu);this.deviceLost=false;this.resize();
     if(this.roomWater)await this.attachRoomWater(this.roomWater);
     if(this.warmupFactory)await this.prepareToolResources(this.warmupFactory());
     this.renderError='';this.recoveryCount++;
@@ -194,11 +201,71 @@ export class Renderer {
       this.prepareMaterials();
       await this.gpu.compileAsync(samples,this.renderCamera,this.scene);
       // The colour compiler does not visit every first-use shadow pipeline.
-      // Warm those under the same lights without showing sample mortar.
+      // Warm the sample's shadows under the same lights without uploading the
+      // whole construction site in one blocked loading-screen frame.
       const previous=this.gpu.getRenderTarget(),target=new THREE.RenderTarget(1,1);
+      const sampleMeshes=new Set<THREE.Object3D>();
+      samples.traverse(object=>{if((object as THREE.Mesh).isMesh)sampleMeshes.add(object);});
+      const hidden:THREE.Object3D[]=[];
+      this.scene.traverse(object=>{
+        if((object as THREE.Mesh).isMesh&&object.visible&&!sampleMeshes.has(object)){
+          object.visible=false;hidden.push(object);
+        }
+      });
       try{this.gpu.setRenderTarget(target);this.gpu.render(this.scene,this.renderCamera);}
-      finally{this.gpu.setRenderTarget(previous);target.dispose();}
+      finally{
+        this.gpu.setRenderTarget(previous);
+        for(const object of hidden)object.visible=true;
+        target.dispose();
+      }
     }finally{this.scene.remove(samples);}
+  }
+  /** Use vertex attributes for authored site instances. Three's default
+   * uniform array makes a pipeline for each instance count and uploads its
+   * matrices on every frame. Attributes retain the same transforms, colours,
+   * materials and shadows, including in the WebGL fallback. */
+  private configureSceneInstancing(renderer:WebGPURenderer):void{
+    type NodeBuilder={getUniformBufferLimit:()=>number};
+    type Backend={createNodeBuilder?:(object:THREE.Object3D,renderer:WebGPURenderer)=>NodeBuilder};
+    const backend=renderer.backend as unknown as Backend;
+    if(!backend.createNodeBuilder)return;
+    const create=backend.createNodeBuilder;
+    backend.createNodeBuilder=(object,owner)=>{
+      const builder=create.call(backend,object,owner);
+      const mesh=object as THREE.InstancedMesh;
+      if(mesh.isInstancedMesh&&this.optimizedInstances.has(mesh))
+        builder.getUniformBufferLimit=()=>0;
+      return builder;
+    };
+  }
+  /** Compile the two views that expose the largest number of construction
+   * meshes, yielding between site parts while the loading screen is visible.
+   * A one-pixel pass on the real canvas warms the remaining shadow pipeline. */
+  async prepareSiteViews(parts:readonly THREE.Object3D[],yaws:readonly number[],pitch:number,onDirection:()=>void):Promise<void>{
+    await this.ready;
+    this.prepareMaterials();
+    this.snapshotRenderCamera();
+    const size=this.gpu.getSize(new THREE.Vector2());
+    const bounds=parts.map(part=>({part,box:new THREE.Box3().setFromObject(part,true)}));
+    const frustum=new THREE.Frustum(),projection=new THREE.Matrix4();
+    try{
+      for(const yaw of yaws){
+        const view=this.renderCamera.clone();
+        view.rotation.set(pitch,yaw,0,'YXZ');
+        view.updateMatrixWorld(true);
+        frustum.setFromProjectionMatrix(projection.multiplyMatrices(view.projectionMatrix,view.matrixWorldInverse));
+        for(const {part,box} of bounds){
+          if(!box.isEmpty()&&!frustum.intersectsBox(box))continue;
+          await this.gpu.compileAsync(part,view,this.scene);
+          await new Promise<void>(resolve=>setTimeout(resolve,0));
+        }
+        this.gpu.setSize(1,1,false);
+        try{this.gpu.render(this.scene,view);}
+        finally{this.gpu.setSize(size.x,size.y,false);}
+        onDirection();
+        await new Promise<void>(resolve=>setTimeout(resolve,0));
+      }
+    }finally{this.gpu.setSize(size.x,size.y,false);}
   }
   private prepareMaterials():void{
     this.scene.traverse(object=>{
