@@ -387,17 +387,22 @@ export class Game {
     }
     loadingIcons.forEach((icon, index) => { icon.style.animationDelay = `${iconOrder[index] * .85}s`; });
     let preparedStages = 0;
+    const viewStages=mansionPreview&&sceneParams.get('template')!=='blank'&&sceneParams.get('editor')!=='1'?4:0;
     const markPrepared = (): void => {
-      const percent = Math.round(++preparedStages / 8 * 100);
+      const percent = Math.round(++preparedStages / (8+viewStages) * 100);
       startLoadPercent.value = `${percent}%`;
       startLoadPercent.setAttribute('aria-label', `Site preparation ${percent}%`);
     };
     startButton.disabled = true;
     const observePreparation = (task: Promise<void>): Promise<void> => task.then(markPrepared);
+    const earlyViews=viewStages>0&&!sceneParams.has('level');
+    const prepareEarlyViews=earlyViews?this.renderer.prepareSceneDirections(
+      [Math.PI,Math.PI/2,0,-Math.PI/2],this.player.pitch,markPrepared):Promise.resolve();
     this.ready = Promise.all([
       observePreparation(this.renderer.ready),
       observePreparation(this.workerBody.ready),
       observePreparation(this.apprentice.ready),
+      prepareEarlyViews,
     ]).then(async () => {
       await this.apprentice.crewReady;
       markPrepared();
@@ -414,6 +419,9 @@ export class Game {
           : 'SAVED LEVEL UNAVAILABLE';
       } else if (params.get('template') === 'blank') root.querySelector('#start-level-current')!.textContent = 'NEW SITE · UNSAVED';
       markPrepared();
+      if(viewStages&&!earlyViews){
+        await this.renderer.prepareSceneDirections([Math.PI,Math.PI/2,0,-Math.PI/2],this.player.pitch,markPrepared);
+      }
       if (!missingSelectedLevel && params.get('editor') !== '1') {
         // A one-pixel shader warmup leaves the full-size colour/shadow passes
         // cold. On WebGL the first live view otherwise blocks after Start.
