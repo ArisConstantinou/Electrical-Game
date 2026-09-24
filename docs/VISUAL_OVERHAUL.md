@@ -1,5 +1,29 @@
 # Electrical-Game visual overhaul
 
+## Mansion dry-field foliage, 2026-09-24
+
+The mansion hillside previously scattered 115 pale green dodecahedrons. These
+read as separate smooth stones, not dry plants, in the playable exterior view.
+The same 115 locations now use a compact CC0 scanned dry shrub, with cutout
+twigs and leaves, varied scale, rotation and tint. A 2,684-triangle sample is
+instanced in three material passes. The old meshes remain a visible fallback
+if loading fails. The existing single Studio asset pivot, terrain, stones,
+collision and gameplay route are unchanged. Source, authors, license, original
+files and checksums are in `public/assets/vegetation/wild-rooibos-1k/SOURCES.md`.
+
+Matching desktop and 390×844 portrait views of the actual scene are in
+`artifacts/mansion-field/before/` and `artifacts/mansion-field/after/`.
+The isolated production build,
+Studio contract and WebGL/WebGPU camera checks passed. In the fixed WebGL pose,
+draw calls changed 824→826 desktop and 810→812 portrait; visible triangles
+changed about 2.51m→2.79m desktop and 2.40m→2.68m portrait. A short 100-frame
+Windows Chrome portrait-emulation sample measured 21.2 ms p95 before and
+20.7–21.1 ms after across two candidate runs, but this is not a physical-phone
+result or proof of equal GPU
+cost. WebGPU portrait samples varied more, from 21.2 to 26.4 ms on the
+candidate; the same live baseline measured 24.0 ms. The wider terrain and
+building still need substantial work to approach the exterior concept.
+
 ## Work-wall mortar and fired-clay wear, 2026-09-24
 
 The original breakable wall still read as an even grid in the live gameplay

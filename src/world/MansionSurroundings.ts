@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { siteMaterial } from './SiteMaterials';
 import { createFieldstoneBoundary } from './FieldstoneBoundary';
 
@@ -104,9 +105,14 @@ export class MansionSurroundings extends THREE.Group {
   }
 
   private addDryFieldDetails(): void {
+    const scrub = new THREE.Group();
+    scrub.name = 'Separate drought-tolerant field shrubs at varied depths';
+    this.add(scrub);
+    // Keep a visible, editor-stable fallback until the compact scanned shrub
+    // arrives. The parent is registered by Studio before this async load ends.
     const shrubs = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(.5, 1),
       new THREE.MeshStandardMaterial({ color: 0x839177, roughness: 1 }), 115);
-    shrubs.name = 'Separate drought-tolerant field shrubs at varied depths';
+    shrubs.name = 'Field shrubs while scanned foliage loads';
     const stones = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(.35, 0),
       siteMaterial('concrete', 0xb5ad99, .4, .4), 72);
     stones.name = 'Individual rough field stones';
@@ -133,8 +139,70 @@ export class MansionSurroundings extends THREE.Group {
       mesh.castShadow = mesh.receiveShadow = true;
       mesh.raycast = () => undefined;
       mesh.computeBoundingSphere();
-      this.add(mesh);
+      (mesh === shrubs ? scrub : this).add(mesh);
     }
+    this.loadScannedScrub(scrub, shrubs);
+  }
+
+  private loadScannedScrub(parent: THREE.Group, fallback: THREE.InstancedMesh): void {
+    const root = `${import.meta.env.BASE_URL}assets/vegetation/wild-rooibos-1k/`;
+    new GLTFLoader().load(`${root}wild_rooibos_bush_1k.gltf`, asset => {
+      const variant = asset.scene.getObjectByName('wild_rooibos_bush_d');
+      if (!variant) { parent.userData.photogrammetryError = 'Missing compact shrub sample'; return; }
+      const pieces: THREE.Mesh[] = [];
+      variant.traverse(object => { if (object instanceof THREE.Mesh) pieces.push(object); });
+      if (pieces.length !== 3) { parent.userData.photogrammetryError = 'Incomplete compact shrub sample'; return; }
+      const scanned: THREE.InstancedMesh[] = [];
+      const alpha = new THREE.TextureLoader().load(`${root}textures/wild_rooibos_bush_alpha_1k.jpg`, () => {
+        if (scanned.length !== 3) { parent.userData.photogrammetryError = 'Incomplete instanced shrub'; return; }
+        parent.remove(fallback);
+        fallback.geometry.dispose();
+        (fallback.material as THREE.Material).dispose();
+        parent.add(...scanned);
+        parent.userData.photogrammetryReady = true;
+      }, undefined, error => { parent.userData.photogrammetryError = String(error); });
+      alpha.flipY = false;
+      alpha.anisotropy = 4;
+      const matrix = new THREE.Matrix4(), rotation = new THREE.Quaternion();
+      const position = new THREE.Vector3(), scale = new THREE.Vector3(), tint = new THREE.Color();
+      // One compact scan keeps 115 separate field plants visible with only
+      // three instanced draws. Scale and orientation vary per planting spot.
+      for (const [part, piece] of pieces.entries()) {
+        const material = (piece.material as THREE.MeshStandardMaterial).clone();
+        const sourceName = material.name;
+        material.name = `CC0 scanned dry scrub ${part + 1}`;
+        material.roughness = 1;
+        material.roughnessMap = null;
+        material.metalness = 0;
+        material.metalnessMap = null;
+        if (/leaves|twigs/.test(sourceName)) {
+          material.alphaMap = alpha;
+          material.alphaTest = .43;
+          material.transparent = false;
+          material.depthWrite = true;
+          material.side = THREE.DoubleSide;
+          material.needsUpdate = true;
+        }
+        const instances = new THREE.InstancedMesh(piece.geometry, material, 115);
+        instances.name = `Scanned dry field shrub ${part + 1}`;
+        instances.castShadow = false;
+        instances.receiveShadow = true;
+        instances.raycast = () => undefined;
+        for (let i = 0; i < 115; i++) {
+          const x = 26 + ((i * .61803398875) % 1) * 43;
+          const z = -30 + ((i * .41421356237) % 1) * 79;
+          const spread = 2.2 + ((i * .754877666) % 1) * 1.35;
+          position.set(x, this.terrainHeight(x, z), z);
+          rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), i * 2.39);
+          scale.set(spread * (.84 + i % 5 * .04), spread * (.83 + i % 4 * .05), spread);
+          instances.setMatrixAt(i, matrix.compose(position, rotation, scale));
+          const variation = .94 + ((i * .3660254) % 1) * .11;
+          instances.setColorAt(i, tint.setRGB(variation * .96, variation, variation * .87));
+        }
+        instances.computeBoundingSphere();
+        scanned.push(instances);
+      }
+    }, undefined, error => { parent.userData.photogrammetryError = String(error); });
   }
 
   private addRetainingWall(): void {

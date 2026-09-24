@@ -1,0 +1,62 @@
+{
+  "url": "http://127.0.0.1:5365/Electrical-Game/?mansion=preview&renderer=webgpu",
+  "servedFrom": "live 5365",
+  "pose": {
+    "x": 21.8,
+    "y": 1.72,
+    "z": 3.1,
+    "yaw": -1.5707963267948966,
+    "pitch": -0.05
+  },
+  "cases": [
+    {
+      "device": "desktop",
+      "info": {
+        "shrubs": [
+          {
+            "name": "site-asset:separate-drought-tolerant-field-shrubs-at-varied-depths:1",
+            "visible": true
+          }
+        ],
+        "scanned": false,
+        "scanError": "",
+        "scanMeshes": 0,
+        "studioPivot": "mansion:site-asset:separate-drought-tolerant-field-shrubs-at-varied-depths:1",
+        "drawCalls": 824,
+        "triangles": 2514679,
+        "error": ""
+      },
+      "profile": {
+        "frameP95Ms": 22.399999976158142,
+        "renderCpuP95Ms": 22,
+        "drawCalls": 824,
+        "triangles": 2514679
+      }
+    },
+    {
+      "device": "portrait",
+      "info": {
+        "shrubs": [
+          {
+            "name": "site-asset:separate-drought-tolerant-field-shrubs-at-varied-depths:1",
+            "visible": true
+          }
+        ],
+        "scanned": false,
+        "scanError": "",
+        "scanMeshes": 0,
+        "studioPivot": "mansion:site-asset:separate-drought-tolerant-field-shrubs-at-varied-depths:1",
+        "drawCalls": 98,
+        "triangles": 544144,
+        "error": ""
+      },
+      "profile": {
+        "frameP95Ms": 24,
+        "renderCpuP95Ms": 23.5,
+        "drawCalls": 811,
+        "triangles": 2400431
+      }
+    }
+  ],
+  "errors": []
+}
