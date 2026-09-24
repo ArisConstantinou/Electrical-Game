@@ -1,5 +1,11 @@
 Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web game named WIRE THE HOUSE, based on real Cyprus residential first-fix practices, editable in Web Game Studio, playable on desktop/mobile, deployed to arisconstantinou/Electrical-Game via GitHub Pages, and ending at FIRST FIX COMPLETE without cable pulling.
 
+## 2026-09-24 · Full visual goal: first-fix floor offcuts
+
+- In isolated `codex/site-floor-debris` from integrated `3654ade`, replaced the original regular 26-chip row with clustered clay shell fragments, mortar crumbs and six broken four-chamber units. The first uniform orange candidate was rejected after visual inspection; the retained candidate uses photographed clay, varied angle/tone and the original Studio asset ID.
+- Direct live baseline and isolated candidate share the 5365 origin, same cameras and desktop/390×844 viewports. TypeScript/Vite build, 40-case room tour, source/Studio registry, and focused visual metrics passed. Details and captures: `artifacts/site-floor-debris/`.
+- This is a partial environment step. The complete Site Pro 04 visual target, other rooms/phases, electrical hardware, characters/tools/effects, and physical phone quality/performance remain active. Next: integrate the candidate into the verified 5365 checkout, then run direct live visual and gameplay checks.
+
 ## 2026-09-24 · Full visual goal: fieldstone perimeter slice
 
 - Isolated branch `codex/limestone-boundary` from integrated `383beff`. The sole 5365 listener was preserved for the same-camera baseline.

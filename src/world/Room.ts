@@ -11,6 +11,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { ExteriorCourtyard } from './ExteriorCourtyard';
 import { MansionGroundWing } from './MansionGroundWing';
 import { createWorksiteBench } from './WorksiteBench';
+import { createSiteFloorDebris } from './SiteFloorDebris';
 import type { PlayerObstacle } from '../player/EquipmentCollision';
 
 /** Constant-time hit on a raised clay face; backing remains hittable in joints. */
@@ -184,37 +185,9 @@ export class Room extends THREE.Group {
     this.worksiteBench = createWorksiteBench();
     this.add(this.worksiteBench);
 
-    // Fired-clay shells leave thin angular plates, not round gravel. Share one
-    // mesh/draw call for the existing 26 pieces and keep their floor positions.
-    const rubbleGeometry = new THREE.BufferGeometry();
-    rubbleGeometry.setAttribute('position', new THREE.Float32BufferAttribute([
-      -.5,-.15,-.4, .4,-.15,-.45, .5,-.15,.15, -.3,-.15,.5,
-      -.42,.15,-.32, .45,.15,-.26, .25,.15,.23, -.3,.15,.39,
-    ], 3));
-    rubbleGeometry.setIndex([0,2,1,0,3,2,4,5,6,4,6,7,0,1,5,0,5,4,1,2,6,1,6,5,2,3,7,2,7,6,3,0,4,3,4,7]);
-    const flatRubble = rubbleGeometry.toNonIndexed();
-    rubbleGeometry.dispose();
-    flatRubble.computeVertexNormals();
-    const rubble = new THREE.InstancedMesh(flatRubble, siteMaterial('clay', 0xbd7854), 26);
-    rubble.name = 'Brick rubble';
-    rubble.userData.studioEntityId = 'world:site-clay-rubble';
-    rubble.castShadow = rubble.receiveShadow = true;
-    const matrix = new THREE.Matrix4(), rotation = new THREE.Quaternion(), position = new THREE.Vector3(), scale = new THREE.Vector3();
-    const vertex = new THREE.Vector3(), color = new THREE.Color();
-    for (let index = 0; index < 26; index += 1) {
-      scale.set(.033 + index % 4 * .014, .024 + index % 3 * .012, .028 + index % 5 * .006);
-      rotation.setFromEuler(new THREE.Euler((index % 4 - 1.5) * .18, index * 2.399, (index % 3 - 1) * .20));
-      matrix.compose(new THREE.Vector3(), rotation, scale);
-      let lowest = Infinity;
-      const points = flatRubble.getAttribute('position');
-      for (let i = 0; i < points.count; i++) lowest = Math.min(lowest, vertex.fromBufferAttribute(points, i).applyMatrix4(matrix).y);
-      position.set(-2.5 + ((index * 1.71) % 5), -lowest + .001, -2.05 + (index % 5) * .11);
-      matrix.compose(position, rotation, scale);
-      rubble.setMatrixAt(index, matrix);
-      rubble.setColorAt(index, color.setRGB(.85 + index % 4 * .04, .84 + index % 3 * .03, .79 + index % 5 * .035));
-    }
-    rubble.computeBoundingSphere();
-    this.add(rubble);
+    // Small site offcuts accumulate at actual work locations. Keep the old
+    // Studio asset name/ID so saved scene transforms still find the rubble.
+    this.add(createSiteFloorDebris());
     this.mansionWing?.registerOriginalRoomSurfaces(floor, ceiling);
     this.mansionWing?.registerOriginalRoomAssets(this, this.exterior, [this.brickWall, ...this.referenceWalls]);
     this.sun = addLighting(scene);

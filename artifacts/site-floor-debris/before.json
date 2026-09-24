@@ -1,0 +1,87 @@
+{
+  "baseline": true,
+  "views": [
+    {
+      "device": "desktop",
+      "name": "front-floor",
+      "scene": {
+        "present": false,
+        "counts": [],
+        "calls": 213,
+        "triangles": 899353,
+        "error": "",
+        "frames": {
+          "medianMs": 16.69999999999891,
+          "p95Ms": 16.799999999999272
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "name": "bench-floor",
+      "scene": {
+        "present": false,
+        "counts": [],
+        "calls": 463,
+        "triangles": 1590947,
+        "error": ""
+      }
+    },
+    {
+      "device": "desktop",
+      "name": "rear-floor",
+      "scene": {
+        "present": false,
+        "counts": [],
+        "calls": 542,
+        "triangles": 1598999,
+        "error": ""
+      }
+    },
+    {
+      "device": "portrait",
+      "name": "front-floor",
+      "scene": {
+        "present": false,
+        "counts": [],
+        "calls": 450,
+        "triangles": 1632024,
+        "error": "",
+        "frames": {
+          "medianMs": 16.69999999999891,
+          "p95Ms": 16.700000000000728
+        }
+      }
+    },
+    {
+      "device": "portrait",
+      "name": "bench-floor",
+      "scene": {
+        "present": false,
+        "counts": [],
+        "calls": 460,
+        "triangles": 1563757,
+        "error": ""
+      }
+    },
+    {
+      "device": "portrait",
+      "name": "rear-floor",
+      "scene": {
+        "present": false,
+        "counts": [],
+        "calls": 482,
+        "triangles": 1555083,
+        "error": ""
+      }
+    }
+  ],
+  "errors": [],
+  "editor": {
+    "registered": true,
+    "id": "room-part:brick-rubble:1",
+    "stableId": "world:site-clay-rubble",
+    "counts": [],
+    "pickable": false
+  }
+}
