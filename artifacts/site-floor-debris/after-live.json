@@ -1,0 +1,115 @@
+{
+  "baseline": false,
+  "views": [
+    {
+      "device": "desktop",
+      "name": "front-floor",
+      "scene": {
+        "present": true,
+        "counts": [
+          88,
+          66,
+          6
+        ],
+        "calls": 215,
+        "triangles": 904837,
+        "error": "",
+        "frames": {
+          "medianMs": 16.69999999999891,
+          "p95Ms": 16.799999999999272
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "name": "bench-floor",
+      "scene": {
+        "present": true,
+        "counts": [
+          88,
+          66,
+          6
+        ],
+        "calls": 466,
+        "triangles": 1599827,
+        "error": ""
+      }
+    },
+    {
+      "device": "desktop",
+      "name": "rear-floor",
+      "scene": {
+        "present": true,
+        "counts": [
+          88,
+          66,
+          6
+        ],
+        "calls": 546,
+        "triangles": 1608179,
+        "error": ""
+      }
+    },
+    {
+      "device": "portrait",
+      "name": "front-floor",
+      "scene": {
+        "present": true,
+        "counts": [
+          88,
+          66,
+          6
+        ],
+        "calls": 454,
+        "triangles": 1642992,
+        "error": "",
+        "frames": {
+          "medianMs": 16.700000000000728,
+          "p95Ms": 16.700000000000728
+        }
+      }
+    },
+    {
+      "device": "portrait",
+      "name": "bench-floor",
+      "scene": {
+        "present": true,
+        "counts": [
+          88,
+          66,
+          6
+        ],
+        "calls": 464,
+        "triangles": 1572937,
+        "error": ""
+      }
+    },
+    {
+      "device": "portrait",
+      "name": "rear-floor",
+      "scene": {
+        "present": true,
+        "counts": [
+          88,
+          66,
+          6
+        ],
+        "calls": 486,
+        "triangles": 1564263,
+        "error": ""
+      }
+    }
+  ],
+  "errors": [],
+  "editor": {
+    "registered": true,
+    "id": "room-part:brick-rubble:1",
+    "stableId": "world:site-clay-rubble",
+    "counts": [
+      88,
+      66,
+      6
+    ],
+    "pickable": false
+  }
+}

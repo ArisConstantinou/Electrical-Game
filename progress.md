@@ -4,7 +4,7 @@ Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web gam
 
 - In isolated `codex/site-floor-debris` from integrated `3654ade`, replaced the original regular 26-chip row with clustered clay shell fragments, mortar crumbs and six broken four-chamber units. The first uniform orange candidate was rejected after visual inspection; the retained candidate uses photographed clay, varied angle/tone and the original Studio asset ID.
 - Direct live baseline and isolated candidate share the 5365 origin, same cameras and desktop/390×844 viewports. TypeScript/Vite build, 40-case room tour, source/Studio registry, and focused visual metrics passed. Details and captures: `artifacts/site-floor-debris/`.
-- This is a partial environment step. The complete Site Pro 04 visual target, other rooms/phases, electrical hardware, characters/tools/effects, and physical phone quality/performance remain active. Next: integrate the candidate into the verified 5365 checkout, then run direct live visual and gameplay checks.
+- Integrated at `76c3456` into the checkout served at the sole 5365 preview. Direct live gameplay cameras, Studio asset registry and the same front-floor desktop/mobile view passed; `artifacts/site-floor-debris/after-live-*` contains the runtime evidence. This is a partial environment step. The complete Site Pro 04 visual target, other rooms/phases, electrical hardware, characters/tools/effects, and physical phone quality/performance remain active.
 
 ## 2026-09-24 · Full visual goal: fieldstone perimeter slice
 

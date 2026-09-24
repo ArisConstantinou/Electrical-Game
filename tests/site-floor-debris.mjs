@@ -5,15 +5,16 @@ import { extname, resolve, sep } from 'node:path';
 import { blockPointerLock } from './browser-safety.mjs';
 
 const baseline = process.argv.includes('--baseline');
+const live = process.argv.includes('--live');
 const root = resolve('dist');
-const out = resolve('output/site-floor-debris', baseline ? 'before' : 'candidate');
+const out = resolve('output/site-floor-debris', baseline ? 'before' : live ? 'live' : 'candidate');
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const report = { baseline, views: [], errors: [] };
 try {
   const context = await browser.newContext({ viewport: { width: 1366, height: 768 } });
   await blockPointerLock(context);
-  if (!baseline) await context.route('http://127.0.0.1:5365/Electrical-Game/**', async route => {
+  if (!baseline && !live) await context.route('http://127.0.0.1:5365/Electrical-Game/**', async route => {
     const relative = decodeURIComponent(new URL(route.request().url()).pathname.slice('/Electrical-Game/'.length)) || 'index.html';
     const file = resolve(root, relative);
     if (!file.startsWith(root + sep)) return route.abort();
