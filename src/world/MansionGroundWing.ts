@@ -150,6 +150,13 @@ export class MansionGroundWing extends THREE.Group {
         pivot.add(pickProxy);
       }
       this.editableAssets.set(id, pivot);
+      if (object.name === 'Existing olive tree retained in open mansion court') {
+        const obstacle = this.obstacles.find(item => item.id === 'retained-olive-trunk');
+        const proxy = object.getObjectByName('Retained olive trunk collision proxy');
+        if (obstacle && proxy) this.editableAssetColliders.set(pivot, {
+          obstacle, matrix: new THREE.Matrix4().makeScale(0, 0, 0), source: proxy,
+        });
+      }
       if (windowSill) {
         const obstacle = this.obstacles.find(item => item.id === `court-open-window-sill-${windowSill[1]}`);
         if (obstacle) this.editableAssetColliders.set(pivot, {
@@ -380,9 +387,9 @@ export class MansionGroundWing extends THREE.Group {
         continue;
       }
       asset.updateWorldMatrix(true, true);
-      if (entry.matrix.equals(asset.matrixWorld)) continue;
-      entry.matrix.copy(asset.matrixWorld);
       const source = entry.source;
+      if (entry.matrix.equals(asset.matrixWorld) && source?.name !== 'Retained olive trunk collision proxy') continue;
+      entry.matrix.copy(asset.matrixWorld);
       if (source instanceof BrickWall) source.updateWorldMatrix(true, false);
       if (source instanceof THREE.Mesh && /^(?:B1|B2) retaining /.test(source.name))
         source.updateWorldMatrix(true, false);

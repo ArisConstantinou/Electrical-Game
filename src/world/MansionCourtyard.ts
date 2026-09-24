@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import type { PlayerObstacle } from '../player/EquipmentCollision';
 import { brickFacePatch, brickFaceTone } from './BrickFacePatch';
@@ -13,6 +15,7 @@ export class MansionCourtyard extends THREE.Group {
   readonly obstacles: PlayerObstacle[] = [];
   readonly masonryDemolition = new Map<string, MansionMasonryDemolition>();
   private readonly tree: THREE.Object3D | null;
+  private readonly treeColliderProxy: THREE.Mesh | null;
   private windTime = 0;
 
   constructor(oliveSource: THREE.Object3D | null) {
@@ -25,19 +28,30 @@ export class MansionCourtyard extends THREE.Group {
     this.addRecessedFacingRooms();
     this.addBrickStorage();
     this.tree = oliveSource?.clone(true) ?? null;
+    this.treeColliderProxy = this.tree
+      ? new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ visible: false })) : null;
     if (this.tree) {
       this.tree.name = 'Existing olive tree retained in open mansion court';
       this.tree.position.set(13.35, .025, 11.35);
       this.tree.scale.setScalar(1.35);
       this.add(this.tree);
+      if (this.treeColliderProxy) {
+        this.treeColliderProxy.name = 'Retained olive trunk collision proxy';
+        this.treeColliderProxy.position.y = .74;
+        this.treeColliderProxy.scale.set(.49, 1.48, .49);
+        this.treeColliderProxy.raycast = () => undefined;
+        this.tree.add(this.treeColliderProxy);
+      }
       this.obstacles.push({ id: 'retained-olive-trunk', minX: 13.02, maxX: 13.68, minZ: 11.02, maxZ: 11.68 });
+      this.loadScannedCourtTree(this.tree);
     }
   }
 
   update(dt: number): void {
     if (!this.tree) return;
     this.windTime += Math.min(.05, Math.max(0, dt));
-    const canopy = this.tree.children.find(child => child instanceof THREE.Group);
+    const canopy = this.tree.getObjectByName('Scanned olive canopy') ??
+      this.tree.children.find(child => child instanceof THREE.Group);
     // The source canopy is the first Group under the tree; each leaf spray is
     // still a separate instanced branch and can sway without rebuilding meshes.
     if (canopy) {
@@ -48,6 +62,96 @@ export class MansionCourtyard extends THREE.Group {
         branch.rotation.x = .019 * Math.sin(this.windTime * (.83 + index * .07) + index * .8);
       });
     }
+  }
+
+  private loadScannedCourtTree(tree: THREE.Object3D): void {
+    const requestedAt = performance.now();
+    const decoder = new DRACOLoader();
+    decoder.setDecoderPath(`${import.meta.env.BASE_URL}assets/draco/`);
+    const loader = new GLTFLoader();
+    loader.setDRACOLoader(decoder);
+    loader.load(`${import.meta.env.BASE_URL}assets/vegetation/courtyard-tree/courtyard-tree-optimized.glb`, asset => {
+      const model = asset.scene;
+      const trunk = model.getObjectByName('courtyard_tree_trunk');
+      const branches = model.getObjectByName('courtyard_tree_branches');
+      const leaves = model.getObjectByName('courtyard_tree_leaves');
+      if (!(trunk instanceof THREE.Mesh) || !(branches instanceof THREE.Mesh) || !(leaves instanceof THREE.Mesh)) {
+        tree.userData.scannedError = 'Optimized tree has missing parts';
+        decoder.dispose();
+        return;
+      }
+      const canopy = new THREE.Group();
+      canopy.name = 'Scanned olive canopy';
+      model.add(canopy);
+      canopy.attach(branches);
+      canopy.attach(leaves);
+      const leafMaterial = leaves.material as THREE.MeshStandardMaterial;
+      leafMaterial.color.setHex(0xb9c3b4);
+      leafMaterial.transparent = false;
+      leafMaterial.depthWrite = true;
+      for (const part of [trunk, branches, leaves]) {
+        part.castShadow = part === trunk || part === branches;
+        part.receiveShadow = true;
+        part.raycast = () => undefined;
+      }
+      const bounds = new THREE.Box3().setFromObject(model);
+      // Set the root at the actual foot of the trunk, rather than the centre
+      // of an asymmetrical canopy; it belongs in the authored gravel basin.
+      model.updateMatrixWorld(true);
+      const trunkPositions = trunk.geometry.getAttribute('position');
+      const basePoint = new THREE.Vector3();
+      let footMinX = Infinity, footMaxX = -Infinity, footMinZ = Infinity, footMaxZ = -Infinity;
+      for (let i = 0; i < trunkPositions.count; i++) {
+        basePoint.fromBufferAttribute(trunkPositions, i).applyMatrix4(trunk.matrixWorld);
+        if (basePoint.y > bounds.min.y + .45) continue;
+        footMinX = Math.min(footMinX, basePoint.x); footMaxX = Math.max(footMaxX, basePoint.x);
+        footMinZ = Math.min(footMinZ, basePoint.z); footMaxZ = Math.max(footMaxZ, basePoint.z);
+      }
+      const footX = Number.isFinite(footMinX) ? (footMinX + footMaxX) / 2 : 0;
+      const footZ = Number.isFinite(footMinZ) ? (footMinZ + footMaxZ) / 2 : 0;
+      // The scan includes a thin capture plinth around the roots. Seat it
+      // below the gravel so only the rooted trunk is visible at ground level.
+      model.position.set(-footX, -bounds.min.y - .14, -footZ);
+      const fallback = tree.children.filter(child => child !== this.treeColliderProxy);
+      tree.remove(...fallback);
+      tree.add(model);
+      // Collision follows the actual trunk below eye height. Its small editor
+      // proxy moves with the tree pivot; overhanging branches stay walkable.
+      tree.updateWorldMatrix(true, true);
+      const vertices = trunkPositions;
+      const point = new THREE.Vector3();
+      const groundY = tree.getWorldPosition(new THREE.Vector3()).y;
+      let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+      for (let i = 0; i < vertices.count; i++) {
+        point.fromBufferAttribute(vertices, i).applyMatrix4(trunk.matrixWorld);
+        if (point.y < groundY - .05 || point.y > groundY + 1.8) continue;
+        minX = Math.min(minX, point.x); maxX = Math.max(maxX, point.x);
+        minZ = Math.min(minZ, point.z); maxZ = Math.max(maxZ, point.z);
+      }
+      if (Number.isFinite(minX) && this.treeColliderProxy) {
+        const margin = .08;
+        const centreWorld = new THREE.Vector3((minX + maxX) / 2, groundY + .9, (minZ + maxZ) / 2);
+        this.treeColliderProxy.position.copy(tree.worldToLocal(centreWorld));
+        const worldScale = tree.getWorldScale(new THREE.Vector3());
+        this.treeColliderProxy.scale.set((maxX - minX + margin * 2) / worldScale.x,
+          1.8 / worldScale.y, (maxZ - minZ + margin * 2) / worldScale.z);
+        const obstacle = this.obstacles.find(item => item.id === 'retained-olive-trunk');
+        if (obstacle) {
+          obstacle.minX = minX - margin; obstacle.maxX = maxX + margin;
+          obstacle.minZ = minZ - margin; obstacle.maxZ = maxZ + margin;
+        }
+      }
+      const pivot = tree.parent;
+      if (pivot?.userData.levelEditorKind === 'asset') {
+        const size = new THREE.Box3().setFromObject(tree).getSize(new THREE.Vector3());
+        pivot.userData.baseSize = [size.x, size.y, size.z];
+      }
+      tree.userData.scannedReady = true;
+      tree.userData.scannedLoadMs = performance.now() - requestedAt;
+      tree.userData.scannedTriangles = [trunk, branches, leaves].reduce((sum, part) =>
+        sum + (part.geometry.index?.count ?? part.geometry.getAttribute('position').count) / 3, 0);
+      decoder.dispose();
+    }, undefined, error => { tree.userData.scannedError = String(error); decoder.dispose(); });
   }
 
   private addGround(): void {

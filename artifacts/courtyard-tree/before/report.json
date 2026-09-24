@@ -1,0 +1,135 @@
+{
+  "url": "http://127.0.0.1:5365/Electrical-Game/?mansion=preview&renderer=webgl",
+  "source": "live 5365",
+  "cases": [
+    {
+      "device": "desktop",
+      "view": "court",
+      "info": {
+        "treeName": "Existing olive tree retained in open mansion court",
+        "childNames": [
+          "Tapered forked weathered olive trunk",
+          ""
+        ],
+        "position": [
+          13.35,
+          0.02499999999999991,
+          11.35
+        ],
+        "scale": [
+          1.35,
+          1.35,
+          1.35
+        ],
+        "obstacle": {
+          "id": "retained-olive-trunk",
+          "minX": 13.02,
+          "maxX": 13.68,
+          "minZ": 11.02,
+          "maxZ": 11.68
+        },
+        "calls": 1006,
+        "triangles": 3005196,
+        "frameP95Ms": 16.899999976158142,
+        "error": ""
+      }
+    },
+    {
+      "device": "desktop",
+      "view": "close",
+      "info": {
+        "treeName": "Existing olive tree retained in open mansion court",
+        "childNames": [
+          "Tapered forked weathered olive trunk",
+          ""
+        ],
+        "position": [
+          13.35,
+          0.02499999999999991,
+          11.35
+        ],
+        "scale": [
+          1.35,
+          1.35,
+          1.35
+        ],
+        "obstacle": {
+          "id": "retained-olive-trunk",
+          "minX": 13.02,
+          "maxX": 13.68,
+          "minZ": 11.02,
+          "maxZ": 11.68
+        },
+        "calls": 948,
+        "triangles": 2919630,
+        "frameP95Ms": 16.899999976158142,
+        "error": ""
+      }
+    },
+    {
+      "device": "portrait",
+      "view": "court",
+      "info": {
+        "treeName": "Existing olive tree retained in open mansion court",
+        "childNames": [
+          "Tapered forked weathered olive trunk",
+          ""
+        ],
+        "position": [
+          13.35,
+          0.02499999999999991,
+          11.35
+        ],
+        "scale": [
+          1.35,
+          1.35,
+          1.35
+        ],
+        "obstacle": {
+          "id": "retained-olive-trunk",
+          "minX": 13.02,
+          "maxX": 13.68,
+          "minZ": 11.02,
+          "maxZ": 11.68
+        },
+        "calls": 843,
+        "triangles": 2637686,
+        "frameP95Ms": 16.800000071525574,
+        "error": ""
+      }
+    },
+    {
+      "device": "portrait",
+      "view": "close",
+      "info": {
+        "treeName": "Existing olive tree retained in open mansion court",
+        "childNames": [
+          "Tapered forked weathered olive trunk",
+          ""
+        ],
+        "position": [
+          13.35,
+          0.02499999999999991,
+          11.35
+        ],
+        "scale": [
+          1.35,
+          1.35,
+          1.35
+        ],
+        "obstacle": {
+          "id": "retained-olive-trunk",
+          "minX": 13.02,
+          "maxX": 13.68,
+          "minZ": 11.02,
+          "maxZ": 11.68
+        },
+        "calls": 787,
+        "triangles": 2550632,
+        "frameP95Ms": 16.800000071525574,
+        "error": ""
+      }
+    }
+  ],
+  "errors": []
+}

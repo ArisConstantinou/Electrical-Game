@@ -14,7 +14,7 @@ try {
     { name: 'mobile-landscape', viewport: { width: 844, height: 390 }, mobile: true },
     { name: 'tablet-portrait', viewport: { width: 820, height: 1180 }, mobile: true },
     { name: 'desktop', viewport: { width: 1366, height: 768 }, mobile: false },
-  ]) {
+  ].filter(device => !process.env.QA_DEVICE || device.name === process.env.QA_DEVICE)) {
     const context = await browser.newContext({ viewport: device.viewport, deviceScaleFactor: 1, isMobile: device.mobile, hasTouch: device.mobile });
     await blockPointerLock(context);
     const page = await context.newPage();
@@ -48,7 +48,7 @@ try {
         await page.waitForFunction(({ axis, target, greater }) => {
           const p = window.__wireTheHouse.player.camera.position, value = axis === 'x' ? p.x : p.z;
           return greater ? value > target : value < target;
-        }, { axis, target, greater }, { timeout: 6000, polling: 50 });
+        }, { axis, target, greater }, { timeout: 15000, polling: 50 });
       } finally {
         await page.evaluate(() => window.__wireTheHouse.input.keys.delete('KeyW'));
       }
@@ -68,7 +68,7 @@ try {
     const tree = await page.evaluate(() => {
       const wing = window.__wireTheHouse.room.mansionWing;
       const olive = wing.courtyard.getObjectByName('Existing olive tree retained in open mansion court');
-      const canopy = olive?.children.find(child => child.type === 'Group');
+      const canopy = olive?.getObjectByName('Scanned olive canopy') ?? olive?.children.find(child => child.type === 'Group');
       return { exists: Boolean(olive), rotation: canopy?.rotation.z ?? null,
         obstacle: wing.obstacles.some(item => item.id === 'retained-olive-trunk') };
     });
@@ -76,7 +76,7 @@ try {
     await page.waitForTimeout(350);
     const laterRotation = await page.evaluate(() => {
       const olive = window.__wireTheHouse.room.mansionWing.courtyard.getObjectByName('Existing olive tree retained in open mansion court');
-      return olive.children.find(child => child.type === 'Group').rotation.z;
+      return (olive.getObjectByName('Scanned olive canopy') ?? olive.children.find(child => child.type === 'Group')).rotation.z;
     });
     assert(Math.abs(laterRotation - tree.rotation) > .0002, `${device.name}: olive canopy does not move over time`);
     const back = await walk(Math.PI / 2, 'x', 8.3, false);

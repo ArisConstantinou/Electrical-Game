@@ -1,0 +1,85 @@
+{
+  "url": "http://127.0.0.1:5365/Electrical-Game/?mansion=preview&renderer=webgl",
+  "source": "C:\\Users\\arz0r\\.codex\\worktrees\\scanned-courtyard-tree\\Electrical-Game\\dist",
+  "cases": [
+    {
+      "device": "portrait",
+      "view": "court",
+      "info": {
+        "treeName": "Existing olive tree retained in open mansion court",
+        "childNames": [
+          "Retained olive trunk collision proxy",
+          "Scene"
+        ],
+        "scanned": true,
+        "scannedError": "",
+        "scannedTriangles": 131515,
+        "scannedLoadMs": 1120.3999999761581,
+        "studioPivot": "mansion:site-asset:existing-olive-tree-retained-in-open-mansion-court:1",
+        "position": [
+          13.35,
+          0.02499999999999991,
+          11.35
+        ],
+        "scale": [
+          1.35,
+          1.35,
+          1.35
+        ],
+        "obstacle": {
+          "id": "retained-olive-trunk",
+          "minX": 12.237171148359776,
+          "maxX": 13.998823724091052,
+          "minZ": 10.839145030677319,
+          "maxZ": 12.607522253096104,
+          "minFloorY": -0.1750000000000001,
+          "maxFloorY": 1.825
+        },
+        "calls": 836,
+        "triangles": 2779720,
+        "frameP95Ms": 16.90000009536743,
+        "error": ""
+      }
+    },
+    {
+      "device": "portrait",
+      "view": "close",
+      "info": {
+        "treeName": "Existing olive tree retained in open mansion court",
+        "childNames": [
+          "Retained olive trunk collision proxy",
+          "Scene"
+        ],
+        "scanned": true,
+        "scannedError": "",
+        "scannedTriangles": 131515,
+        "scannedLoadMs": 1120.3999999761581,
+        "studioPivot": "mansion:site-asset:existing-olive-tree-retained-in-open-mansion-court:1",
+        "position": [
+          13.35,
+          0.02499999999999991,
+          11.35
+        ],
+        "scale": [
+          1.35,
+          1.35,
+          1.35
+        ],
+        "obstacle": {
+          "id": "retained-olive-trunk",
+          "minX": 12.237171148359776,
+          "maxX": 13.998823724091052,
+          "minZ": 10.839145030677319,
+          "maxZ": 12.607522253096104,
+          "minFloorY": -0.1750000000000001,
+          "maxFloorY": 1.825
+        },
+        "calls": 780,
+        "triangles": 2692666,
+        "frameP95Ms": 16.800000071525574,
+        "error": ""
+      }
+    }
+  ],
+  "errors": []
+}

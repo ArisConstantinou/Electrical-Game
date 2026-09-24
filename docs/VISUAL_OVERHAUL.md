@@ -508,3 +508,27 @@ infill exists. Candidate field capture loaded without render/page errors at
 2.80M / 2.69M visible triangles (before about 2.79M / 2.68M). Short host
 frame samples vary and do not prove phone performance. The full mansion
 exterior, all floors and environmental quality remain incomplete.
+
+## Courtyard tree scan, 2026-09-24
+
+The mansion courtyard's earlier procedural olive had a narrow, pale, visibly
+flat canopy. The retained tree pivot now loads an optimized, texture-packed
+photogrammetry derivative with a twisted trunk, branching and denser foliage.
+The editable Blender source and source/license record accompany the runtime
+GLB. This Poly Haven source is a coastal tree and is an **olive-like visual
+proxy**, not a botanically verified olive. The older procedural tree remains
+visible while the local GLB loads and if loading fails. The scan's base was
+seated under the gravel; the trunk collision bounds update after load and
+continue to follow the existing Studio pivot.
+
+Matched 1366×768 desktop and 390×844 Chrome-emulated portrait captures are in
+`artifacts/courtyard-tree/before/` and `after/`. The focused production-build
+test checked both camera poses per viewport, loaded geometry (131,515 tree
+triangles), pivot, collision, Studio movement and actual player contact. The
+courtyard route, wind and return checks passed in portrait, landscape, tablet
+and desktop emulation. Studio linked-game contract passed 10/10. Desktop
+court draw calls changed 1006 to 999, visible scene triangles 3,005,196 to
+3,147,230; portrait court 843 to 836 and 2,637,686 to 2,779,720. Short
+headless frame p95 was near 16.8 to 17.0 ms and is limited by host pacing;
+physical phone/GPU memory cost and long-session performance remain unverified.
+The separate outer grove still uses its existing LOD tree.
