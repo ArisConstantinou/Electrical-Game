@@ -879,7 +879,11 @@ export class MansionGroundWing extends THREE.Group {
       geometry.setAttribute('brickPatch', new THREE.InstancedBufferAttribute(new Float32Array(batch.patches), 4));
       const bricks = new THREE.InstancedMesh(geometry, masonryFaceMaterial, batch.matrices.length);
       bricks.name = `${name} · ${index === 0 ? 'sound clay units' : index === 1 ? 'lightly chipped units A' : index === 2 ? 'lightly chipped units B' : 'broken corners'}`;
-      bricks.castShadow = bricks.receiveShadow = true;
+      // The continuous backing already casts this wall's structural shadow.
+      // Casting every clay variant again multiplies shadow draw calls while
+      // leaving the visible wall and its demolition meshes untouched.
+      bricks.castShadow = false;
+      bricks.receiveShadow = true;
       for (let i = 0; i < batch.matrices.length; i++) {
         bricks.setMatrixAt(i, batch.matrices[i]);
         bricks.setColorAt(i, batch.colors[i]);
@@ -888,7 +892,11 @@ export class MansionGroundWing extends THREE.Group {
       editable.add(bricks);
       batchMeshes[index] = bricks;
     }
-    editable.add(hollowClayWallEnds(length, rows, course, gap, alongX, name));
+    const clayEnds = hollowClayWallEnds(length, rows, course, gap, alongX, name);
+    clayEnds.traverse(object => {
+      if (object instanceof THREE.Mesh) object.castShadow = false;
+    });
+    editable.add(clayEnds);
     const obstacle: PlayerObstacle = { id: name, minX: Math.min(x0, x1) - .12, maxX: Math.max(x0, x1) + .12,
       minZ: Math.min(z0, z1) - .12, maxZ: Math.max(z0, z1) + .12,
       minFloorY: baseY, maxFloorY: baseY + 3 };

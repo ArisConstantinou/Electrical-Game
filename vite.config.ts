@@ -40,6 +40,24 @@ const studioOverrides = (): Plugin => ({
   },
 });
 
+// The licensed bundle embeds six large JPEGs solely for its ocean-floor mesh.
+// Our indoor integration hides that mesh immediately, so decoding those images
+// on first hose use stalls mobile rendering without contributing any pixels.
+// Keep the vendor source intact and replace only that hidden floor's textures
+// before Vite bundles the runtime. Fail the build if a vendor update changes
+// the expected initialization code so this cannot silently patch another path.
+const omitHiddenOceanFloorTextures = (): Plugin => ({
+  name: 'wire-house-omit-hidden-ocean-floor-textures',
+  enforce: 'pre',
+  transform(code, id) {
+    if (!id.split('?')[0].replaceAll('\\', '/').endsWith('/src/generated/room-water-runtime.js')) return;
+    const original = '[e,S,k,x,U,P]=await Promise.all([V.loadAsync(HV),V.loadAsync(dV),V.loadAsync(KV),V.loadAsync(GV),V.loadAsync(oV),V.loadAsync(TV)])';
+    const replacement = '[e,S,k,x,U,P]=[0,1,2,3,4,5].map(()=>{let A=new r.DataTexture(new Uint8Array([128,128,128,255]),1,1);return A.needsUpdate=!0,A})';
+    if (code.split(original).length !== 2) throw new Error('Water Pro hidden-floor initialization changed; review the mobile floor-texture optimization');
+    return code.replace(original, replacement);
+  },
+});
+
 const levelEditorDocument = (): Plugin => ({
   name: 'wire-house-level-editor-document',
   configureServer(server) {
@@ -119,7 +137,7 @@ const levelEditorDocument = (): Plugin => ({
 export default defineConfig({
   base: '/Electrical-Game/',
   cacheDir: '.vite-cache',
-  plugins: [studioOverrides(), levelEditorDocument()],
+  plugins: [omitHiddenOceanFloorTextures(), studioOverrides(), levelEditorDocument()],
   server: { host: '127.0.0.1', port: 5365, strictPort: true },
   preview: { host: '127.0.0.1', port: 5365, strictPort: true },
   build: { target: 'es2022', sourcemap: false },

@@ -86,7 +86,7 @@ export class Renderer {
       this.contextLost=false;this.resolveContextRestored?.();this.resolveContextRestored=null;this.contextRestored=null;
     });
     this.resize();
-    this.ready=this.gpu.init().then(()=>undefined);
+    this.ready=this.gpu.init().then(()=>this.configureMasonryInstancing(this.gpu));
   }
 
   private bindDeviceLoss():void{
@@ -135,7 +135,7 @@ export class Renderer {
     this.gpu.setPixelRatio(Math.min(devicePixelRatio,GAME_CONFIG.renderer.maxPixelRatio));
     this.gpu.shadowMap.enabled=true;this.gpu.shadowMap.type=THREE.PCFShadowMap;
     this.gpu.outputColorSpace=THREE.SRGBColorSpace;this.gpu.toneMapping=THREE.ACESFilmicToneMapping;this.gpu.toneMappingExposure=1.05;
-    this.bindDeviceLoss();await this.gpu.init();this.deviceLost=false;this.resize();
+    this.bindDeviceLoss();await this.gpu.init();this.configureMasonryInstancing(this.gpu);this.deviceLost=false;this.resize();
     if(this.roomWater)await this.attachRoomWater(this.roomWater);
     if(this.warmupFactory)await this.prepareToolResources(this.warmupFactory());
     this.renderError='';this.recoveryCount++;
@@ -199,6 +199,41 @@ export class Renderer {
       try{this.gpu.setRenderTarget(target);this.gpu.render(this.scene,this.renderCamera);}
       finally{this.gpu.setRenderTarget(previous);target.dispose();}
     }finally{this.scene.remove(samples);}
+  }
+  /** Compile the actual construction scene under its lights while the start
+   * screen is visible. Attribute-based masonry shaders are reused at play. */
+  async prepareSceneDirections(yaws:readonly number[],pitch:number,onDirection:()=>void):Promise<void>{
+    await this.ready;
+    this.prepareMaterials();
+    this.snapshotRenderCamera();
+    for(const yaw of yaws){
+      const view=this.renderCamera.clone();
+      view.rotation.set(pitch,yaw,0,'YXZ');
+      view.updateMatrixWorld(true);
+      await this.gpu.compileAsync(this.scene,view,this.scene);
+      onDirection();
+    }
+  }
+  /** Three r185 chooses a differently sized uniform array for each small
+   * masonry InstancedMesh. Every wall length then links another vertex shader
+   * when the player turns. Attributes share one shader while preserving every
+   * instance matrix, colour, brick patch and material. Scope this to our two
+   * masonry materials so the licensed water renderer keeps its own path. */
+  private configureMasonryInstancing(renderer:WebGPURenderer):void{
+    type NodeBuilder={getUniformBufferLimit:()=>number};
+    type WebGLBackend={isWebGLBackend?:boolean;createNodeBuilder?:(object:THREE.Object3D,renderer:WebGPURenderer)=>NodeBuilder};
+    const backend=renderer.backend as unknown as WebGLBackend;
+    if(!backend.isWebGLBackend||!backend.createNodeBuilder)return;
+    const create=backend.createNodeBuilder;
+    backend.createNodeBuilder=(object,owner)=>{
+      const builder=create.call(backend,object,owner);
+      const mesh=object as THREE.InstancedMesh;
+      const materialName=mesh.isInstancedMesh?(mesh.material as THREE.Material).name:'';
+      if(materialName==='Varied photographed fired-clay units'||materialName==='Rough hollow clay cut and mortar'){
+        builder.getUniformBufferLimit=()=>0;
+      }
+      return builder;
+    };
   }
   private prepareMaterials():void{
     this.scene.traverse(object=>{
