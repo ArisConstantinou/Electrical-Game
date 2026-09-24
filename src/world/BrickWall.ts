@@ -47,11 +47,17 @@ const finishedClay = mix(photographedClay, clayInterior, siteClayReady.mul(.25))
 const mortarNoise = sin(positionWorld.x.mul(68).add(positionWorld.y.mul(19)))
   .mul(sin(positionWorld.y.mul(91).sub(positionWorld.x.mul(27))));
 const mortarWear = attribute<'float'>('brickWear', 'float');
-const mortarReach = mortarNoise.mul(.005).add(mortarWear.mul(.022)).add(.018);
-const mortarMask = smoothstep(mortarReach.sub(.007), mortarReach.add(.012), edgeDistance).oneMinus();
-const mortarGrain = fract(sin(dot(floor(positionWorld.xy.mul(590)), vec2(127.1, 311.7))).mul(43758.5453));
-const roughMortar = vec3(.42, .405, .375).mul(mortarGrain.mul(.18).add(.91));
-const laidFace = mix(finishedClay, roughMortar, mortarMask.mul(.68));
+const jointGrain = fract(sin(dot(floor(positionWorld.xy.mul(510)), vec2(127.1, 311.7))).mul(43758.5453));
+const mortarReach = mortarNoise.mul(.012).add(jointGrain.mul(.006))
+  .add(mortarWear.mul(.024)).add(.024);
+const mortarMask = smoothstep(mortarReach.sub(.008), mortarReach.add(.014), edgeDistance).oneMinus();
+// The same mortar remains physically recessed. Fine grit breaks up its color,
+// while hand-troweled squeeze-out reaches a few selected faces.
+const roughMortar = vec3(.42, .405, .375).mul(jointGrain.mul(.18).add(.91));
+const mortarStain = smoothstep(.025, .11, edgeDistance).oneMinus()
+  .mul(smoothstep(.3, .9, mortarNoise.add(.5)))
+  .mul(mortarWear.mul(.28).add(.08));
+const laidFace = mix(finishedClay, roughMortar, mortarMask.mul(.90).add(mortarStain));
 // A face mask keeps real mortar joints, internal chambers and broken edges on
 // their own rough clay/mortar colors in both WebGPU and the WebGL backend.
 wallMaterial.colorNode = mix(mix(rawMasonry, laidFace, attribute<'float'>('brickFace', 'float').mul(brickImageReady)),laserTint,laserBand);

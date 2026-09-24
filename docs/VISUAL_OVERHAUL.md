@@ -1,5 +1,30 @@
 # Electrical-Game visual overhaul
 
+## Work-wall mortar and fired-clay wear, 2026-09-24
+
+The original breakable wall still read as an even grid in the live gameplay
+capture. Its face material now gives the recessed mortar joints a less even
+reach and a little irregular squeeze-out on selected bricks. The common eight
+face atlas now selects its scuffed and chipped photographs more often, including
+on the side, rear, exterior, and mansion brick walls that share that atlas.
+There is no new geometry or texture fetch in the final shader, and no change to
+the masonry volume, hit plane, saved damage, box fit, or four horizontal bores.
+
+`artifacts/front-wall-mortar/before-desktop-close.png` and
+`after-desktop-close.png` use the same front-wall camera. The after mobile and
+side-wall captures are in that folder. The candidate 32-view room tour,
+TypeScript/build, Studio contract, masonry acceptance browser chase, coherent
+shell fracture, and horizontal bore profile passed. The historical
+`masonry-impact-equivalence` oracle still fails while comparing the current
+material colors against commit `b9f5c77`; this change does not edit
+`MasonryVolume.ts`, and that test has no passing result for this slice.
+The 390x844 DPR3 Windows Chrome WebGL samples recorded 402 draw calls and
+about 1.47 million triangles at the front-wall pose before and after. Frame
+interval p95 ranged from 19.9 to 24.0 ms across the repeated live baseline
+and 21.0 to 21.7 ms for the final candidate. This variation cannot establish
+a speedup or physical-phone performance. The room and broader site remain
+visibly short of the approved Site Pro 04 concept.
+
 ## Fieldstone site boundary, 2026-09-24
 
 The long low boundary beside the mansion previously rendered as 240 identical

@@ -1,0 +1,25 @@
+{
+  "environment": "Windows Chrome WebGL, 390x844 DPR3 touch emulation, front work wall",
+  "source": "live 5365",
+  "samples": [
+    {
+      "frames": 109,
+      "medianMs": 16.699999928474426,
+      "p95Ms": 20.100000023841858,
+      "maxMs": 22,
+      "drawCalls": 402,
+      "triangles": 1473183,
+      "renderError": ""
+    },
+    {
+      "frames": 109,
+      "medianMs": 16.5,
+      "p95Ms": 19.899999976158142,
+      "maxMs": 22.100000023841858,
+      "drawCalls": 402,
+      "triangles": 1473199,
+      "renderError": ""
+    }
+  ],
+  "errors": []
+}

@@ -4,7 +4,9 @@
 export function brickFacePatch(row: number, column: number, seed = 0): [number, number, number, number] {
   let hash = Math.imul(row + seed * 17 + 41, 73856093) ^ Math.imul(column + seed * 29 + 73, 19349663);
   hash = Math.imul(hash ^ (hash >>> 16), 2246822519) >>> 0;
-  const tiles = [0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 4, 4, 4, 4, 5, 5, 6, 7];
+  // Scuffed and chipped units are occasional, visible field pieces rather
+  // than one exceptional brick on an otherwise factory-perfect elevation.
+  const tiles = [0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 4, 5, 5, 6, 6, 7, 7];
   const tile = tiles[hash % tiles.length];
   const atlasColumn = tile % 2, atlasRow = Math.floor(tile / 2);
   const cropX = .006 + ((hash >>> 3) % 5) * .01;

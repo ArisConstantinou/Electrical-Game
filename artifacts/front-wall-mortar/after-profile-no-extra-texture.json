@@ -1,0 +1,25 @@
+{
+  "environment": "Windows Chrome WebGL, 390x844 DPR3 touch emulation, front work wall",
+  "source": "C:\\Users\\arz0r\\.codex\\worktrees\\front-wall-mortar-surface\\Electrical-Game\\dist",
+  "samples": [
+    {
+      "frames": 109,
+      "medianMs": 16.199999928474426,
+      "p95Ms": 21.700000047683716,
+      "maxMs": 24.200000047683716,
+      "drawCalls": 402,
+      "triangles": 1473183,
+      "renderError": ""
+    },
+    {
+      "frames": 109,
+      "medianMs": 16.399999976158142,
+      "p95Ms": 21,
+      "maxMs": 22.600000023841858,
+      "drawCalls": 402,
+      "triangles": 1473199,
+      "renderError": ""
+    }
+  ],
+  "errors": []
+}
