@@ -51,21 +51,43 @@ hollowSection.translate(0, 0, -.5);
 const clay = new THREE.MeshStandardMaterial({ map: siteClayImage, color: 0xe8d7cc, roughness: 1, flatShading: true });
 const render = siteMaterial('concrete', 0xd8d0c5);
 render.flatShading = true;
-const dust = siteMaterial('plaster', 0xffffff, 3, 3);
-dust.vertexColors = true;
-dust.normalMap = null;
-dust.flatShading = true;
-dust.side = THREE.DoubleSide;
+const bedCanvas = document.createElement('canvas');
+bedCanvas.width = bedCanvas.height = 512;
+const bedContext = bedCanvas.getContext('2d');
+if (!bedContext) throw new Error('Rubble material canvas unavailable');
+bedContext.fillStyle = '#87513d';
+bedContext.fillRect(0, 0, 512, 512);
+let bedSeed = 0x4b1d9a37;
+const bedRandom = (): number => {
+  bedSeed = (Math.imul(bedSeed, 1664525) + 1013904223) >>> 0;
+  return bedSeed / 4294967296;
+};
+const bedColors = ['#b96d4e', '#a75b40', '#c27b56', '#9c503a', '#ab9b8d', '#857e76'];
+for (let i = 0; i < 2800; i++) {
+  const x = bedRandom() * 512, y = bedRandom() * 512;
+  const size = i < 600 ? 4 + bedRandom() * 9 : 1 + bedRandom() * 4;
+  const colorIndex = Math.floor(bedRandom() * (i % 5 ? 4 : bedColors.length));
+  bedContext.fillStyle = bedColors[colorIndex];
+  bedContext.beginPath();
+  bedContext.moveTo(x - size * .6, y - size * .2);
+  bedContext.lineTo(x - size * .1, y - size * .6);
+  bedContext.lineTo(x + size * .6, y - size * .3);
+  bedContext.lineTo(x + size * .4, y + size * .5);
+  bedContext.lineTo(x - size * .4, y + size * .4);
+  bedContext.closePath();
+  bedContext.fill();
+}
+const bedTexture = new THREE.CanvasTexture(bedCanvas);
+bedTexture.name = 'Crushed clay and plaster fragments';
+bedTexture.colorSpace = THREE.SRGBColorSpace;
+bedTexture.wrapS = bedTexture.wrapT = THREE.RepeatWrapping;
+bedTexture.anisotropy = 4;
+const rubbleBed = new THREE.MeshStandardMaterial({ map: bedTexture, roughness: 1, flatShading: true,
+  side: THREE.DoubleSide });
 // Fine debris needs a broken, many-sided outline. A tetrahedron keeps a
 // triangular silhouette however much its instances are rotated or scaled.
-const gritGeometry = new THREE.BufferGeometry();
-{
-  const outline = [
-    [-.49, -.14], [-.36, -.43], [-.09, -.49], [.29, -.40], [.48, -.19],
-    [.45, .12], [.20, .43], [-.13, .47], [-.43, .27],
-  ];
-  const upper = [.29, .37, .25, .34, .22, .35, .27, .39, .24];
-  const lower = [-.25, -.19, -.32, -.23, -.35, -.20, -.30, -.22, -.34];
+const makeGritGeometry = (outline: number[][], upper: number[], lower: number[]): THREE.BufferGeometry => {
+  const geometry = new THREE.BufferGeometry();
   const vertices: number[] = [], indices: number[] = [];
   for (const heights of [upper, lower]) for (let i = 0; i < outline.length; i++) {
     vertices.push(outline[i][0], heights[i], outline[i][1]);
@@ -78,10 +100,22 @@ const gritGeometry = new THREE.BufferGeometry();
     const next = (i + 1) % outline.length;
     indices.push(i, next, outline.length + i, next, outline.length + next, outline.length + i);
   }
-  gritGeometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-  gritGeometry.setIndex(indices);
-  gritGeometry.computeVertexNormals();
-}
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+};
+const gritFlake = makeGritGeometry(
+  [[-.49, -.14], [-.36, -.43], [-.09, -.49], [.29, -.40], [.48, -.19],
+    [.45, .12], [.20, .43], [-.13, .47], [-.43, .27]],
+  [.29, .37, .25, .34, .22, .35, .27, .39, .24],
+  [-.25, -.19, -.32, -.23, -.35, -.20, -.30, -.22, -.34],
+);
+const gritChunk = makeGritGeometry(
+  [[-.46, -.23], [-.25, -.46], [.20, -.42], [.48, -.13], [.34, .36], [-.12, .47], [-.45, .17]],
+  [.36, .43, .32, .40, .29, .44, .31],
+  [-.35, -.28, -.40, -.30, -.42, -.32, -.39],
+);
 const clayGritMaterial = new THREE.MeshStandardMaterial({ color: 0xb3684a, roughness: 1, flatShading: true });
 const renderGritMaterial = new THREE.MeshStandardMaterial({ color: 0xaaa196, roughness: 1, flatShading: true });
 
@@ -92,9 +126,13 @@ export class MansionBreakoutRubble {
   private readonly clayShards = new THREE.InstancedMesh(shard, clay, 600);
   private readonly renderShards = new THREE.InstancedMesh(shard, render, 150);
   private readonly sections = new THREE.InstancedMesh(hollowSection, clay, 32);
-  private readonly clayGrit = new THREE.InstancedMesh(gritGeometry, clayGritMaterial, 840);
-  private readonly renderGrit = new THREE.InstancedMesh(gritGeometry, renderGritMaterial, 480);
-  private readonly mound = new THREE.Mesh(new THREE.BufferGeometry(), dust);
+  private readonly clayGrit = new THREE.InstancedMesh(gritFlake, clayGritMaterial, 260);
+  private readonly clayChunks = new THREE.InstancedMesh(gritChunk, clayGritMaterial, 160);
+  private readonly claySlivers = new THREE.InstancedMesh(shard, clayGritMaterial, 110);
+  private readonly renderGrit = new THREE.InstancedMesh(gritFlake, renderGritMaterial, 100);
+  private readonly renderChunks = new THREE.InstancedMesh(gritChunk, renderGritMaterial, 80);
+  private readonly renderSlivers = new THREE.InstancedMesh(shard, renderGritMaterial, 60);
+  private readonly mound = new THREE.Mesh(new THREE.BufferGeometry(), rubbleBed);
   private moundBounds = '';
   private readonly matrix = new THREE.Matrix4();
   private readonly position = new THREE.Vector3();
@@ -104,11 +142,13 @@ export class MansionBreakoutRubble {
 
   constructor(private readonly alongX: boolean) {
     this.group.name = 'Fallen clay and plaster from opened masonry';
-    this.mound.name = 'Mixed clay and plaster grit beneath broken blocks';
+    this.mound.name = 'Irregular crushed-clay and plaster bed beneath broken blocks';
     this.mound.receiveShadow = true;
     this.mound.raycast = () => undefined;
     this.group.add(this.mound);
-    for (const mesh of [this.clayShards, this.renderShards, this.sections, this.clayGrit, this.renderGrit]) {
+    for (const mesh of [this.clayShards, this.renderShards, this.sections,
+      this.clayGrit, this.clayChunks, this.claySlivers,
+      this.renderGrit, this.renderChunks, this.renderSlivers]) {
       mesh.count = 0;
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       mesh.castShadow = mesh === this.sections;
@@ -121,8 +161,9 @@ export class MansionBreakoutRubble {
   update(centers: readonly number[], impactSide: -1 | 1): void {
     if (!centers.length) {
       this.group.visible = false;
-      this.clayShards.count = this.renderShards.count = this.sections.count =
-        this.clayGrit.count = this.renderGrit.count = 0;
+      for (const mesh of [this.clayShards, this.renderShards, this.sections,
+        this.clayGrit, this.clayChunks, this.claySlivers,
+        this.renderGrit, this.renderChunks, this.renderSlivers]) mesh.count = 0;
       return;
     }
     this.group.visible = true;
@@ -132,32 +173,32 @@ export class MansionBreakoutRubble {
     const peak = Math.min(.45, centers.length * .007);
     const rampHeight = (along: number, outward: number): number => {
       const edge = THREE.MathUtils.clamp((spread - Math.abs(along - center)) / .24, 0, 1);
-      const distance = THREE.MathUtils.clamp((Math.abs(outward) - .115) / 1.08, 0, 1);
+      const distance = THREE.MathUtils.clamp((Math.abs(outward) - .115) / .65, 0, 1);
       return peak * edge * (1 - distance) ** 1.28;
     };
     const bounds = `${minimum}:${maximum}:${Math.floor(centers.length / 5)}:${impactSide}`;
     if (bounds !== this.moundBounds) {
       this.moundBounds = bounds;
-      const positions: number[] = [], colors: number[] = [], uvs: number[] = [], indices: number[] = [];
-      const columns = 24, depthSteps = 8, rowWidth = columns + 1;
+      const positions: number[] = [], uvs: number[] = [], indices: number[] = [];
+      const columns = 36, depthSteps = 12, rowWidth = columns + 1;
       for (let depth = 0; depth <= depthSteps; depth++) for (let column = 0; column <= columns; column++) {
         const t = depth / depthSteps;
         const index = depth * rowWidth + column;
-        const along = center + (column / columns * 2 - 1) * spread;
-        const edgeWobble = depth > 0 && depth < depthSteps ? (scatter(index, 22) - .5) * .035 : 0;
-        const out = impactSide * (.115 + t * 1.08 + edgeWobble);
-        const height = .003 + rampHeight(along, out) * (.91 + scatter(index, 31) * .09);
+        const along = center + (column / columns * 2 - 1) * spread * (1 - t * .13)
+          + (depth ? (scatter(index, 80) - .5) * .02 : 0);
+        const edgeWobble = depth ? (scatter(index, 22) - .5) * (.015 + t * .025) : 0;
+        const out = impactSide * (.115 + t * .65 + edgeWobble);
+        const slope = rampHeight(along, out);
+        const height = Math.max(.003, .003 + slope * (.92 + scatter(index, 31) * .08)
+          + (scatter(index, 71) - .5) * .01 * (1 - t));
         positions.push(this.alongX ? along : out, height, this.alongX ? out : along);
-        uvs.push(column / columns, t);
-        const mix = scatter(index, 49);
-        colors.push(.80 + mix * .12, .73 + mix * .11, .67 + mix * .10);
+        uvs.push(column / columns * 2, t);
         if (depth === depthSteps || column === columns) continue;
         const next = index + rowWidth;
         indices.push(index, next, index + 1, index + 1, next, next + 1);
       }
       const geometry = new THREE.BufferGeometry();
       geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-      geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
       geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
       geometry.setIndex(indices);
       geometry.computeVertexNormals();
@@ -174,7 +215,7 @@ export class MansionBreakoutRubble {
         const source = centers[Math.min(centers.length - 1, Math.floor(i / density))];
         const along = source + (scatter(seed, 1) - scatter(seed, 2)) * .25;
         const side = impactSide;
-        const out = side * (.12 + scatter(seed, 4) ** 1.35 * .96);
+        const out = side * (.12 + scatter(seed, 4) ** 1.35 * .78);
         const surface = rampHeight(along, out);
         const largeRender = kind === 'render' && scatter(seed, 18) < .20;
         const long = kind === 'section' ? .16 + scatter(seed, 5) * .20
@@ -209,24 +250,28 @@ export class MansionBreakoutRubble {
     place(this.clayShards, Math.min(600, Math.ceil(centers.length * 9.3)), 'clay');
     place(this.renderShards, Math.min(150, Math.ceil(centers.length * 2.3)), 'render');
     place(this.sections, Math.min(32, Math.floor(centers.length * .5)), 'section');
-    const placeGrit = (mesh: THREE.InstancedMesh, count: number, density: number, salt: number) => {
+    const placeGrit = (mesh: THREE.InstancedMesh, count: number, density: number, salt: number,
+      shape: 'flake' | 'chunk' | 'sliver') => {
       const previous = mesh.count;
       mesh.count = count;
       if (previous >= count) return;
       for (let i = previous; i < count; i++) {
         const seed = i + salt;
         const source = centers[Math.min(centers.length - 1, Math.floor(i / density))];
-        const along = source + (scatter(seed, 1) - scatter(seed, 2)) * .72;
-        const out = impactSide * (.12 + scatter(seed, 3) * 1.18);
+        const along = source + (scatter(seed, 1) - scatter(seed, 2)) * .30;
+        const scatterOut = scatter(seed, 3);
+        const stray = scatter(seed, 15) < .06;
+        const out = impactSide * (.12 + (stray ? .68 + scatterOut * .28 : scatterOut ** 2.6 * .62));
         const grain = scatter(seed, 4);
         const size = grain < .32 ? .002 + grain * .018 : .005 + (grain - .32) * .038;
         this.position.set(this.alongX ? along : out,
-          .002 + rampHeight(along, out) + size * .35,
+          .002 + rampHeight(along, out) + size * (shape === 'chunk' ? .32 : .15),
           this.alongX ? out : along);
         this.rotation.setFromEuler(new THREE.Euler(scatter(seed, 6) * Math.PI,
           scatter(seed, 7) * Math.PI * 2, scatter(seed, 8) * Math.PI));
-        this.scale.set(size * (.75 + scatter(seed, 9) * .7),
-          size * (.38 + scatter(seed, 10) * .65), size * (.55 + scatter(seed, 11) * .8));
+        this.scale.set(size * (shape === 'sliver' ? 1.5 + scatter(seed, 9) * 1.3 : .65 + scatter(seed, 9) * .75),
+          size * (shape === 'chunk' ? .65 + scatter(seed, 10) * .65 : .12 + scatter(seed, 10) * .27),
+          size * (shape === 'sliver' ? .22 + scatter(seed, 11) * .38 : .55 + scatter(seed, 11) * .8));
         mesh.setMatrixAt(i, this.matrix.compose(this.position, this.rotation, this.scale));
         const shade = .75 + scatter(seed, 12) * .42;
         mesh.setColorAt(i, this.tint.setRGB(shade, shade * (.90 + scatter(seed, 13) * .12),
@@ -236,7 +281,11 @@ export class MansionBreakoutRubble {
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       mesh.computeBoundingSphere();
     };
-    placeGrit(this.clayGrit, Math.min(840, Math.ceil(centers.length * 13)), 13, 1301);
-    placeGrit(this.renderGrit, Math.min(480, Math.ceil(centers.length * 7.5)), 7.5, 2909);
+    placeGrit(this.clayGrit, Math.min(260, Math.ceil(centers.length * 4)), 4, 1301, 'flake');
+    placeGrit(this.clayChunks, Math.min(160, Math.ceil(centers.length * 2.5)), 2.5, 1703, 'chunk');
+    placeGrit(this.claySlivers, Math.min(110, Math.ceil(centers.length * 1.6)), 1.6, 1987, 'sliver');
+    placeGrit(this.renderGrit, Math.min(100, Math.ceil(centers.length * 1.4)), 1.4, 2909, 'flake');
+    placeGrit(this.renderChunks, Math.min(80, Math.ceil(centers.length * 1.1)), 1.1, 3203, 'chunk');
+    placeGrit(this.renderSlivers, Math.min(60, Math.ceil(centers.length * .8)), .8, 3509, 'sliver');
   }
 }
