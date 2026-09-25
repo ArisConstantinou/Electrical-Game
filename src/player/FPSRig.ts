@@ -421,10 +421,10 @@ export class FPSRig extends THREE.Group {
     // At arm's-length contact the full 75 cm steel bit cannot fit between the
     // eye and the facade. Keep the motor in a stable viewmodel stance and let
     // the bit enter the wall visually; the actual strike still uses `point`.
-    const visualPoint = point.clone().addScaledVector(forward, Math.max(0, 1.0 - forwardDistance));
-    const motorGoal = eye.clone().addScaledVector(forward, .35)
-      .addScaledVector(right, this.hammerGripBlend < .5 ? .20 : -.20);
-    motorGoal.y -= .22;
+    const visualPoint = point.clone().addScaledVector(forward, Math.max(0, .58 - forwardDistance));
+    const motorGoal = eye.clone().addScaledVector(forward, .45)
+      .addScaledVector(right, this.hammerGripBlend < .5 ? .30 : -.30);
+    motorGoal.y -= .25;
     const towardTip = visualPoint.clone().sub(motorGoal).normalize();
     const orientation = new THREE.Quaternion().setFromUnitVectors(this.tipAnchor.clone().normalize(), towardTip);
     hammer.quaternion.copy(this.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(orientation));
@@ -1131,7 +1131,7 @@ export class FPSRig extends THREE.Group {
   }
   private createHammer(): THREE.Group {
     const group = buildToolModel('hammer');
-    const rigidParts = group.children.filter(child => child.name !== 'Rotatable auxiliary handle');
+    const rear = group.getObjectByName('Longitudinal rear handle and battery') as THREE.Group | undefined;
     const auxiliary = group.getObjectByName('Rotatable auxiliary handle') as THREE.Group | undefined;
     this.attachArms('hammer',group);
     // Exactly 400 mm of exposed steel from the dust seal (-.349) to the
@@ -1184,8 +1184,10 @@ export class FPSRig extends THREE.Group {
       object.material=Array.isArray(object.material)?object.material.map(prepare):prepare(object.material);
       object.renderOrder=bit?20:21;
     });
-    batchStaticVisuals(group, rigidParts, mesh => mesh.name === 'hammer-trigger');
-    if(auxiliary)batchStaticVisuals(auxiliary, [...auxiliary.children]);
+    // The overlay motor depends on the draw order of its housing and chuck.
+    // Merge only detail within each handle, leaving the visible body separate.
+    if (rear) batchStaticVisuals(rear, [...rear.children], mesh => mesh.name === 'hammer-trigger');
+    if (auxiliary) batchStaticVisuals(auxiliary, [...auxiliary.children]);
     return group;
   }
 }
