@@ -241,27 +241,19 @@ export class Renderer {
       return builder;
     };
   }
-  /** Compile the two views that expose the largest number of construction
-   * meshes, yielding between site parts while the loading screen is visible.
-   * A one-pixel pass on the real canvas warms the remaining shadow pipeline. */
-  async prepareSiteViews(parts:readonly THREE.Object3D[],yaws:readonly number[],pitch:number,onDirection:()=>void):Promise<void>{
+  /** Warm the nearby side view with bounded one-pixel draws. The draws compile
+   * their own pipelines; an earlier compileAsync pass repeated the expensive
+   * traversal without improving the first route after Start. */
+  async prepareSiteViews(yaws:readonly number[],pitch:number,onDirection:()=>void):Promise<void>{
     await this.ready;
     this.prepareMaterials();
     this.snapshotRenderCamera();
     const size=this.gpu.getSize(new THREE.Vector2());
-    const bounds=parts.map(part=>({part,box:new THREE.Box3().setFromObject(part,true)}));
-    const frustum=new THREE.Frustum(),projection=new THREE.Matrix4();
     try{
       for(const yaw of yaws){
         const view=this.renderCamera.clone();
         view.rotation.set(pitch,yaw,0,'YXZ');
         view.updateMatrixWorld(true);
-        frustum.setFromProjectionMatrix(projection.multiplyMatrices(view.projectionMatrix,view.matrixWorldInverse));
-        for(const {part,box} of bounds){
-          if(!box.isEmpty()&&!frustum.intersectsBox(box))continue;
-          await this.gpu.compileAsync(part,view,this.scene);
-          await new Promise<void>(resolve=>setTimeout(resolve,0));
-        }
         this.gpu.setSize(1,1,false);
         try{
           // Upload material and geometry resources in bounded slices. A single

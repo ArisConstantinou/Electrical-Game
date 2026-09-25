@@ -401,7 +401,7 @@ export class Game {
     }
     loadingIcons.forEach((icon, index) => { icon.style.animationDelay = `${iconOrder[index] * .85}s`; });
     const viewStages=mansionPreview&&this.room.mansionWing&&sceneParams.get('template')!=='blank'&&
-      !sceneParams.has('level')&&sceneParams.get('editor')!=='1'?2:0;
+      !sceneParams.has('level')&&sceneParams.get('editor')!=='1'?1:0;
     let preparedStages = 0;
     const markPrepared = (): void => {
       const percent = Math.round(++preparedStages / (8+viewStages) * 100);
@@ -433,7 +433,7 @@ export class Game {
       } else if (params.get('template') === 'blank') root.querySelector('#start-level-current')!.textContent = 'NEW SITE · UNSAVED';
       markPrepared();
       if(viewStages&&this.room.mansionWing){
-        await this.renderer.prepareSiteViews(this.room.mansionWing.children,[0,-Math.PI/2],this.player.pitch,markPrepared);
+        await this.renderer.prepareSiteViews([-Math.PI/2],this.player.pitch,markPrepared);
       }
       if (!missingSelectedLevel && params.get('editor') !== '1') {
         // A one-pixel shader warmup leaves the full-size colour/shadow passes
