@@ -459,6 +459,7 @@ export class Game {
       !sceneParams.has('level')&&sceneParams.get('editor')!=='1'?1:0;
     let preparedStages = 0;
     const markPrepared = (): void => {
+      if (startButton.dataset.preparing === 'false') return;
       const percent = Math.round(++preparedStages / (8+viewStages) * 100);
       startLoadPercent.value = `${percent}%`;
       startLoadPercent.setAttribute('aria-label', `Site preparation ${percent}%`);

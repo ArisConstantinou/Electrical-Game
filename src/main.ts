@@ -23,4 +23,19 @@ void game.ready.then(() => {
     const steps = Math.max(1, Math.round(ms / (1000 / 60)));
     for (let index = 0; index < steps; index += 1) game.step(1 / 60);
   };
+}).catch(error => {
+  console.error('Site preparation failed', error);
+  const button = document.querySelector<HTMLButtonElement>('#start-button');
+  const label = document.querySelector<HTMLElement>('#start-button-label');
+  const progress = document.querySelector<HTMLOutputElement>('#start-load-percent');
+  if (!button || !label || !progress) return;
+  button.disabled = false;
+  button.dataset.preparing = 'false';
+  label.textContent = 'RETRY LOADING';
+  progress.value = 'LOAD FAILED';
+  progress.setAttribute('aria-label', 'Loading failed. Tap to retry');
+  button.addEventListener('click', event => {
+    event.stopImmediatePropagation();
+    location.reload();
+  }, { capture: true, once: true });
 });
