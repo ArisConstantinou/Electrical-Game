@@ -263,7 +263,25 @@ export class Renderer {
           await new Promise<void>(resolve=>setTimeout(resolve,0));
         }
         this.gpu.setSize(1,1,false);
-        try{this.gpu.render(this.scene,view);}
+        try{
+          // Upload material and geometry resources in bounded slices. A single
+          // all-site first draw blocked Chrome for nearly a second even on a
+          // 1-pixel target; the same meshes can warm over yielded frames.
+          const meshes:THREE.Mesh[]=[];
+          this.scene.traverseVisible(object=>{if((object as THREE.Mesh).isMesh)meshes.push(object as THREE.Mesh);});
+          for(const mesh of meshes)mesh.visible=false;
+          try{
+            for(let offset=0;offset<meshes.length;offset+=80){
+              const slice=meshes.slice(offset,offset+80);
+              for(const mesh of slice)mesh.visible=true;
+              this.gpu.render(this.scene,view);
+              for(const mesh of slice)mesh.visible=false;
+              await new Promise<void>(resolve=>setTimeout(resolve,0));
+            }
+          }finally{for(const mesh of meshes)mesh.visible=true;}
+          this.scene.traverse(object=>{if(object instanceof THREE.DirectionalLight)object.shadow.needsUpdate=true;});
+          this.gpu.render(this.scene,view);
+        }
         finally{this.gpu.setSize(size.x,size.y,false);}
         onDirection();
         await new Promise<void>(resolve=>setTimeout(resolve,0));
