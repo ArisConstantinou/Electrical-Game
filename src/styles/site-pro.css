@@ -221,6 +221,14 @@ html, body { background: #151a1d; }
   #site-pro-use > span { position: absolute; top: calc(100% + 2px); left: 50%; width: 80px; transform: translateX(-50%); color: #fff; font-size: 0; text-shadow: 0 1px 3px #000; }
   #site-pro-use > span::after { content: 'USE TOOL'; display: block; white-space: nowrap; text-align: center; font: 800 11px/1 'Barlow Condensed', Arial, sans-serif; letter-spacing: 0; }
   #site-pro-use #mobile-use-status { display: none; }
+  #game-shell[data-active-tool="hammer"] #site-pro-use #mobile-use-status[data-ready="false"] {
+    display:block; position:absolute; left:50%; top:auto; bottom:calc(100% + 7px);
+    width:150px; max-width:calc(100vw - 24px); padding:5px 7px;
+    transform:translateX(-50%); border:1px solid #ffdc32;
+    border-radius:6px; background:#192126e8; color:#ffdc32;
+    font:800 12px/1.2 'Barlow Condensed',Arial,sans-serif;
+    text-align:center; pointer-events:none;
+  }
   #site-pro-use[aria-pressed="true"]::before, #mobile-interact[aria-pressed="true"]::before { filter: brightness(0); }
   #mobile-interact:not([hidden]) { top: auto; bottom: calc(var(--orbit-stick-bottom) + env(safe-area-inset-bottom)); max-width: none; }
   #mobile-interact::before { background-image: url('../assets/ui/interact-hand.svg'); }

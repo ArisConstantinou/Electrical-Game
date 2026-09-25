@@ -418,6 +418,15 @@ export class FPSRig extends THREE.Group {
     }
     const { forward, right } = this.bodyFrame(camera);
     const forwardDistance = point.clone().sub(eye).dot(forward);
+    // The full-length tool cannot seat its motor between the eye and a wall
+    // this close. Do not report a ready strike while the bit is visibly off
+    // the aim after the finite-arm constraint moves the whole hammer aside.
+    if (forwardDistance < .68) {
+      this.restHammer(camera);
+      this.contactStatus = 'too-close';
+      this.reachReason = 'Too close. Step back slightly to give the hammer room.';
+      return false;
+    }
     // At arm's-length contact the full 75 cm steel bit cannot fit between the
     // eye and the facade. Keep the motor in a stable viewmodel stance and let
     // the bit enter the wall visually; the actual strike still uses `point`.

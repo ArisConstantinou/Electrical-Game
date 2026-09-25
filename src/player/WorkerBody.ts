@@ -8,6 +8,25 @@ import referenceGrips from './referenceGrips.json';
 import {solveRigidGrasp,type GraspHistory} from './RigidGrasp';
 
 const Y=new THREE.Vector3(0,1,0);
+async function loadWorkerModel(asset:string):Promise<THREE.Group>{
+  const url=`${import.meta.env.BASE_URL}assets/worker/${asset}`;
+  for(let attempt=0;attempt<2;attempt++){
+    try{return (await new GLTFLoader().loadAsync(attempt===0?url:`${url}?retry=${Date.now()}`)).scene;}
+    catch(error){if(attempt===1)throw error;}
+  }
+  throw new Error(`Could not load ${asset}`);
+}
+async function loadWorkerMetadata():Promise<Record<string,{head:number[];tail:number[]}>>{
+  const url=`${import.meta.env.BASE_URL}assets/worker/skeleton.json`;
+  for(let attempt=0;attempt<2;attempt++){
+    try{
+      const response=await fetch(attempt===0?url:`${url}?retry=${Date.now()}`);
+      if(!response.ok)throw new Error(`Worker skeleton HTTP ${response.status}`);
+      return await response.json() as Record<string,{head:number[];tail:number[]}>;
+    }catch(error){if(attempt===1)throw error;}
+  }
+  throw new Error('Could not load worker skeleton');
+}
 /** Full anatomical sample. World-space skeleton owns the pose; camera aim remains independent. */
 export class WorkerBody extends THREE.Group {
   private static readonly templates=new Map<string,Promise<{scene:THREE.Group;metadata:Record<string,{head:number[];tail:number[]}>}>>();
@@ -80,7 +99,11 @@ export class WorkerBody extends THREE.Group {
     super();this.name='Anatomical full body worker';this.userData.studioEntityId='worker:full-body';scene.add(this);
     const detail=options.detail??'full',asset=detail==='apprentice'?'worker-apprentice-lod.glb':'worker.glb';
     let template=WorkerBody.templates.get(asset);
-    if(!template){template=Promise.all([new GLTFLoader().loadAsync(`${import.meta.env.BASE_URL}assets/worker/${asset}`),fetch(`${import.meta.env.BASE_URL}assets/worker/skeleton.json`).then(r=>r.json() as Promise<Record<string,{head:number[];tail:number[]}>>)]).then(([g,metadata])=>({scene:g.scene,metadata}));WorkerBody.templates.set(asset,template);}
+    if(!template){
+      template=Promise.all([loadWorkerModel(asset),loadWorkerMetadata()]).then(([scene,metadata])=>({scene,metadata}));
+      WorkerBody.templates.set(asset,template);
+      void template.catch(()=>{if(WorkerBody.templates.get(asset)===template)WorkerBody.templates.delete(asset);});
+    }
     this.ready=template.then(({scene:source,metadata})=>{
       for(const [name,entry]of Object.entries(metadata))this.lengths.set(name,new THREE.Vector3().fromArray(entry.head).distanceTo(new THREE.Vector3().fromArray(entry.tail)));
       const model=cloneSkeleton(source),skins:THREE.SkinnedMesh[]=[];this.add(model);model.traverse(o=>{

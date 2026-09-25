@@ -1,15 +1,30 @@
 import assert from 'node:assert/strict';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
+import path from 'node:path';
 import { chromium } from 'playwright';
 import { blockPointerLock } from './browser-safety.mjs';
 
 const out = 'output/default-mansion-access';
 await mkdir(out, { recursive: true });
+const routeDist = async page => {
+  if (!process.env.QA_DIST_ROOT) return;
+  const root = path.resolve(process.env.QA_DIST_ROOT);
+  await page.route('http://127.0.0.1:5365/Electrical-Game/**', async route => {
+    const relative = decodeURIComponent(new URL(route.request().url()).pathname).slice('/Electrical-Game/'.length) || 'index.html';
+    const file = path.resolve(root, relative);
+    if (!file.startsWith(root + path.sep)) return route.abort();
+    try {
+      const extension = path.extname(file).toLowerCase();
+      await route.fulfill({ status: 200, body: await readFile(file), contentType: ({ '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webp': 'image/webp', '.jpg': 'image/jpeg', '.png': 'image/png', '.glb': 'model/gltf-binary', '.gltf': 'model/gltf+json', '.bin': 'application/octet-stream', '.svg': 'image/svg+xml' })[extension] || 'application/octet-stream' });
+    } catch { await route.fulfill({ status: 404, body: `Missing isolated asset: ${relative}` }); }
+  });
+};
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 try {
   const context = await browser.newContext({ viewport: { width: 1536, height: 864 } });
   await blockPointerLock(context);
   const page = await context.newPage();
+  await routeDist(page);
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('http://127.0.0.1:5365/Electrical-Game/');
@@ -79,6 +94,7 @@ try {
   const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   await blockPointerLock(mobile);
   const mobilePage = await mobile.newPage();
+  await routeDist(mobilePage);
   const mobileErrors = [];
   mobilePage.on('pageerror', error => mobileErrors.push(error.message));
   await mobilePage.goto('http://127.0.0.1:5365/Electrical-Game/');

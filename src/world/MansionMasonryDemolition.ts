@@ -197,7 +197,7 @@ export class MansionMasonryDemolition {
 
   /** The original work wall's material lattice is allocated only for bricks
    * actually struck. The intact instanced wall stays cheap and unchanged. */
-  strikeAt(index: number, camera: THREE.Camera, mode: 'chase' | 'demolish' = 'demolish'): boolean {
+  strikeAt(index: number, camera: THREE.Camera, mode: 'chase' | 'demolish' = 'demolish', aimedDirection?: THREE.Vector3): boolean {
     if (!this.remaining[index]) return false;
     let entry = this.broken.get(index);
     if (!entry) entry = this.createBrokenBrick(index);
@@ -205,7 +205,7 @@ export class MansionMasonryDemolition {
     this.inverse.copy(this.group.matrixWorld).invert();
     const wallCamera = camera.getWorldPosition(new THREE.Vector3()).applyMatrix4(this.inverse);
     const origin = wallCamera.clone().sub(entry.origin).applyQuaternion(entry.rotation.clone().invert());
-    const wallDirection = camera.getWorldDirection(new THREE.Vector3()).transformDirection(this.inverse);
+    const wallDirection = (aimedDirection?.clone() ?? camera.getWorldDirection(new THREE.Vector3())).transformDirection(this.inverse);
     const direction = wallDirection.clone().applyQuaternion(entry.rotation.clone().invert());
     const joint = this.jointContact(entry, origin, direction, 2.4);
     const contact = joint?.contact ?? entry.volume.raycast(origin, direction, 2.4);
