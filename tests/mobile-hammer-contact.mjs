@@ -37,7 +37,7 @@ try{
     const page=await context.newPage();page.on('pageerror',e=>report.errors.push(e.message));
     try{
       await page.goto(url);await page.waitForFunction(()=>window.__wireTheHouse?.isReadyForStart,{timeout:120000});
-      await page.locator('#start-button').tap();await page.locator('#start-screen').waitFor({state:'hidden'});await page.locator('#site-pro-tools').tap();await page.locator('#mobile-tool-slider [data-tool="hammer"]').tap();await page.waitForFunction(()=>window.__wireTheHouse.selectedTool==='hammer');
+      await page.locator('#start-button').tap();await page.locator('#start-screen').waitFor({state:'hidden'});await page.locator('#worker-bar-handle').tap();await page.locator('#mobile-tool-slider [data-tool="hammer"]').tap();await page.waitForFunction(()=>window.__wireTheHouse.selectedTool==='hammer');
       await page.evaluate(({distance,yaw})=>{
         const g=window.__wireTheHouse,c=g.renderer.camera;
         window.__contactStep=g.step.bind(g);g.step=()=>{};
@@ -70,9 +70,9 @@ try{
       const touch=(type,touchPoints)=>cdp.send('Input.dispatchTouchEvent',{type,touchPoints});
       // Exercise both action-pad styles without changing the production input.
       if(yaw<0){
-        await page.locator('#site-pro-tools').tap();
+        await page.locator('#worker-bar-handle').tap();
         await page.locator('#quick-aim-input').tap();
-        await page.locator('#site-pro-tools').tap();
+        await page.locator('#worker-bar-handle').tap();
       }
       if(!diagnostic){
         const beforeSwipe=await state(page);
@@ -96,6 +96,9 @@ try{
       if(!diagnostic){
         assert.equal(afterHold.held,true,'Stationary explicit hold must keep the hammer active');
         assert(afterHold.impacts>initial.impacts&&afterHold.removedCm3>initial.removedCm3,'Native stationary hold must make real masonry contact and remove material');
+        const moveBox=await page.locator('#joystick').boundingBox();
+        assert(moveBox,'Mobile MOVE joystick is missing');
+        const move={x:moveBox.x+moveBox.width/2,y:moveBox.y+moveBox.height/2,id:1};
         // AUTO chooses a wall-hug pose; proximity alone no longer implies head contact.
         if(afterHold.status==='too-close'){
           assert.equal(afterHold.status,'too-close','Head collision must explain why the tool cannot strike');
@@ -108,7 +111,7 @@ try{
           }
           await page.evaluate(async()=>{const g=window.__wireTheHouse;await g.room.brickWall.waitForGeometry();await g.renderer.waitForFrame();window.__contactStep(0);await g.renderer.waitForFrame();});
           await page.screenshot({path:`${out}/too-close-${yaw}.png`});
-          const move={x:75,y:540,id:1};await touch('touchStart',[action,move]);
+          await touch('touchStart',[action,move]);
           await touch('touchMove',[action,{...move,y:560}]);
           const recovery=[];
           for(let i=0;i<70;i++){
@@ -124,7 +127,7 @@ try{
           assert(resumed.impacts+resumed.debrisStrikes>backed.impacts+backed.debrisStrikes+5,'Stepping back must resume hammering without repressing USE');
           assert(resumed.removedCm3>afterHold.removedCm3,'Recovered contact must continue removing real material');
         }else{
-          const move={x:75,y:540,id:1},sign=yaw<0?-1:1;
+          const sign=yaw<0?-1:1;
           await touch('touchStart',[action,move]);await touch('touchMove',[action,{...move,x:move.x+sign*28}]);
           await step(page,180);await touch('touchEnd',[{...move,x:move.x+sign*28}]);
           const moved=await state(page);entry.moving=moved;
