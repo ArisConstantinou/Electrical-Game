@@ -13,6 +13,7 @@ import { FPSRig, RIG_TOOLS, type RigTool } from '../player/FPSRig';
 import { Room } from '../world/Room';
 import { SiteOcclusion } from '../world/SiteOcclusion';
 import { MansionMasonryBatch } from '../world/MansionMasonryBatch';
+import type { MasonryAim } from '../world/MansionMasonryDemolition';
 import { MissionSystem } from '../systems/MissionSystem';
 import { MarkingSystem } from '../systems/MarkingSystem';
 import { HeightMeasureSystem } from '../systems/HeightMeasureSystem';
@@ -141,6 +142,60 @@ export class Game {
   private hudSettingsKey = '';
   private readonly pendingSceneActions:Array<()=>void>=[];
   private readonly mobileControls: MobileControls;
+  private lastHammerMasonryAim: MasonryAim | null = null;
+  private failedHammerMasonry: { aim: MasonryAim; attempts: number } | null = null;
+
+  /** Keep a held chisel on surviving clay at the edge of its own fresh hole. */
+  private hammerMasonryAim(): { aim: MasonryAim; direction?: THREE.Vector3 } | null {
+    const wing = this.room.mansionWing;
+    if (!wing) return null;
+    const camera = this.renderer.camera;
+    const failed = this.failedHammerMasonry;
+    // The object directly under the crosshair always owns the next strike.
+    const direct = wing.aimMasonry(camera);
+    if (direct) {
+      this.lastHammerMasonryAim = direct;
+      if (failed && failed.attempts >= 2 && failed.aim.wall === direct.wall && failed.aim.index === direct.index) return null;
+      return { aim: direct };
+    }
+    const previous = this.lastHammerMasonryAim;
+    if (!this.input.actionHeld || !previous) return null;
+    if (!previous.wall.group.visible || !previous.wall.group.parent) {
+      this.lastHammerMasonryAim = null;
+      return null;
+    }
+    const eye = camera.getWorldPosition(new THREE.Vector3());
+    const view = camera.getWorldDirection(new THREE.Vector3());
+    const toPrevious = previous.point.clone().sub(eye);
+    const distance = toPrevious.length();
+    if (distance > 1.25 || distance < .15 || view.dot(toPrevious.divideScalar(distance)) < .97) {
+      this.lastHammerMasonryAim = null;
+      return null;
+    }
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+    // These rays are smaller than one brick at normal working distance. No
+    // impact is invented: each candidate must hit the surviving volume.
+    for (const radius of [.025, .05, .085, .12]) {
+      let best: { aim: MasonryAim; direction: THREE.Vector3 } | null = null;
+      let bestDistance = Infinity;
+      for (const [x, y] of [[0, -1], [-1, 0], [1, 0], [0, 1], [-.707, -.707], [.707, -.707], [-.707, .707], [.707, .707]]) {
+        const direction = view.clone().addScaledVector(right, x * radius).addScaledVector(up, y * radius).normalize();
+        const aim = previous.wall.aim(camera, 1.25, eye, direction);
+        if (!aim) continue;
+        // A ray can still report a thin shell after its impact has become
+        // empty. Do not keep choosing that same dead spot on every strike.
+        if (failed && failed.attempts >= 2 && failed.aim.wall === aim.wall && failed.aim.index === aim.index) continue;
+        const continuity = aim.point.distanceToSquared(previous.point);
+        if (continuity < bestDistance) { best = { aim, direction }; bestDistance = continuity; }
+      }
+      if (best) {
+        this.lastHammerMasonryAim = best.aim;
+        return best;
+      }
+    }
+    return null;
+  }
 
   constructor(root: HTMLElement) {
     this.hud = new HUD(root);
@@ -523,6 +578,10 @@ export class Game {
     this.room.update(dt, this.renderer.viewCamera ?? this.renderer.camera);
     this.hammerWorkStance.restore(this.renderer.camera);
     const active = this.mission.activePoint;
+    if (this.selectedTool !== 'hammer') {
+      this.lastHammerMasonryAim = null;
+      this.failedHammerMasonry = null;
+    } else if (!this.input.actionHeld) this.failedHammerMasonry = null;
     const leveling = active?.stage === 'leveling';
     if (leveling && !this.wasLeveling && document.pointerLockElement) void document.exitPointerLock();
     this.wasLeveling = leveling;
@@ -665,8 +724,17 @@ export class Game {
     this.audio.setContinuous('mixer',this.mixing.mixerRunning);
     setLaserProjection(this.laserLevel.activeHeightM);
     if (this.selectedTool === 'hammer') {
-      const masonry = this.room.mansionWing?.aimMasonry(this.renderer.camera);
-      if (masonry) this.fpsRig.contactMasonry(this.renderer.camera, masonry.point);
+      const masonry = this.hammerMasonryAim();
+      if (masonry) this.fpsRig.contactMasonry(this.renderer.camera, masonry.aim.point);
+      else if (this.input.actionHeld && this.lastHammerMasonryAim) {
+        // A completely cleared opening is air. Hold the tool by its previous
+        // work point instead of snapping it into the unrelated room-wall pose.
+        this.fpsRig.contactMasonry(this.renderer.camera, this.lastHammerMasonryAim.point);
+        this.fpsRig.reachable = false;
+        this.fpsRig.chiselInAir = true;
+        this.fpsRig.contactStatus = 'no-solid';
+        this.fpsRig.reachReason = 'No solid masonry under the chisel. Aim at an edge or remaining rib.';
+      }
       else this.fpsRig.contact(this.renderer.camera, this.room.brickWall);
     }
     else if(this.selectedTool==='trowel')this.fpsRig.poseTrowel(this.renderer.camera,this.mortar.throwFeedback.motion,dt,this.room.brickWall.volume.frontZ);
@@ -805,9 +873,17 @@ export class Game {
   private performAction(continuing = false): void {
     if(this.apprentice.ownsInput){if(this.apprentice.mode==='layout')this.apprentice.confirm();return;}
     if (this.selectedTool === 'hammer') {
-      const masonry = this.room.mansionWing?.aimMasonry(this.renderer.camera);
+      const masonry = this.hammerMasonryAim();
       if (masonry) {
-        if (this.fpsRig.contactMasonry(this.renderer.camera, masonry.point) && masonry.wall.strikeAt(masonry.index, this.renderer.camera, this.hammerMode)) {
+        const inReach = this.fpsRig.contactMasonry(this.renderer.camera, masonry.aim.point);
+        const struck = inReach && masonry.aim.wall.strikeAt(masonry.aim.index, this.renderer.camera, this.hammerMode, masonry.direction);
+        if (inReach) {
+          if (struck) this.failedHammerMasonry = null;
+          else if (this.failedHammerMasonry?.aim.wall === masonry.aim.wall && this.failedHammerMasonry.aim.index === masonry.aim.index)
+            this.failedHammerMasonry.attempts++;
+          else this.failedHammerMasonry = { aim: masonry.aim, attempts: 1 };
+        }
+        if (struck) {
           this.room.invalidateSunShadow();
           this.siteOcclusion?.invalidate();
           this.renderer.invalidateMaterialPreparation();
@@ -817,6 +893,7 @@ export class Game {
         }
         return;
       }
+      if (this.lastHammerMasonryAim && this.input.actionHeld) return;
     }
     if(['spring','cutter'].includes(this.selectedTool)){this.hud.notify('Πήγαινε στη μάτσα PVC και πάτησε E για χειροκίνητη προετοιμασία.',false,1800);return;}
     if(['measure','drill','driver'].includes(this.selectedTool))return;
