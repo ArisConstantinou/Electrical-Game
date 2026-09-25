@@ -962,14 +962,15 @@ export class FPSRig extends THREE.Group {
     this.feedOffset.set(0,0,0);
     this.hammerFeedOffset.set(0,0,0);this.hammerFit.feedM=0;
     const hammer=this.tools.get('hammer')!;
-    // Keep the chosen hand and screen side even outside a reachable work area.
-    // The established right-handed rest pose is the blend's zero endpoint.
+    // Turn the idle motor across the torso so both finite grips can sit farther
+    // from the eye. A forward-only target gets pulled back by the arm solver.
+    // Mirror the pose when the player changes the tool's screen side.
     const {eye,right,forward}=this.bodyFrame(camera),view=camera.getWorldDirection(new THREE.Vector3());
     const worldQ=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(right,new THREE.Vector3(0,1,0),forward.clone().negate()));
-    worldQ.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(-.28,THREE.MathUtils.lerp(-.12,.12,this.hammerGripBlend),-.06+this.hammerGripBlend*.12)));
+    worldQ.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(-.28,THREE.MathUtils.lerp(1.08,-1.08,this.hammerGripBlend),-.06+this.hammerGripBlend*.12)));
     hammer.quaternion.copy(this.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(worldQ));
-    const target=eye.clone().addScaledVector(forward,.32).addScaledVector(right,THREE.MathUtils.lerp(.16,-.16,this.hammerGripBlend));
-    target.y-=.34+THREE.MathUtils.clamp(-view.y,0,1)*.13;
+    const target=eye.clone().addScaledVector(forward,.45).addScaledVector(right,THREE.MathUtils.lerp(.45,-.45,this.hammerGripBlend));
+    target.y-=.40+THREE.MathUtils.clamp(-view.y,0,1)*.13;
     hammer.position.copy(this.worldToLocal(target));
     this.constrainHeldTool(camera);this.poseArms(camera);
     this.chiselTipWorld.copy(hammer.localToWorld(this.tipAnchor.clone()));
