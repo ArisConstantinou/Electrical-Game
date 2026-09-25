@@ -293,8 +293,9 @@ export class MansionGroundWing extends THREE.Group {
     this.gameplayCulled.clear();
   }
 
-  updateGameplayVisibility(x: number, z: number, feetY: number): void {
-    if (this.emptyTemplate) return;
+  updateGameplayVisibility(x: number, z: number, feetY: number): boolean {
+    if (this.emptyTemplate) return false;
+    let changed = false;
     const nearStair = Math.hypot(x - 6.5, z - 9.6) < 6.5;
     const showB1 = feetY < -.05 || nearStair;
     const showB2 = feetY < -2.5;
@@ -305,12 +306,15 @@ export class MansionGroundWing extends THREE.Group {
       const shouldCull = floor === 5 ? !showB1 : !showB2;
       if (shouldCull) {
         if (!this.gameplayCulled.has(object)) this.gameplayCulled.set(object, object.visible);
+        if (object.visible) changed = true;
         object.visible = false;
       } else if (this.gameplayCulled.has(object)) {
+        if (object.visible !== this.gameplayCulled.get(object)!) changed = true;
         object.visible = this.gameplayCulled.get(object)!;
         this.gameplayCulled.delete(object);
       }
     }
+    return changed;
   }
 
   setEmptyTemplate(enabled: boolean): void { this.emptyTemplate = enabled; }

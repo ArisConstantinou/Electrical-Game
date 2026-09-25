@@ -199,8 +199,16 @@ export class Room extends THREE.Group {
       shadowCamera.right = shadowCamera.top = 8;
       shadowCamera.far = 28;
       shadowCamera.updateProjectionMatrix();
+      // The site and sun are stationary while the player only turns the view.
+      // Reuse the exact shadow texture until the light's anchor or construction
+      // changes; rebuilding its 600+ static casters on every look frame costs
+      // more than the colour pass on desktop.
+      this.sun.shadow.autoUpdate = false;
+      this.sun.shadow.needsUpdate = true;
     }
   }
+
+  invalidateSunShadow(): void { if (this.mansionPreview && this.sun) this.sun.shadow.needsUpdate = true; }
 
   update(dt: number, view?: THREE.Camera): void {
     this.exterior.update(dt);

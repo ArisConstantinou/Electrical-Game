@@ -44,6 +44,7 @@ export class Renderer {
   private pendingSize:{width:number;height:number}|null=null;
   private lastRenderTime=performance.now();
   private readonly materialCache=new WeakMap<THREE.Material,THREE.Material>();
+  private materialsDirty=true;
   private readonly optimizedInstances=new WeakSet<THREE.Object3D>();
   private mortarSurface:THREE.Texture|null=null;
   private readonly gazeEuler=new THREE.Euler(0,0,0,'YXZ');
@@ -95,6 +96,7 @@ export class Renderer {
   optimizeSiteInstances(root:THREE.Object3D):void{
     root.traverse(object=>{if(object instanceof THREE.InstancedMesh)this.optimizedInstances.add(object);});
   }
+  invalidateMaterialPreparation():void{this.materialsDirty=true;}
 
   private bindDeviceLoss():void{
     this.gpu.onDeviceLost=()=>{
@@ -189,6 +191,7 @@ export class Renderer {
     if(surface)surface.visible=room.surface.visible;
     this.roomWater=room;
     this.waterWasVisible=true;
+    this.invalidateMaterialPreparation();
   }
   /** Compile transient tool samples under the actual scene lights before play.
    * Shared geometry/materials remain owned by the tool; samples never simulate. */
@@ -268,6 +271,8 @@ export class Renderer {
     }finally{this.gpu.setSize(size.x,size.y,false);}
   }
   private prepareMaterials():void{
+    if(!this.materialsDirty)return;
+    this.materialsDirty=false;
     this.scene.traverse(object=>{
       const mesh=object as THREE.Mesh;if(!mesh.isMesh||Array.isArray(mesh.material))return;
       const old=mesh.material as THREE.MeshStandardMaterial;

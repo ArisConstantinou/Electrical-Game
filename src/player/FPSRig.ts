@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { batchStaticVisuals } from '../world/StaticVisualBatch';
 import { buildToolModel } from './ToolModels';
 import { buildTapeMeasureModel, buildMeasurePencil } from './TapeMeasureModel';
 import { buildReferenceToolModel } from './ReferenceToolModels';
@@ -1130,6 +1131,8 @@ export class FPSRig extends THREE.Group {
   }
   private createHammer(): THREE.Group {
     const group = buildToolModel('hammer');
+    const rigidParts = group.children.filter(child => child.name !== 'Rotatable auxiliary handle');
+    const auxiliary = group.getObjectByName('Rotatable auxiliary handle') as THREE.Group | undefined;
     this.attachArms('hammer',group);
     // Exactly 400 mm of exposed steel from the dust seal (-.349) to the
     // cutting edge (-.749). Keep the contact anchor and visual mesh identical.
@@ -1168,13 +1171,21 @@ export class FPSRig extends THREE.Group {
     // Keep the held motor and hands visible when the player works close to a
     // wall. Only the steel bit is depth tested so material can still hide its
     // tip as it enters the brick. Clone materials shared with world props.
+    const viewMaterials = new Map<THREE.Material, { bit?: THREE.Material; body?: THREE.Material }>();
     group.traverse(object=>{
       if(!(object instanceof THREE.Mesh))return;
       const bit=object===chisel||object===chiselTip||object===this.pointedTip;
-      const prepare=(source:THREE.Material)=>{const copy=source.clone();copy.depthTest=bit;copy.depthWrite=bit;copy.transparent=false;return copy;};
+      const prepare=(source:THREE.Material)=>{
+        const variants=viewMaterials.get(source)??{};
+        let copy=bit?variants.bit:variants.body;
+        if(!copy){copy=source.clone();copy.depthTest=bit;copy.depthWrite=bit;copy.transparent=false;if(bit)variants.bit=copy;else variants.body=copy;viewMaterials.set(source,variants);}
+        return copy;
+      };
       object.material=Array.isArray(object.material)?object.material.map(prepare):prepare(object.material);
       object.renderOrder=bit?20:21;
     });
+    batchStaticVisuals(group, rigidParts, mesh => mesh.name === 'hammer-trigger');
+    if(auxiliary)batchStaticVisuals(auxiliary, [...auxiliary.children]);
     return group;
   }
 }

@@ -57,6 +57,8 @@ export class PvcStock extends THREE.Group{
   readonly bundleRoots:THREE.Group[]=[];
   readonly bundleRemaining=Array<number>(PVC_BUNDLE_COUNT).fill(PVC.count);
   private readonly reserveMeshes:Array<{pipes:THREE.InstancedMesh;ends:THREE.InstancedMesh;straps:THREE.Mesh[]}>=[];
+  private readonly stockBarrels:THREE.InstancedMesh;
+  private readonly stockEnds:THREE.InstancedMesh;
   readonly bundleHighlight:THREE.Box3Helper;
   private readonly bundleBox=new THREE.Box3();
   private readonly bundleRay=new THREE.Raycaster();
@@ -69,6 +71,7 @@ export class PvcStock extends THREE.Group{
     super();this.name='PVC workshop · 20 × 3 m';this.userData.studioEntityId='pvc:workshop';
     const original=new THREE.Group();original.name='PVC bundle 1 · 20 × 3 m';original.userData.pvcBundleIndex=0;this.bundleRoots.push(original);this.add(original);
     const pipeG=new THREE.CylinderGeometry(.01,.01,3,10,1,true),endG=new THREE.RingGeometry(.008,.01,10);
+    const pickOnlyPvc=pvcMaterial.clone();pickOnlyPvc.visible=false;
     for(let i=0;i<PVC.count;i++){
       const group=new THREE.Group();group.userData.pvcStock=i;original.add(group);this.pipes.push(group);
       part(group,pipeG,pvcMaterial,'3 m PVC length',[0,1.5,0]);
@@ -77,7 +80,17 @@ export class PvcStock extends THREE.Group{
       // The three rigid pieces move together when the bundle opens. Preserve
       // their visible meshes and picking while drawing one shadow per pipe.
       batchStaticShadows(group,group.children);
+      for(const mesh of group.children)if(mesh instanceof THREE.Mesh && (mesh.name==='3 m PVC length'||mesh.name==='Open pipe end'))mesh.material=pickOnlyPvc;
     }
+    this.stockBarrels=new THREE.InstancedMesh(pipeG,pvcMaterial,PVC.count);
+    this.stockBarrels.name='Visible first bundle PVC tubes';
+    this.stockBarrels.receiveShadow=true;
+    this.stockBarrels.frustumCulled=false;
+    original.add(this.stockBarrels);
+    this.stockEnds=new THREE.InstancedMesh(endG,pvcMaterial,PVC.count*2);
+    this.stockEnds.name='Visible first bundle open PVC ends';
+    this.stockEnds.frustumCulled=false;
+    original.add(this.stockEnds);
     const bandMaterial=new THREE.MeshStandardMaterial({color:0x1b7e78,roughness:.45});
     for(const y of [.4,1.5,2.6]){
       const strap=part(original,new THREE.TorusGeometry(.055,.004,5,32),bandMaterial,'Rounded factory plastic strap');
@@ -122,7 +135,7 @@ export class PvcStock extends THREE.Group{
   setBundleRemaining(index:number,count:number):void{
     if(!Number.isInteger(index)||index<0||index>=PVC_BUNDLE_COUNT)throw new RangeError('Unknown PVC bundle');
     const remaining=Math.max(0,Math.min(PVC.count,Math.floor(count)));this.bundleRemaining[index]=remaining;
-    if(index===0){this.pipes.forEach((pipe,i)=>pipe.visible=i<remaining);this.straps.forEach(strap=>strap.visible=remaining>0);}
+    if(index===0){this.pipes.forEach((pipe,i)=>pipe.visible=i<remaining);this.stockBarrels.count=remaining;this.stockEnds.count=remaining*2;this.straps.forEach(strap=>strap.visible=remaining>0);}
     else{const bundle=this.reserveMeshes[index-1];bundle.pipes.count=remaining;bundle.ends.count=remaining*2;bundle.straps.forEach(strap=>strap.visible=remaining>0);}
   }
   bundleCenter(index:number):THREE.Vector3{
@@ -144,11 +157,20 @@ export class PvcStock extends THREE.Group{
   }
   layout(progress:number):void{
     this.spread=progress;
+    const transform=new THREE.Matrix4(),local=new THREE.Matrix4(),rotation=new THREE.Quaternion();
     for(let i=0;i<PVC.count;i++){
       const p=this.pipes[i],offset=STOCK_BUNDLE_OFFSETS[i];
       p.position.set(THREE.MathUtils.lerp(STOCK_CENTER.x+offset.x,1.94+i*.028,progress),STOCK_CENTER.y,THREE.MathUtils.lerp(STOCK_CENTER.z+offset.y,-.35,progress));
       p.rotation.z=THREE.MathUtils.lerp(-STOCK_LEAN,0,progress);p.rotation.x=progress*Math.PI/2;
+      p.updateMatrix();
+      local.compose(new THREE.Vector3(0,1.5,0),rotation.identity(),new THREE.Vector3(1,1,1));
+      this.stockBarrels.setMatrixAt(i,transform.multiplyMatrices(p.matrix,local));
+      for(let end=0;end<2;end++){
+        local.compose(new THREE.Vector3(0,end*3,0),rotation.setFromAxisAngle(new THREE.Vector3(1,0,0),Math.PI/2),new THREE.Vector3(1,1,1));
+        this.stockEnds.setMatrixAt(i*2+end,transform.multiplyMatrices(p.matrix,local));
+      }
     }
+    this.stockBarrels.instanceMatrix.needsUpdate=this.stockEnds.instanceMatrix.needsUpdate=true;
     this.ruler.visible=progress===1;
     this.presetMarks.visible=progress===1;
   }

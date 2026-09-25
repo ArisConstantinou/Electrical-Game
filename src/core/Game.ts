@@ -11,6 +11,8 @@ import { DesktopControls } from '../player/DesktopControls';
 import { MobileControls, type AimControlMode, type AimInputMode } from '../player/MobileControls';
 import { FPSRig, RIG_TOOLS, type RigTool } from '../player/FPSRig';
 import { Room } from '../world/Room';
+import { SiteOcclusion } from '../world/SiteOcclusion';
+import { MansionMasonryBatch } from '../world/MansionMasonryBatch';
 import { MissionSystem } from '../systems/MissionSystem';
 import { MarkingSystem } from '../systems/MarkingSystem';
 import { HeightMeasureSystem } from '../systems/HeightMeasureSystem';
@@ -74,6 +76,8 @@ export class Game {
   private readonly frontCamera=new THREE.PerspectiveCamera(48,1,.025,60);
   private readonly inspectionHidden:THREE.Object3D[]=[];
   readonly room: Room;
+  private readonly masonryBatch: MansionMasonryBatch | null;
+  private readonly siteOcclusion: SiteOcclusion | null;
   readonly mission: MissionSystem;
   readonly conduit: ConduitSystem;
   readonly mortar: MortarSystem;
@@ -175,6 +179,8 @@ export class Game {
     root.querySelector('#start-level-current')!.textContent = mansionPreview ? 'MANSION SITE · PREVIEW' : 'ORIGINAL FIRST FIX ROOM';
     if (mansionPreview) this.renderer.scene.fog = new THREE.Fog(0xaab9bd, 22, 88);
     this.room = new Room(this.renderer.scene, mansionPreview);
+    this.masonryBatch = this.room.mansionWing ? new MansionMasonryBatch(this.room.mansionWing,
+      () => {this.renderer.optimizeSiteInstances(this.room);this.renderer.invalidateMaterialPreparation();}) : null;
     this.renderer.optimizeSiteInstances(this.room);
     this.player.setMansionPreview(mansionPreview);
     if (mansionPreview && sceneParams.get('template') !== 'blank' && !sceneParams.has('level') && sceneParams.get('editor') !== '1') {
@@ -189,6 +195,7 @@ export class Game {
     }
     if (this.room.mansionWing) this.player.setSurfaceProvider((x,z,currentFloor)=>this.room.mansionWing!.surfaceHeight(x,z,currentFloor));
     this.renderer.scene.add(this.room);
+    if(mansionPreview)this.room.update(0,this.renderer.camera);
     this.hoseSupply=new HoseSupplyLine(this.renderer.scene,this.fpsRig.getObjectByName('FPS hose tool')!);
     this.mission = new MissionSystem(this.renderer.scene);
     this.room.brickWall.registerInstallations(this.mission.points);
@@ -237,6 +244,8 @@ export class Game {
     this.mobileControls.setMovementStickMode(this.movementStickMode);
     this.pvc = new PvcWorkshop(this);
     this.apprentice = new ApprenticeSystem(this, this.chasing);
+    this.siteOcclusion = this.room.mansionWing ? new SiteOcclusion(this.room.mansionWing,
+      [this.mixing.models.group, this.pvc.stock, this.mission.root, this.mortar.group, this.room]) : null;
     new MobileHUD();
     this.bindEvents();
     this.modelInspector=new ModelInspector(this);
@@ -406,6 +415,7 @@ export class Game {
       observePreparation(this.renderer.ready),
       observePreparation(this.workerBody.ready),
       observePreparation(this.apprentice.ready),
+      this.masonryBatch?.ready ?? Promise.resolve(),
     ]).then(async () => {
       await this.apprentice.crewReady;
       markPrepared();
@@ -489,20 +499,27 @@ export class Game {
   step(dt: number, waterDt = dt, present = true): void {
     this.restoreInspectionVisibility();
     if (this.levelEditor.active) {
+      this.siteOcclusion?.restore();
+      this.masonryBatch?.disableForEditor();
+      this.renderer.invalidateMaterialPreparation();
       this.levelEditor.update();
       this.room.update(dt);
+      this.room.invalidateSunShadow();
       if (present) this.renderer.render();
       return;
     }
     if(this.modelInspector.active&&!this.modelInspector.live){
+      this.siteOcclusion?.restore();
+      this.masonryBatch?.disableForEditor();
+      this.renderer.invalidateMaterialPreparation();
       for(const sound of ['spray','hose','drill','driver','trowel','mixer','hammer'] as const)this.audio.setContinuous(sound,false);
-      this.modelInspector.update(dt);if(present)this.renderer.render();return;
+      this.modelInspector.update(dt);this.room.invalidateSunShadow();if(present)this.renderer.render();return;
     }
     this.modelInspector.beforeWorld(dt);
-    this.room.mansionWing?.updateGameplayVisibility(
+    if(this.room.mansionWing?.updateGameplayVisibility(
       this.player.camera.position.x, this.player.camera.position.z,
       this.player.camera.position.y - this.player.eyeHeight,
-    );
+    ))this.room.invalidateSunShadow();
     this.room.update(dt, this.renderer.viewCamera ?? this.renderer.camera);
     this.hammerWorkStance.restore(this.renderer.camera);
     const active = this.mission.activePoint;
@@ -534,10 +551,21 @@ export class Game {
     // auto-crouch or retarget the camera from the wall point under the cursor.
     this.player.handWorkTargetY=handWork&&this.selectedTool!=='fitting'?this.boxWorkAim()?.y??null:null;
     if (this.started && !leveling && !this.pvc.focused) this.player.update(Math.min(dt, 0.05));
+    if(this.modelInspector.active)this.masonryBatch?.disableForEditor();
+    else this.masonryBatch?.update(this.renderer.camera);
+    // Outdoors the retained olive canopy and the player's moving body cast
+    // visible animated shadows. Keep those shadows live around the tree and
+    // while walking in direct daylight; enclosed bays can reuse the static map.
+    if(this.room.mansionWing && this.player.camera.position.x>9 && this.player.camera.position.z>6 &&
+       this.player.camera.position.z<16 &&
+       (this.player.velocity.lengthSq()>.001 || Math.hypot(this.player.camera.position.x-13.35,this.player.camera.position.z-11.35)<4))
+      this.room.invalidateSunShadow();
     this.fpsRig.beginFrame(dt, this.selectedTool==='hammer' && this.input.actionHeld && Math.abs(this.player.velocity.x)>1e-6
       ? this.player.velocity.x*Math.min(dt,.05) : null,this.selectedTool==='hammer'&&(this.input.actionHeld||this.input.actionRequested));
     this.renderer.camera.rotation.set(this.player.pitch, this.player.yaw, 0);
-    for(const action of this.pendingSceneActions.splice(0))action();
+    const sceneActions=this.pendingSceneActions.splice(0);
+    for(const action of sceneActions)action();
+    if(sceneActions.length){this.room.invalidateSunShadow();this.renderer.invalidateMaterialPreparation();}
     if(this.hammerAutoSide&&this.started&&!this.apprentice.ownsInput&&!leveling&&this.selectedTool==='hammer'){
       this.room.brickWall.chiselSideDegrees=this.hammerWorkStance.resolveSide(this.renderer.camera,this.room.brickWall.chiselSideDegrees);
     }
@@ -728,8 +756,12 @@ export class Game {
     if(this.renderer.viewCamera&&!this.renderer.modelScene)this.hideInspectionObstructions(this.renderer.viewCamera);
     // Catch-up physics may run several times per image. Build wet surfaces
     // only once at presentation, keeping cheap flat patches within one budget.
-    if(present)this.mortar.flushWetGeometry(64,3);
-    if(present)this.chasing.flushFragmentRendering(2048,.5);
+    if(present&&this.mortar.flushWetGeometry(64,3)>0){this.room.invalidateSunShadow();this.renderer.invalidateMaterialPreparation();}
+    if(present&&this.chasing.flushFragmentRendering(2048,.5)>0){this.room.invalidateSunShadow();this.renderer.invalidateMaterialPreparation();}
+    if(this.chasing.airborneFragmentCount>0||this.mixing.mixerRunning||this.pvc.focused||
+       this.apprentice.mode!=='off'&&this.apprentice.phase!=='idle')this.room.invalidateSunShadow();
+    if(this.modelInspector.active)this.siteOcclusion?.restore();
+    else this.siteOcclusion?.update(this.renderer.camera,dt);
     if(this.roomWater.surface.visible&&!this.roomWater.waterProActive&&!this.waterProTask&&!this.waterProFailed)void this.activateWaterPro();
     if(this.waterProTask)return;
     if (present && this.renderer.render()) {
@@ -776,6 +808,9 @@ export class Game {
       const masonry = this.room.mansionWing?.aimMasonry(this.renderer.camera);
       if (masonry) {
         if (this.fpsRig.contactMasonry(this.renderer.camera, masonry.point) && masonry.wall.strikeAt(masonry.index, this.renderer.camera, this.hammerMode)) {
+          this.room.invalidateSunShadow();
+          this.siteOcclusion?.invalidate();
+          this.renderer.invalidateMaterialPreparation();
           this.fpsRig.strike();
           this.fpsRig.toolAction = 1;
           this.audio.play('hammer', .65);
@@ -826,7 +861,7 @@ export class Game {
     if(this.selectedTool==='fitting'){if(result.success)this.boxFitPreview.clearGuide();else this.boxFitPreview.pin(this.renderer.camera,this.boxAssembly.snapshot.modules);this.boxFitPreview.invalidate();}
     if(retrieving&&result.success){this.boxAssembly.restore(target.definition.boxLayout??target.boxGroup.layout);this.syncBoxAssembly();}
     else if(this.selectedTool==='fitting'&&result.success){this.boxAssembly.reset('1G');this.syncBoxAssembly();}
-    if(result.success)this.fpsRig.toolAction=1;
+    if(result.success){this.fpsRig.toolAction=1;this.room.invalidateSunShadow();this.renderer.invalidateMaterialPreparation();}
     if(this.selectedTool==='hammer'&&result.success)this.fpsRig.strike();
     // BOX uses the live fit panel; old failure toasts must not follow a new aim.
     if(result.message&&this.selectedTool!=='fitting')this.hud.notify(result.message,result.success,this.selectedTool==='level'?4500:700);
