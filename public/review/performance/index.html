@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="el">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Electrical-Game · Καταγραφή απόδοσης</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#151719;color:#fff;font:16px system-ui,sans-serif}iframe{position:fixed;inset:0;width:100%;height:100%;border:0}button{min-height:48px;border:1px solid #f4cd36;border-radius:10px;padding:10px 14px;background:#f4cd36;color:#171717;font:700 15px system-ui;cursor:pointer}button:disabled{opacity:.55;cursor:default}.quiet{background:#23272c;color:#fff;border-color:#6e767e}#panel{position:fixed;z-index:5;top:calc(env(safe-area-inset-top) + 8px);left:50%;transform:translateX(-50%);width:min(94vw,480px);border:1px solid #555;border-radius:14px;background:#181b20f5;box-shadow:0 6px 24px #0008;padding:14px}h1{font-size:19px;margin:0 0 10px}p{margin:8px 0;line-height:1.4;color:#dce0e5}.buttons{display:flex;gap:8px;flex-wrap:wrap}#status{font-size:14px;margin:0 0 10px}#panel.compact{width:auto;max-width:94vw;padding:6px;display:flex;gap:8px;align-items:center}#panel.compact #status{margin:0;font-size:13px}#panel.compact h1,#panel.compact #intro,#panel.compact #results,#panel.compact #begin,#panel.compact #download,#panel.compact #copy,#panel.compact #close{display:none}#stop[hidden],[hidden]{display:none!important}#results{max-height:56vh;overflow:auto;margin-top:10px}table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:8px 4px;border-bottom:1px solid #454b52}th{color:#f4cd36}#summary{white-space:pre-line}a{color:#f4cd36}
+</style>
+<iframe id="game" title="Electrical-Game" allow="fullscreen; gamepad; autoplay" allowfullscreen></iframe>
+<section id="panel" aria-label="Καταγραφή απόδοσης">
+ <h1>Καταγραφή στη συσκευή σου</h1>
+ <div id="intro"><p>Πάτησε «Καταγραφή», μετά START στο παιχνίδι. Περπάτησε στην αυλή, γύρισε τη θέα και ανέβα τους ορόφους. Η καταγραφή σταματά σε δύο λεπτά ή όταν πατήσεις «Τέλος».</p><p>Διατηρούνται οι ρυθμίσεις και η πλήρης οθόνη του παιχνιδιού. Τα αποτελέσματα μένουν στη συσκευή σου.</p></div>
+ <p id="status" role="status">Φόρτωση παιχνιδιού…</p>
+ <div class="buttons"><button id="begin" disabled>Καταγραφή</button><button id="stop" hidden>Τέλος</button><button id="download" hidden>Αποθήκευση αναφοράς</button><button id="copy" class="quiet" hidden>Αντιγραφή αριθμών</button><button id="close" class="quiet">Πίσω στο παιχνίδι</button></div>
+ <div id="results" hidden><p id="summary"></p><table><thead><tr><th>Περιοχή</th><th>FPS</th><th>P95 / μέγιστο</th></tr></thead><tbody id="rows"></tbody></table><p>Μετράμε τον χρόνο ανάμεσα στις ολοκληρωμένες υποβολές εικόνας και τον χρόνο JavaScript. Αυτό δεν είναι ξεχωριστή μέτρηση GPU. Η επιστροφή από το παρασκήνιο καταγράφεται χωριστά.</p></div>
+</section>
+<script type="module" src="./recorder.js"></script>
+</html>

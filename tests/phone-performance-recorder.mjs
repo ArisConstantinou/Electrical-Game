@@ -1,0 +1,44 @@
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import {readFile,mkdir,writeFile} from 'node:fs/promises';
+import {chromium} from 'playwright';
+import {blockPointerLock} from './browser-safety.mjs';
+import {routeBuildingDist} from './building-qa-utils.mjs';
+const out='output/phone-performance-recorder';await mkdir(out,{recursive:true});
+const browser=await chromium.launch({channel:'chrome',headless:true}),result={errors:[],cases:[]};
+try{
+ const context=await browser.newContext({viewport:{width:430,height:932},deviceScaleFactor:3,isMobile:true,hasTouch:true});
+ await blockPointerLock(context);await routeBuildingDist(context);
+ await context.route('**/review/performance/**',async route=>{
+  const pathname=new URL(route.request().url()).pathname,name=pathname.endsWith('/')?'index.html':path.basename(pathname);
+  if(!['index.html','recorder.js'].includes(name))return route.abort();
+  await route.fulfill({body:await readFile(`public/review/performance/${name}`),contentType:name.endsWith('.js')?'text/javascript':'text/html'});
+ });
+ const page=await context.newPage();page.on('pageerror',e=>result.errors.push(e.message));
+ await page.goto('http://127.0.0.1:5365/Electrical-Game/review/performance/?renderer=webgl');
+ await page.locator('#begin').waitFor();await page.waitForFunction(()=>!document.querySelector('#begin').disabled,null,{timeout:120000});
+ const game=page.frames().find(f=>f.parentFrame());
+ await game.evaluate(()=>{window.__recorderBefore={step:window.__wireTheHouse.step,draw:window.__wireTheHouse.renderer.drawScene};});
+ await page.screenshot({path:`${out}/portrait-ready.png`});
+ await page.locator('#begin').tap();await game.locator('#apprentice-count').selectOption('0');await game.locator('#start-button').tap();
+ await game.evaluate(()=>window.__wireTheHouse.selectTool('hammer'));
+ await page.waitForTimeout(1200);
+ const cdp=await context.newCDPSession(page),stick=await game.locator('#joystick').boundingBox(),cx=stick.x+stick.width/2,cy=stick.y+stick.height/2;
+ const beforeMove=await game.evaluate(()=>window.__wireTheHouse.player.camera.position.z);
+ await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{id:1,x:cx,y:cy}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{id:1,x:cx,y:stick.y+stick.height*.08}]});await page.waitForTimeout(400);await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+ const afterMove=await game.evaluate(()=>window.__wireTheHouse.player.camera.position.z);assert(Math.abs(beforeMove-afterMove)>.1,'Recording preserves actual touch movement');
+ await game.evaluate(()=>document.dispatchEvent(new Event('freeze')));await page.waitForTimeout(600);await game.evaluate(()=>document.dispatchEvent(new Event('resume')));await page.waitForTimeout(1000);
+ await page.locator('#stop').tap();
+ const report=await page.evaluate(()=>window.performanceRecording.report);
+ assert(report.frames.count>30&&Number.isFinite(report.frames.fps));assert.equal(report.device.viewport.width,430);assert.equal(report.device.devicePixelRatio,3);assert.equal(report.device.backend,'WebGL2');assert(report.buildScripts.some(s=>s.includes('/assets/index-')),'Records the served build');
+ assert(report.events.some(e=>e.type==='freeze')&&report.events.some(e=>e.type==='resume'));assert.deepEqual(report.errors,[]);assert(report.samples.every(s=>s.cpuMs>=0&&Number.isFinite(s.cpuMs)&&s.triangles>0));
+ assert(await game.evaluate(()=>{const g=window.__wireTheHouse;return g.step===window.__recorderBefore.step&&g.renderer.drawScene===window.__recorderBefore.draw;}),'Finishing restores runtime methods');
+ assert(await page.locator('#download').isVisible());await page.screenshot({path:`${out}/portrait-results.png`});
+ const downloadPromise=page.waitForEvent('download');await page.locator('#download').tap();const download=await downloadPromise;await download.saveAs(`${out}/downloaded-report.json`);
+ const exported=JSON.parse(await readFile(`${out}/downloaded-report.json`,'utf8'));assert.equal(exported.frames.count,report.frames.count);
+ result.cases.push({name:'native-movement-and-resume',frames:report.frames.count,events:report.events,viewport:report.device.viewport});
+ await page.locator('#begin').tap();await page.waitForTimeout(600);await page.locator('#stop').tap();
+ const second=await page.evaluate(()=>window.performanceRecording.report);assert(second.frames.count>10&&second.frames.count<report.frames.count,'New capture starts clean');assert.equal(second.events.filter(e=>e.type==='recording-started').length,1);
+ result.cases.push({name:'fresh-second-capture',frames:second.frames.count});assert.deepEqual(result.errors,[]);result.passed=true;
+}finally{await browser.close();await writeFile(`${out}/report.json`,JSON.stringify(result,null,2));}
+console.log(JSON.stringify(result));
