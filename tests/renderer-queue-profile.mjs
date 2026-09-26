@@ -13,7 +13,7 @@ try{
   if(version==='before')await context.route(base+'**',async route=>{
    const relative=decodeURIComponent(new URL(route.request().url()).pathname.slice(new URL(base).pathname.length))||'index.html';
    if(relative!=='index.html'&&!/\.(?:js|css)$/.test(relative))return route.fallback();
-   const directory=resolve('output/encoder-previous/core'),path=resolve(directory,relative);assert(path.startsWith(directory+sep));
+   const directory=resolve(process.env.QA_BASELINE_CORE??'output/encoder-previous/core'),path=resolve(directory,relative);assert(path.startsWith(directory+sep));
    let body;try{body=await readFile(path);}catch(error){if(error.code==='ENOENT')return route.fallback();throw error;}
    await route.fulfill({body,contentType:relative.endsWith('.js')?'text/javascript':relative.endsWith('.css')?'text/css':'text/html'});
   });

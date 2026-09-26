@@ -135,6 +135,10 @@ export class MansionGroundWing extends THREE.Group {
       pivot.userData.levelEditorGround = /\b(?:ground|terrain|soil|floor)\b/i.test(object.name);
       if (object.name.startsWith('B1 ')) pivot.userData.levelEditorFloor = 5;
       if (object.name.startsWith('B2 ')) pivot.userData.levelEditorFloor = 6;
+      // The open shaft remains visible from the foyer even beyond the room's
+      // distance threshold. Its enclosure/foundation must never expose sky.
+      pivot.userData.openStairShaft = /^B[12] /.test(object.name) &&
+        (/\bstair(?:-well)?\b/.test(object.name) || /^B[12] (?:(?:circulation|garage and services) structural floor|retaining corridor )/.test(object.name));
       pivot.userData.levelEditorLabel = `${object.name}${count > 1 ? ` · ${count}` : ''}`;
       const windowSill = /^Courtyard east window sill assembly (8|12)$/.exec(object.name);
       if (windowSill) pivot.userData.levelEditorOpeningSill = true;
@@ -346,7 +350,10 @@ export class MansionGroundWing extends THREE.Group {
   updateGameplayVisibility(x: number, z: number, feetY: number): boolean {
     if (this.emptyTemplate) return false;
     let changed = false;
-    const nearStair = Math.hypot(x - 6.5, z - 9.6) < 6.5;
+    // The shaft and adjoining corridor shell stay visible independently.
+    // Workshop/storage details retain their bounded proximity policy, so the
+    // courtyard does not draw hidden below-grade rooms to close the stair void.
+    const nearStair = Math.hypot(x-6.5,z-9.6) < 6.5;
     const showB1 = feetY < -.05 || nearStair;
     // The open stair well gives the ground foyer a line of sight to B2.
     // Culling it here exposed the sky through the bottom of the stair void.
@@ -355,6 +362,7 @@ export class MansionGroundWing extends THREE.Group {
       const floor = object.userData.levelEditorFloor === 5 || object.name.startsWith('B1 ') ? 5
         : object.userData.levelEditorFloor === 6 || object.name.startsWith('B2 ') ? 6 : 0;
       if (!floor) continue;
+      if (object.userData.openStairShaft) continue;
       const shouldCull = floor === 5 ? !showB1 : !showB2;
       if (shouldCull) {
         if (!this.gameplayCulled.has(object)) this.gameplayCulled.set(object, object.visible);

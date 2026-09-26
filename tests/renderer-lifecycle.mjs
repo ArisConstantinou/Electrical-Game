@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import * as THREE from 'three';
 import {build} from 'esbuild';
 import {mkdir,writeFile} from 'node:fs/promises';
 await mkdir('output',{recursive:true});
@@ -95,5 +96,13 @@ function fixture(){
   gpu.resolve();await f.r.waitForFrame();
  }finally{globalThis.setTimeout=previousSet;globalThis.clearTimeout=previousClear;if(clockDescriptor)Object.defineProperty(performance,'now',clockDescriptor);else delete performance.now;}
  report.cases.push('late timer after CPU-blocked loading does not trigger graphics recovery');
+}
+{
+ const f=fixture(),scene=new THREE.Scene(),sun=new THREE.DirectionalLight(),source=new THREE.Mesh(new THREE.BoxGeometry(),new THREE.MeshBasicMaterial()),samples=new THREE.Group();
+ sun.castShadow=true;sun.shadow.autoUpdate=false;scene.add(sun,source);Object.assign(f.r,{scene,camera:new THREE.PerspectiveCamera(),renderCamera:new THREE.PerspectiveCamera()});
+ let target=null;Object.assign(f.r.gpu,{compileAsync:async()=>{},getRenderTarget:()=>target,setRenderTarget:value=>{target=value;},render:()=>{assert.equal(source.visible,false);sun.shadow.needsUpdate=false;}});
+ await f.r.prepareToolResources(samples);
+ assert.equal(source.visible,true);assert.equal(samples.parent,null);assert.equal(target,null);assert.equal(sun.shadow.needsUpdate,true,'Sample-only warmup must not leave an empty cached sun map after recovery');
+ report.cases.push('tool warmup restores full-site shadow invalidation for the first recovered frame');
 }
 report.passed=true;await writeFile('output/renderer-lifecycle.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));

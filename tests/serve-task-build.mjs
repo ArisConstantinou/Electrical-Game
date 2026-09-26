@@ -13,4 +13,15 @@ export async function serveTaskBuild(context,base){
     const contentType=path.endsWith('.js')?'text/javascript':path.endsWith('.css')?'text/css':path.endsWith('.html')?'text/html':path.endsWith('.png')?'image/png':'application/octet-stream';
     await route.fulfill({status:200,contentType,body:await readFile(path)});
   });
+  // Sparse reference cores share unchanged static assets with this build.
+  if(process.env.TASK_BUILD_CORE){
+    const core=resolve(process.env.TASK_BUILD_CORE);
+    await context.route(origin.origin+prefix+'**',async route=>{
+      const relative=decodeURIComponent(new URL(route.request().url()).pathname.slice(prefix.length))||'index.html';
+      if(relative!=='index.html'&&!/\.(?:js|css)$/.test(relative))return route.fallback();
+      const path=resolve(core,relative);assert(path.startsWith(core+sep));
+      let body;try{body=await readFile(path);}catch(error){if(error.code==='ENOENT')return route.fallback();throw error;}
+      await route.fulfill({body,contentType:relative.endsWith('.js')?'text/javascript':relative.endsWith('.css')?'text/css':'text/html'});
+    });
+  }
 }

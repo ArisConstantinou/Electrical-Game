@@ -37,8 +37,11 @@ export class SiteOcclusion {
     const visited = new Set<THREE.Mesh>();
     for (const root of this.roots) {
       if (!root.visible) continue;
-      root.updateWorldMatrix(true, true);
+      root.updateWorldMatrix(true, false);
       root.traverseVisible(object => {
+        // Update only the visible path used by this query. Traversing all
+        // hidden tools and basement descendants here caused idle spikes.
+        if(object!==root)object.updateWorldMatrix(false,false);
         if (!(object instanceof THREE.Mesh) || object instanceof THREE.SkinnedMesh) return;
         visited.add(object);
         const originalMask = this.hidden.get(object) ?? object.layers.mask;
@@ -84,9 +87,16 @@ export class SiteOcclusion {
     const alongX = obstacle.maxX - obstacle.minX > obstacle.maxZ - obstacle.minZ;
     const plane = alongX ? (obstacle.minZ + obstacle.maxZ) / 2 : (obstacle.minX + obstacle.maxX) / 2;
     const eyeAxis = alongX ? this.eye.z : this.eye.x;
+    // A bound straddling the wall, or on the eye's side, cannot be fully
+    // covered. Reject it before doing eight ray/rectangle intersections.
+    const closestAxis=eyeAxis>plane?(alongX?box.max.z:box.max.x):(alongX?box.min.z:box.min.x);
+    if((eyeAxis-plane)*(closestAxis-plane)>=0)return false;
     const floor = obstacle.minFloorY ?? wall.group.position.y;
     const ceiling = obstacle.maxFloorY ?? floor + 3;
-    for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) {
+    for(let corner=0;corner<8;corner++){
+      const x=corner&1?box.max.x:box.min.x;
+      const y=corner&2?box.max.y:box.min.y;
+      const z=corner&4?box.max.z:box.min.z;
       const pointAxis = alongX ? z : x;
       const distance = pointAxis - eyeAxis;
       if (Math.abs(distance) < 1e-5) return false;

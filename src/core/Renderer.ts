@@ -5,6 +5,7 @@ import { GAME_CONFIG } from '../data/gameConfig';
 import { laserBand, laserTint, laserEmission } from '../systems/LaserProjection';
 import type { RoomWaterSystem } from '../systems/RoomWaterSystem';
 import type { RoomWaterRuntime } from '../generated/room-water-runtime';
+import { HiddenRenderTransforms } from '../world/HiddenRenderTransforms';
 
 export class Renderer {
   readonly scene = new THREE.Scene();
@@ -51,6 +52,7 @@ export class Renderer {
   private lastRenderTime=performance.now();
   private readonly materialCache=new WeakMap<THREE.Material,THREE.Material>();
   private materialsDirty=true;
+  private readonly hiddenTransforms=new HiddenRenderTransforms();
   private readonly optimizedInstances=new WeakSet<THREE.Object3D>();
   private mortarSurface:THREE.Texture|null=null;
   private readonly gazeEuler=new THREE.Euler(0,0,0,'YXZ');
@@ -252,7 +254,12 @@ export class Renderer {
         for(const object of hidden)object.visible=true;
         target.dispose();
       }
-    }finally{this.scene.remove(samples);}
+    }finally{
+      this.scene.remove(samples);
+      // Sample-only warmup can consume the cached sun map. The first real
+      // frame, including after device recovery, must contain the whole site.
+      this.scene.traverse(object=>{if(object instanceof THREE.DirectionalLight&&object.castShadow)object.shadow.needsUpdate=true;});
+    }
   }
   /** Use vertex attributes for authored site instances. Three's default
    * uniform array makes a pipeline for each instance count and uploads its
@@ -313,10 +320,24 @@ export class Renderer {
       }
     }finally{this.gpu.setSize(size.x,size.y,false);}
   }
+  /** Prepare one real route view during LOADING, without forcing invisible
+   * source meshes or every LOD into the GPU cache. */
+  async prepareSiteFrame():Promise<void>{
+    await this.ready;
+    this.prepareMaterials();this.snapshotRenderCamera();
+    const size=this.gpu.getSize(new THREE.Vector2());
+    try{
+      this.gpu.setSize(1,1,false);
+      this.gpu.render(this.scene,this.renderCamera);
+      this.fenceSubmittedFrame();await this.waitForFrame();
+    }finally{this.gpu.setSize(size.x,size.y,false);}
+    await new Promise<void>(resolve=>setTimeout(resolve,0));
+  }
   private prepareMaterials():void{
     if(!this.materialsDirty)return;
     this.materialsDirty=false;
     this.scene.traverse(object=>{
+      this.hiddenTransforms.prepare(object);
       const mesh=object as THREE.Mesh;if(!mesh.isMesh||Array.isArray(mesh.material))return;
       const old=mesh.material as THREE.MeshStandardMaterial;
       if(!old.isMeshStandardMaterial||(old as unknown as MeshStandardNodeMaterial).isNodeMaterial)return;

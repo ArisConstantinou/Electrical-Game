@@ -12,6 +12,7 @@ import { createCourtyardClayStack, createTimberPallet } from './LooseClaySupplie
 
 /** A traversable open-air room, with reused live olive geometry rather than a backdrop. */
 export class MansionCourtyard extends THREE.Group {
+  readonly ready:Promise<void>;
   readonly obstacles: PlayerObstacle[] = [];
   readonly masonryDemolition = new Map<string, MansionMasonryDemolition>();
   private readonly tree: THREE.Object3D | null;
@@ -43,8 +44,8 @@ export class MansionCourtyard extends THREE.Group {
         this.tree.add(this.treeColliderProxy);
       }
       this.obstacles.push({ id: 'retained-olive-trunk', minX: 13.02, maxX: 13.68, minZ: 11.02, maxZ: 11.68 });
-      this.loadScannedCourtTree(this.tree);
     }
+    this.ready=this.tree?this.loadScannedCourtTree(this.tree):Promise.resolve();
   }
 
   update(dt: number): void {
@@ -64,7 +65,8 @@ export class MansionCourtyard extends THREE.Group {
     }
   }
 
-  private loadScannedCourtTree(tree: THREE.Object3D): void {
+  private loadScannedCourtTree(tree: THREE.Object3D): Promise<void> {
+    return new Promise(resolve=>{
     const requestedAt = performance.now();
     const decoder = new DRACOLoader();
     decoder.setDecoderPath(`${import.meta.env.BASE_URL}assets/draco/`);
@@ -78,6 +80,7 @@ export class MansionCourtyard extends THREE.Group {
       if (!(trunk instanceof THREE.Mesh) || !(branches instanceof THREE.Mesh) || !(leaves instanceof THREE.Mesh)) {
         tree.userData.scannedError = 'Optimized tree has missing parts';
         decoder.dispose();
+        resolve();
         return;
       }
       const canopy = new THREE.Group();
@@ -151,7 +154,9 @@ export class MansionCourtyard extends THREE.Group {
       tree.userData.scannedTriangles = [trunk, branches, leaves].reduce((sum, part) =>
         sum + (part.geometry.index?.count ?? part.geometry.getAttribute('position').count) / 3, 0);
       decoder.dispose();
-    }, undefined, error => { tree.userData.scannedError = String(error); decoder.dispose(); });
+      resolve();
+    }, undefined, error => { tree.userData.scannedError = String(error); decoder.dispose(); resolve(); });
+    });
   }
 
   private addGround(): void {

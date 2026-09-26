@@ -33,6 +33,9 @@ try{
  const report=await page.evaluate(()=>window.performanceRecording.report);
  assert(report.frames.count>30&&Number.isFinite(report.frames.fps));assert.equal(report.device.viewport.width,430);assert.equal(report.device.devicePixelRatio,3);assert.equal(report.device.backend,'WebGL2');assert(report.buildScripts.some(s=>s.includes('/assets/index-')),'Records the served build');
  assert(report.events.some(e=>e.type==='freeze')&&report.events.some(e=>e.type==='resume'));assert.deepEqual(report.errors,[]);assert(report.samples.every(s=>s.cpuMs>=0&&Number.isFinite(s.cpuMs)&&s.triangles>0));
+ assert(report.slowestFrames.length===5&&report.slowestFrames.every(s=>Number.isFinite(s.cpuMs)&&s.geometries>0&&s.textures>0&&typeof s.shadowRequested==='boolean'));
+ assert(report.slowestFrames.every((s,i,a)=>!i||s.frameMs<=a[i-1].frameMs),'Real slow frames are exported in descending interval order');
+ assert.match(await page.locator('#summary').textContent(),/CPU παιχνιδιού: P95/);
  assert(await game.evaluate(()=>{const g=window.__wireTheHouse;return g.step===window.__recorderBefore.step&&g.renderer.drawScene===window.__recorderBefore.draw;}),'Finishing restores runtime methods');
  assert(await page.locator('#download').isVisible());await page.screenshot({path:`${out}/portrait-results.png`});
  const downloadPromise=page.waitForEvent('download');await page.locator('#download').tap();const download=await downloadPromise;await download.saveAs(`${out}/downloaded-report.json`);

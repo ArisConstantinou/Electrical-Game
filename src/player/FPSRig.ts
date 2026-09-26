@@ -28,6 +28,13 @@ const material = (color: number, roughness = 0.7, metalness = 0.05): THREE.MeshS
 const place = (object: THREE.Object3D, x: number, y: number, z: number): THREE.Object3D => { object.position.set(x, y, z); object.renderOrder = 20; return object; };
 
 export class FPSRig extends THREE.Group {
+  override updateWorldMatrix(updateParents:boolean,updateChildren:boolean,force=false):void{
+    // Explicit queries on a stowed tool still update it directly. Camera and
+    // active-grip queries need only the tool trees visible in this frame.
+    super.updateWorldMatrix(updateParents,false,force);
+    if(updateChildren)for(const child of this.children)
+      if(child.visible)child.updateWorldMatrix(false,true,true);
+  }
   readonly hammerReady:Promise<void>;
   useAnatomicalSpray(active:boolean):void {this.useAnatomicalBody(active);}
   useAnatomicalBody(active:boolean):void {

@@ -33,6 +33,8 @@ export class ConstructionRenderBatch {
       const visibilityFloor=owner.userData.levelEditorFloor===5||owner.name.startsWith('B1 ')?5:
         owner.userData.levelEditorFloor===6||owner.name.startsWith('B2 ')?6:0;
       object.userData.constructionVisibilityFloor=visibilityFloor;
+      const openStairShaft=Boolean(owner.userData.openStairShaft);
+      object.userData.openStairShaft=openStairShaft;
       const floor = Math.round(object.getWorldPosition(new THREE.Vector3()).y / 3.3);
       const attributes=Object.keys(object.geometry.attributes).sort().join(',');
       let materialKey=materialKeys.get(object.material);
@@ -41,7 +43,7 @@ export class ConstructionRenderBatch {
         materialKey=JSON.stringify(renderState)+object.material.customProgramCacheKey();
         materialKeys.set(object.material,materialKey);
       }
-      const key = `${visibilityFloor}:${floor}:${materialKey}:${attributes}:${object.castShadow}:${object.receiveShadow}:${object.layers.mask}`;
+      const key = `${visibilityFloor}:${openStairShaft}:${floor}:${materialKey}:${attributes}:${object.castShadow}:${object.receiveShadow}:${object.layers.mask}`;
       const meshes = buckets.get(key) ?? [];
       meshes.push(object); buckets.set(key, meshes);
     });
@@ -59,6 +61,7 @@ export class ConstructionRenderBatch {
       // Basement visibility is owned by the same floor as its authored source;
       // grouping may never make a hidden slab persist over an open stair void.
       batch.userData.levelEditorFloor=source.userData.constructionVisibilityFloor;
+      batch.userData.openStairShaft=source.userData.openStairShaft;
       batch.raycast = () => undefined;
       root.add(batch); this.batches.push(batch);
       for (const mesh of meshes) { this.sources.set(mesh, mesh.visible); mesh.visible = false; }

@@ -44,7 +44,8 @@ function finish(){
  report={schema:2,createdAt:new Date().toISOString(),gameURL:gameURL.href,buildScripts:[...frame.contentDocument.querySelectorAll('script[src]')].map(s=>s.src),device:{userAgent:navigator.userAgent,viewport:{width:innerWidth,height:innerHeight},devicePixelRatio,canvas:{width:canvas.width,height:canvas.height},backend:backend.isWebGLBackend?'WebGL2':'WebGPU'},durationMs:number(performance.now()-startedAt),visiblePlayingMs:number(visibleMs),effectiveFPS:visibleMs?number(presentations*1000/visibleMs):null,longestPresentationGapMs:number(longestGap),finalState,diagnostics,method:'Successful scene submissions, not isolated GPU completion. Interval statistics describe received frames only. Effective FPS includes time without new submissions while visible and playing, including a frozen tail. Paused/background time is excluded. One independent child animation heartbeat and one diagnostic snapshot per second.',frames:stats(samples.map(s=>s.frameMs)),cpu:stats(samples.map(s=>s.cpuMs)),byArea,errors:[...errors,...renderer.renderError?[renderer.renderError]:[]],events,samples};
  panel.classList.remove('compact');panel.classList.add('completed');$('stop').hidden=true;$('begin').hidden=false;$('begin').textContent='Νέα καταγραφή';$('results').hidden=false;$('download').hidden=!samples.length;$('copy').hidden=!samples.length;
  $('status').textContent=finalState.gapMs>2000?'Το παιχνίδι σταμάτησε να δίνει νέα καρέ. Η διάγνωση αποθηκεύτηκε.':samples.length?'Η καταγραφή ολοκληρώθηκε.':'Δεν καταγράφηκαν εικόνες παιχνιδιού. Πάτησε START και ξαναδοκίμασε.';
- const s=report.frames;$('summary').textContent=s?`${report.effectiveFPS} FPS συνολικά · ${s.count} διαστήματα καρέ\nΚαρέ που ελήφθησαν: ${s.fps} FPS\nP95: ${s.p95Ms} ms · μέγιστο: ${s.maxMs} ms\n${s.over50ms} καρέ πάνω από 50 ms\nΜεγαλύτερο διάστημα χωρίς νέο καρέ: ${number(longestGap/1000)} s`:'Χωρίς δείγματα.';
+ report.slowestFrames=[...samples].sort((a,b)=>b.frameMs-a.frameMs).slice(0,5);
+ const s=report.frames;$('summary').textContent=s?`${report.effectiveFPS} FPS συνολικά · ${s.count} διαστήματα καρέ\nΚαρέ που ελήφθησαν: ${s.fps} FPS\nP95: ${s.p95Ms} ms · μέγιστο: ${s.maxMs} ms\n${s.over50ms} καρέ πάνω από 50 ms\nCPU παιχνιδιού: P95 ${report.cpu.p95Ms} ms · μέγιστο ${report.cpu.maxMs} ms\nΜεγαλύτερο διάστημα χωρίς νέο καρέ: ${number(longestGap/1000)} s`:'Χωρίς δείγματα.';
  $('rows').replaceChildren();for(const [name,s]of Object.entries(byArea)){const row=document.createElement('tr');for(const text of [name,s.fps,`${s.p95Ms} / ${s.maxMs} ms`]){const cell=document.createElement('td');cell.textContent=text;row.append(cell);}$('rows').append(row);}
 }
 function start(){
@@ -63,13 +64,13 @@ function start(){
   }
  };
  wrappedDraw=function(...args){
-  const began=performance.now(),cpuBeforeDraw=pendingCPU;
+  const began=performance.now(),cpuBeforeDraw=pendingCPU,shadowRequested=!!game.room.sun?.shadow.needsUpdate;
   const result=originalDraw.apply(this,args);
   {
    const now=performance.now();if(active&&game.started&&!document.hidden&&!frame.contentDocument.hidden){
     if(!first){first=now;visibleAt=now;note('first-game-frame');}presentations++;
     if(last)longestGap=Math.max(longestGap,now-last);
-    if(last&&samples.length<30000){const p=game.player.camera.position,sample={atMs:number(now-startedAt),frameMs:number(now-last),cpuMs:number(cpuBeforeDraw+now-began),area:area(),position:[number(p.x),number(p.y),number(p.z)],tool:game.selectedTool,drawCalls:game.renderer.webgl.info.render.calls,triangles:game.renderer.webgl.info.render.triangles};samples.push(sample);if(activeStep)activeStep.sample=sample;}
+    if(last&&samples.length<30000){const p=game.player.camera.position,info=game.renderer.webgl.info,sample={atMs:number(now-startedAt),frameMs:number(now-last),cpuMs:number(cpuBeforeDraw+now-began),area:area(),position:[number(p.x),number(p.y),number(p.z)],tool:game.selectedTool,drawCalls:info.render.calls,triangles:info.render.triangles,geometries:info.memory.geometries,textures:info.memory.textures,shadowRequested};samples.push(sample);if(activeStep)activeStep.sample=sample;}
     last=now;
    }
    if(activeStep)activeStep.drawn=true;
@@ -105,7 +106,7 @@ $('download').onclick=async()=>{
  if(navigator.canShare?.({files:[file]})){try{await navigator.share({files:[file],title:'Electrical-Game performance'});return;}catch(error){if(error.name==='AbortError')return;}}
  const url=URL.createObjectURL(file),link=document.createElement('a');link.href=url;link.download=file.name;link.click();setTimeout(()=>URL.revokeObjectURL(url),30000);
 };
-$('copy').onclick=async()=>{if(!report?.frames)return;try{await navigator.clipboard.writeText(`${navigator.userAgent}\n${report.device.backend} · ${report.device.canvas.width}×${report.device.canvas.height}\nΈκδοση: ${report.buildScripts.join(', ')}\n${$('summary').textContent}\n${Object.entries(report.byArea).map(([name,s])=>`${name}: ${s.fps} FPS, P95 ${s.p95Ms}ms, max ${s.maxMs}ms`).join('\n')}\nΔιάγνωση: ${JSON.stringify(report.finalState)}\nΣφάλματα: ${JSON.stringify(report.errors)}`);$('status').textContent='Οι αριθμοί και η διάγνωση αντιγράφηκαν.';}catch{$('status').textContent='Η αντιγραφή δεν επιτράπηκε. Χρησιμοποίησε την αποθήκευση αναφοράς.';}};
+$('copy').onclick=async()=>{if(!report?.frames)return;try{await navigator.clipboard.writeText(`${navigator.userAgent}\n${report.device.backend} · ${report.device.canvas.width}×${report.device.canvas.height}\nΈκδοση: ${report.buildScripts.join(', ')}\n${$('summary').textContent}\n${Object.entries(report.byArea).map(([name,s])=>`${name}: ${s.fps} FPS, P95 ${s.p95Ms}ms, max ${s.maxMs}ms`).join('\n')}\nΑργότερα καρέ: ${JSON.stringify(report.slowestFrames)}\nΔιάγνωση: ${JSON.stringify(report.finalState)}\nΣφάλματα: ${JSON.stringify(report.errors)}`);$('status').textContent='Οι αριθμοί και η διάγνωση αντιγράφηκαν.';}catch{$('status').textContent='Η αντιγραφή δεν επιτράπηκε. Χρησιμοποίησε την αποθήκευση αναφοράς.';}};
 const wait=setInterval(()=>{
  try{const g=frame.contentWindow.__wireTheHouse;if(!g?.isReadyForStart)return;game=g;clearInterval(wait);$('begin').disabled=false;$('status').textContent='Έτοιμο για καταγραφή.';}catch{$('status').textContent='Δεν μπορούμε να διαβάσουμε το παιχνίδι. Άνοιξε αυτή τη σελίδα από τον ίδιο ιστότοπο.';clearInterval(wait);}
 },500);

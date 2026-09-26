@@ -435,6 +435,7 @@ export class Game {
     addEventListener('wirehouse:graphics-lost',()=>{this.suspendLifecycle();if(!document.hidden)queueMicrotask(()=>void this.resumeLifecycle());});
     this.hud.onStart(() => {
       this.started = true;
+      this.fpsWindowStart=performance.now();this.fpsFrames=0;
       if (matchMedia('(pointer: fine)').matches)
         window.dispatchEvent(new Event('wirehouse:request-desktop-look-lock'));
       if(this.apprentice.count>=1){
@@ -460,7 +461,7 @@ export class Game {
     }
     loadingIcons.forEach((icon, index) => { icon.style.animationDelay = `${iconOrder[index] * .85}s`; });
     const viewStages=mansionPreview&&this.room.mansionWing&&sceneParams.get('template')!=='blank'&&
-      !sceneParams.has('level')&&sceneParams.get('editor')!=='1'?1:0;
+      !sceneParams.has('level')&&sceneParams.get('editor')!=='1'?8:0;
     let preparedStages = 0;
     const markPrepared = (): void => {
       if (startButton.dataset.preparing === 'false') return;
@@ -495,7 +496,23 @@ export class Game {
       } else if (params.get('template') === 'blank') root.querySelector('#start-level-current')!.textContent = 'NEW SITE · UNSAVED';
       markPrepared();
       if(viewStages&&this.room.mansionWing){
+        await this.room.mansionWing.courtyard.ready;
         await this.renderer.prepareSiteViews([-Math.PI/2],this.player.pitch,markPrepared);
+        const position=this.player.camera.position.clone(),yaw=this.player.yaw,pitch=this.player.pitch;
+        try{
+          for(const view of [
+            [0,1.65,2,0], [12,1.65,14.4,1.8], [12,1.65,14.4,-.42],
+            [7.5,8.25,2.75,-1], [7.5,14.85,2.75,-1],
+            [11,-1.75,2.2,-1], [11,-5.15,2.2,-1],
+          ]){
+            this.player.camera.position.set(view[0],view[1],view[2]);this.player.yaw=view[3];this.player.pitch=.15;
+            this.step(0,0,false);
+            await this.renderer.prepareSiteFrame();markPrepared();
+          }
+        }finally{
+          this.player.camera.position.copy(position);this.player.yaw=yaw;this.player.pitch=pitch;
+          this.step(0,0,false);
+        }
       }
       if (!missingSelectedLevel && params.get('editor') !== '1') {
         // A one-pixel shader warmup leaves the full-size colour/shadow passes
@@ -558,7 +575,7 @@ export class Game {
     }
   }
 
-  step(dt: number, waterDt = dt, present = true): void {
+  step(dt: number, waterDt = dt, present = true, bodyDt:number|null=dt): void {
     this.restoreInspectionVisibility();
     if (this.levelEditor.active) {
       this.siteOcclusion?.restore();
@@ -813,8 +830,8 @@ export class Game {
     this.workerBody.overview=this.frontBodyView||this.modelInspector.live;
     const bodyPlayer=this.mixing.wheelbarrow.driving?{eyeHeight:1.65,velocity:this.player.velocity,yaw:this.mixing.wheelbarrow.telemetry.yaw+Math.PI,pitch:-.60}:this.pvc.focused?{eyeHeight:this.renderer.camera.position.y,velocity:this.player.velocity,yaw:this.player.yaw,pitch:this.player.pitch}:this.player;
     const clearPipeLayout=this.pvc.focused&&['spreading','marking','fastener-marking','pipe-install-ready'].includes(this.pvc.phase)&&!this.workerBody.overview;
-    if(!clearPipeLayout&&(this.selectedTool!=='hose'||mixingOwnedInput||pvcOwnedInput)){
-      const poseBody=()=>this.workerBody.update(dt,this.renderer.camera,bodyPlayer,this.fpsRig,this.selectedTool,this.input.actionHeld,mixingOwnedInput||this.pvc.blocksWork,this.pvc.blocksWork?this.pvc.anatomicalGrips():this.mixing.anatomicalGrips(),this.workSurfaces.frontForBounds);
+    if(bodyDt!==null&&!clearPipeLayout&&(this.selectedTool!=='hose'||mixingOwnedInput||pvcOwnedInput)){
+      const poseBody=()=>this.workerBody.update(bodyDt,this.renderer.camera,bodyPlayer,this.fpsRig,this.selectedTool,this.input.actionHeld,mixingOwnedInput||this.pvc.blocksWork,this.pvc.blocksWork?this.pvc.anatomicalGrips():this.mixing.anatomicalGrips(),this.workSurfaces.frontForBounds);
       // Box and level grips test hundreds of candidate poses. Installed
       // casings and mortar stay fixed for this synchronous solve, so reuse
       // their bounds without changing contact or collision decisions.
@@ -1314,7 +1331,11 @@ export class Game {
     if(elapsed===0)this.step(0);
     for(let remaining=elapsed;remaining>1e-8;){
       const dt=Math.min(remaining,.05);remaining-=dt;
-      this.step(dt,dt,remaining<=1e-8);
+      // A delayed GPU frame can require several physics steps. Solve the
+      // displayed body once at their final state, retaining all elapsed pose
+      // time. Tool-release and hose-emission contact solves remain in step().
+      const present=remaining<=1e-8;
+      this.step(dt,dt,present,present?elapsed:null);
     }
     const workMs=performance.now()-frameStart;
     this.nextGameFrameAt=performance.now()+(workMs>32?Math.min(18,workMs-24):0);

@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import * as THREE from 'three';
+import {HiddenRenderTransforms} from '../src/world/HiddenRenderTransforms.ts';
+const scene=new THREE.Group(),hidden=new THREE.Group(),anchor=new THREE.Object3D(),policy=new HiddenRenderTransforms();
+scene.add(hidden);hidden.add(anchor);anchor.position.set(1,2,3);scene.updateMatrixWorld(true);
+scene.traverse(o=>policy.prepare(o));hidden.visible=false;hidden.position.x=5;
+let updates=0;const matrixUpdate=anchor.updateMatrix.bind(anchor);anchor.updateMatrix=()=>{updates++;matrixUpdate();};
+for(let i=0;i<120;i++)scene.updateMatrixWorld(true);
+assert.equal(updates,0,'Hidden descendants must skip frame transforms');
+assert.deepEqual(anchor.getWorldPosition(new THREE.Vector3()).toArray(),[6,2,3],'Explicit hidden-anchor query stays correct');
+hidden.visible=true;hidden.position.x=8;scene.updateMatrixWorld(true);
+assert.deepEqual(anchor.getWorldPosition(new THREE.Vector3()).toArray(),[9,2,3],'First visible frame restores current transforms');
+const camera=new THREE.PerspectiveCamera();camera.visible=false;camera.position.x=2;policy.prepare(camera);camera.updateMatrixWorld(true);assert.equal(camera.matrixWorld.elements[12],2,'Hidden logical cameras continue to update');
+console.log('Hidden render transforms: skipped frame work, explicit anchor queries, visibility restoration and cameras PASS');
