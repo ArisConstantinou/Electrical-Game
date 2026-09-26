@@ -5,6 +5,14 @@ type Surface = 'floor' | 'concrete' | 'plaster' | 'clay';
 const textureSources = new Map<Surface, HTMLCanvasElement>();
 const textureLoader = new THREE.TextureLoader();
 const materialTextures = new Map<string, THREE.Texture>();
+const loadingImages:Promise<Error|null>[]=[];
+/** Cloned textures share their source image, but clone() marks them for upload
+ * immediately. Wait for that source before compiling/rendering the site. */
+export async function siteMaterialsReady():Promise<void>{
+  const results=await Promise.all(loadingImages);
+  const error=results.find(result=>result!==null);
+  if(error)throw error;
+}
 const photographed: Partial<Record<Surface, string>> = new URLSearchParams(location.search).get('materials') === 'legacy' ? {} : {
   floor: 'concrete_screed',
   concrete: 'concrete',
@@ -19,7 +27,10 @@ function photographedTexture(surface: Surface, repeatX: number, repeatY: number,
   const sourceKey = `image:${filename}`;
   let sourceImage = materialTextures.get(sourceKey);
   if (!sourceImage) {
-    sourceImage = textureLoader.load(`${import.meta.env.BASE_URL}assets/site-materials/${filename}`);
+    const url=`${import.meta.env.BASE_URL}assets/site-materials/${filename}`;
+    let resolveImage!:(error:Error|null)=>void;
+    loadingImages.push(new Promise(resolve=>{resolveImage=resolve;}));
+    sourceImage = textureLoader.load(url,()=>resolveImage(null),undefined,()=>resolveImage(new Error(`Construction texture failed to load: ${filename}`)));
     if (kind === 'albedo') sourceImage.colorSpace = THREE.SRGBColorSpace;
     materialTextures.set(sourceKey, sourceImage);
   }

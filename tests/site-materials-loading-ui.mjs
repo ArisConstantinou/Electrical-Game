@@ -1,0 +1,33 @@
+import assert from 'node:assert/strict';
+import {chromium} from 'playwright';
+import {mkdir,writeFile} from 'node:fs/promises';
+import {blockPointerLock} from './browser-safety.mjs';
+import {serveTaskBuild} from './serve-task-build.mjs';
+const base='http://127.0.0.1:5365/Electrical-Game/',out=process.argv[2]??'output/site-materials-loading';
+await mkdir(out,{recursive:true});
+const report={method:'Real WebGPU, cold image requests; hold the shared concrete images until other startup resources can finish.',errors:[],console:[],held:0};
+const browser=await chromium.launch({channel:'chrome',headless:true});let release;
+const held=new Promise(resolve=>{release=resolve;});
+try{
+ const context=await browser.newContext({viewport:{width:430,height:932},deviceScaleFactor:2,isMobile:true,hasTouch:true});await blockPointerLock(context);await serveTaskBuild(context,base);
+ await context.route('**/assets/site-materials/concrete-wall-009-*-1k.jpg',async route=>{report.held++;await held;await route.fallback();});
+ const page=await context.newPage();page.on('pageerror',e=>report.errors.push(e.message));page.on('console',m=>{if(m.type()==='error')report.console.push(m.text());});await page.goto(base,{waitUntil:'domcontentloaded'});
+ await page.waitForTimeout(8000);
+ report.waiting=await page.evaluate(()=>({ready:!!window.__wireTheHouse?.isReadyForStart,disabled:document.querySelector('#start-button')?.disabled,progress:document.querySelector('#start-load-percent')?.value}));
+ await page.screenshot({path:`${out}/waiting.png`});
+ assert(report.held>=2,'Both shared concrete images must still be loading');
+ assert.equal(report.waiting.ready,false,'Do not present incomplete material textures as ready');
+ assert.equal(report.waiting.disabled,true,'Keep loading until the shared images are usable');
+ assert.notEqual(report.waiting.progress,'LOAD FAILED','A slow valid image must not crash the texture upload');
+ release();await page.waitForFunction(()=>window.__wireTheHouse?.isReadyForStart,undefined,{timeout:120000});await page.locator('#start-button').tap();await page.waitForTimeout(1200);
+ report.running=await page.evaluate(()=>({started:window.__wireTheHouse.started,raf:window.__wireTheHouse.animationFrame,error:window.__wireTheHouse.renderer.renderError}));
+ assert(report.running.started&&report.running.raf!==null);assert.equal(report.running.error,'');assert.deepEqual(report.errors,[]);assert(!report.console.some(s=>s.includes('Site preparation failed')));
+ await page.screenshot({path:`${out}/running.png`});await context.close();
+ const failedContext=await browser.newContext({viewport:{width:430,height:932},isMobile:true,hasTouch:true});await blockPointerLock(failedContext);await serveTaskBuild(failedContext,base);
+ await failedContext.route('**/assets/site-materials/concrete-wall-009-albedo-1k.jpg',route=>route.fulfill({status:404,body:'Missing test image'}));
+ const failedPage=await failedContext.newPage();await failedPage.goto(base);
+ await failedPage.waitForFunction(()=>document.querySelector('#start-load-percent')?.value==='LOAD FAILED',undefined,{timeout:120000});
+ report.failedAsset=await failedPage.evaluate(()=>({ready:!!window.__wireTheHouse?.isReadyForStart,label:document.querySelector('#start-button-label')?.textContent,disabled:document.querySelector('#start-button')?.disabled}));
+ assert.equal(report.failedAsset.ready,false);assert.equal(report.failedAsset.label,'RETRY LOADING');assert.equal(report.failedAsset.disabled,false,'A missing image must leave a usable retry action');report.passed=true;
+}finally{release();await browser.close();await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));}
+console.log(JSON.stringify(report));

@@ -45,6 +45,8 @@ export class Renderer {
   private readonly waterProjection=new THREE.Matrix4();
   private readonly waterEye=new THREE.Vector3();
   private renderTask:Promise<void>|null=null;
+  private readonly submittedFrames=new Set<Promise<void>>();
+  private queueWaitMaxMs=0;
   private pendingSize:{width:number;height:number}|null=null;
   private lastRenderTime=performance.now();
   private readonly materialCache=new WeakMap<THREE.Material,THREE.Material>();
@@ -55,8 +57,8 @@ export class Renderer {
   private readonly gazeQuaternion=new THREE.Quaternion();
   renderError='';
   /** Gameplay may advance again once all passes using this scene have finished. */
-  get framePending():boolean{return this.renderTask!==null||this.recoveryTask!==null||this.deviceLost||this.graphicsFault||this.recoveryBlocked||this.suspended;}
-  get lifecycleTelemetry():object{return{suspended:this.suspended,recovering:this.recoveryTask!==null,deviceLost:this.deviceLost,contextLost:this.contextLost,recoveries:this.recoveryCount,generation:this.renderGeneration,graphicsFault:this.graphicsFault,recoveryBlocked:this.recoveryBlocked,graphicsErrors:this.graphicsErrors};}
+  get framePending():boolean{return this.renderTask!==null||this.submittedFrames.size>=2||this.pendingSize!==null&&this.submittedFrames.size>0||this.recoveryTask!==null||this.deviceLost||this.graphicsFault||this.recoveryBlocked||this.suspended;}
+  get lifecycleTelemetry():object{return{suspended:this.suspended,recovering:this.recoveryTask!==null,deviceLost:this.deviceLost,contextLost:this.contextLost,recoveries:this.recoveryCount,generation:this.renderGeneration,graphicsFault:this.graphicsFault,recoveryBlocked:this.recoveryBlocked,queuedFrames:this.submittedFrames.size,queueWaitMaxMs:Math.round(this.queueWaitMaxMs),graphicsErrors:this.graphicsErrors};}
 
   constructor(container: HTMLElement) {
     this.scene.background = new THREE.Color(0xaab9bd);
@@ -123,11 +125,14 @@ export class Renderer {
    * invalid encoder must be retired; losing the RAF callback is not recovery. */
   recoverFromFrameError(error:unknown):boolean{
     const message=String(error);
-    if(!/InvalidStateError/.test(message)||!/GPUCommandEncoder\.(?:beginRenderPass|beginComputePass|finish)/.test(message))return false;
+    if(!/InvalidStateError/.test(message)||!/(?:GPUDevice|GPUCommandEncoder|GPUCommandBuffer|GPURenderPassEncoder|GPUComputePassEncoder|GPUQueue)\./.test(message))return false;
+    this.failGraphicsFrame(message);
+    return true;
+  }
+  private failGraphicsFrame(message:string):void{
     this.recordGraphicsError(message);this.renderError=message;this.graphicsFault=true;
     this.recoveryBlocked=++this.faultAttempts>2;
     window.dispatchEvent(new CustomEvent('wirehouse:graphics-lost'));
-    return true;
   }
   setWarmupFactory(factory:()=>THREE.Group):void{this.warmupFactory=factory;}
   suspend():void{this.suspended=true;this.renderGeneration++;}
@@ -139,7 +144,7 @@ export class Renderer {
     // A suspended GPU readback can remain unresolved after the page returns.
     // Retire its entire renderer/runtime instead of racing a second optical
     // update on the same instance if it does not finish within a short grace.
-    const pending=this.renderTask;
+    const pending=this.renderTask??(this.submittedFrames.size?Promise.all(this.submittedFrames).then(()=>{}):null);
     const recovery=(async()=>{
       if(this.contextRestored)await this.contextRestored;
       if(pending&&!this.deviceLost){
@@ -147,14 +152,14 @@ export class Renderer {
         try{await Promise.race([pending,new Promise<void>(resolve=>{timer=setTimeout(resolve,1200);})]);}
         finally{if(timer!==undefined)clearTimeout(timer);}
       }
-      if(this.deviceLost||this.graphicsFault||this.renderTask===pending&&pending!==null)await this.rebuildGraphics();
+      if(this.deviceLost||this.graphicsFault||this.renderTask!==null||this.submittedFrames.size>0)await this.rebuildGraphics();
       this.lastRenderTime=performance.now();this.waterWasVisible=true;this.resize();
     })();
     this.recoveryTask=recovery;
     try{await recovery;}finally{if(this.recoveryTask===recovery)this.recoveryTask=null;}
   }
   private async rebuildGraphics():Promise<void>{
-    this.renderGeneration++;this.renderTask=null;
+    this.renderGeneration++;this.renderTask=null;this.submittedFrames.clear();
     const previous=this.gpu,canvas=previous.domElement;
     // Graphics resources are disposable; the room, water simulation fields,
     // placements and gameplay camera remain the same live objects.
@@ -170,7 +175,7 @@ export class Renderer {
     this.gpu.setPixelRatio(Math.min(devicePixelRatio,GAME_CONFIG.renderer.maxPixelRatio));
     this.gpu.shadowMap.enabled=true;this.gpu.shadowMap.type=THREE.PCFShadowMap;
     this.gpu.outputColorSpace=THREE.SRGBColorSpace;this.gpu.toneMapping=THREE.ACESFilmicToneMapping;this.gpu.toneMappingExposure=1.05;
-    this.bindDeviceLoss();await this.gpu.init();this.configureSceneInstancing(this.gpu);this.deviceLost=false;this.resize();
+    this.bindDeviceLoss();await this.gpu.init();this.configureSceneInstancing(this.gpu);this.deviceLost=false;this.graphicsFault=false;this.resize();
     if(this.roomWater)await this.attachRoomWater(this.roomWater);
     if(this.warmupFactory)await this.prepareToolResources(this.warmupFactory());
     this.graphicsFault=false;this.renderError='';this.recoveryCount++;
@@ -199,7 +204,7 @@ export class Renderer {
     this.camera.updateProjectionMatrix();
     // Water Pro.resize mutates its camera projection and depth targets.
     // Defer it with the accepted frame, rather than midway through a GPU pass.
-    if(this.water)this.pendingSize={width,height};
+    if(this.water||this.renderTask||this.submittedFrames.size)this.pendingSize={width,height};
     else this.webgl.setSize(width,height,false);
   };
 
@@ -241,7 +246,7 @@ export class Renderer {
           object.visible=false;hidden.push(object);
         }
       });
-      try{this.gpu.setRenderTarget(target);this.gpu.render(this.scene,this.renderCamera);}
+      try{this.gpu.setRenderTarget(target);this.gpu.render(this.scene,this.renderCamera);this.fenceSubmittedFrame();await this.waitForFrame();}
       finally{
         this.gpu.setRenderTarget(previous);
         for(const object of hidden)object.visible=true;
@@ -293,12 +298,14 @@ export class Renderer {
               const slice=meshes.slice(offset,offset+80);
               for(const mesh of slice)mesh.visible=true;
               this.gpu.render(this.scene,view);
+              this.fenceSubmittedFrame();await this.waitForFrame();
               for(const mesh of slice)mesh.visible=false;
               await new Promise<void>(resolve=>setTimeout(resolve,0));
             }
           }finally{for(const mesh of meshes)mesh.visible=true;}
           this.scene.traverse(object=>{if(object instanceof THREE.DirectionalLight)object.shadow.needsUpdate=true;});
           this.gpu.render(this.scene,view);
+          this.fenceSubmittedFrame();await this.waitForFrame();
         }
         finally{this.gpu.setSize(size.x,size.y,false);}
         onDirection();
@@ -406,11 +413,51 @@ export class Renderer {
     this.renderTask=task;
     return true;
   }
-  async waitForFrame():Promise<void>{await this.ready;await this.renderTask;}
+  async waitForFrame():Promise<void>{
+    await this.ready;
+    // Optical passes may submit their colour frame while this wait is pending.
+    while(this.renderTask||this.submittedFrames.size){
+      if(this.renderTask)await this.renderTask;
+      await Promise.all(this.submittedFrames);
+    }
+    if(this.graphicsFault||this.deviceLost)throw new Error(this.renderError||'Graphics device lost');
+  }
+  private fenceSubmittedFrame():void{
+    const backend=this.gpu.backend as unknown as {device?:{queue:{onSubmittedWorkDone:()=>Promise<void>}}};
+    if(!backend.device)return;
+    const generation=this.renderGeneration,started=performance.now();
+    const completion=backend.device.queue.onSubmittedWorkDone();
+    // RAF schedules JavaScript, not GPU completion. Two images allow CPU/GPU
+    // overlap while placing a hard bound on work queued by a slower phone.
+    let timer:ReturnType<typeof setTimeout>|undefined;
+    const deadline=new Promise<void>((_resolve,reject)=>{
+      const arm=()=>{
+        const due=performance.now()+10000;
+        timer=setTimeout(()=>{
+          if(generation!==this.renderGeneration||this.suspended){reject(new Error('Retired frame wait'));return;}
+          // Cold shader preparation can block JS and delay both this timer
+          // and the completion notification. Give queued GPU callbacks a turn
+          // instead of treating that CPU delay as an unresponsive GPU.
+          if(performance.now()-due>250){arm();return;}
+          reject(new Error('no completion within 10000 ms while the browser remained responsive'));
+        },10000);
+      };
+      arm();
+    });
+    const task=Promise.race([completion,deadline]).catch(error=>{
+      if(generation===this.renderGeneration&&!this.suspended&&!this.graphicsFault&&!this.deviceLost)
+        this.failGraphicsFrame(`GPUQueue.onSubmittedWorkDone: ${String(error)}`);
+    }).finally(()=>{
+      clearTimeout(timer);this.submittedFrames.delete(task);
+      if(generation===this.renderGeneration)this.queueWaitMaxMs=Math.max(this.queueWaitMaxMs,performance.now()-started);
+    });
+    this.submittedFrames.add(task);
+  }
   private drawScene(scene:THREE.Scene):void{
-    const rect=this.modelViewport;if(!rect){this.gpu.render(scene,this.activeRenderCamera);return;}
+    const rect=this.modelViewport;if(!rect){this.gpu.render(scene,this.activeRenderCamera);this.fenceSubmittedFrame();return;}
     const viewport=this.gpu.getViewport(new THREE.Vector4()),scissor=this.gpu.getScissor(new THREE.Vector4()),test=this.gpu.getScissorTest();
     try{this.gpu.setViewport(rect.x,rect.y,rect.width,rect.height);this.gpu.setScissor(rect.x,rect.y,rect.width,rect.height);this.gpu.setScissorTest(true);this.gpu.render(scene,this.activeRenderCamera);}
     finally{this.gpu.setViewport(viewport);this.gpu.setScissor(scissor);this.gpu.setScissorTest(test);}
+    this.fenceSubmittedFrame();
   }
 }

@@ -11,6 +11,7 @@ import { DesktopControls } from '../player/DesktopControls';
 import { MobileControls, type AimControlMode, type AimInputMode } from '../player/MobileControls';
 import { FPSRig, RIG_TOOLS, type RigTool } from '../player/FPSRig';
 import { Room } from '../world/Room';
+import { siteMaterialsReady } from '../world/SiteMaterials';
 import { SiteOcclusion } from '../world/SiteOcclusion';
 import { MansionMasonryBatch } from '../world/MansionMasonryBatch';
 import { BuildingHeadroom } from '../world/BuildingHeadroom';
@@ -478,6 +479,7 @@ export class Game {
       this.masonryBatch?.ready ?? Promise.resolve(),
     ]).then(async () => {
       await this.apprentice.crewReady;
+      await siteMaterialsReady();
       markPrepared();
       this.renderer.setWarmupFactory(()=>this.mortar.createRenderWarmup());
       await this.renderer.prepareToolResources(this.mortar.createRenderWarmup());

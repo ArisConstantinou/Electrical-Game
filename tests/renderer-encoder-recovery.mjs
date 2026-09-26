@@ -5,12 +5,14 @@ await mkdir('output',{recursive:true});
 await build({entryPoints:['src/core/Renderer.ts'],outfile:'output/renderer-encoder-bundle.mjs',bundle:true,format:'esm',platform:'node',external:['three','three/*']});
 const {Renderer}=await import('../output/renderer-encoder-bundle.mjs?'+Date.now());
 const r=Object.create(Renderer.prototype),events=[];
-Object.assign(r,{graphicsErrors:[],faultAttempts:0,graphicsFault:false,recoveryBlocked:false,renderTask:null,recoveryTask:null,deviceLost:false,suspended:false});
+Object.assign(r,{graphicsErrors:[],faultAttempts:0,graphicsFault:false,recoveryBlocked:false,renderTask:null,submittedFrames:new Set(),pendingSize:null,recoveryTask:null,deviceLost:false,suspended:false});
 const previous=globalThis.window;globalThis.window=new EventTarget();window.addEventListener('wirehouse:graphics-lost',event=>events.push(event.type));
 try{
  assert.equal(r.recoverFromFrameError(new Error('Unrelated simulation bug')),false,'Do not reinterpret game bugs as GPU failures');
+ assert.equal(r.recoverFromFrameError(new DOMException('Input element is unavailable','InvalidStateError')),false);
  for(let attempt=1;attempt<=3;attempt++){
-  assert(r.recoverFromFrameError(new DOMException('GPUCommandEncoder.beginRenderPass: Unable to begin render pass.','InvalidStateError')));
+  const message=attempt===1?'GPUDevice.createCommandEncoder: Unable to make command encoder.':'GPUCommandEncoder.beginRenderPass: Unable to begin render pass.';
+  assert(r.recoverFromFrameError(new DOMException(message,'InvalidStateError')));
   assert(r.framePending);assert.equal(r.recoveryBlocked,attempt>2);
  }
  assert.equal(events.length,3);assert.equal(r.graphicsErrors.length,3);

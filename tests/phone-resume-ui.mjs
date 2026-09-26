@@ -13,22 +13,26 @@ try{
   const page=await context.newPage();await page.routeWebSocket('**',()=>{});page.on('pageerror',e=>report.errors.push(e.message));
   page.on('console',m=>{if(m.type()==='error')report.consoleErrors.push(m.text());});
   await page.goto(base+(backend==='webgl'?'?renderer=webgl':''));await page.locator('#start-button').tap({timeout:120000});
-  await page.locator('[data-tool="hose"]').tap();
+  await page.locator('#worker-bar-handle').tap();await page.locator('#mobile-tool-slider [data-tool="hose"]').tap();
   await page.evaluate(async()=>{
    const g=window.__wireTheHouse,v=g.room.brickWall.volume;
-   for(let i=0;i<8;i++){const h=v.raycast({x:.4+i*.01,y:1.3,z:-2},{x:0,y:0,z:-1},.8);if(h)v.impact({point:h.point,direction:{x:0,y:0,z:-1},edge:{x:1,y:0,z:0},chisel:'flat',widthM:.05,energyJ:8});}
+   for(let i=0;i<8;i++){const h=v.raycast({x:.4+i*.01,y:1.3,z:v.frontZ+.5},{x:0,y:0,z:-1},.8);if(!h)throw Error('Resume fixture cannot reach the live wall');v.impact({point:h.point,direction:{x:0,y:0,z:-1},edge:{x:1,y:0,z:0},chisel:'flat',widthM:.05,energyJ:8});}
    g.room.brickWall.flushGeometry();await g.room.brickWall.waitForGeometry();g.roomWater.addFloorWater(0,0,100);
+   // Exercise real wet optical frames. The new foyer spawn looks away from
+   // this water; a stalled-water fixture there never invokes water.update.
+   g.player.camera.position.set(0,1.65,2);g.player.yaw=0;g.player.pitch=.3;
+   await g.activateWaterPro();
    window.__resumeObjects=[g.renderer.scene,g.room.brickWall.volume,g.roomWater.field,g.mission,g.mortar];
    window.__resumeFrames=0;window.__resumeLifecycle=[];for(const name of ['freeze','resume','visibilitychange'])document.addEventListener(name,()=>window.__resumeLifecycle.push(name));
    for(const name of ['webglcontextlost','webglcontextrestored'])document.querySelector('#game-canvas').addEventListener(name,()=>window.__resumeLifecycle.push(name));
    const render=g.renderer.render.bind(g.renderer);g.renderer.render=(...args)=>{const accepted=render(...args);if(accepted)window.__resumeFrames++;return accepted;};
   });
   const cdp=await context.newCDPSession(page);
-  const state=()=>page.evaluate(()=>{const g=window.__wireTheHouse;return{frames:window.__resumeFrames,held:g.input.actionHeld,keys:[...g.input.keys],move:g.input.mobileMove,look:g.input.mobileLook,tool:g.selectedTool,removed:g.room.brickWall.volume.removedVolume,waterReceived:g.roomWater.telemetry.receivedLitres,emitted:g.mortar.waterGunLitres,camera:g.renderer.camera.position.toArray(),sameObjects:[g.renderer.scene,g.room.brickWall.volume,g.roomWater.field,g.mission,g.mortar].every((o,i)=>o===window.__resumeObjects[i]),pending:g.renderer.framePending,error:g.renderer.renderError,locked:!!document.pointerLockElement,lifecycle:window.__resumeLifecycle,renderer:g.renderer.lifecycleTelemetry??null};});
+  const state=()=>page.evaluate(()=>{const g=window.__wireTheHouse;return{frames:window.__resumeFrames,held:g.input.actionHeld,keys:[...g.input.keys],move:g.input.mobileMove,look:g.input.mobileLook,tool:g.selectedTool,removed:g.room.brickWall.volume.removedVolume,waterReceived:g.roomWater.telemetry.receivedLitres,emitted:g.mortar.waterGunLitres,camera:g.renderer.camera.position.toArray(),sameObjects:[g.renderer.scene,g.room.brickWall.volume,g.roomWater.field,g.mission,g.mortar].every((o,i)=>o===window.__resumeObjects[i]),pending:g.renderer.framePending,error:g.renderer.renderError,locked:!!document.pointerLockElement,lifecycle:window.__resumeLifecycle,gameLifecycle:{paused:g.lifecyclePaused,ready:g.loopReady,started:g.started,animationFrame:g.animationFrame,waterPreparing:!!g.waterProTask,generation:g.lifecycleGeneration},renderer:g.renderer.lifecycleTelemetry??null};});
   for(const scenario of ['freeze','freeze-again','context-loss','stalled-frame']){
    if(process.env.QA_SCENARIO&&scenario!==process.env.QA_SCENARIO)continue;
    if(scenario==='context-loss'&&backend!=='webgl')continue;
-   const b=await page.locator('#look-joystick').boundingBox();await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{id:1,x:b.x+b.width*.5,y:b.y+b.height*.5}]});await page.waitForTimeout(300);
+   const b=await page.locator('#site-pro-use').boundingBox();await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{id:1,x:b.x+b.width*.5,y:b.y+b.height*.5}]});await page.waitForTimeout(300);
    const before=await state();assert(before.held&&before.removed>0);
    const record={backend,scenario,before};report.cases.push(record);
    if(scenario==='context-loss'){
@@ -51,17 +55,20 @@ try{
     }
    }
    try{await page.waitForFunction(previous=>window.__resumeFrames>previous+12,before.frames,{timeout:20000});}catch(error){record.failedState=await state();throw error;}
-   const after=await state();record.after=after;assert.equal(after.removed,before.removed,'Resume preserves excavation');assert.equal(after.tool,before.tool);assert(after.sameObjects&&after.waterReceived>=before.waterReceived);assert.equal(after.emitted,record.pausedEmission,'Background time must not emit a backlog of hose water');assert.deepEqual(after.camera,before.camera);assert(!after.held&&!after.locked);assert.deepEqual(after.keys,[]);assert.deepEqual(after.move,{x:0,y:0});assert.deepEqual(after.look,{x:0,y:0});assert.equal(after.error,'');
+   const after=await state();record.after=after;assert.equal(after.removed,before.removed,'Resume preserves excavation');assert.equal(after.tool,before.tool);assert(after.sameObjects&&after.waterReceived>=before.waterReceived);assert.equal(after.emitted,record.pausedEmission,'Background time must not emit a backlog of hose water');assert(after.camera.every((value,i)=>Math.abs(value-before.camera[i])<1e-6),'Resume preserves camera within floating-point collision precision');assert(!after.held&&!after.locked);assert.deepEqual(after.keys,[]);assert.deepEqual(after.move,{x:0,y:0});assert.deepEqual(after.look,{x:0,y:0});assert.equal(after.error,'');
    if(scenario==='stalled-frame'){await page.evaluate(()=>window.__releaseStalledFrame());await page.waitForTimeout(300);const late=await state();assert(late.frames>after.frames&&!late.error,'Late abandoned frame must not stop the recovered renderer');}
    await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
    // A fresh physical gesture after waking still operates the same loaded game.
-   const control=await page.locator('#look-joystick').boundingBox();const e0=(await state()).emitted;await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{id:2,x:control.x+control.width*.5,y:control.y+control.height*.5}]});await page.waitForTimeout(300);await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});assert((await state()).emitted>e0);
+   const control=await page.locator('#site-pro-use').boundingBox();const e0=(await state()).emitted;await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{id:2,x:control.x+control.width*.5,y:control.y+control.height*.5}]});await page.waitForTimeout(300);await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});assert((await state()).emitted>e0);
    await page.screenshot({path:`${out}/${backend}-${scenario}.png`});console.log(JSON.stringify({backend,scenario,framesAfter:after.frames-before.frames,passed:true}));
   }
-  await page.locator('[data-tool="trowel"]').tap();
-  const use=await page.locator('#look-joystick').boundingBox();
+  // Tool-drawer visibility is a separate UI contract; the wet fixture can
+  // enter the mixing proximity UI. Use the same public selection event here.
+  await page.evaluate(()=>window.dispatchEvent(new CustomEvent('wirehouse:select-tool',{detail:'trowel'})));
+  const use=await page.locator('#site-pro-use').boundingBox();
   const massBefore=await page.evaluate(()=>window.__wireTheHouse.mortar.launchedMass);
   await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{id:3,x:use.x+use.width*.5,y:use.y+use.height*.5}]});await page.waitForTimeout(350);
+  assert(await page.evaluate(()=>window.__wireTheHouse.input.actionHeld&&window.__wireTheHouse.mortar.throwFeedback.holding),'The trowel really charges before suspension');
   await page.evaluate(()=>document.dispatchEvent(new Event('freeze')));await page.waitForTimeout(800);await page.evaluate(()=>document.dispatchEvent(new Event('resume')));await page.waitForTimeout(700);
   const chargedResume=await page.evaluate(()=>({held:window.__wireTheHouse.input.actionHeld,mass:window.__wireTheHouse.mortar.launchedMass,casting:window.__wireTheHouse.mortar.throwFeedback.casting}));
   assert(!chargedResume.held&&!chargedResume.casting);assert.equal(chargedResume.mass,massBefore,'Waking after a held trowel must not launch a scoop');await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});

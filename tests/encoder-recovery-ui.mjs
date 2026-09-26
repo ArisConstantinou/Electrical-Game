@@ -8,7 +8,7 @@ await mkdir(out,{recursive:true});const report={method:'Real portrait WebGPU run
 const browser=await chromium.launch({channel:'chrome',headless:true});
 try{
  const context=await browser.newContext({viewport:{width:430,height:932},deviceScaleFactor:2,isMobile:true,hasTouch:true});await blockPointerLock(context);await serveTaskBuild(context,base);
- const page=await context.newPage();page.on('pageerror',e=>report.errors.push(e.message));await page.goto(base);await page.locator('#start-button').tap({timeout:120000});
+ const page=await context.newPage();page.on('pageerror',e=>report.errors.push(e.message));await page.goto(base);await page.waitForFunction(()=>window.__wireTheHouse?.isReadyForStart,undefined,{timeout:120000});await page.locator('#start-button').tap();
  await page.waitForTimeout(1200);
  await page.evaluate(()=>{
   const g=window.__wireTheHouse;if(!g.renderer.webgl.backend.isWebGPUBackend)throw Error('Test requires actual WebGPU');
@@ -20,8 +20,8 @@ try{
   if(kind==='wet-async')await page.evaluate(async()=>{const g=window.__wireTheHouse;g.player.camera.position.set(0,1.65,2);g.player.yaw=0;g.player.pitch=.3;g.roomWater.addFloorWater(0,0,12);await g.activateWaterPro();});
   await page.waitForTimeout(500);const before=await state(),record={kind,before};report.cases.push(record);
   await page.evaluate(kind=>{
-   const g=window.__wireTheHouse,message='GPUCommandEncoder.beginRenderPass: Unable to begin render pass.';
-   const target=kind==='dry-sync'?g.renderer.gpu:g.renderer.water,method=kind==='dry-sync'?'render':'update',original=target[method];
+   const g=window.__wireTheHouse,message=kind==='dry-sync'?'GPUDevice.createCommandEncoder: Unable to make command encoder.':'GPUCommandEncoder.beginRenderPass: Unable to begin render pass.';
+   const target=kind==='dry-sync'?g.renderer.gpu.backend.device:g.renderer.water,method=kind==='dry-sync'?'createCommandEncoder':'update',original=target[method];
    target[method]=function(...args){target[method]=original;const error=new DOMException(message,'InvalidStateError');if(kind==='wet-async')return Promise.reject(error);throw error;};
   },kind);
   try{await page.waitForFunction(previous=>{const g=window.__wireTheHouse;return window.__encoderFrames>previous+12&&(g.renderer.lifecycleTelemetry.recoveries??0)>0&&!g.lifecyclePaused;},before.frames,{timeout:25000});}
@@ -30,7 +30,7 @@ try{
   assert.equal(after.graphics.recoveries,before.graphics.recoveries+1,'Each encoder failure rebuilds exactly once');
   assert(after.sameObjects&&after.tool===before.tool&&after.removed===before.removed&&after.water===before.water,'Recovery preserves gameplay and excavation');
   assert(after.position.every((v,i)=>Math.abs(v-before.position[i])<1e-6),'Recovery keeps the camera position');assert.equal(after.error,'');
-  assert(after.graphics.graphicsErrors.some(e=>e.message.includes('beginRenderPass')),'Fault remains available to phone diagnostics');
+  assert(after.graphics.graphicsErrors.some(e=>e.message.includes(kind==='dry-sync'?'createCommandEncoder':'beginRenderPass')),'Fault remains available to phone diagnostics');
   await page.screenshot({path:`${out}/${kind}.png`});
  }
  assert.deepEqual(report.errors,[]);report.passed=true;
