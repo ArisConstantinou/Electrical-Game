@@ -1,0 +1,128 @@
+[
+  {
+    "id": "exterior-before",
+    "title": "Πριν",
+    "width": 1366,
+    "height": 768,
+    "originalSha256": "2310c0bc07356fc4dadbd56a331203097dd58578df08325d0b4dce9be1ffe5cc"
+  },
+  {
+    "id": "exterior-after",
+    "title": "Μετά",
+    "width": 1366,
+    "height": 768,
+    "originalSha256": "c89f21d3263d7e5e50db83ba050f6501466cffb4f281dd6e6d3f2563b6055494"
+  },
+  {
+    "id": "ceiling-before",
+    "title": "Πριν",
+    "width": 1366,
+    "height": 768,
+    "originalSha256": "52ff571554f1e0d7f625fbfd5df9643fbea3cc86e628eb2eb5739029c7ca477d"
+  },
+  {
+    "id": "ceiling-after",
+    "title": "Μετά",
+    "width": 1366,
+    "height": 768,
+    "originalSha256": "548bc73e1f67c47f0c172ba9fecc31e2f6ff3c7939b28f1e7647063176805ad5"
+  },
+  {
+    "id": "floor-before",
+    "title": "Πριν",
+    "width": 1366,
+    "height": 768,
+    "originalSha256": "3ac5d3894ab1704fff2526c35f6c94e0127bab40a95f29bd84ba6483cefd3db7"
+  },
+  {
+    "id": "floor-after",
+    "title": "Μετά",
+    "width": 1366,
+    "height": 768,
+    "originalSha256": "ff232970174626ea1d634bdeeeb1aa6fb2f13a46809e376289769f6faeffed86"
+  },
+  {
+    "id": "stair-landing",
+    "title": "Πλατύσκαλο και πρόσβαση ορόφου",
+    "width": 1366,
+    "height": 768,
+    "originalSha256": "11f4ce198c03f4bae4ddc4db06d84cbe4c9e056fa1d607c1d69fb62fa7c01605"
+  },
+  {
+    "id": "01-standing",
+    "title": "Όρθιος με το κάγκο",
+    "width": 1280,
+    "height": 960,
+    "originalSha256": "59032a9700ccbf82937db617fa5e72da98b63ea86b59f1b8b751bf3102d0bcdf"
+  },
+  {
+    "id": "02-crouched",
+    "title": "Σκυφτός με το κάγκο",
+    "width": 1280,
+    "height": 960,
+    "originalSha256": "822e2166c21aee6e7520b4aee5d80e9a9e102a26e2744792c40b424c08d24f61"
+  },
+  {
+    "id": "03-breaking-straight",
+    "title": "Σπάσιμο ίσια στον τοίχο",
+    "width": 1280,
+    "height": 960,
+    "originalSha256": "ec1bd39941d1de89645a953177972657687815e55642f28605622a5e8eec496e"
+  },
+  {
+    "id": "04-breaking-side",
+    "title": "Πλαϊνή γωνία 45°",
+    "width": 1280,
+    "height": 960,
+    "originalSha256": "24872114ab4d4d28fe11a5fe2cffcb68a1290959709eebbadd6ef7f95dd13c3a"
+  },
+  {
+    "id": "05-breaking-vertical-chisel",
+    "title": "Κάθετη κόψη 90°",
+    "width": 1280,
+    "height": 960,
+    "originalSha256": "99b1a0120a71e5ae8bec5202727f11e1197e78ff84de3051b07355100f4e1f12"
+  },
+  {
+    "id": "06-breaking-crouched",
+    "title": "Χαμηλή εργασία, σκυφτός",
+    "width": 1280,
+    "height": 960,
+    "originalSha256": "0cfb077d43a77522860eec24bfadc78438f56e2e774d62c6a7b00b62a4123e77"
+  },
+  {
+    "id": "07-jump-takeoff",
+    "title": "Άλμα — προετοιμασία",
+    "width": 1280,
+    "height": 960,
+    "originalSha256": "9e52727c11299b3d162c8eb7be0884cd18d2ecf9f2c662c99a726f314f0650ea"
+  },
+  {
+    "id": "08-jump-apex",
+    "title": "Άλμα — στον αέρα",
+    "width": 1280,
+    "height": 960,
+    "originalSha256": "b8730debd5fa5a954ba0a5ed316ee5704d2e45fd3d5b4de8e9951a01a1bbab1d"
+  },
+  {
+    "id": "09-jump-landing",
+    "title": "Άλμα — προσγείωση",
+    "width": 1280,
+    "height": 960,
+    "originalSha256": "6b7397a115ba7984cd9484091285b55888c16f218a198b8fff594c617df3ccda"
+  },
+  {
+    "id": "arm-before",
+    "title": "Η προβληματική στάση",
+    "width": 1280,
+    "height": 960,
+    "originalSha256": "13a2b6e1040c6446fb91cab94ba5faec5cf95081a024c0cdea126d747518b200"
+  },
+  {
+    "id": "arm-after",
+    "title": "Διόρθωση στήριξης και αγκώνα",
+    "width": 1280,
+    "height": 960,
+    "originalSha256": "67523743a6f45897af97da4c9e5da359d13a47b8deb277c5f2a4953482f7f203"
+  }
+]
