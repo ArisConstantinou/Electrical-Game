@@ -3,6 +3,7 @@ import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {routeBuildingDist} from './building-qa-utils.mjs';
 import {blockPointerLock} from './browser-safety.mjs';
+import {holdMobileJump} from './mobile-gesture-utils.mjs';
 const out=process.env.QA_LIVE==='1'?'output/building-jump-live':'output/building-jump';await mkdir(out,{recursive:true});const report={live:process.env.QA_LIVE==='1',profiles:[],errors:[]};
 const browser=await chromium.launch({channel:'chrome',headless:true});
 try{
@@ -12,15 +13,15 @@ try{
   await page.waitForFunction(()=>window.__wireTheHouse?.isReadyForStart&&!document.querySelector('#start-button')?.disabled,null,{timeout:120000});await page.locator('#apprentice-count').selectOption('0');await page.locator('#start-button').click();
   const r={name,cases:[]};report.profiles.push(r);
   if(mobile){
-   r.controls=await page.evaluate(()=>['mobile-stand','mobile-crouch','mobile-jump','joystick','look-joystick','site-pro-use'].map(id=>{const e=document.getElementById(id),b=e.getBoundingClientRect();return {id,x:b.x,y:b.y,w:b.width,h:b.height,visible:getComputedStyle(e).display!=='none'};}));
+   assert.equal(await page.locator('#mobile-stand,#mobile-crouch,#mobile-jump,#site-pro-use,#mobile-interact').count(),0);
+   r.controls=await page.evaluate(()=>['joystick','look-joystick'].map(id=>{const e=document.getElementById(id),b=e.getBoundingClientRect();return {id,x:b.x,y:b.y,w:b.width,h:b.height,visible:getComputedStyle(e).display!=='none'};}));
    for(const control of r.controls){assert(control.visible);assert(control.w>=44&&control.h>=44);assert(control.x>=0&&control.y>=0&&control.x+control.w<=width+1&&control.y+control.h<=height+1);}
-   const jump=r.controls.find(c=>c.id==='mobile-jump');for(const c of r.controls.filter(c=>c!==jump))assert(jump.x+jump.w<=c.x||c.x+c.w<=jump.x||jump.y+jump.h<=c.y||c.y+c.h<=jump.y,`Jump overlaps ${c.id}`);
   }
   const poses=name==='desktop'?[{name:'foyer',x:3.35,z:8.8,floor:0},{name:'doorway',x:3.35,z:7.25,floor:0},...[0,3.3,6.6,9.9,-3.4,-6.8].flatMap(base=>[{name:`flight-${base}`,x:5.5,z:9.54,floor:base+(base<0?3.4/22:.15)*6},{name:`landing-${base}`,x:6.5,z:11.64,floor:base+(base<0?1.7:1.65)}])]:[{name:'foyer',x:3.35,z:8.8,floor:0}];
   for(const p of poses){
    await page.evaluate(p=>{const g=window.__wireTheHouse;g.player.camera.position.set(p.x,p.floor+1.65,p.z);g.player.yaw=-1.3;g.player.pitch=.2;g.selectedTool='spray';g.fpsRig.show('spray');},p);await page.waitForTimeout(200);
    await page.evaluate(()=>{const g=window.__wireTheHouse;window.__jumpFrames=[];window.__jumpStep=g.step;g.step=function(...args){const value=window.__jumpStep.apply(this,args);const p=g.player;window.__jumpFrames.push({offset:p.jumpOffset,grounded:p.grounded,head:p.camera.position.y+.22,floor:p.supportFloorY,bodyY:g.workerBody.position.y});return value;};});
-   if(mobile)await page.locator('#mobile-jump').tap();else await page.keyboard.down('Space');
+   if(mobile)await holdMobileJump(page);else await page.keyboard.down('Space');
    await page.waitForFunction(()=>window.__jumpFrames.some(f=>f.offset>.2),null,{timeout:5000});
    if(p.name==='foyer')await page.screenshot({path:`${out}/${name}-airborne.png`});
    await page.waitForTimeout(900);if(!mobile)await page.keyboard.up('Space');

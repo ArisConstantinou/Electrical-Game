@@ -104,12 +104,12 @@ export class HUD {
 
               <button id="aim-speed" type="button" aria-label="Change aim sensitivity"><span>AIM SPEED</span><b>NORMAL</b></button>
               <button id="wall-assist" type="button" aria-label="Toggle automatic wall precision"><span>WALL ASSIST</span><b>AUTO</b></button>
-              <small>FLOATING places MOVE under your thumb; FIXED keeps it at the corner. Drag the right side to look. Hold USE and drag to aim while moving; a third AIM finger is optional.</small>
+              <small>FLOATING places MOVE under your thumb; FIXED keeps it at the corner. Double tap MOVE to crouch or stand. Tap AIM to use or interact; tap again to stop continuous work. Hold AIM still for a moment to jump; drag to look.</small>
             </div>
           </section>
           <button id="desktop-key-guide-toggle" type="button" aria-label="Show keyboard controls" aria-expanded="false" aria-controls="desktop-key-guide" title="Show keyboard controls"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="7" width="26" height="18" rx="3"/><path d="M8 13h2m4 0h2m4 0h2M8 18h2m4 0h2m4 0h2M11 22h10"/></svg><span>KEYS</span></button>
           <aside id="desktop-key-guide" class="hud-card" aria-label="Keyboard and mouse controls" hidden>
-            <div><kbd>WASD</kbd><span>MOVE</span><kbd>MOUSE</kbd><span>LOOK</span><kbd>SHIFT</kbd><span>FAST</span><kbd>SPACE</kbd><span>JUMP</span><kbd>H</kbd><span>CROUCH / STAND</span></div>
+            <div><kbd>WASD</kbd><span>MOVE</span><kbd>MOUSE</kbd><span>LOOK</span><kbd>SHIFT</kbd><span>FAST</span><kbd>SPACE / RMB</kbd><span>JUMP</span><kbd>H</kbd><span>CROUCH / STAND</span></div>
             <div><kbd>LMB</kbd><span>USE / HOLD</span><kbd>E</kbd><span>INTERACT</span><kbd>WHEEL</kbd><span>SWITCH TOOL</span></div>
             <div><kbd>1–9</kbd><span>SELECT TOOL</span><kbd>9 / M</kbd><span>MEASURE / MARK</span><kbd>C</kbd><span>FULL BODY VIEW</span></div>
             <div><kbd>0</kbd><span>DRILL</span><kbd>B</kbd><span>DRIVER</span><kbd>L</kbd><span>LASER</span></div>
@@ -196,15 +196,9 @@ export class HUD {
             </div>
           </div>
           <div id="mobile-controls" aria-label="Mobile controls">
-            <button id="mobile-interact" type="button" aria-label="Interact with nearby mixing object" aria-pressed="false" hidden><b>INTERACT</b><small>ΣΤΑΘΜΟΣ</small></button>
             <div id="mobile-move-zone" aria-label="Touch here to move"></div><div id="joystick" aria-label="Movement joystick"><div class="joystick-ring"></div><div id="joystick-thumb"></div></div>
-            <nav id="mobile-stance-controls" aria-label="Player height">
-              <button id="mobile-stand" type="button" data-height="stand" aria-label="Stand up" aria-pressed="true"><span>STAND</span></button>
-              <button id="mobile-crouch" type="button" data-height="crouch" aria-label="Crouch" aria-pressed="false"><span>CROUCH</span></button>
-              <button id="mobile-jump" type="button" aria-label="Jump" title="Jump"><span>JUMP</span></button>
-            </nav>
-            <div id="look-joystick" role="button" tabindex="0" aria-label="Drag to aim"><div class="look-joystick-ring"></div><div id="look-joystick-thumb"><span id="mobile-action" aria-hidden="true">AIM</span><small aria-hidden="true">LOOK</small></div><div id="drag-aim-cue" aria-hidden="true"></div><small id="aim-control-label">AIM</small></div>
-            <button id="site-pro-use" type="button" aria-label="Hold to use selected tool" aria-pressed="false"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 25h18M12 22V8h8v14M9 8h14M16 3v5"/></svg><span>USE</span><output id="mobile-use-status">READY</output></button>
+            <div id="look-joystick" role="button" tabindex="0" aria-label="Drag to aim; hold still to jump"><div class="look-joystick-ring"></div><div id="look-joystick-thumb"><span id="mobile-action" aria-hidden="true">AIM</span><small aria-hidden="true">JUMP</small></div><div id="drag-aim-cue" aria-hidden="true"></div><small id="aim-control-label">AIM</small></div>
+            <output id="mobile-use-status" hidden>READY</output>
             <nav id="aim-quick-controls" aria-label="Aim controls">
               ${quickButton('quick-aim-input','AIM','STICK','aim','all','cycle-aim-input')}
               ${quickButton('quick-aim-speed','LOOK','NORMAL','speed','all','cycle-aim-speed')}
@@ -221,7 +215,6 @@ export class HUD {
               ${quickButton('quick-water-flow','FLOW','FLOOD','color','hose','cycle-water-mode')}
               ${quickButton('quick-loft-down','LOFT −','12°','down','trowel','mortar-angle',-5)}
               ${quickButton('quick-loft-up','LOFT +','12°','up','trowel','mortar-angle',5)}
-              ${quickButton('quick-work-height','HEIGHT','CROUCH','crouch','hammer spray trowel hose fitting level measure drill driver laser','work-height')}
             </nav>
             <button id="tool-mode-toggle" type="button" aria-label="Change selected tool mode">
               <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 10h15l-3-3m3 3-3 3M25 22H10l3 3m-3-3 3-3"/></svg><span>LIVE</span>
@@ -359,8 +352,6 @@ export class HUD {
       dispatchEvent(new CustomEvent('wirehouse:hammer-side-handle',{detail:angle}));
     });
     root.querySelector('#work-height')!.addEventListener('click',()=>dispatchEvent(new CustomEvent('wirehouse:work-height')));
-    root.querySelectorAll<HTMLButtonElement>('#mobile-stance-controls [data-height]').forEach(button=>bindHammerButton(`#${button.id}`,()=>dispatchEvent(new CustomEvent('wirehouse:work-height-set',{detail:button.dataset.height==='crouch'}))));
-    bindHammerButton('#mobile-jump',()=>dispatchEvent(new CustomEvent('wirehouse:jump')));
     root.querySelector('#mortar-angle-down')!.addEventListener('click',()=>dispatchEvent(new CustomEvent('wirehouse:mortar-angle',{detail:-5})));
     root.querySelector('#mortar-angle-up')!.addEventListener('click',()=>dispatchEvent(new CustomEvent('wirehouse:mortar-angle',{detail:5})));
     this.shell = root.querySelector('#game-shell')!;
@@ -812,7 +803,7 @@ export class HUD {
     if(!this.displayChanged('manual-aim','manual'))return;
     this.shell.querySelector('#mobile-action')!.textContent='AIM';
     this.shell.querySelector('#aim-control-label')!.textContent='AIM';
-    this.shell.querySelector('#look-joystick')!.setAttribute('aria-label','Drag to aim');
+    this.shell.querySelector('#look-joystick')!.setAttribute('aria-label','Drag to aim; tap to use or interact; hold still to jump');
   }
   updateHeightMeasure(active:boolean,height:number|null,ready:boolean):void {
     const value=height===null?'—':height.toFixed(2);
@@ -822,8 +813,8 @@ export class HUD {
     this.shell.querySelector('#measure-hint')!.textContent=ready?'Aim up or down to choose height':height===null?'Aim at a wall':'Move closer to measure';
     this.shell.querySelector<HTMLButtonElement>('#measure-mark')!.disabled=!ready;
     this.shell.querySelector('#mobile-action')!.textContent='AIM';
-    this.shell.querySelector('#look-joystick-thumb small')!.textContent=active?'MEASURE':'LOOK';
-    this.shell.querySelector('#look-joystick')!.setAttribute('aria-label',active?'Drag to aim the tape measure':'Drag to aim');
+    this.shell.querySelector('#look-joystick-thumb small')!.textContent=active?'MEASURE':'JUMP';
+    this.shell.querySelector('#look-joystick')!.setAttribute('aria-label',active?'Drag to aim the tape measure; tap to mark; hold still to jump':'Drag to aim; tap to use or interact; hold still to jump');
   }
   updateLaser(tool:RigTool,state:{phase:string;hint:string;heightM:number|null;progress:number;active:boolean;mounted:boolean}):void {
     const visible=['drill','driver','laser'].includes(tool),height=state.heightM===null?'—':`${state.heightM.toFixed(2)} m`;
@@ -847,16 +838,15 @@ export class HUD {
   updateWorkHeight(crouched:boolean):void {
     if(!this.displayChanged('work-height',String(crouched)))return;
     this.shell.querySelector('#work-height')!.textContent=crouched?'STAND UP':'CROUCH · LOW WORK';
-    this.shell.querySelector('#quick-work-height b')!.textContent=crouched?'STAND':'CROUCH';
-    this.shell.querySelector('#mobile-stand')!.setAttribute('aria-pressed',String(!crouched));
-    this.shell.querySelector('#mobile-crouch')!.setAttribute('aria-pressed',String(crouched));
+    this.shell.querySelector('#joystick')!.setAttribute('data-crouched',String(crouched));
   }
 
   updateMobileUseStatus(message:string,ready:boolean,active:boolean):void {
     if(!this.displayChanged('mobile-use-status',`${message}:${ready}:${active}`))return;
     const status=this.shell.querySelector<HTMLElement>('#mobile-use-status')!;
     status.textContent=message;status.dataset.ready=String(ready);status.dataset.active=String(active);
-    this.shell.querySelector('#site-pro-use')!.classList.toggle('using-tool',active);
+    this.shell.querySelector('#look-joystick')!.classList.toggle('using-tool',active);
+    this.shell.querySelector('#look-joystick-thumb small')!.textContent=active?'STOP':'JUMP';
   }
 
   updateAimSpeed(profile: 'precise' | 'normal' | 'fast'): void {
@@ -875,12 +865,12 @@ export class HUD {
     if (inputText) inputText.textContent = mode.toUpperCase();
     this.shell.classList.toggle('aim-input-drag', mode === 'drag');
     const look = this.shell.querySelector<HTMLElement>('#look-joystick');
-    look?.setAttribute('aria-label',mode==='drag'?'Drag to aim; hold USE separately to work':'Steer to aim; hold USE separately to work');
+    look?.setAttribute('aria-label',mode==='drag'?'Drag to aim; tap to use or interact; hold still to jump':'Steer to aim; tap to use or interact; hold still to jump');
     this.shell.querySelector('#quick-aim-input b')!.textContent=mode.toUpperCase();
     this.shell.querySelector('#aim-control-label')!.textContent=mode==='drag'?'DRAG TO AIM':'STICK TO AIM';
   }
   updateMovementStick(mode: 'floating' | 'fixed'): void {
     this.shell.querySelector('#movement-stick-mode b')!.textContent = mode.toUpperCase();
-    this.shell.querySelector('#joystick')!.setAttribute('aria-label', mode === 'floating' ? 'Floating movement joystick' : 'Fixed movement joystick');
+    this.shell.querySelector('#joystick')!.setAttribute('aria-label', (mode === 'floating' ? 'Floating movement joystick' : 'Fixed movement joystick')+'; double tap to toggle crouch and stand');
   }
 }

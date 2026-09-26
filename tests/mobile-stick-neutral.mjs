@@ -16,7 +16,7 @@ function fixture(Controls=MobileControls){
  const listeners={},useListeners={},classes={contains:()=>false,add(){},remove(){}},style={transform:'',removeProperty(){}};
  const action={classList:classes,style,contains:target=>target===action,addEventListener(){},setAttribute(){},setPointerCapture(){},hasPointerCapture:()=>false,getBoundingClientRect:()=>({left:200,top:300,width:120,height:120})};
  const use={classList:classes,addEventListener:(name,fn)=>useListeners[name]=fn,setAttribute(){},setPointerCapture(){},hasPointerCapture:()=>false};
- const movePad={classList:classes,style:{...style},setPointerCapture(){},hasPointerCapture:()=>false,getBoundingClientRect:()=>({left:20,top:300,width:120,height:120})};
+ const movePad={classList:classes,style:{...style},closest:()=>null,contains:target=>target===movePad,setPointerCapture(){},hasPointerCapture:()=>false,getBoundingClientRect:()=>({left:20,top:300,width:120,height:120})};
  const moveZone={getBoundingClientRect:()=>({left:0,right:180,top:200,bottom:800})};
  const thumb={style:{...style}},moveThumb={style:{...style}};
  const surface={classList:classes,closest:()=>null,addEventListener:(name,fn)=>listeners[name]=fn,querySelectorAll:()=>[],querySelector:selector=>selector==='#look-joystick'?action:selector==='#look-joystick-thumb'?thumb:selector==='#site-pro-use'?use:selector==='#joystick'?movePad:selector==='#joystick-thumb'?moveThumb:selector==='#mobile-move-zone'?moveZone:null};
@@ -28,7 +28,7 @@ function fixture(Controls=MobileControls){
  const up=()=>controls.onPointerUp(event(0,0,'pointerup'));
  const useDown=()=>useListeners.pointerdown(event(260,500,'pointerdown',2,use));
  const useUp=()=>useListeners.pointerup(event(260,500,'pointerup',2,use));
- const pointerDown=(id,x,y,target=surface)=>listeners.pointerdown(event(x,y,'pointerdown',id,target));
+ const pointerDown=(id,x,y,target=movePad)=>listeners.pointerdown(event(x,y,'pointerdown',id,target));
  const pointerMove=(id,x,y,target=surface)=>listeners.pointermove(event(x,y,'pointermove',id,target));
  const pointerUp=id=>controls.onPointerUp(event(0,0,'pointerup',id,surface));
  const useDownId=id=>useListeners.pointerdown(event(300,500,'pointerdown',id,use));

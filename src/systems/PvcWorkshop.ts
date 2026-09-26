@@ -299,7 +299,7 @@ export class PvcWorkshop {
       const point=this.fastenerPrepTarget();if(point){this.startIndependentFastening(point);action=false;startedFasteners=true;}
     }
     if(interaction&&(wasBlocking||this.stockAimed()||this.target&&this.game.boxPlacement.target(this.game.renderer.camera)===this.target)){this.interact();action=false;interaction=false;}
-    // Mobile has one consistent primary control: the ordinary USE joystick.
+    // A short mobile AIM tap supplies the ordinary primary action.
     // It advances every PVC work phase and also performs the contextual stock /
     // box action while carrying, instead of replacing the joysticks with a row
     // of text-labelled buttons.
@@ -310,7 +310,7 @@ export class PvcWorkshop {
     }
     // Desktop E intentionally sets actionHeld, so desktop work still follows
     // the captured mouse surfaces. On touch, actionHeld belongs to the visible
-    // USE joystick and is the canonical spring / bend hold.
+    // tapped AIM toggle and supplies duration-based bending.
     this.pressHeld=this.focused&&(this.toolbarHold||this.canvasHold||this.touch&&this.game.input.actionHeld);
     if(this.focused){
       const c=this.game.renderer.camera,t=1-Math.exp(-8*dt);c.position.lerp(this.cameraDestination,t);c.quaternion.slerp(this.targetRotation,t);
@@ -725,12 +725,12 @@ export class PvcWorkshop {
     };
     if(this.touch)Object.assign(tips,{
       marking:'Σύρε πάνω/κάτω για μήκος · ΣΗΜΑΔΕΨΕ για μαρκάρισμα',
-      spring:'Κράτα SPRING για εισαγωγή',
-      bending:'8 ΘΕΣΕΙΣ ΧΕΡΙΩΝ · Κράτα ΛΥΓΙΣΕ · ΕΛΕΓΧΟΣ στις 90°',
+      spring:'Tap AIM για εισαγωγή spring',
+      bending:'8 ΘΕΣΕΙΣ ΧΕΡΙΩΝ · Tap AIM: έναρξη / διακοπή λυγίσματος · Tap AIM στις 90°: έλεγχος',
       review:'Διάλεξε 1, 5 ή ΟΛΕΣ · μετά ΕΤΟΙΜΑΣΕ ΚΑΙ ΚΡΑΤΑ',
-      fitting:'Σύρε πάνω/κάτω το cutter · Κράτα ΚΟΨΕ',cut:'ΠΡΟΕΤΟΙΜΑΣΕ ΟΠΕΣ ή ΠΙΣΩ','pipe-install-ready':'USE · ΕΦΑΡΜΟΣΕ ΣΩΛΗΝΑ',
-      'fastener-marking':'Σύρε το στόχο · USE για κάθε οπή · μετά πάτησε το εικονίδιο τρυπανιού',
-      'fastener-drilling':'Τρύπημα 12 mm · μία οπή τη φορά','fastener-insert-ready':'USE · ΠΕΡΑΣΕ ΣΥΡΜΑ','fastener-inserting':'Πέρασμα ανοικτού σύρματος','fastener-tighten-ready':'USE · ΣΤΡΙΨΕ ΜΕ ΠΕΝΣΑ','fastener-tightening':'Στρίψιμο ένα-ένα',
+      fitting:'Σύρε πάνω/κάτω το cutter · Tap AIM: κόψε',cut:'ΠΡΟΕΤΟΙΜΑΣΕ ΟΠΕΣ ή ΠΙΣΩ','pipe-install-ready':'Tap AIM · ΕΦΑΡΜΟΣΕ ΣΩΛΗΝΑ',
+      'fastener-marking':'Σύρε το στόχο · Tap AIM για κάθε οπή · μετά πάτησε το εικονίδιο τρυπανιού',
+      'fastener-drilling':'Τρύπημα 12 mm · μία οπή τη φορά','fastener-insert-ready':'Tap AIM · ΠΕΡΑΣΕ ΣΥΡΜΑ','fastener-inserting':'Πέρασμα ανοικτού σύρματος','fastener-tighten-ready':'Tap AIM · ΣΤΡΙΨΕ ΜΕ ΠΕΝΣΑ','fastener-tightening':'Στρίψιμο ένα-ένα',
     });
     const key=this.touch?'ΑΓΓΙΞΕ':'E';
     const hint=show?(this.message||tips[this.phase]||`${key}: συνέχεια`):
@@ -776,10 +776,8 @@ export class PvcWorkshop {
       const action=this.focused
         ? this.phase==='marking'?'AIM':this.phase==='fastener-marking'?'ΣΗΜΑΔΙ':this.phase==='fastener-insert-ready'?'ΣΥΡΜΑ':this.phase==='pipe-install-ready'?'ΣΩΛΗΝΑ':this.phase==='fastener-tighten-ready'?'ΣΤΡΙΨΕ':this.phase==='spring'?'SPRING':this.phase==='bending'?(this.bend.ready?'ΕΛΕΓΧΟΣ':'ΛΥΓΙΣΕ'):this.phase==='review'?'ΕΤΟΙΜΑΣΕ':this.phase==='fitting'?'ΚΟΨΕ':this.phase==='cut'?'ΟΠΕΣ':'USE'
         : this.fastenerPrepAvailable?'ΟΠΕΣ':this.phase==='sealed'&&near?'ΚΟΨΕ':this.phase==='loose'&&near?'ΑΠΛΩΣΕ':this.phase==='batch'&&near?(this.prepared.length?'ΠΑΡΕ':'ΝΕΑ'):this.phase==='carrying'&&near?'ΕΠΙΣΤΡΕΨΕ':this.phase==='carrying'&&nearBox?'ΕΦΑΡΜΟΣΕ':'USE';
-      const mobileAction=this.game.hud.shell.querySelector<HTMLElement>('#mobile-action')!,mobileDetail=this.game.hud.shell.querySelector<HTMLElement>('#look-joystick-thumb small')!,joystick=this.game.hud.shell.querySelector<HTMLElement>('#look-joystick')!,use=this.game.hud.shell.querySelector<HTMLButtonElement>('#site-pro-use')!;
-      mobileAction.textContent='AIM';mobileDetail.textContent='LOOK';joystick.setAttribute('aria-label','Drag to aim');
-      use.querySelector('span')!.textContent=action==='AIM'?'USE':action;
-      use.setAttribute('aria-label',action==='AIM'?'Hold to use selected tool':`Hold to ${action}`);
+      const mobileAction=this.game.hud.shell.querySelector<HTMLElement>('#mobile-action')!,mobileDetail=this.game.hud.shell.querySelector<HTMLElement>('#look-joystick-thumb small')!,joystick=this.game.hud.shell.querySelector<HTMLElement>('#look-joystick')!;
+      mobileAction.textContent='AIM';mobileDetail.textContent=this.game.input.actionHeld?'STOP':'JUMP';joystick.setAttribute('aria-label',`Drag to aim; tap to ${action==='AIM'?'use':action}; hold still to jump`);
     }
   }
   get telemetry(){const fitError=this.fitErrorAt(this.phase==='fitting'?this.cutS:this.cutFrom);return{phase:this.phase,focused:this.focused,raw:this.rawCount,prepared:this.prepared.length,carrying:Boolean(this.carried),installed:this.installedCount,total:this.rawCount+this.prepared.length+Number(Boolean(this.carried))+this.installedCount,markCm:this.bend.mark*100,markingProgress:this.markingProgress,markingActive:this.markingActive,springInsertion:this.insertion,springCentreM:this.bend.mark,springLengthM:PVC.springLength,retrievalCableM:PVC.cableLength,grip:this.bend.grip,angle:this.bend.angle,radiusMm:this.bend.radius?this.bend.radius*1000:null,ready:this.bend.ready,angles:[...this.bend.angles],quantity:this.quantity,target:this.target?.definition.id??null,guideTarget:this.guideTarget?.definition.id??null,boxBottomCm:this.boxBottomHeight()===null?null:this.boxBottomHeight()!*100,cutCm:this.cutS*100,cutFromCm:this.cutFrom*100,fitErrorMm:fitError,fitReady:fitError>=-SHORT_PIPE_TOLERANCE_MM&&fitError<=BOX_ENTRY_ALLOWANCE_MM,boxEntryAllowanceMm:BOX_ENTRY_ALLOWANCE_MM,offcuts:this.offcuts.length,message:this.message,preview:this.pipe.visible,fasteners:{holes:this.fastenerHoles.length,pairs:this.fastenerPairs.length,drilled:this.fastenerHoles.filter(h=>h.drilled).length,index:this.fastenerIndex,progress:this.fastenerProgress,bitDiameterMm:12,aim:{...this.fastenerAim},positions:this.fastenerHoles.map(h=>({side:h.side,x:h.marker.position.x,y:h.y,z:h.marker.position.z})),rebars:this.fastenerPairs.map(p=>({visible:p.rebar.visible,position:p.rebar.position.toArray(),scale:p.rebar.scale.toArray(),left:p.rebar.userData.leftHole,right:p.rebar.userData.rightHole}))},arms:this.arms.map(a=>({side:a.side,reach:a.shoulder.distanceTo(a.wrist)}))};}

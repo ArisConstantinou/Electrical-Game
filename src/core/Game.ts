@@ -296,7 +296,10 @@ export class Game {
       this.hud.shell,
       this.input,
       this.player,
-      () => this.isContinuousAction(),
+      () => this.pvc?.focused
+        ? this.pvc.phase==='bending'&&!this.pvc.bend.ready
+        : this.mixing?.active ? this.mixing.tool==='mixer'
+        : this.isContinuousAction()||this.selectedTool==='trowel',
     );
     this.mobileControls.setAimControlMode(this.aimControlMode);
     this.mobileControls.setAimInputMode(this.aimInputMode);
@@ -1082,14 +1085,14 @@ export class Game {
       if(this.selectedTool !== 'hammer' || event.repeat) return;
       if(event.code === 'Minus' || event.code === 'Equal') {event.preventDefault();setHammerSpeed(this.hammerSpeed + (event.code === 'Equal' ? .25 : -.25));}
     });
-    addEventListener('wirehouse:work-height',()=>{this.mixing.releaseAutomaticStance();this.player.crouched=!this.player.crouched;this.hud.updateWorkHeight(this.player.crouched);});
+    addEventListener('wirehouse:work-height',()=>{this.mixing.releaseAutomaticStance(true);this.player.crouched=!this.player.crouched;this.hud.updateWorkHeight(this.player.crouched);});
     addEventListener('wirehouse:jump',()=>{
       if(!this.started||this.levelEditor.active||this.modelInspector.active&&!this.modelInspector.live||
         this.apprentice.ownsInput||this.mixing.blocksWork||this.mixing.wheelbarrow.busy||this.pvc.blocksWork||
         this.hud.shell.classList.contains('settings-open'))return;
-      this.mixing.releaseAutomaticStance();this.input.jumpRequested=true;
+      this.mixing.releaseAutomaticStance(true);this.input.jumpRequested=true;
     });
-    addEventListener('wirehouse:work-height-set',event=>{this.mixing.releaseAutomaticStance();this.player.crouched=Boolean((event as CustomEvent<boolean>).detail);this.hud.updateWorkHeight(this.player.crouched);});
+    addEventListener('wirehouse:work-height-set',event=>{this.mixing.releaseAutomaticStance(true);this.player.crouched=Boolean((event as CustomEvent<boolean>).detail);this.hud.updateWorkHeight(this.player.crouched);});
     addEventListener('keydown',event=>{
       if(!this.started||event.code!=='KeyH'||event.repeat||(event.target instanceof Element&&event.target.closest('input,textarea,select,[contenteditable="true"]')))return;
       event.preventDefault();window.dispatchEvent(new CustomEvent('wirehouse:work-height'));

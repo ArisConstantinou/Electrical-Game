@@ -38,6 +38,8 @@ export class PlayerController {
   supportFloorY = 0;
   private jumpFeetY = 0;
   private jumpPreparationLeft=0;
+  private readonly airborneVelocity=new THREE.Vector3();
+  private airborneSpeed=0;
   private readonly jumpMotion=new JumpMotion();
   get jumpPose(){return this.jumpMotion.pose;}
   private ceilingProvider:((x:number,z:number,feetY:number)=>number)|null=null;
@@ -96,6 +98,19 @@ export class PlayerController {
     const forward = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
     const right = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
     this.velocity.copy(forward).multiplyScalar(y * speed).addScaledVector(right, x * speed);
+    if(!this.grounded){
+      // Preserve the actual takeoff direction/sprint speed after input release.
+      // Deliberate input can steer gently; turning the view alone cannot turn
+      // the worker's momentum or bring a running jump to an instant stop.
+      if(length>.08){
+        const targetSpeed=Math.max(this.airborneSpeed,speed);
+        this.velocity.normalize().multiplyScalar(targetSpeed*Math.min(1,length));
+        const dx=this.velocity.x-this.airborneVelocity.x,dz=this.velocity.z-this.airborneVelocity.z;
+        const change=Math.hypot(dx,dz),amount=change>0?Math.min(1,4*dt/change):0;
+        this.airborneVelocity.x+=dx*amount;this.airborneVelocity.z+=dz*amount;
+      }
+      this.velocity.copy(this.airborneVelocity);
+    }
     const previousZ=this.camera.position.z;
     this.camera.position.addScaledVector(this.velocity, dt);
     const work=this.workPosition;
@@ -162,7 +177,9 @@ export class PlayerController {
     const feetY = this.camera.position.y - this.eyeHeight - this.jumpOffset;
     const oldFloor = this.surfaceProvider?.(previousX, previousZ, feetY) ?? 0;
     let nextFloor = this.surfaceProvider?.(this.camera.position.x, this.camera.position.z, oldFloor) ?? 0;
-    if (Math.abs(nextFloor - oldFloor) > .21) {
+    // An airborne worker may clear a riser below their feet. Reject a taller
+    // ledge, while retaining the existing adjacent-riser rule on the ground.
+    if (this.grounded ? Math.abs(nextFloor - oldFloor) > .21 : nextFloor > this.jumpFeetY + .21) {
       this.camera.position.x = previousX;
       this.camera.position.z = previousZ;
       this.velocity.x = this.velocity.z = 0;
@@ -175,8 +192,11 @@ export class PlayerController {
     if(preparing)this.jumpPreparationLeft=Math.max(0,this.jumpPreparationLeft-dt);
     if(preparing&&this.jumpPreparationLeft===0){
       this.grounded=false;this.jumpFeetY=nextFloor;this.verticalVelocity=3.8;
+      this.airborneVelocity.copy(this.velocity);this.airborneSpeed=this.velocity.length();
     }
     if(!this.grounded){
+      // Collision/ledge rejection must also stop momentum into that obstacle.
+      this.airborneVelocity.copy(this.velocity);
       // Absolute ballistic feet height prevents the stair surface from lifting
       // an airborne worker. A second press in the air cannot reset the jump.
       this.jumpFeetY+=this.verticalVelocity*dt-7*dt*dt;
