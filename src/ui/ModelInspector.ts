@@ -85,7 +85,7 @@ export class ModelInspector {
     const held=(selector:string,interact:boolean)=>{const button=this.el(selector);button.addEventListener('pointerdown',e=>{if(!this.live)return;e.preventDefault();button.setPointerCapture(e.pointerId);this.use(true,interact);});for(const event of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(event,()=>this.use(false,interact));};
     held('#model-use',false);held('#model-interact',true);
     this.panel.querySelectorAll<HTMLElement>('[data-control-input]').forEach(button=>{button.addEventListener('pointerdown',e=>{if(!this.live)return;e.preventDefault();button.setPointerCapture(e.pointerId);this.game.input.keys.add(button.dataset.controlInput!);});for(const event of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(event,()=>this.game.input.keys.delete(button.dataset.controlInput!));});
-    addEventListener('keyup',e=>{if(this.live&&e.code==='Space')this.use(false,false);},true);
+    addEventListener('keyup',e=>{if(this.live&&e.code==='Enter')this.use(false,false);},true);
     surface.addEventListener('pointerdown',e=>{if(!this.live||e.button!==0||!(e.altKey||this.aimMode))return;this.aiming=true;this.controls.enabled=false;surface.setPointerCapture(e.pointerId);},true);
     surface.addEventListener('pointermove',e=>{if(this.live&&this.aiming)this.game.player.look(e.movementX,e.movementY);});
     for(const event of ['pointerup','pointercancel','lostpointercapture'])surface.addEventListener(event,()=>{if(this.live){this.aiming=false;this.controls.enabled=true;}});
@@ -99,7 +99,7 @@ export class ModelInspector {
     this.el<HTMLInputElement>('#model-speed').addEventListener('input',e=>{this.speed=Number((e.target as HTMLInputElement).value);this.el('#model-speed-value').textContent=`${this.speed}×`;});
     for(const [id,direction] of [['front',new THREE.Vector3(0,.05,-1)],['back',new THREE.Vector3(0,.05,1)],['side',new THREE.Vector3(1,.05,0)],['fit',new THREE.Vector3(.15,.08,-1)]] as const)this.el(`#model-${id}`).addEventListener('click',()=>this.fit(this.isBoardReference()&&id!=='side'?direction.clone().multiply(new THREE.Vector3(1,1,-1)):direction));
     // Capture before gameplay listeners: text entry/orbiting must never use a tool.
-    addEventListener('keydown',e=>{if(!this.active)return;if(e.code==='Escape'){e.preventDefault();this.close();e.stopImmediatePropagation();return;}const typing=e.target instanceof Element&&e.target.closest('input,select,textarea');if(e.code==='KeyC'&&!typing){e.preventDefault();this.faceFront();e.stopImmediatePropagation();return;}if(!this.live||typing){e.stopImmediatePropagation();return;}if(e.code==='Space'){e.preventDefault();if(!e.repeat)this.use(true,false);}},true);
+    addEventListener('keydown',e=>{if(!this.active)return;if(e.code==='Escape'){e.preventDefault();this.close();e.stopImmediatePropagation();return;}const typing=e.target instanceof Element&&e.target.closest('input,select,textarea');if(e.code==='KeyC'&&!typing){e.preventDefault();this.faceFront();e.stopImmediatePropagation();return;}if(!this.live||typing){e.stopImmediatePropagation();return;}if(e.code==='Space'){e.preventDefault();if(!e.repeat)window.dispatchEvent(new CustomEvent('wirehouse:jump'));}if(e.code==='Enter'){e.preventDefault();if(!e.repeat)this.use(true,false);}},true);
   }
   private el<T extends HTMLElement=HTMLElement>(selector:string):T{return this.panel.querySelector<T>(selector)!;}
   private status(message:string):void{this.el('#model-status').textContent=message;}
@@ -153,7 +153,7 @@ export class ModelInspector {
       this.busy=true;this.status('Φόρτωση χαρακτήρα…');
       try{
         if(!this.worker){this.worker=new WorkerBody(this.scene);this.rig=new FPSRig();this.scene.add(this.poseCamera);this.poseCamera.add(this.rig);}
-        await this.worker.ready;
+        await Promise.all([this.worker.ready,this.rig!.hammerReady]);
         if(!this.active||this.selected!=='character'){this.worker.visible=false;this.poseCamera.visible=false;return;}
         this.worker.visible=true;this.poseCamera.visible=true;this.worker.overview=true;this.updatePose(0);this.fit();this.status('Ζωντανό μοντέλο · ίδια γεωμετρία και λαβές με το παιχνίδι');
       }catch(error){this.status(`Δεν φορτώθηκε ο χαρακτήρας: ${String(error)}`);}finally{this.busy=false;}
@@ -180,7 +180,7 @@ export class ModelInspector {
     else result=new THREE.Group();
     result.name=source.name;result.position.copy(source.position);result.quaternion.copy(source.quaternion);result.scale.copy(source.scale);result.visible=source.visible;
     const mesh=result as THREE.Mesh;if(mesh.material){const material=(m:THREE.Material)=>{const c=m.clone();c.colorWrite=true;c.depthWrite=true;c.depthTest=true;this.materials.push(c);return c;};mesh.material=Array.isArray(mesh.material)?mesh.material.map(material):material(mesh.material);}
-    for(const child of source.children)if(!(child instanceof THREE.Light)&&!(child instanceof THREE.Camera))result.add(this.copyAsset(child));
+    for(const child of source.children)if(!(child instanceof THREE.Light)&&!(child instanceof THREE.Camera)&&!(source.name==='FPS hammer tool'&&child.name.includes('five-finger')))result.add(this.copyAsset(child));
     return result;
   }
   private updatePose(dt:number):void{
@@ -204,7 +204,8 @@ export class ModelInspector {
     const box=new THREE.Box3().setFromObject(root),center=box.getCenter(new THREE.Vector3()),size=box.getSize(new THREE.Vector3());
     if(box.isEmpty()||!Number.isFinite(size.length()))return;
     const radius=Math.max(.025,size.length()/2),fov=THREE.MathUtils.degToRad(this.camera.fov),angle=Math.min(fov,2*Math.atan(Math.tan(fov/2)*this.camera.aspect));
-    const distance=radius/Math.sin(angle/2)*(this.isBoardReference()?.79:1.12);this.controls.target.copy(center);if(this.live)direction.applyAxisAngle(new THREE.Vector3(0,1,0),this.game.workerBody.rotation.y);this.camera.position.copy(center).addScaledVector(direction.normalize(),distance);this.camera.near=Math.max(.002,distance/1000);this.camera.far=Math.max(200,distance*5);this.camera.updateProjectionMatrix();this.controls.update();
+    const framing=this.preview?.name==='FPS hammer tool' ? .68 : this.isBoardReference() ? .79 : 1.12;
+    const distance=radius/Math.sin(angle/2)*framing;this.controls.target.copy(center);if(this.live)direction.applyAxisAngle(new THREE.Vector3(0,1,0),this.game.workerBody.rotation.y);this.camera.position.copy(center).addScaledVector(direction.normalize(),distance);this.camera.near=Math.max(.002,distance/1000);this.camera.far=Math.max(200,distance*5);this.camera.updateProjectionMatrix();this.controls.update();
   }
   private resize():void{
     const rect=this.el('#model-orbit').getBoundingClientRect(),canvas=this.game.renderer.webgl.domElement.getBoundingClientRect(),w=rect.width,h=rect.height;
@@ -220,7 +221,7 @@ export class ModelInspector {
   private use(down:boolean,interact:boolean):void{if(!this.live)return;if(interact)this.heldInteract=down;else this.heldUse=down;const input=this.game.input;input.actionHeld=this.heldUse||this.heldInteract;if(down)input.actionRequested=true;if(interact){input.interactionHeld=down;if(down)input.interactionRequested=true;}}
   setLive(value:boolean):void{
     this.live=value&&this.active;this.panel.dataset.live=String(this.live);this.heldUse=false;this.heldInteract=false;this.game.input.resetTransientInput();this.game.mortar.cancel();this.el('.model-library').hidden=true;this.el('#model-aim-marker').hidden=true;
-    this.el('#model-live').setAttribute('aria-pressed',String(this.live));this.el('#model-live').textContent='LIVE CONTROL';this.el('#model-drive').hidden=!this.live;this.el('#model-controls-hint').textContent=this.live?'WASD: move · Shift: fast · V: crouch · Space: use · E: interact · AIM / Alt + drag: aim · Left-drag: orbit · Right-drag: pan · Wheel: zoom':'Left-drag: rotate · Right-drag: pan · Wheel: zoom';
+    this.el('#model-live').setAttribute('aria-pressed',String(this.live));this.el('#model-live').textContent='LIVE CONTROL';this.el('#model-drive').hidden=!this.live;this.el('#model-controls-hint').textContent=this.live?'WASD: move · Shift: fast · V: crouch · Space: jump · Enter: use · E: interact · AIM / Alt + drag: aim · Left-drag: orbit · Right-drag: pan · Wheel: zoom':'Left-drag: rotate · Right-drag: pan · Wheel: zoom';
     this.el('#model-live-controls').hidden=!this.live;this.el('#character-poses').hidden=this.live||this.selected!=='character';
     this.el('.model-note').textContent=this.live?'LIVE: Οι ενέργειες επηρεάζουν κανονικά το παιχνίδι. Τα μοντέλα και οι κινήσεις είναι τα πραγματικά.':'Το παιχνίδι είναι σε παύση. Η επιθεώρηση δεν αλλάζει αντικείμενα ή υλικά του κόσμου.';
     this.game.renderer.modelScene=this.live?null:this.scene;this.game.renderer.viewCamera=this.camera;

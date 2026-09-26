@@ -12,7 +12,7 @@ const steps=(page,n=3)=>page.evaluate(n=>{for(let i=0;i<n;i++)window.__laserStep
 const keys={measure:'Digit9',drill:'Digit0',laser:'KeyL',driver:'KeyB',hammer:'Digit4'};
 async function select(page,tool,mobile){
   if(mobile){
-    if(!await page.locator('#mobile-tool-slider').isVisible())await page.locator('#site-pro-tools').tap();
+    if(!await page.locator('#mobile-tool-slider').isVisible())await page.locator('#worker-bar-handle').tap();
     const button=page.locator(`#mobile-tool-slider [data-tool="${tool}"]`);
     await button.scrollIntoViewIfNeeded();await button.tap();
   }else await page.keyboard.press(keys[tool]);
@@ -23,15 +23,19 @@ async function aim(page,kind='side',height=1.2,distance=.43){
     const g=window.__wireTheHouse,c=g.renderer.camera;
     g.hammerWorkStance.restore(c);
     if(kind==='side'){
-      const side=g.room.getObjectByName('Left concrete wall');
-      const segment=side?.getObjectByName('Solid wall before window opening');
-      if(!segment?.geometry?.parameters?.width)throw new Error('Left wall segment is missing');
-      const surface=segment.position.x+segment.geometry.parameters.width/2+.02;
-      c.position.set(surface+distance,g.player.eyeHeight,0);c.lookAt(surface,height,0);
+      // The former decorative side wall is now chaseable clay masonry. Use
+      // the retained left structural column for the stable concrete reference.
+      const column=g.room.referenceWalls.find(o=>o.userData.studioEntityId==='world:column:-2.72');
+      if(!column)throw new Error('Structural concrete reference is missing');
+      const centre=column.getWorldPosition(c.position.clone()),surface=centre.z+.19;
+      c.position.set(centre.x,g.player.eyeHeight,surface+distance);c.lookAt(centre.x,height,surface);
     }
     else{c.position.set(0,g.player.eyeHeight,g.room.brickWall.volume.frontZ+distance);c.lookAt(0,height,g.room.brickWall.volume.frontZ);}
     g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;
-    g.player.workPosition.locked=false;g.player.workPosition.released=false;
+    g.player.workPosition.locked=false;
+    // Work on the column at the manually chosen reach, outside the main
+    // installation wall's automatic bracing plane.
+    g.player.workPosition.released=kind==='side';
     window.__laserAim={camera:c.position.toArray(),pitch:g.player.pitch,yaw:g.player.yaw,eye:g.player.eyeHeight};
   },{kind,height,distance});await steps(page,90);
 }
@@ -99,7 +103,7 @@ try{
     const page=await context.newPage();
     try{
       page.on('pageerror',e=>report.errors.push(`${name}: ${e.message}`));await page.routeWebSocket('**',()=>{});
-      await page.goto(url);await page.waitForFunction(()=>window.__wireTheHouse?.laserLevel&&window.__wireTheHouse?.roomWater.waterProActive,null,{timeout:120000});
+      await page.goto(url);await page.waitForFunction(()=>window.__wireTheHouse?.laserLevel&&window.__wireTheHouse?.isReadyForStart,null,{timeout:120000});
       await page.locator('#start-button')[mobile?'tap':'click']();await page.locator('#start-screen').waitFor({state:'hidden'});
       await page.evaluate(async()=>{const g=window.__wireTheHouse;window.__laserStep=g.step.bind(g);g.step=()=>{};await g.renderer.waitForFrame();});
       await select(page,'measure',mobile);await aim(page);const measured=await state(page);

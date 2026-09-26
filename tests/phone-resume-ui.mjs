@@ -2,12 +2,14 @@ import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {blockPointerLock} from './browser-safety.mjs';
+import {serveTaskBuild} from './serve-task-build.mjs';
 const base=process.argv[2]??'http://127.0.0.1:5365/Electrical-Game/',out=process.argv[3]??'output/phone-resume';await mkdir(out,{recursive:true});
 const report={base,limitations:'Explicit document freeze/resume events around a Chromium scheduler freeze request, plus real GPU context loss. Visible headless tabs do not emit lifecycle events for the CDP request alone. Not a physical iPhone lock test.',cases:[],errors:[],consoleErrors:[]};
 const browser=await chromium.launch({channel:'chrome',headless:true});
 try{
  for(const backend of process.env.QA_PLATFORM?[process.env.QA_PLATFORM]:['webgl','webgpu']){
   const context=await browser.newContext({viewport:{width:390,height:844},hasTouch:true,isMobile:true});await blockPointerLock(context);
+  await serveTaskBuild(context,base);
   const page=await context.newPage();await page.routeWebSocket('**',()=>{});page.on('pageerror',e=>report.errors.push(e.message));
   page.on('console',m=>{if(m.type()==='error')report.consoleErrors.push(m.text());});
   await page.goto(base+(backend==='webgl'?'?renderer=webgl':''));await page.locator('#start-button').tap({timeout:120000});

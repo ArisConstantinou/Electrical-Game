@@ -76,6 +76,7 @@ export class WorkerBody extends THREE.Group {
   private phase=0;
   private gaitBlend=0;
   private travelTurn=0;
+  private hammerBrace=0;
   private travel=new THREE.Vector3(0,0,-1);
   private clock=0;
   private bend=0;
@@ -207,7 +208,7 @@ export class WorkerBody extends THREE.Group {
     else for(let i=0;i<12;i++){const mid=(lo+hi)/2;if(distance(mid)>reach)lo=mid;else hi=mid;}
     this.worldRotation(clavicle,new THREE.Quaternion().slerp(toward,hi).multiply(restQ));
   }
-  update(dt:number,camera:THREE.PerspectiveCamera,player:Pick<PlayerController,'eyeHeight'|'velocity'|'yaw'|'pitch'>,fps:FPSRig,tool:RigTool,working:boolean,station:boolean,stationGrips:WorkerGripTarget[]=[],frontForBounds?:(bounds:THREE.Box3)=>number|null):void{
+  update(dt:number,camera:THREE.PerspectiveCamera,player:Pick<PlayerController,'eyeHeight'|'velocity'|'yaw'|'pitch'>&Partial<Pick<PlayerController,'supportFloorY'|'jumpOffset'|'grounded'|'jumpPose'>>,fps:FPSRig,tool:RigTool,working:boolean,station:boolean,stationGrips:WorkerGripTarget[]=[],frontForBounds?:(bounds:THREE.Box3)=>number|null):void{
     if(!this.loaded)return;
     this.visible=true;
     fps.useAnatomicalBody(true);
@@ -220,11 +221,14 @@ export class WorkerBody extends THREE.Group {
     // The eye already eases between heights. Follow its actual position,
     // including low socket work, rather than snapping the torso at 1.1 m
     // while the camera is still travelling through it.
-    this.bend=cartGrip?0:THREE.MathUtils.clamp((1.65-camera.position.y)/.70,0,1);
+    const bodyFloor=(player.supportFloorY??0)+(player.jumpOffset??0);
+    const eyeAboveFeet=camera.position.y-bodyFloor,airborne=player.grounded===false;
+    const jump=station?undefined:player.jumpPose,jumpBalance=jump?.balance??0,jumpTuck=jump?.tuck??0,jumpCompression=jump?.compression??0;
+    this.bend=cartGrip?0:THREE.MathUtils.clamp((1.65-eyeAboveFeet)/.70,0,1);
     const speed=Math.hypot(player.velocity.x,player.velocity.z);
     const grips=station?stationGrips:fps.anatomicalGrips();
     const yawQ=new THREE.Quaternion().setFromAxisAngle(Y,player.yaw),forward=new THREE.Vector3(0,0,-1).applyQuaternion(yawQ),right=new THREE.Vector3(1,0,0).applyQuaternion(yawQ);
-    this.gaitBlend=THREE.MathUtils.damp(this.gaitBlend,speed>.025?1:0,12,Math.min(dt,.05));
+    this.gaitBlend=THREE.MathUtils.damp(this.gaitBlend,speed>.025&&!airborne?1:0,12,Math.min(dt,.05));
     if(speed>.025)this.travel.set(player.velocity.x,0,player.velocity.z).normalize();
     // Walking turns the hips, knees and boots into the travel axis at every
     // walking speed. A carried tool is not a world-space body constraint.
@@ -237,17 +241,26 @@ export class WorkerBody extends THREE.Group {
     const desiredTurn=anchored?0:travelYaw;
     this.travelTurn=THREE.MathUtils.damp(this.travelTurn,desiredTurn,10,Math.min(dt,.05));
     const cartFrame=grips.find(g=>g.active&&g.bodyFrame)?.bodyFrame;
+    const hammerHeld=tool==='hammer'&&!station&&grips.some(grip=>grip.active);
+    this.hammerBrace=THREE.MathUtils.damp(this.hammerBrace,hammerHeld&&fps.reachable&&!airborne&&speed<.1?1:0,12,Math.min(dt,.05));
     const bodyYaw=player.yaw+this.travelTurn,bodyQ=cartFrame?.quaternion.clone()??new THREE.Quaternion().setFromAxisAngle(Y,bodyYaw),bodyForward=new THREE.Vector3(0,0,-1).applyQuaternion(bodyQ),bodyRight=new THREE.Vector3(1,0,0).applyQuaternion(bodyQ);
     // Pipe work is held in front of the chest. Step the body under the eyes
     // instead of retaining the rearward walking stance and overreaching.
     const pipeWork=grips.some(grip=>grip.active&&grip.surfaceContact);
-    // Keep the chest behind the first-person camera during pipe work. The old
-    // five-centimetre offset put the camera inside the shirt and hid the pipe.
-    const bodyOffset=grips.find(grip=>grip.active&&grip.firstPersonClearance)?.firstPersonClearance??(pipeWork?.05:.17);
-    this.position.set(camera.position.x+Math.sin(player.yaw)*bodyOffset,0,camera.position.z+Math.cos(player.yaw)*bodyOffset);this.rotation.set(0,bodyYaw,0);
+    // The hammer pose solver braces its shoulders over the tool. The imported
+    // worker used to retain the rearward walking stance, leaving its support
+    // hand short even while the hidden control rig reported a valid grip.
+    const supportForward=hammerHeld?Math.max(...grips.filter(g=>g.active).map(g=>g.center.clone().sub(camera.position).dot(forward))):0;
+    const hammerLean=hammerHeld?(fps.reachable?.18+THREE.MathUtils.clamp((supportForward-.55)*.8,0,.20):.12):0;
+    // Keep the eye in front of the neck opening. Holding the heavier tool
+    // previously pulled the torso through the camera in downward portrait
+    // views; the shared forearm solve now reaches from this braced body.
+    const bodyOffset=grips.find(grip=>grip.active&&grip.firstPersonClearance)?.firstPersonClearance??(hammerHeld&&fps.reachable?.105:pipeWork||hammerHeld?.05:.17);
+    this.position.set(camera.position.x+Math.sin(player.yaw)*bodyOffset,bodyFloor,camera.position.z+Math.cos(player.yaw)*bodyOffset);this.rotation.set(0,bodyYaw,0);
     if(cartFrame){this.position.copy(cartFrame.position);this.quaternion.copy(cartFrame.quaternion);}
     this.updateMatrixWorld(true);
-    const pelvis=this.bone('pelvis'),position=pelvis.getWorldPosition(new THREE.Vector3());position.y-=this.bend*.44+(cartGrip?0:Math.max(0,.95-camera.position.y));
+    const pelvis=this.bone('pelvis'),position=pelvis.getWorldPosition(new THREE.Vector3());position.y-=this.bend*.44+jumpCompression+(cartGrip?0:Math.max(0,.95-eyeAboveFeet));
+    position.addScaledVector(forward,-jumpCompression*.28);
     position.x+=Math.sin(player.yaw)*this.bend*.15;position.z+=Math.cos(player.yaw)*this.bend*.15;
     // Locomotion starts at the centre of mass, not at the ankles. Two vertical
     // pulses per cycle follow the two contacts, while lateral sway transfers
@@ -270,12 +283,28 @@ export class WorkerBody extends THREE.Group {
     // The rib cage counter-rotates against the pelvis and leans into travel.
     // Crouch keeps its existing forward fold, now layered with the gait rather
     // than replacing every standing movement with a rigid torso.
-    const spineDirection=Y.clone().applyQuaternion(cartFrame?.quaternion??new THREE.Quaternion()).addScaledVector(forward,1.1*this.bend+(pipeWork?.24:0)).addScaledVector(this.travel,.050*upperMotion).addScaledVector(bodyRight,-step*.018*upperMotion).normalize();
+    const spineDirection=Y.clone().applyQuaternion(cartFrame?.quaternion??new THREE.Quaternion()).addScaledVector(forward,1.1*this.bend+(pipeWork?.24:0)+hammerLean+jumpCompression*1.1+jumpTuck*.045).addScaledVector(this.travel,.050*upperMotion).addScaledVector(bodyRight,-step*.018*upperMotion).normalize();
     this.orient('spine',this.point('spine').add(spineDirection));this.rotateWorld('spine',Y,-pelvisYaw*.72);
-    const chestDirection=Y.clone().applyQuaternion(cartFrame?.quaternion??new THREE.Quaternion()).addScaledVector(forward,.24*this.bend+(pipeWork?.08:0)).addScaledVector(this.travel,.026*upperMotion).addScaledVector(bodyRight,step*.014*upperMotion).normalize();
+    const chestDirection=Y.clone().applyQuaternion(cartFrame?.quaternion??new THREE.Quaternion()).addScaledVector(forward,.24*this.bend+(pipeWork?.08:0)+hammerLean*.2).addScaledVector(this.travel,.026*upperMotion).addScaledVector(bodyRight,step*.014*upperMotion).normalize();
     this.orient('chest',this.point('chest').add(chestDirection));this.rotateWorld('chest',Y,-pelvisYaw*.52);
     const headCounter=-this.travelTurn-pelvisYaw*.22;
     this.rotateWorld('neck',Y,headCounter*.72);this.rotateWorld('head',Y,headCounter*.28);
+    if(hammerHeld){
+      // Seat the rib cage over the SAME bounded feed used by the two-hand
+      // tool solve. Previously the tool advanced while the visible shoulders
+      // stayed behind; unrestricted clavicle IK concealed that mismatch.
+      const center=this.point('upper_arm.L').add(this.point('upper_arm.R')).multiplyScalar(.5);
+      const support=fps.anatomicalHammerShoulderCenter(camera);
+      const delta=support.sub(center);
+      // Preserve the jump compression, whose tool carry is applied below.
+      delta.y-=jumpCompression;
+      const p=pelvis.getWorldPosition(new THREE.Vector3()).add(delta);
+      // Step the stance under the load; leaving both boots behind made a
+      // corrected torso lean sideways over straight, unsupported legs.
+      this.position.add(new THREE.Vector3(delta.x,0,delta.z).multiplyScalar(.65*this.hammerBrace));
+      this.updateMatrixWorld(true);
+      pelvis.position.copy(pelvis.parent!.worldToLocal(p));this.updateMatrixWorld(true);
+    }
     this.locomotionState={speed,forward:along,sideways,pelvisBobM:pelvisBob,pelvisSwayM:pelvisSway,pelvisYawDegrees:THREE.MathUtils.radToDeg(pelvisYaw),spineCounterDegrees:THREE.MathUtils.radToDeg(-pelvisYaw*.72),headCounterDegrees:THREE.MathUtils.radToDeg(headCounter)};
     // A lateral step is shorter so the trailing foot never crosses the lead
     // foot. Cadence follows distance travelled, including backwards motion.
@@ -288,14 +317,15 @@ export class WorkerBody extends THREE.Group {
       // Linear return during support cancels body translation, keeping the
       // planted shoe still in world space; only the swing phase lifts it.
       const u=phase/Math.PI,stride=(u<1?-amplitude+2*amplitude*THREE.MathUtils.smoothstep(u,0,1):amplitude-2*amplitude*(u-1))*moving;
-      const foot=this.position.clone().addScaledVector(bodyRight,sign*.187).addScaledVector(bodyForward,-.055).addScaledVector(this.travel,stride);
-      foot.y=.09+Math.max(0,Math.sin(phase))*.065*moving;
+      const foot=this.position.clone().addScaledVector(bodyRight,sign*(.187+.035*this.hammerBrace)).addScaledVector(bodyForward,-.055-sign*.085*this.hammerBrace*(fps.hammerHandedness==='left'?-1:1)).addScaledVector(this.travel,stride);
+      foot.y=bodyFloor+.09+(airborne?jumpTuck*(side==='R'?.19:.14):Math.max(0,Math.sin(phase))*.065*moving);
+      if(airborne)foot.addScaledVector(bodyForward,jumpTuck*(side==='R'?.12:.055));
       this.limb('thigh.'+side,'shin.'+side,'foot.'+side,foot,bodyForward.clone().addScaledVector(bodyRight,sign*.12));
       this.worldRotation(this.bone('foot.'+side),(cartFrame?yawQ:bodyQ).clone().multiply(this.footRest.get(side)!));
       // Lift the toe during swing, then return the complete boot to the flat
       // planted rest frame. This is deliberately absent during support so the
       // existing analytic plant cancellation remains exact.
-      const swing=Math.max(0,Math.sin(phase))*moving;
+      const swing=airborne?jumpTuck:Math.max(0,Math.sin(phase))*moving;
       this.rotateWorld('foot.'+side,bodyRight,-THREE.MathUtils.degToRad(8)*swing);
       this.rotateWorld('toe.'+side,bodyRight,THREE.MathUtils.degToRad(11)*swing);
     }
@@ -317,8 +347,18 @@ export class WorkerBody extends THREE.Group {
       // Ground the boots again after the stance shift; arm solving follows.
       for(const [side,sign]of [['R',1],['L',-1]] as const){const foot=this.point('foot.'+side);foot.y=.09;this.limb('thigh.'+side,'shin.'+side,'foot.'+side,foot,forward.clone().addScaledVector(right,sign*.12));this.worldRotation(this.bone('foot.'+side),yawQ.clone().multiply(this.footRest.get(side)!));}
     }
+    // A two-handed load stays close to the chest. Move the complete object and
+    // BOTH contact frames before solving either arm, never one hand alone.
+    if(hammerHeld&&Math.abs(jumpBalance)+jumpCompression>0){
+      const pivot=grips.reduce((p,g)=>g.active?p.add(g.center):p,new THREE.Vector3()).multiplyScalar(1/grips.filter(g=>g.active).length);
+      const to=pivot.clone().addScaledVector(forward,-.025*Math.max(0,jumpBalance)).addScaledVector(Y,-.10*jumpBalance-jumpCompression*.32);
+      const turn=new THREE.Quaternion().setFromAxisAngle(right,-.04*jumpBalance);
+      fps.transformAnatomicalGrasp(pivot,to,turn);
+      for(const grip of grips){grip.center.sub(pivot).applyQuaternion(turn).add(to);grip.rotation.premultiply(turn);if(grip.trigger)grip.trigger.sub(pivot).applyQuaternion(turn).add(to);}
+    }
     const fixedHands=this.poseReferenceGrasps(grips,camera,fps,station,right,frontForBounds);
     if(cartFrame){this.poseCartHandles(grips,right,raisedCart,working);fixedHands.add('R');fixedHands.add('L');}
+    if(hammerHeld){this.poseHammerGrasps(grips,bodyRight,working);for(const grip of grips.filter(g=>g.active))fixedHands.add(grip.side>0?'R':'L');}
     for(const [side,sign]of [['R',1],['L',-1]] as const){
       if(fixedHands.has(side))continue;
       const grip=grips.find(g=>g.side===sign&&g.active);
@@ -419,6 +459,20 @@ export class WorkerBody extends THREE.Group {
         const trigger=grip.trigger?.clone().sub(grip.center).applyQuaternion(toolTurn).add(center);
         this.wrapGrip(side,center,rotation,grip.section,false,working,grip.shape,trigger);
         this.gripErrors.R=this.point('hand.R').distanceTo(targetWrist);
+      }else if(tool==='measure'&&grip&&side==='L'&&!grip.contactLocked){
+        // The pencil is an independent left-hand object. Carry it with a
+        // neutral forearm instead of forcing the old downward wrist frame.
+        const wrist=this.position.clone().addScaledVector(right,-.30).addScaledVector(forward,.24);
+        wrist.y=camera.position.y-.53-jumpCompression;
+        this.limb('upper_arm.L','forearm.L','hand.L',wrist,right.clone().negate().addScaledVector(Y,-1));
+        const long=this.point('hand.L').sub(this.point('forearm.L')).normalize(),axis=Y.clone().addScaledVector(long,-long.y).normalize();
+        this.setHandOrientation(side,axis,long);
+        const q=this.bone('hand.L').getWorldQuaternion(new THREE.Quaternion()),across=long.clone(),back=across.clone().cross(axis).normalize();
+        const rotation=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(across,axis,back));
+        const center=this.point('hand.L').add(this.handFrames.get(side)!.knuckle.clone().applyQuaternion(q)).addScaledVector(across,-grip.section[0]*.6).addScaledVector(back,grip.section[1]+.012);
+        fps.transformAnatomicalGrasp(grip.center,center,rotation.clone().multiply(grip.rotation.clone().invert()),grip.object);
+        this.wrapGrip(side,center,rotation,grip.section,false,false,'box');
+        this.gripErrors.L=this.point('hand.L').distanceTo(wrist);
       }else if(tool==='laser'&&grip&&side==='R'){
         const axis=Y.clone().applyQuaternion(grip.rotation),oldAcross=new THREE.Vector3(1,0,0).applyQuaternion(grip.rotation),oldBack=new THREE.Vector3(0,0,1).applyQuaternion(grip.rotation);
         let long=grip.center.clone().sub(this.point('upper_arm.R')).addScaledVector(axis,-grip.center.clone().sub(this.point('upper_arm.R')).dot(axis)).normalize();
@@ -434,8 +488,14 @@ export class WorkerBody extends THREE.Group {
           long=this.point('hand.R').sub(this.point('forearm.R')).normalize();
           this.setHandOrientation(side,axis.clone().addScaledVector(long,-axis.dot(long)).normalize(),long);
         }
+        // A crouch/landing can put the authored target just outside finite
+        // reach. Seat the carried object at the solved wrist before wrapping.
+        const shift=this.point('hand.R').sub(wrist),center=grip.center.clone().add(shift);
+        fps.transformAnatomicalGrasp(grip.center,center,new THREE.Quaternion());grip.center.copy(center);wrist.add(shift);
         this.gripErrors.R=this.point('hand.R').distanceTo(wrist);
         this.wrapGrip(side,grip.center,rotation,section,false,working,grip.shape);
+      }else if(tool==='hammer'&&!station&&grip){
+        this.poseHammerGrip(side,grip,right,working);
       }else if(grip?.surfaceContact){
         this.posePipeGrip(side,grip);
       }else if(grip){
@@ -478,7 +538,12 @@ export class WorkerBody extends THREE.Group {
         const armPhase=Math.sin(this.phase+(sign===1?Math.PI:0))*this.gaitBlend,armRange=THREE.MathUtils.lerp(.045,.14,speedBlend);
         this.rotateWorld('clavicle.'+side,Y,-armPhase*THREE.MathUtils.degToRad(4.5));
         const wrist=this.position.clone().addScaledVector(bodyRight,sign*.245-sideways*armPhase*armRange*.25).addScaledVector(bodyForward,.015+armPhase*armRange*(.55+.45*Math.abs(along)));
-        wrist.y=Math.max(.32,camera.position.y-.80)+Math.abs(armPhase)*.014+Math.sin(this.clock*1.7)*.002;
+        wrist.y=Math.max(bodyFloor+.32,camera.position.y-.80)+Math.abs(armPhase)*.014+Math.sin(this.clock*1.7)*.002;
+        if(Math.abs(jumpBalance)>0){
+          const balanceWrist=this.position.clone().addScaledVector(bodyRight,sign*(.245+.36*Math.max(0,jumpBalance))).addScaledVector(bodyForward,.10*Math.max(0,jumpBalance));
+          balanceWrist.y=bodyFloor+eyeAboveFeet-.80+.39*Math.max(0,jumpBalance)-jumpCompression;
+          wrist.lerp(balanceWrist,Math.min(1,Math.abs(jumpBalance)*2));
+        }
         this.limb('upper_arm.'+side,'forearm.'+side,'hand.'+side,wrist,bodyRight.clone().multiplyScalar(sign).add(new THREE.Vector3(0,-1,0)));
         this.worldRotation(this.bone('hand.'+side),this.bone('forearm.'+side).getWorldQuaternion(new THREE.Quaternion()).multiply(this.handFrames.get(side)!.foreToHand));
         for(const digit of ['index','middle','ring','little'])for(let j=1;j<=3;j++){
@@ -488,6 +553,20 @@ export class WorkerBody extends THREE.Group {
     }
     if(tool==='fitting'&&!station)this.poseBoxGrasps(grips,camera,fps,right,frontForBounds);
     else this.boxGraspHistory.clear();
+    // Preserve the solved wrist/finger contact by rotating the entire loaded
+    // arm chain and its object together around the shoulder. This also covers
+    // calibrated tool grips: no tool floats away while the arm balances.
+    if(!station&&!hammerHeld&&Math.abs(jumpBalance)>1e-5&&fps.visible){
+      const active=grips.filter(g=>g.active);
+      // Shared two-hand implements retain their support hand; the box builder
+      // has independent left/right objects and may carry each independently.
+      if(active.length<=1||tool==='spray'||tool==='fitting'||tool==='measure')for(const side of (tool==='spray'?['R']:active.map(g=>g.side>0?'R':'L'))){
+        const sign=side==='R'?1:-1,pivot=this.point('upper_arm.'+side);
+        const turn=new THREE.Quaternion().setFromAxisAngle(Y,-sign*.55*jumpBalance).multiply(new THREE.Quaternion().setFromAxisAngle(forward,-sign*.25*jumpBalance)).multiply(new THREE.Quaternion().setFromAxisAngle(right,-.10*jumpBalance));
+        this.worldRotation(this.bone('upper_arm.'+side),turn.clone().multiply(this.bone('upper_arm.'+side).getWorldQuaternion(new THREE.Quaternion())));
+        fps.transformAnatomicalGrasp(pivot,pivot,turn,active.find(g=>(g.side>0?'R':'L')===side)?.object);
+      }
+    }
     this.headParts.forEach(o=>o.visible=true);
     for(const material of this.headMaterials){material.colorWrite=this.overview;material.depthWrite=this.overview;}
     // Publish the completed pose as one unit. Render/shadow passes can have
@@ -495,12 +574,87 @@ export class WorkerBody extends THREE.Group {
     this.updateMatrixWorld(true);
     for(const skeleton of this.skeletons)skeleton.update();
   }
-  private posePipeGrip(side:string,grip:WorkerGripTarget):void {
+  private poseHammerGrasps(grips:WorkerGripTarget[],right:THREE.Vector3,working:boolean):void {
+    for(const grip of grips.filter(g=>g.active))this.poseHammerGrip(grip.side>0?'R':'L',grip,right,working);
+  }
+  private hammerGraspFrame(side:string,grip:WorkerGripTarget,right:THREE.Vector3) {
+    const sign=side==='R'?1:-1,axis=Y.clone().applyQuaternion(grip.rotation).normalize();
+    if(axis.y<-.05)axis.negate();
+    const frame=this.handFrames.get(side)!,upperLength=this.lengths.get('upper_arm.'+side)!,foreLength=this.lengths.get('forearm.'+side)!;
+    const clavicleBone=this.bone('clavicle.'+side),upperBone=this.bone('upper_arm.'+side),foreBone=this.bone('forearm.'+side);
+    const clavicle=this.point('clavicle.'+side),clavicleRest=clavicleBone.parent!.getWorldQuaternion(new THREE.Quaternion()).multiply(this.rest.get(clavicleBone)!.q);
+    const shoulderOffset=this.rest.get(upperBone)!.p.clone().applyQuaternion(clavicleRest),clavicleLength=shoulderOffset.length(),shoulderAxis=shoulderOffset.clone().normalize();
+    const forward=Y.clone().cross(right),long=forward.clone().addScaledVector(axis,-axis.dot(forward)).normalize();
+    const baseQ=this.handOrientation(side,axis,long);
+    const neutral=baseQ.clone().multiply(frame.foreToHand.clone().invert());
+    baseQ.premultiply(new THREE.Quaternion().setFromUnitVectors(Y.clone().applyQuaternion(neutral),long));
+    const foreQ=baseQ.clone().multiply(frame.foreToHand.clone().invert());
+    const back=long.clone().multiplyScalar(-sign).cross(axis).normalize(),across=axis.clone().cross(back);
+    const wristOffset=across.clone().multiplyScalar(-sign*grip.section[0]*.6).addScaledVector(back,-grip.section[1]-.012).sub(frame.knuckle.clone().applyQuaternion(baseQ));
+    const elbowOffset=wristOffset.clone().addScaledVector(Y.clone().applyQuaternion(foreQ),-foreLength);
+    // A neutral power grasp defines the forearm. Choose its swivel on the
+    // handle together with the nearest shoulder position on the clavicle's
+    // sphere. The clavicle is a bounded shoulder assist, never another elbow.
+    const bindHinge=Y.clone().cross(Y.clone().applyQuaternion(this.rest.get(foreBone)!.q)).normalize();
+    const bindBasis=new THREE.Matrix4().makeBasis(bindHinge,Y,bindHinge.clone().cross(Y)).invert();
+    const shoulderLimit=THREE.MathUtils.degToRad(25);
+    let best=Infinity,angle=0,clavicleQ=clavicleRest.clone();
+    const evaluate=(phi:number)=>{
+      const turn=new THREE.Quaternion().setFromAxisAngle(axis,phi),e=elbowOffset.clone().applyQuaternion(turn).add(grip.center);
+      const toElbow=e.clone().sub(clavicle),distance=toElbow.length(),direction=toElbow.clone().normalize();
+      const cone=Math.acos(THREE.MathUtils.clamp((clavicleLength**2+distance**2-upperLength**2)/(2*clavicleLength*distance),-1,1));
+      const radial=shoulderAxis.clone().addScaledVector(direction,-shoulderAxis.dot(direction)).normalize();
+      const desired=direction.clone().multiplyScalar(Math.cos(cone)).addScaledVector(radial,Math.sin(cone));
+      const shoulderTurn=new THREE.Quaternion().setFromUnitVectors(shoulderAxis,desired),shoulderAngle=new THREE.Quaternion().angleTo(shoulderTurn);
+      shoulderTurn.identity().slerp(new THREE.Quaternion().setFromUnitVectors(shoulderAxis,desired),Math.min(1,shoulderLimit/Math.max(1e-8,shoulderAngle)));
+      const cq=shoulderTurn.clone().multiply(clavicleRest),s=shoulderOffset.clone().applyQuaternion(shoulderTurn).add(clavicle);
+      const u=e.clone().sub(s).normalize(),f=Y.clone().applyQuaternion(turn.clone().multiply(foreQ)),hinge=u.clone().cross(f).normalize();
+      const uq=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(hinge,u,hinge.clone().cross(u)).multiply(bindBasis));
+      const neutralUpper=cq.clone().multiply(this.rest.get(upperBone)!.q);
+      neutralUpper.premultiply(new THREE.Quaternion().setFromUnitVectors(Y.clone().applyQuaternion(neutralUpper),u));
+      const neutralFore=uq.clone().multiply(this.rest.get(foreBone)!.q);
+      neutralFore.premultiply(new THREE.Quaternion().setFromUnitVectors(Y.clone().applyQuaternion(neutralFore),f));
+      const upperRoll=uq.angleTo(neutralUpper),foreRoll=neutralFore.angleTo(turn.clone().multiply(foreQ));
+      const error=e.distanceTo(s)-upperLength;
+      const score=10000*error**2+1.5*shoulderAngle**2+.2*upperRoll**2+.12*foreRoll**2
+        +8*Math.max(0,upperRoll-1.35)**2+8*Math.max(0,foreRoll-1.6)**2
+        +25*Math.max(0,-sign*e.clone().sub(s).dot(right)-.02)**2+20*Math.max(0,e.y-grip.center.y-.04)**2+.015*phi**2;
+      if(score<best){best=score;angle=phi;clavicleQ=cq;}
+    };
+    for(let i=-8;i<=8;i++)evaluate(i*Math.PI/12);
+    for(const step of [Math.PI/48,Math.PI/192,Math.PI/768]){const center=angle;for(let i=-3;i<=3;i++)evaluate(THREE.MathUtils.clamp(center+i*step,-Math.PI*2/3,Math.PI*2/3));}
+    const swivel=new THREE.Quaternion().setFromAxisAngle(axis,angle),q=swivel.clone().multiply(baseQ);
+    const elbow=elbowOffset.clone().applyQuaternion(swivel).add(grip.center),wrist=wristOffset.clone().applyQuaternion(swivel).add(grip.center);
+    const rotation=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(across.applyQuaternion(swivel),axis,back.applyQuaternion(swivel)));
+    return {elbow,wrist,q,rotation,clavicleQ};
+  }
+  private poseHammerGrip(side:string,grip:WorkerGripTarget,right:THREE.Vector3,working:boolean):void {
+    // Most grips allow the knuckle row to sit obliquely on the cylinder.
+    // A tightly folded rear arm can cross that solve's singularity; evaluate
+    // its residual before publishing the pose and use the rigid-grasp branch.
+    this.posePipeGrip(side,grip,working,true);
+    const fit=this.fingerFit['hammerWrist'+side] as {bendDegrees:number};
+    if(fit.bendDegrees<2&&this.gripErrors[side]<.006)return;
+    const frame=this.handFrames.get(side)!;
+    const {elbow,wrist,q,rotation,clavicleQ}=this.hammerGraspFrame(side,grip,right);
+    this.worldRotation(this.bone('clavicle.'+side),clavicleQ);
+    this.orient('upper_arm.'+side,elbow);
+    this.orient('forearm.'+side,wrist);
+    const handFrame=q.clone().multiply(frame.basis.clone().invert());
+    this.setHandOrientation(side,new THREE.Vector3(1,0,0).applyQuaternion(handFrame),Y.clone().applyQuaternion(handFrame),true);
+    this.gripErrors[side]=this.point('hand.'+side).distanceTo(wrist);
+    this.wrapGrip(side,grip.center,rotation,grip.section,false,working,'round',undefined,undefined,true);
+    const actualFore=this.point('hand.'+side).sub(this.point('forearm.'+side)).normalize();
+    const neutralFore=Y.clone().applyQuaternion(q.clone().multiply(frame.foreToHand.clone().invert()));
+    this.fingerFit['hammerWrist'+side]={bendDegrees:THREE.MathUtils.radToDeg(actualFore.angleTo(neutralFore))};
+  }
+  private posePipeGrip(side:string,grip:WorkerGripTarget,working=false,hammer=false):void {
     const sign=side==='R'?1:-1,pipeAxis=Y.clone().applyQuaternion(grip.rotation).normalize();
+    if(hammer&&pipeAxis.y<-.05)pipeAxis.negate();
     const frame=this.handFrames.get(side)!,upperLength=this.lengths.get('upper_arm.'+side)!,foreLength=this.lengths.get('forearm.'+side)!;
     this.reachWithShoulder(side,grip.center,.001);
     const shoulder=this.point('upper_arm.'+side),right=new THREE.Vector3(1,0,0).applyQuaternion(this.quaternion);
-    const pole=Y.clone().multiplyScalar(side==='R'?-.40:-1).addScaledVector(right,sign*(side==='R'?1:.3));
+    const pole=Y.clone().multiplyScalar(hammer?-1:side==='R'?-.40:-1).addScaledVector(right,sign*(hammer?.45:side==='R'?1:.3));
     let long=grip.center.clone().sub(shoulder).normalize(),q=new THREE.Quaternion(),wrist=new THREE.Vector3(),elbow=new THREE.Vector3();
     // Solve from a downward anatomical elbow pole. The knuckle row can sit
     // obliquely on a round pipe; forcing it parallel made the elbow flip to
@@ -517,7 +671,8 @@ export class WorkerBody extends THREE.Group {
       const along=(upperLength*upperLength-foreLength*foreLength+d*d)/(2*d),height=Math.sqrt(Math.max(0,upperLength*upperLength-along*along));
       const bend=pole.clone().addScaledVector(axis,-pole.dot(axis)).normalize();
       elbow.copy(shoulder).addScaledVector(axis,along).addScaledVector(bend,height);
-      const next=wrist.clone().sub(elbow).normalize();long.lerp(next,.65).normalize();
+      const next=wrist.clone().sub(elbow).normalize();
+      long.lerp(next,.65).normalize();
     }
     this.orient('upper_arm.'+side,elbow);this.orient('forearm.'+side,wrist);
     // Preserve the solved palm rotation, with the elbow crease in its bend plane.
@@ -527,10 +682,10 @@ export class WorkerBody extends THREE.Group {
     this.gripErrors[side]=this.point('hand.'+side).distanceTo(wrist);
     const back=long.clone().multiplyScalar(-sign).cross(pipeAxis).normalize(),across=pipeAxis.clone().cross(back);
     const rotation=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(across,pipeAxis,back));
-    this.wrapGrip(side,grip.center,rotation,grip.section,false,false,'round',undefined,undefined,true);
+    this.wrapGrip(side,grip.center,rotation,grip.section,false,working,'round',undefined,undefined,true);
     const actualFore=this.point('hand.'+side).sub(this.point('forearm.'+side)).normalize();
     const neutralFore=Y.clone().applyQuaternion(q.clone().multiply(frame.foreToHand.clone().invert()));
-    this.fingerFit['pipeWrist'+side]={bendDegrees:THREE.MathUtils.radToDeg(actualFore.angleTo(neutralFore))};
+    this.fingerFit[(hammer?'hammerWrist':'pipeWrist')+side]={bendDegrees:THREE.MathUtils.radToDeg(actualFore.angleTo(neutralFore))};
   }
   private poseCartHandles(grips:WorkerGripTarget[],right:THREE.Vector3,raised:number,working:boolean):void {
     const contacts=grips.filter(g=>g.active&&g.bodyFrame),back=right.clone().cross(Y).normalize();

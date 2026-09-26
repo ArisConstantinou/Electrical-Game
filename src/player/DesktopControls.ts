@@ -108,6 +108,9 @@ export class DesktopControls {
     addEventListener('keydown', event => {
       if(event.defaultPrevented)return;
       if(surface.classList.contains('model-open')||(surface.dataset.apprenticeMode&&surface.dataset.apprenticeMode!=='off')||event.target instanceof Element&&event.target.closest('input,textarea,select,[contenteditable="true"]'))return;
+      if(event.code==='Space'&&!surface.classList.contains('settings-open')&&document.querySelector('#start-screen')?.classList.contains('hidden')){
+        event.preventDefault();if(!event.repeat)window.dispatchEvent(new CustomEvent('wirehouse:jump'));return;
+      }
       if((event.code==='Escape'||event.key==='Escape')&&surface.dataset.boxAssembly==='true'){
         if(!event.repeat)exitBoxAssembly();
         return;

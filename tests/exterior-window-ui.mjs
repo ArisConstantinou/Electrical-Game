@@ -42,6 +42,8 @@ try {
       const game = window.__wireTheHouse, room = game.room, camera = game.renderer.camera;
       const left = room.referenceWalls.find(object => object.name === 'Left concrete wall');
       const parts = left?.children.map(part => part.name) ?? [];
+      const workingInfill=['Original room west wall before window','Original room west wall after window',
+        'Original room window clay sill','Original room window clay head'].map(name=>Boolean(room.mansionWing?.masonryDemolition.has(name)));
       const pose = (x, z, yaw, pitch = -.04) => {
         camera.position.set(x, 1.65, z);
         camera.rotation.set(pitch, yaw, 0, 'YXZ');
@@ -71,13 +73,17 @@ try {
       const windRange = Math.max(...windAngles) - Math.min(...windAngles);
       pose(-1.45, 2, Math.PI / 2);
       await game.renderer.waitForFrame();
-      return { parts, hole, solid, near, shifted, windRange, firedClayCount: firedClay?.count ?? 0,
+      return { parts, workingInfill, mansion:Boolean(room.mansionWing), hole, solid, near, shifted, windRange, firedClayCount: firedClay?.count ?? 0,
         renderError: game.renderer.renderError,
         outsideMeshes: room.exterior.children.length, hasGlass: room.exterior.getObjectByName('glass') !== undefined };
     });
-    assert(state.parts.length >= 6 && state.parts.some(name => name.includes('sill')) && state.parts.some(name => name.includes('lintel')));
+    assert(state.parts.some(name => name.includes('sill')) && state.parts.some(name => name.includes('lintel')));
+    // Mansion infill is now independent, destructible masonry rather than
+    // decorative children of the retained concrete window frame.
+    if(state.mansion)assert(state.workingInfill.every(Boolean),'All four window infill sections must support masonry work');
+    else assert(state.parts.length>=6);
     assert.equal(state.hole, 'no-wall', `${device.name}: opening must not have an invisible solid panel`);
-    assert.equal(state.solid, 'ready', `${device.name}: remaining concrete stays a work surface`);
+    assert.equal(state.solid, 'ready', `${device.name}: remaining masonry stays a work surface`);
     assert(Math.abs(state.near.tree - state.shifted.tree) > .02, `${device.name}: near olive tree has no camera parallax`);
     assert(state.windRange > .005, `${device.name}: courtyard foliage has no motion`);
     assert(state.outsideMeshes >= 6 && !state.hasGlass && state.renderError === '');

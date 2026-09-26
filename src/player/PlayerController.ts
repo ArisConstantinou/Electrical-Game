@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { Input } from '../core/Input';
 import { GAME_CONFIG } from '../data/gameConfig';
 import { resolveEquipmentCollisions, type PlayerObstacle } from './EquipmentCollision';
+import { JumpMotion } from './JumpMotion';
 
 export type MobileAimProfile = 'precise' | 'normal' | 'fast';
 
@@ -31,6 +32,15 @@ export class PlayerController {
   private emptySite=false;
   private surfaceProvider:((x:number,z:number,currentFloor:number)=>number)|null=null;
   collisionContacts:string[]=[];
+  grounded = true;
+  verticalVelocity = 0;
+  jumpOffset = 0;
+  supportFloorY = 0;
+  private jumpFeetY = 0;
+  private jumpPreparationLeft=0;
+  private readonly jumpMotion=new JumpMotion();
+  get jumpPose(){return this.jumpMotion.pose;}
+  private ceilingProvider:((x:number,z:number,feetY:number)=>number)|null=null;
 
   constructor(readonly camera: THREE.PerspectiveCamera, private readonly input: Input) {
     camera.position.set(-1.72, GAME_CONFIG.player.eyeHeight, -0.58);
@@ -41,6 +51,7 @@ export class PlayerController {
   setMansionPreview(enabled:boolean):void { this.mansionPreview=enabled; }
   setEmptySite(enabled:boolean):void { this.emptySite=enabled; }
   setSurfaceProvider(provider:(x:number,z:number,currentFloor:number)=>number):void { this.surfaceProvider=provider; }
+  setCeilingProvider(provider:(x:number,z:number,feetY:number)=>number):void { this.ceilingProvider=provider; }
 
   // All tools share direct aiming. A hard eye-only window prevents precise
   // placement of the work point and introduces a dead zone on every reversal.
@@ -54,10 +65,12 @@ export class PlayerController {
   }
 
   update(dt: number): void {
+    const jumpRequested=this.input.jumpRequested;this.input.jumpRequested=false;
     const enteringHandWork=this.handWorkTargetY!==null&&!this.wasHandWork;
     this.wasHandWork=this.handWorkTargetY!==null;
     const wallDistance = Math.abs(this.camera.position.z - GAME_CONFIG.room.wallFrontZ);
-    const handWork=this.handWorkTargetY!==null&&this.wallWorkEnabled&&Math.cos(this.yaw)>.65&&wallDistance<.94&&!this.workPosition.released;
+    const canBrace=this.grounded&&!jumpRequested&&this.jumpPreparationLeft<=0;
+    const handWork=canBrace&&this.handWorkTargetY!==null&&this.wallWorkEnabled&&Math.cos(this.yaw)>.65&&wallDistance<.94&&!this.workPosition.released;
     // Bend knees/hips for low hand work. The body never rises above standing
     // eye height, and distant or high wall areas still require repositioning.
     this.handWorkEyeHeight=handWork?THREE.MathUtils.clamp(this.handWorkTargetY!+.34,.68,GAME_CONFIG.player.eyeHeight):null;
@@ -89,12 +102,12 @@ export class PlayerController {
     const wasLocked=work.locked;
     const wallDistanceNow=this.camera.position.z-GAME_CONFIG.room.wallFrontZ;
     const facingWall=Math.cos(this.yaw)>.2;
-    if(!this.wallWorkEnabled || !facingWall){work.locked=false;}
+    if(!this.wallWorkEnabled || !facingWall || !canBrace){work.locked=false;}
     // Backward intent explicitly releases the stance. Do not immediately snap
     // back while the player is standing inside the entry zone after release.
     if(work.locked && y<-.12){work.locked=false;work.released=true;}
     if(wallDistanceNow>1.15 || y>.2)work.released=false;
-    if(this.wallWorkEnabled && facingWall && !work.released && !work.locked && y>=-.12 && wallDistanceNow<(this.handWorkTargetY===null?1.10:.94) && wallDistanceNow>.30)work.locked=true;
+    if(canBrace&&this.wallWorkEnabled && facingWall && !work.released && !work.locked && y>=-.12 && wallDistanceNow<(this.handWorkTargetY===null?1.10:.94) && wallDistanceNow>.30)work.locked=true;
     // Looking or changing a tool pose must not pull the camera to a newly
     // calculated standoff. Take up a new distance on approach/forward intent;
     // once braced, keep that distance until the player deliberately moves.
@@ -146,7 +159,7 @@ export class PlayerController {
     // Only adjacent 15 cm risers may change the floor height in one movement
     // step. This prevents entering the elevated return flight from ground level
     // or walking off an unfinished landing through empty air.
-    const feetY = this.camera.position.y - this.eyeHeight;
+    const feetY = this.camera.position.y - this.eyeHeight - this.jumpOffset;
     const oldFloor = this.surfaceProvider?.(previousX, previousZ, feetY) ?? 0;
     let nextFloor = this.surfaceProvider?.(this.camera.position.x, this.camera.position.z, oldFloor) ?? 0;
     if (Math.abs(nextFloor - oldFloor) > .21) {
@@ -156,7 +169,29 @@ export class PlayerController {
       nextFloor = oldFloor;
     }
     work.distanceM=this.camera.position.z-GAME_CONFIG.room.wallFrontZ;
-    this.camera.position.y = THREE.MathUtils.damp(this.camera.position.y, this.eyeHeight + nextFloor, 14, dt);
+    this.supportFloorY=nextFloor;
+    if(jumpRequested&&this.grounded&&this.jumpPreparationLeft<=0)this.jumpPreparationLeft=.075;
+    const preparing=this.jumpPreparationLeft>0;
+    if(preparing)this.jumpPreparationLeft=Math.max(0,this.jumpPreparationLeft-dt);
+    if(preparing&&this.jumpPreparationLeft===0){
+      this.grounded=false;this.jumpFeetY=nextFloor;this.verticalVelocity=3.8;
+    }
+    if(!this.grounded){
+      // Absolute ballistic feet height prevents the stair surface from lifting
+      // an airborne worker. A second press in the air cannot reset the jump.
+      this.jumpFeetY+=this.verticalVelocity*dt-7*dt*dt;
+      this.verticalVelocity-=14*dt;
+      const ceiling=this.ceilingProvider?.(this.camera.position.x,this.camera.position.z,nextFloor)??Infinity;
+      const maxFeet=ceiling-this.eyeHeight-.22;
+      if(this.jumpFeetY>maxFeet){this.jumpFeetY=Math.max(nextFloor,maxFeet);this.verticalVelocity=Math.min(0,this.verticalVelocity);}
+      if(this.jumpFeetY<=nextFloor){this.jumpFeetY=nextFloor;this.verticalVelocity=0;this.grounded=true;}
+      this.jumpOffset=Math.max(0,this.jumpFeetY-nextFloor);
+      this.camera.position.y=this.jumpFeetY+this.eyeHeight;
+    }else{
+      this.jumpOffset=0;
+      this.camera.position.y = THREE.MathUtils.damp(this.camera.position.y, this.eyeHeight + nextFloor, 14, dt);
+    }
+    this.jumpMotion.update(dt,!this.grounded,this.verticalVelocity,this.jumpPreparationLeft>0?1-this.jumpPreparationLeft/.075:0);
     if(handFocus){handFocus.x+=this.camera.position.x-previousX;this.camera.lookAt(handFocus);this.pitch=this.camera.rotation.x;this.yaw=this.camera.rotation.y;}
   }
 

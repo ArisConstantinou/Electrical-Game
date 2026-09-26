@@ -1,0 +1,24 @@
+import {createRequire} from 'node:module';
+import {pathToFileURL} from 'node:url';
+import path from 'node:path';
+import os from 'node:os';
+import {mkdir,writeFile} from 'node:fs/promises';
+import {routeBuildingDist} from './building-qa-utils.mjs';
+import {blockPointerLock} from './browser-safety.mjs';
+const client=path.join(process.env.CODEX_HOME??path.join(os.homedir(),'.codex'),'skills/develop-web-game/scripts/web_game_playwright_client.js');
+const req=createRequire(client),{chromium}=req('playwright');
+const connect=chromium.connect.bind(chromium);
+chromium.connect=async(...args)=>{
+ const browser=await connect(...args),newPage=browser.newPage.bind(browser);
+ browser.newPage=async(...args)=>{const page=await newPage(...args);await routeBuildingDist(page.context());await blockPointerLock(page.context());
+ const goto=page.goto.bind(page);
+ page.goto=async(...args)=>{const response=await goto(...args);await page.waitForFunction(()=>window.__wireTheHouse?.isReadyForStart&&!document.querySelector('#start-button')?.disabled,null,{timeout:120000});return response;};
+ const click=page.click.bind(page);
+ page.click=async(selector,...args)=>{const result=await click(selector,...args);if(selector==='#start-button')await page.keyboard.press('Digit4');return result;};
+ return page;};
+ return browser;
+};
+await mkdir('output/building-skill',{recursive:true});
+await writeFile('output/building-skill/actions.json',JSON.stringify({steps:[{buttons:[],frames:10},{buttons:['up','space'],frames:12},{buttons:[],frames:45}]}));
+process.argv=[process.execPath,client,'--url','http://127.0.0.1:5365/Electrical-Game/?renderer=webgl','--click-selector','#start-button','--iterations','1','--actions-file','output/building-skill/actions.json','--screenshot-dir','output/building-skill'];
+await import(pathToFileURL(client).href);

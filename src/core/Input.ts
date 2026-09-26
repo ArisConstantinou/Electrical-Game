@@ -6,6 +6,7 @@ export class Input {
   actionHeld = false;
   interactionRequested = false;
   interactionHeld = false;
+  jumpRequested = false;
 
   constructor() {
     addEventListener('keydown', this.onKeyDown);
@@ -34,6 +35,7 @@ export class Input {
     this.interactionHeld = false;
     this.interactionRequested = false;
     this.resetMobileMove();
+    this.jumpRequested = false;
     this.resetMobileLook();
   }
 

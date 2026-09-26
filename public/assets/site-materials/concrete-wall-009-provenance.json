@@ -1,0 +1,16 @@
+[
+  {
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_wall_009/concrete_wall_009_diff_1k.jpg",
+    "sha256": "59811fad71658323462287b072eef22ebb857c13bba63eeff34842a4d4dba8fe",
+    "kind": "albedo",
+    "bytes": 626688,
+    "md5": "183930f83ca9b70797b1226833d64bf3"
+  },
+  {
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_wall_009/concrete_wall_009_nor_gl_1k.jpg",
+    "sha256": "0caa2f8681b5c81de775d32deb6ad0644e9f943015faf42e1e7cccfbd6c5c04f",
+    "kind": "normal",
+    "bytes": 518536,
+    "md5": "68c543079c71fd14e9f0b38b126eb116"
+  }
+]

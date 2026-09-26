@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { castStairFlight } from './CastStairFlight';
+import { addCourtyardWings } from './CourtyardWings';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import type { PlayerObstacle } from '../player/EquipmentCollision';
 import { brickFacePatch, brickFaceTone } from './BrickFacePatch';
@@ -30,6 +32,7 @@ export class MansionGroundWing extends THREE.Group {
   private readonly gameplayCulled = new Map<THREE.Object3D, boolean>();
   private retainingContactMaterial: THREE.MeshStandardMaterial | null = null;
   private emptyTemplate = false;
+  private readonly wingFloors: THREE.Mesh[] = [];
   readonly courtyard: MansionCourtyard;
   readonly surroundings: MansionSurroundings;
 
@@ -61,7 +64,7 @@ export class MansionGroundWing extends THREE.Group {
     if (new URLSearchParams(location.search).get('garage') === 'off') {
       this.wall('Foyer south fired-clay partition', 1.35, 7.65, 9, 7.65);
     } else {
-      this.wall('Foyer south masonry west of garage passage', 1.35, 7.65, 6.55, 7.65);
+      this.wall('Foyer south masonry west of garage passage', 1.35, 7.65, 2.2, 7.65);
       this.wall('Foyer south masonry east of garage passage', 8.45, 7.65, 9, 7.65);
       this.addGroundGarage();
     }
@@ -81,6 +84,10 @@ export class MansionGroundWing extends THREE.Group {
     this.addSetbackFloorShell(3);
     this.addUpperStairCore(3);
     this.addSetbackFloorShell(4);
+    // The expanded stepped terraces continue beyond the old short guard.
+    for(const object of [...this.children])if(/^L[34] (?:temporary terrace-edge protection post|continuous temporary terrace-edge rail)$/.test(object.name))this.remove(object);
+    for(let i=this.obstacles.length-1;i>=0;i--)if(/^L[34] terrace east-edge guard$/.test(this.obstacles[i].id))this.obstacles.splice(i,1);
+    this.wingFloors.push(...addCourtyardWings(this,this.wall.bind(this),this.obstacles));
     // Existing room boundaries remain physically closed except for the new aperture.
     this.obstacles.push(
       { id: 'mansion-room-east', minX: 3.76, maxX: 4.05, minZ: -2.41, maxZ: 3.62 },
@@ -94,7 +101,7 @@ export class MansionGroundWing extends THREE.Group {
     this.castFrame(9, 7.65);
     this.castFrame(-1.35, 15.5);
     this.castFrame(9, 15.5);
-    this.addTemporarySafety();
+    this.finishStairCirculation();
     this.registerAuthoredAssets();
   }
 
@@ -293,6 +300,36 @@ export class MansionGroundWing extends THREE.Group {
     }
   }
 
+  /** Original room's clay infill uses the same chisel/demolition model as
+   * every added floor. Concrete reveals and the electrical work walls remain. */
+  connectOriginalRoomMasonry(room:THREE.Group):THREE.Group[] {
+    const west=room.getObjectByName('Left concrete wall') as THREE.Group;
+    const east=room.getObjectByName('Right concrete wall') as THREE.Group;
+    const rear=room.getObjectByName('Rear masonry work surface') as THREE.Group;
+    for(const side of [west,east]){
+      for(const child of [...side.children])
+        if(child instanceof THREE.InstancedMesh || /^(Solid wall|Solid cast|Solid lintel)/.test(child.name) || (side===east && child instanceof THREE.Mesh))side.remove(child);
+      side.userData.studioEntityId=side===west?'world:original-window-frame':'world:original-practice-frame';
+    }
+    for(const child of [...rear.children])if(child instanceof THREE.InstancedMesh||/backing/.test(child.name))rear.remove(child);
+    for(const id of ['mansion-rear-west','mansion-rear-east','mansion-room-east']){
+      const index=this.obstacles.findIndex(item=>item.id===id);if(index>=0)this.obstacles.splice(index,1);
+    }
+    const names:string[]=[];
+    const infill=(name:string,x0:number,z0:number,x1:number,z1:number,base=0,height=3)=>{
+      names.push(name);this.wall(name,x0,z0,x1,z1,base,height);
+    };
+    infill('Original room right practice masonry',3.91,-3.6,3.91,3.6);
+    infill('Original room west wall before window',-3.91,-3.6,-3.91,1.05);
+    infill('Original room west wall after window',-3.91,2.95,-3.91,3.6);
+    infill('Original room window clay sill',-3.91,1.05,-3.91,2.95,0,1.01);
+    infill('Original room window clay head',-3.91,1.05,-3.91,2.95,2.48,.52);
+    infill('Original room rear west infill',-3.8,3.68,-1.35,3.68);
+    infill('Original room rear east infill',1.35,3.68,3.8,3.68);
+    infill('Original room rear lintel infill',-1.35,3.68,1.35,3.68,2.638,.362);
+    return names.map(name=>this.editableWalls.get(name)!);
+  }
+
   update(dt: number): void {
     this.courtyard.update(dt);
     this.surroundings.update(dt);
@@ -311,7 +348,9 @@ export class MansionGroundWing extends THREE.Group {
     let changed = false;
     const nearStair = Math.hypot(x - 6.5, z - 9.6) < 6.5;
     const showB1 = feetY < -.05 || nearStair;
-    const showB2 = feetY < -2.5;
+    // The open stair well gives the ground foyer a line of sight to B2.
+    // Culling it here exposed the sky through the bottom of the stair void.
+    const showB2 = feetY < -2.5 || nearStair;
     for (const object of this.children) {
       const floor = object.userData.levelEditorFloor === 5 || object.name.startsWith('B1 ') ? 5
         : object.userData.levelEditorFloor === 6 || object.name.startsWith('B2 ') ? 6 : 0;
@@ -332,6 +371,12 @@ export class MansionGroundWing extends THREE.Group {
 
   setEmptyTemplate(enabled: boolean): void { this.emptyTemplate = enabled; }
 
+  private editorHidden(object:THREE.Object3D):boolean {
+    for(let node:THREE.Object3D|null=object;node;node=node.parent)
+      if(node.userData.levelEditorHidden===true)return true;
+    return false;
+  }
+
   surfaceHeight(x: number, z: number, currentFloor = 0): number {
     const placed = this.editorSurfaceHeight(x, z, currentFloor);
     if (placed !== null) return placed;
@@ -346,6 +391,16 @@ export class MansionGroundWing extends THREE.Group {
     }
     const closest = (heights: number[]): number => heights.reduce((best, height) =>
       Math.abs(height - currentFloor) < Math.abs(best - currentFloor) ? height : best);
+    for (const floor of this.wingFloors) {
+      if (this.editorHidden(floor)) continue;
+      floor.updateWorldMatrix(true,false);
+      if (!floor.geometry.boundingBox) floor.geometry.computeBoundingBox();
+      const bounds=floor.geometry.boundingBox!;
+      this.corner.set(x,currentFloor,z).applyMatrix4(this.inverseSurfaceMatrix.copy(floor.matrixWorld).invert());
+      if(this.corner.x<bounds.min.x||this.corner.x>bounds.max.x||this.corner.z<bounds.min.z||this.corner.z>bounds.max.z)continue;
+      const height=floor.localToWorld(this.corner.set(0,bounds.max.y,0)).y;
+      if(Math.abs(height-currentFloor)<.22)return height;
+    }
     const stairBases = [-6.8, -3.4, 0, 3.3, 6.6, 9.9];
     const onFirst = x >= 4.8 && x <= 6.2 && z >= 8 && z < 11.08;
     if (onFirst) {
@@ -359,7 +414,7 @@ export class MansionGroundWing extends THREE.Group {
       const step = Math.min(11, Math.floor((11.08 - z) / .28) + 1);
       return closest(stairBases.map(base => base + (base < 0 ? 1.7 + step * 3.4 / 22 : 1.65 + step * .15)));
     }
-    if (x >= 4.48 && x <= 6.6 && z >= 6.5 && z < 8) return closest([-6.8, -3.4, 0, 3.3, 6.6, 9.9]);
+    if (x >= 4.48 && x <= 6.6 && z >= 6.5 && z < 8) return closest([-6.8, -3.4, 0, 3.3, 6.6, 9.9, 13.2]);
     if (x >= 6.5 && x <= 8.5 && z >= 4.5 && z < 8) return closest([-6.8, -3.4, 0, 3.3, 6.6, 9.9, 13.2]);
     if (x >= 6.5 && x <= 9 && z >= 0 && z < 4.5) {
       const heights = [-6.8, -3.4, 0, 3.3, 6.6, 9.9];
@@ -401,7 +456,8 @@ export class MansionGroundWing extends THREE.Group {
 
   obstaclesAt(floorY: number): PlayerObstacle[] {
     for (const [asset, entry] of this.editableAssetColliders) {
-      if (asset.userData.levelEditorHidden === true) {
+      if (this.editorHidden(asset)) {
+        entry.matrix.makeScale(0,0,0);
         entry.obstacle.segments = [];
         entry.obstacle.minX = entry.obstacle.minZ = Infinity;
         entry.obstacle.maxX = entry.obstacle.maxZ = -Infinity;
@@ -440,7 +496,8 @@ export class MansionGroundWing extends THREE.Group {
     }
     for (const [wall, entry] of this.editableWallColliders) {
       const obstacle = entry.obstacle;
-      if (wall.userData.levelEditorHidden === true) {
+      if (this.editorHidden(wall)) {
+        entry.matrix.makeScale(0,0,0);
         obstacle.segments = [];
         obstacle.minX = obstacle.minZ = Infinity;
         obstacle.maxX = obstacle.maxZ = -Infinity;
@@ -498,11 +555,11 @@ export class MansionGroundWing extends THREE.Group {
       obstacle.minZ -= .01; obstacle.maxZ += .01;
       this.corner.set(0, 0, 0).applyMatrix4(wall.matrixWorld);
       obstacle.minFloorY = this.corner.y;
-      this.corner.set(0, 3, 0).applyMatrix4(wall.matrixWorld);
+      this.corner.set(0, (wall.userData.height as number) ?? 3, 0).applyMatrix4(wall.matrixWorld);
       obstacle.maxFloorY = this.corner.y;
     }
     for (const wall of this.masonryDemolition.values())
-      if (wall.group.userData.levelEditorHidden !== true) wall.updateGroundCollision();
+      if (!this.editorHidden(wall.group)) wall.updateGroundCollision();
     return this.obstacles.filter(obstacle =>
       (!this.emptyTemplate || obstacle.id.startsWith('Editor ')) &&
       floorY >= (obstacle.minFloorY ?? -Infinity) - .16 && floorY <= (obstacle.maxFloorY ?? Infinity) + .16);
@@ -690,7 +747,7 @@ export class MansionGroundWing extends THREE.Group {
     sharedSoffit.name = 'Continuous cast soffit under existing L1 floor above garage';
     sharedSoffit.position.set(10.75, 0, 2.25);
     this.add(sharedSoffit);
-    this.wall('Garage passage west fired-clay partition', 6.5, 4.5, 6.5, 7.65);
+    this.wall('Garage passage west fired-clay partition', 6.5, 4.5, 6.5, 6.45);
     this.wall('Garage passage south fired-clay return', 6.5, 4.5, 9, 4.5);
     this.wall('Garage passage east fired-clay return', 9, 5.75, 9, 7.65);
     this.wall('Garage west fired-clay perimeter before passage', 9, -3.5, 9, 4.25);
@@ -828,21 +885,26 @@ export class MansionGroundWing extends THREE.Group {
       floor.position.set(panel.x, -.09, panel.z);
       floor.receiveShadow = true;
       this.add(floor);
-      const roof = new THREE.Mesh(new RoundedBoxGeometry(panel.w, .18, panel.d, 2, .012), siteMaterial('concrete', 0xc9c3b8, panel.w / 2.2, panel.d / 2.2));
+      // Give the worker's head room beside the flight, including a jump at
+      // the edge of a tread. The floor edge remains supported below.
+      const roofPanel = stairVoid ? (panel.x < 4 ? {w:5.7,d:5,x:1.5,z:10.1}
+        : panel.x > 8 ? {w:.35,d:5,x:8.825,z:10.1}
+        : panel.z > 12 ? {w:4.3,d:.1,x:6.5,z:12.55} : panel) : panel;
+      const roof = new THREE.Mesh(new RoundedBoxGeometry(roofPanel.w, .18, roofPanel.d, 2, .012), siteMaterial('concrete', 0xc9c3b8, roofPanel.w / 2.2, roofPanel.d / 2.2));
       roof.name = `${name} load-bearing ceiling slab`;
-      roof.position.set(panel.x, 3.19, panel.z);
+      roof.position.set(roofPanel.x, 3.19, roofPanel.z);
       roof.castShadow = roof.receiveShadow = true;
       this.add(roof);
       // Keep the stair void open, but make each supported underside continuous
       // cast concrete rather than a grid of fictitious overhead clay cells.
-      const soffit = createConcreteSoffit(panel.w, panel.d, 2.92);
+      const soffit = createConcreteSoffit(roofPanel.w, roofPanel.d, 3.07);
       soffit.name = `${name} cast concrete soffit`;
-      soffit.position.set(panel.x, 0, panel.z);
+      soffit.position.set(roofPanel.x, 0, roofPanel.z);
       this.add(soffit);
     }
   }
 
-  private wall(name: string, x0: number, z0: number, x1: number, z1: number, baseY = 0): void {
+  private wall(name: string, x0: number, z0: number, x1: number, z1: number, baseY = 0, height = 3): void {
     const alongX = Math.abs(x1 - x0) > Math.abs(z1 - z0);
     const length = Math.hypot(x1 - x0, z1 - z0);
     const centreX = (x0 + x1) / 2, centreZ = (z0 + z1) / 2;
@@ -851,6 +913,7 @@ export class MansionGroundWing extends THREE.Group {
     editable.userData.studioEntityId = `mansion:wall:${name.toLowerCase().replaceAll(/[^a-z0-9]+/g, '-')}`;
     editable.userData.levelEditorKind = 'brick-wall';
     editable.userData.length = length;
+    editable.userData.height = height;
     editable.userData.alongX = alongX;
     editable.position.set(centreX, baseY, centreZ);
     this.add(editable);
@@ -860,13 +923,13 @@ export class MansionGroundWing extends THREE.Group {
     const mortarBacking = siteMaterial('concrete', 0xaaa399, length / 2, 1.5);
     mortarBacking.emissive.setHex(0x77736e);
     mortarBacking.emissiveIntensity = .28;
-    const backing = new THREE.Mesh(new THREE.BoxGeometry(alongX ? length : .226, 3, alongX ? .226 : length), mortarBacking);
+    const backing = new THREE.Mesh(new THREE.BoxGeometry(alongX ? length : .226, height, alongX ? .226 : length), mortarBacking);
     backing.name = `${name} mortar backing`;
-    backing.position.set(0, 1.5, 0);
+    backing.position.set(0, height / 2, 0);
     backing.castShadow = backing.receiveShadow = true;
     editable.add(backing);
-    const pitch = .38, course = 3 / 23, gap = .006;
-    const columns = Math.ceil(length / pitch) + 1, rows = 23;
+    const pitch = .38, rows = Math.max(1, Math.round(height / (3 / 23))), course = height / rows, gap = .006;
+    const columns = Math.ceil(length / pitch) + 1;
     const wearTypes = ['sound', 'small-chip-a', 'small-chip-b', 'broken-corner'] as const;
     const batches: { matrices: THREE.Matrix4[]; colors: THREE.Color[]; patches: number[] }[] =
       wearTypes.map(() => ({ matrices: [], colors: [], patches: [] }));
@@ -919,13 +982,13 @@ export class MansionGroundWing extends THREE.Group {
     editable.add(hollowClayWallEnds(length, rows, course, gap, alongX, name));
     const obstacle: PlayerObstacle = { id: name, minX: Math.min(x0, x1) - .12, maxX: Math.max(x0, x1) + .12,
       minZ: Math.min(z0, z1) - .12, maxZ: Math.max(z0, z1) + .12,
-      minFloorY: baseY, maxFloorY: baseY + 3 };
+      minFloorY: baseY, maxFloorY: baseY + height };
     this.obstacles.push(obstacle);
     this.editableWallColliders.set(editable, { obstacle, matrix: new THREE.Matrix4().makeScale(0, 0, 0) });
     const brickRefs: (MasonryBrickInstance | null)[] = slots.map(slot => slot
       ? { mesh: batchMeshes[slot.variant], instance: slot.instance }
       : null);
-    this.masonryDemolition.set(name, new MansionMasonryDemolition(editable, brickRefs, backing, obstacle, length, alongX, columns, rows));
+    this.masonryDemolition.set(name, new MansionMasonryDemolition(editable, brickRefs, backing, obstacle, length, alongX, columns, rows, height));
   }
 
   private castFrame(x: number, z: number): void {
@@ -950,19 +1013,7 @@ export class MansionGroundWing extends THREE.Group {
     lintel.position.set(9, 2.61, 14.0);
     lintel.castShadow = lintel.receiveShadow = true;
     this.add(lintel);
-    const geometry = new THREE.BoxGeometry(1, 1, 1), patches = new Float32Array(16 * 4);
-    geometry.setAttribute('brickPatch', new THREE.InstancedBufferAttribute(patches, 4));
-    const clay = new THREE.InstancedMesh(geometry, masonryFaceMaterial, 16);
-    clay.name = 'Fired-clay masonry bearing above courtyard lintel';
-    const matrix = new THREE.Matrix4();
-    for (let row = 0; row < 2; row++) for (let col = 0; col < 8; col++) {
-      const index = row * 8 + col;
-      patches.set(brickFacePatch(row, col, 14), index * 4);
-      clay.setMatrixAt(index, matrix.compose(new THREE.Vector3(9, 2.82 + row * .12, 12.84 + (col + .5) * .29),
-        new THREE.Quaternion(), new THREE.Vector3(.23, .113, .283)));
-    }
-    clay.castShadow = clay.receiveShadow = true;
-    clay.computeBoundingSphere(); this.add(clay);
+    this.wall('Fired-clay masonry bearing above courtyard lintel',9,12.84,9,15.16,2.76,.24);
   }
 
   private addCourtyardWindowBand(z0: number, z1: number): void {
@@ -971,31 +1022,10 @@ export class MansionGroundWing extends THREE.Group {
     const sill = new THREE.Group();
     sill.name = `Courtyard east window sill assembly ${z0}`;
     this.add(sill);
-    const mortar = siteMaterial('floor', 0x938b7f, .5, .5);
-    for (const [name, y0, y1] of [
-      ['sill masonry', 0, 1.04], ['head masonry', 2.43, 3],
-    ] as const) {
-      const parent = name === 'sill masonry' ? sill : this;
-      const backing = new THREE.Mesh(new THREE.BoxGeometry(.20, y1 - y0, z1 - z0), mortar);
-      backing.name = `Courtyard east window ${name}`;
-      backing.position.set(18, (y0 + y1) / 2, (z0 + z1) / 2);
-      backing.castShadow = backing.receiveShadow = true;
-      parent.add(backing);
-      const course = 3 / 23, rows = Math.ceil((y1 - y0) / course), cols = 6;
-      const geometry = new THREE.BoxGeometry(1, 1, 1), patches = new Float32Array(rows * cols * 4);
-      geometry.setAttribute('brickPatch', new THREE.InstancedBufferAttribute(patches, 4));
-      const bricks = new THREE.InstancedMesh(geometry, masonryFaceMaterial, rows * cols);
-      bricks.name = `Individual fired-clay units in ${name}`;
-      const matrix = new THREE.Matrix4();
-      for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
-        const index = row * cols + col, y = y0 + (row + .5) * (y1 - y0) / rows;
-        const z = z0 + (col + .5) * (z1 - z0) / cols;
-        patches.set(brickFacePatch(row, col, 17), index * 4);
-        bricks.setMatrixAt(index, matrix.compose(new THREE.Vector3(18, y, z), new THREE.Quaternion(),
-          new THREE.Vector3(.24, (y1 - y0) / rows - .006, (z1 - z0) / cols - .006)));
-      }
-      bricks.castShadow = bricks.receiveShadow = true;
-      bricks.computeBoundingSphere(); parent.add(bricks);
+    for(const [label,base,height] of [['sill masonry',0,.975],['head masonry',2.495,.505]] as const){
+      const name=`Courtyard east window ${label} ${z0}`;
+      this.wall(name,18,z0,18,z1,base,height);
+      if(label==='sill masonry')sill.attach(this.editableWalls.get(name)!);
     }
     const concrete = siteMaterial('floor', 0xd6cfc4, .22, .25);
     for (const [label, y] of [['raw sill', 1.04], ['supported lintel', 2.43]] as const) {
@@ -1057,7 +1087,7 @@ export class MansionGroundWing extends THREE.Group {
       this.add(rail);
     }
     this.obstacles.push(
-      { id: 'stair-first-flight-west-guard', minX: 4.55, maxX: 4.7, minZ: 8, maxZ: 11.08, minFloorY: 0, maxFloorY: 3.3 },
+      { id: 'stair-first-flight-west-guard', minX: 4.55, maxX: 4.7, minZ: 8.5, maxZ: 11.08, minFloorY: 0, maxFloorY: 3.3 },
       { id: 'stair-flight-well-guard', minX: 6.25, maxX: 6.72, minZ: 8, maxZ: 11.08, minFloorY: 0, maxFloorY: 3.3 },
       { id: 'stair-second-flight-east-guard', minX: 8.3, maxX: 8.5, minZ: 8, maxZ: 11.08, minFloorY: 0, maxFloorY: 3.3 },
     );
@@ -1098,6 +1128,22 @@ export class MansionGroundWing extends THREE.Group {
       this.addCastFloorJoints(corridorFloor, 2.5, 7.6, 7.75, 3.8);
       this.addCastFloorJoints(garageFloor, 9, 9.5, 13.5, 1.25);
       addCast(`${label} side deck at stair foot`, 2.05, .18, 1.5, 5.53, base - .09, 7.25, floorMaterial);
+      // The basement stair is inside a real retaining shaft, not suspended
+      // over the outdoor sky. Leave the south foot open to each corridor.
+      for(const [side,x0,z0,x1,z1] of [
+        ['west',4.45,7.95,4.45,12.34],['east',8.55,7.95,8.55,12.34],
+        ['north',4.45,12.34,8.55,12.34],
+      ] as const){
+        const alongX=x0!==x1,name=`${label} stair shaft ${side} cast enclosure`;
+        addCast(name,alongX?x1-x0:.28,3.4,alongX?.28:z1-z0,(x0+x1)/2,base+1.7,(z0+z1)/2);
+        this.obstacles.push({id:name,minX:Math.min(x0,x1)-.14,maxX:Math.max(x0,x1)+.14,
+          minZ:Math.min(z0,z1)-.14,maxZ:Math.max(z0,z1)+.14,minFloorY:base,maxFloorY:base+3.1});
+      }
+      if(depth===2){
+        // The foundation lies under the flight. The stair profile owns
+        // walking height here, rather than a flat surface over its risers.
+        addCast('B2 closed stair shaft foundation floor',4.38,.24,4.53,6.5,base-.12,10.135,floorMaterial);
+      }
       const wall = (name: string, x0: number, z0: number, x1: number, z1: number): void => {
         const length = Math.hypot(x1 - x0, z1 - z0);
         const alongX = Math.abs(x1 - x0) > Math.abs(z1 - z0);
@@ -1364,18 +1410,21 @@ export class MansionGroundWing extends THREE.Group {
     floor.position.set(9.5, 3.195, 2.25);
     floor.receiveShadow = true;
     this.add(floor);
-    const roof = new THREE.Mesh(new RoundedBoxGeometry(6.28, .2, 4.72, 2, .012), siteMaterial('concrete', 0xcac3b8, 2, 1.5));
+    const roof = new THREE.Mesh(new RoundedBoxGeometry(6.28, .2, 8.02, 2, .012), siteMaterial('concrete', 0xcac3b8, 2, 1.5));
     roof.name = 'L1 room slab prepared for L2';
-    roof.position.set(9.5, 6.5, 2.25);
+    roof.position.set(9.5, 6.5, .6);
     roof.castShadow = roof.receiveShadow = true;
     this.add(roof);
-    const soffit = createConcreteSoffit(6, 4.5, 6.22);
+    this.wingFloors.push(roof);
+    const soffit = createConcreteSoffit(6, 7.8, 6.22);
     soffit.name = 'L1 room cast concrete soffit';
-    soffit.position.set(9.5, 0, 2.25);
+    soffit.position.set(9.5, 0, .6);
     this.add(soffit);
-    this.wall('L1 unfinished north perimeter', 6.5, 0, 12.5, 0, 3.3);
-    this.wall('L1 unfinished west perimeter', 6.5, 0, 6.5, 4.5, 3.3);
-    this.wall('L1 unfinished east perimeter', 12.5, 0, 12.5, 4.5, 3.3);
+    this.wall('L1 unfinished north perimeter', 6.5, -3.3, 8.4, -3.3, 3.3);
+    this.wall('L1 front opening east masonry',10.6,-3.3,12.5,-3.3,3.3);
+    this.wall('L1 unfinished west perimeter', 6.5, -3.3, 6.5, 4.5, 3.3);
+    this.wall('L1 unfinished east perimeter', 12.5, -3.3, 12.5, 2.8, 3.3);
+    this.wall('L1 east veranda entrance north pier',12.5,4.2,12.5,4.5,3.3);
     this.wall('L1 unfinished south partition', 8.2, 4.5, 12.5, 4.5, 3.3);
     this.wall('L1 entrance left masonry pier', 6.5, 4.5, 6.8, 4.5, 3.3);
     const concrete = siteMaterial('floor', 0xe3ddd3, .35, .35);
@@ -1391,21 +1440,7 @@ export class MansionGroundWing extends THREE.Group {
     lintel.position.set(7.5, 5.86, 4.5);
     lintel.castShadow = lintel.receiveShadow = true;
     this.add(lintel);
-    const upperGeometry = new THREE.BoxGeometry(1, 1, 1);
-    const upperPatches = new Float32Array(8 * 4);
-    upperGeometry.setAttribute('brickPatch', new THREE.InstancedBufferAttribute(upperPatches, 4));
-    const upperFill = new THREE.InstancedMesh(upperGeometry, masonryFaceMaterial, 8);
-    upperFill.name = 'Two fired-clay courses above L1 rough opening';
-    const matrix = new THREE.Matrix4();
-    for (let row = 0; row < 2; row++) for (let col = 0; col < 4; col++) {
-      const index = row * 4 + col;
-      upperPatches.set(brickFacePatch(row, col, 12), index * 4);
-      upperFill.setMatrixAt(index, matrix.compose(new THREE.Vector3(6.8 + (col + .5) * .35, 6.075 + row * .15, 4.5),
-        new THREE.Quaternion(), new THREE.Vector3(.345, .145, .2)));
-    }
-    upperFill.castShadow = upperFill.receiveShadow = true;
-    upperFill.computeBoundingSphere();
-    this.add(upperFill);
+    this.wall('Fired-clay infill above L1 room opening',6.8,4.5,8.2,4.5,6.0,.3);
     const pier = new THREE.Mesh(new RoundedBoxGeometry(.3, 3.3, .3, 2, .008), concrete);
     for (const [index, x] of [6.5, 12.5].entries()) for (const [offset, z] of [0, 4.5].entries()) {
       const column = pier.clone();
@@ -1434,21 +1469,8 @@ export class MansionGroundWing extends THREE.Group {
       support.castShadow = support.receiveShadow = true;
       this.add(support);
     }
-    const edgeSteel = new THREE.MeshStandardMaterial({ color: 0xc2a731, roughness: .62, metalness: .25 });
-    for (const z of [6.56, 7.24, 7.9]) {
-      const post = new THREE.Mesh(new THREE.CylinderGeometry(.028, .028, 1.05, 8), edgeSteel);
-      post.name = `Temporary L${fromFloor} side-deck edge-protection post`;
-      post.position.set(4.48, base + .525, z);
-      post.castShadow = true;
-      this.add(post);
-    }
-    const deckRail = new THREE.Mesh(new THREE.CylinderGeometry(.023, .023, 1.46, 8), edgeSteel);
-    deckRail.name = `Visible guard at open L${fromFloor} side deck`;
-    deckRail.position.set(4.48, base + 1, 7.23);
-    deckRail.rotation.x = Math.PI / 2;
-    this.add(deckRail);
-    this.obstacles.push({ id: `L${fromFloor} side-deck edge guard`, minX: 4.42, maxX: 4.53, minZ: 6.51, maxZ: 7.97,
-      minFloorY: base, maxFloorY: base });
+    // The former outer deck guard is now a doorway to the continuous west
+    // veranda. Its outside edge protection is authored with the new wing.
     const geometry = new RoundedBoxGeometry(1, 1, 1, 2, .006);
     const treads = new THREE.InstancedMesh(geometry, concrete, 22);
     const risers = new THREE.InstancedMesh(geometry, formwork, 22);
@@ -1499,18 +1521,21 @@ export class MansionGroundWing extends THREE.Group {
     roof.position.set(7.5, 9.8, 6.25);
     roof.castShadow = roof.receiveShadow = true;
     this.add(roof);
-    const roomRoof = new THREE.Mesh(new RoundedBoxGeometry(6.28, .2, 4.72, 2, .012), siteMaterial('concrete', 0xcac3b8, 2, 1.5));
+    const roomRoof = new THREE.Mesh(new RoundedBoxGeometry(6.28, .2, 8.02, 2, .012), siteMaterial('concrete', 0xcac3b8, 2, 1.5));
     roomRoof.name = 'L2 office shell slab prepared for next floor';
-    roomRoof.position.set(9.5, 9.8, 2.25);
+    roomRoof.position.set(9.5, 9.8, .6);
     roomRoof.castShadow = roomRoof.receiveShadow = true;
     this.add(roomRoof);
-    const soffit = createConcreteSoffit(6, 4.5, 9.52);
+    this.wingFloors.push(roomRoof);
+    const soffit = createConcreteSoffit(6, 7.8, 9.52);
     soffit.name = 'L2 cast concrete room soffit';
-    soffit.position.set(9.5, 0, 2.25);
+    soffit.position.set(9.5, 0, .6);
     this.add(soffit);
-    this.wall('L2 office north perimeter', 6.5, 0, 12.5, 0, 6.6);
-    this.wall('L2 office west perimeter', 6.5, 0, 6.5, 4.5, 6.6);
-    this.wall('L2 office east perimeter', 12.5, 0, 12.5, 4.5, 6.6);
+    this.wall('L2 office north perimeter', 6.5, -3.3, 8.4, -3.3, 6.6);
+    this.wall('L2 front opening east masonry',10.6,-3.3,12.5,-3.3,6.6);
+    this.wall('L2 office west perimeter', 6.5, -3.3, 6.5, 4.5, 6.6);
+    this.wall('L2 office east perimeter', 12.5, -3.3, 12.5, 2.8, 6.6);
+    this.wall('L2 east veranda entrance north pier',12.5,4.2,12.5,4.5,6.6);
     this.wall('L2 office south partition', 8.2, 4.5, 12.5, 4.5, 6.6);
     this.wall('L2 office entrance left masonry pier', 6.5, 4.5, 6.8, 4.5, 6.6);
     const trim = siteMaterial('floor', 0xd4cdc2, .25, .3);
@@ -1532,12 +1557,12 @@ export class MansionGroundWing extends THREE.Group {
     const base = level * 3.3;
     const label = `L${level}`;
     const west = 7, east = level === 3 ? 11 : 10;
-    const north = level === 3 ? .5 : 1;
+    const north = level === 3 ? -1.7 : -.6;
     const south = 4.5;
     const width = east - west, depth = south - north;
     // L3 stands on L2's full roof; L4 stands on the smaller L3 roof. Their
     // uncovered margins become narrow construction terraces, not extra rooms.
-    this.wall(`${label} corridor west masonry return`, 6.5, 4.5, 6.5, level === 3 ? 6.65 : 7.95, base);
+    this.wall(`${label} corridor west masonry return`, 6.5, 4.5, 6.5, 6.65, base);
     this.wall(`${label} corridor east masonry return`, 8.5, 4.5, 8.5, 7.95, base);
     const concrete = siteMaterial('concrete', 0xcac3b8, .8, 1.5);
     const corridorRoof = new THREE.Mesh(new RoundedBoxGeometry(2.24, .2, 3.68, 2, .012), concrete);
@@ -1551,11 +1576,14 @@ export class MansionGroundWing extends THREE.Group {
     roomRoof.position.set((west + east) / 2, base + 3.2, (north + south) / 2);
     roomRoof.castShadow = roomRoof.receiveShadow = true;
     this.add(roomRoof);
+    this.wingFloors.push(roomRoof);
     const soffit = createConcreteSoffit(width, depth, base + 2.92);
     soffit.name = `${label} cast concrete room soffit`;
     soffit.position.set((west + east) / 2, 0, (north + south) / 2);
     this.add(soffit);
-    this.wall(`${label} setback room north masonry`, west, north, east, north, base);
+    const windowCenter=(west+east)/2;
+    this.wall(`${label} setback room north masonry`,west,north,windowCenter-.9,north,base);
+    this.wall(`${label} front opening east masonry`,windowCenter+.9,north,east,north,base);
     this.wall(`${label} setback room west masonry`, west, north, west, south, base);
     this.wall(`${label} setback room south masonry`, 8.2, south, east, south, base);
     // An unfinished 1.5 m terrace opening is left in the east infill wall.
@@ -1604,19 +1632,45 @@ export class MansionGroundWing extends THREE.Group {
       minZ: 1.45, maxZ: 4.05, minFloorY: base, maxFloorY: base });
   }
 
-  private addTemporarySafety(): void {
-    const guard = new THREE.Group();
-    guard.name = 'Temporary edge-protection at future foyer extension';
-    const steel = new THREE.MeshStandardMaterial({ color: 0xc2a731, roughness: .6, metalness: .25 });
-    for (const x of [2.2, 4.2, 6.2, 8.2]) {
-      const post = new THREE.Mesh(new THREE.CylinderGeometry(.025, .025, 1.08, 8), steel);
-      post.position.set(x, .54, 7.96);
-      guard.add(post);
+  private finishStairCirculation(): void {
+    // Replace the separate thin tread/riser render pieces with supported,
+    // closed flights. Collision heights retain the same 11 + 11 risers.
+    const old = this.children.filter(part => /(?:stair flight [AB] (?:tread|riser)|cast stair (?:treads|risers)|cast stair-well safety kerb|Temporary (?:upper )?stair-edge protection rail)/i.test(part.name));
+    for (const part of old) {
+      this.remove(part);
+      if (part instanceof THREE.Mesh) part.geometry.dispose();
     }
-    const rail = new THREE.Mesh(new THREE.CylinderGeometry(.018, .018, 6, 8), steel);
-    rail.rotation.z = Math.PI / 2;
-    rail.position.set(5.2, 1.05, 7.96);
-    guard.add(rail);
-    this.add(guard);
+    for (const base of [-6.8, -3.4, 0, 3.3, 6.6, 9.9]) {
+      const rise = base < 0 ? 1.7 : 1.65;
+      const label = base < 0 ? `B${Math.round(-base / 3.4)}` : base === 0 ? 'Ground' : `L${Math.round(base / 3.3)}`;
+      this.add(castStairFlight(`${label} stair flight A`, 5.5, base, false, rise));
+      this.add(castStairFlight(`${label} stair flight B`, 7.5, base + rise, true, rise));
+      if (base > 0) this.obstacles.push(
+        {id:`${label} stair outer west edge`,minX:4.55,maxX:4.7,minZ:8.5,maxZ:11.08,minFloorY:base,maxFloorY:base+3.3},
+        {id:`${label} stair central well`,minX:6.25,maxX:6.72,minZ:8,maxZ:11.08,minFloorY:base,maxFloorY:base+3.3},
+        {id:`${label} stair outer east edge`,minX:8.3,maxX:8.5,minZ:8,maxZ:11.08,minFloorY:base,maxFloorY:base+3.3});
+    }
+    const approach = new THREE.Mesh(new RoundedBoxGeometry(2.1,.18,1.5,2,.008),siteMaterial('floor',0xd1cbc1));
+    approach.name = 'Ground supported stair approach floor';
+    approach.position.set(5.5,-.09,7.25);
+    approach.castShadow = approach.receiveShadow = true;
+    this.add(approach);
+    const threshold = new THREE.Mesh(new RoundedBoxGeometry(2.25,.18,1.1,2,.008),siteMaterial('floor',0xd1cbc1));
+    threshold.name = 'Ground open foyer stair doorway threshold floor';
+    threshold.position.set(3.325,-.09,7.05);
+    threshold.castShadow = threshold.receiveShadow = true;
+    this.add(threshold); this.wingFloors.push(threshold);
+    const head = new THREE.Mesh(new RoundedBoxGeometry(4.35,.28,.3,2,.008),siteMaterial('concrete',0xd5cfc4));
+    head.name = 'Supported open foyer to staircase lintel';
+    head.position.set(4.375,3.0,7.65);
+    head.castShadow = head.receiveShadow = true;
+    this.add(head);
+    const canvas=document.createElement('canvas');canvas.width=512;canvas.height=96;
+    const ctx=canvas.getContext('2d')!;ctx.fillStyle='#24302d';ctx.fillRect(0,0,512,96);
+    ctx.strokeStyle='#ffdc32';ctx.lineWidth=5;ctx.strokeRect(4,4,504,88);
+    ctx.fillStyle='#ffdc32';ctx.font='bold 52px Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('STAIRS  →',256,49);
+    const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
+    const sign=new THREE.Mesh(new THREE.PlaneGeometry(1.35,.253),new THREE.MeshStandardMaterial({map:texture,roughness:.8}));
+    sign.name='Foyer stair entrance directional sign';sign.position.set(3.4,2.98,7.807);this.add(sign);
   }
 }

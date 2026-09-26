@@ -64,17 +64,22 @@ export class ExteriorCourtyard extends THREE.Group {
 
     // A vertex-coloured atmosphere is spatial sky geometry, not a view image.
     // It remains behind every building and tree as the player changes angle.
-    const skyGeometry = new THREE.SphereGeometry(60, 32, 12);
+    const skyGeometry = new THREE.SphereGeometry(20, 32, 16);
     const skyPositions = skyGeometry.getAttribute('position');
     const skyColors: number[] = [];
     const horizon = new THREE.Color(0xb9cdd4), blue = new THREE.Color(0x78a8ca), skyColor = new THREE.Color();
     for (let i = 0; i < skyPositions.count; i++) {
-      const height = THREE.MathUtils.clamp((skyPositions.getY(i) / 60 + .02) * 2.1, 0, 1);
+      const height = THREE.MathUtils.clamp((skyPositions.getY(i) / 20 + .02) * 2.1, 0, 1);
       skyColor.copy(horizon).lerp(blue, height);
       skyColors.push(skyColor.r, skyColor.g, skyColor.b);
     }
     skyGeometry.setAttribute('color', new THREE.Float32BufferAttribute(skyColors, 3));
-    const sky = new THREE.Mesh(skyGeometry, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false }));
+    const sky = new THREE.Mesh(skyGeometry, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false, depthTest: false }));
+    // A fixed 60 m dome intersected the 60 m camera far plane, leaving a
+    // giant polygonal disc. Draw this camera-centred backdrop before the site.
+    sky.frustumCulled=false;sky.renderOrder=-1000;
+    const skyEye=new THREE.Vector3();
+    sky.onBeforeRender=(_renderer,_scene,camera)=>{camera.getWorldPosition(skyEye);sky.matrixWorld.makeTranslation(skyEye.x,skyEye.y,skyEye.z);};
     sky.name = 'Atmospheric sky gradient behind modeled courtyard'; sky.raycast = () => undefined; this.add(sky);
 
     let parent: THREE.Group = this;

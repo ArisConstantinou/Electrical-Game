@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import * as THREE from 'three';
+import {StaticConstructionTransforms} from '../src/world/StaticConstructionTransforms.ts';
+const scene=new THREE.Group(),wall=new THREE.Group(),brick=new THREE.Mesh(new THREE.BoxGeometry(),new THREE.MeshBasicMaterial());
+scene.add(wall);wall.add(brick);wall.position.set(4,3,2);wall.rotation.y=.7;brick.position.set(.2,.4,.6);
+scene.updateMatrixWorld(true);const before=brick.matrixWorld.clone(),cache=new StaticConstructionTransforms();cache.freeze(wall);
+let multiplies=0;const multiply=brick.matrixWorld.multiplyMatrices.bind(brick.matrixWorld);brick.matrixWorld.multiplyMatrices=(...args)=>{multiplies++;return multiply(...args);};
+for(let i=0;i<120;i++)scene.updateMatrixWorld(true);
+assert.equal(multiplies,0,'Stationary construction must not rebuild world matrices');assert.deepEqual(brick.matrixWorld.elements,before.elements);
+cache.restore();wall.position.x+=2;wall.scale.set(1.2,1,1);scene.updateMatrixWorld(true);assert(multiplies>0);assert.notDeepEqual(brick.matrixWorld.elements,before.elements);
+const edited=brick.matrixWorld.clone();cache.freeze(wall);scene.updateMatrixWorld(true);assert.deepEqual(brick.matrixWorld.elements,edited.elements);
+cache.restore();assert.equal(brick.matrixAutoUpdate,true);assert.equal(brick.matrixWorldAutoUpdate,true);
+brick.matrixAutoUpdate=false;brick.updateMatrix();cache.freeze(wall);cache.restore();assert.equal(brick.matrixAutoUpdate,false,'Respect authored policy');
+console.log('Static transforms: unchanged render, zero repeated world multiplies, editor move/resize/refreeze and policy restoration PASS');

@@ -119,6 +119,9 @@ const levelEditorDocument = (): Plugin => ({
 export default defineConfig({
   base: '/Electrical-Game/',
   cacheDir: '.vite-cache',
+  // QA retains complete before/after builds under output. Only the real app
+  // entry participates in development dependency discovery.
+  optimizeDeps: { entries: ['index.html'] },
   plugins: [studioOverrides(), levelEditorDocument()],
   server: { host: '127.0.0.1', port: 5365, strictPort: true },
   preview: { host: '127.0.0.1', port: 5365, strictPort: true },

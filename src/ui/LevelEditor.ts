@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mapBuildingSurfaces } from '../world/BuildingSurfaceMapping';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import type { Game } from '../core/Game';
@@ -1050,6 +1051,7 @@ export class LevelEditor {
     this.updateHistoryButtons();
   }
   private syncLiveEquipment(): void {
+    for (const object of this.selectedObjects) mapBuildingSurfaces(object);
     if (this.selectedObjects.has(this.game.mixing.wheelbarrow.model.group)) this.game.mixing.wheelbarrow.syncEditorPlacement();
     if (this.selectedObjects.has(this.game.mixing.models.mixer)) this.game.mixing.syncEditorRestPositions();
   }
@@ -1408,6 +1410,7 @@ export class LevelEditor {
     });
   }
   private invalidateEditorShadows(): void {
+    mapBuildingSurfaces(this.game.room);
     for (const shadow of this.editorShadows.keys()) shadow.needsUpdate = true;
   }
   private restoreEditorShadowCache(): void {
@@ -2312,6 +2315,7 @@ export class LevelEditor {
         this.game.apprentice.setEditorStart(1, this.apprenticeStart);
       }
       this.updateStarts();
+      mapBuildingSurfaces(this.game.room);
       // Floor isolation belongs to an open editor. Loading a saved level from
       // the main menu must leave the full playable building visible.
       if (this.active) this.applyFloorVisibility();

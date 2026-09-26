@@ -58,6 +58,7 @@ export class MansionMasonryDemolition {
     private readonly alongX: boolean,
     private readonly columns: number,
     private readonly rows: number,
+    private readonly height = 3,
   ) {
     this.intactBounds = [obstacle.minX, obstacle.maxX, obstacle.minZ, obstacle.maxZ];
     this.brickRefs = bricks instanceof THREE.InstancedMesh
@@ -76,7 +77,7 @@ export class MansionMasonryDemolition {
     }
     this.localBox = new THREE.Box3(
       new THREE.Vector3(this.alongX ? -length / 2 : -.12, 0, this.alongX ? -.12 : -length / 2),
-      new THREE.Vector3(this.alongX ? length / 2 : .12, 3, this.alongX ? .12 : length / 2),
+      new THREE.Vector3(this.alongX ? length / 2 : .12, height, this.alongX ? .12 : length / 2),
     );
   }
 
@@ -124,7 +125,7 @@ export class MansionMasonryDemolition {
   /** Test only the visible face. A camera ray through a cut-out does not hit
    * an invisible backing and can reach the next wall behind it. */
   aim(camera: THREE.Camera, maxDistance = 2.4, eye?: THREE.Vector3, view?: THREE.Vector3): MasonryAim | null {
-    if (!this.group.visible || this.group.parent?.visible === false) return null;
+    for(let node:THREE.Object3D|null=this.group;node;node=node.parent)if(!node.visible)return null;
     const origin = eye ?? camera.getWorldPosition(new THREE.Vector3());
     if (this.obstacle.segments?.length !== 0 &&
         (origin.x < this.obstacle.minX - maxDistance || origin.x > this.obstacle.maxX + maxDistance ||
@@ -140,7 +141,7 @@ export class MansionMasonryDemolition {
     const point = this.localHit.clone().applyMatrix4(this.group.matrixWorld);
     const distance = origin.distanceTo(point);
     if (distance > maxDistance || distance < .15) return null;
-    const row = Math.min(this.rows - 1, Math.max(0, Math.floor(this.localHit.y / (3 / this.rows))));
+    const row = Math.min(this.rows - 1, Math.max(0, Math.floor(this.localHit.y / (this.height / this.rows))));
     const coordinate = this.alongX ? this.localHit.x : this.localHit.z;
     let best = -1, bestDistance = .31;
     // Running-bond rows have a half brick at one end; use actual instance
@@ -374,7 +375,7 @@ export class MansionMasonryDemolition {
     cells.instanceMatrix.needsUpdate = true;
     const geometries: THREE.BufferGeometry[] = [];
     const width = entry.volume.width, height = entry.volume.height;
-    const bedHeight = Math.max(.005, Math.min(.016, 3 / this.rows - height));
+    const bedHeight = Math.max(.005, Math.min(.016, this.height / this.rows - height));
     const add = (x: number, y: number, sx: number, sy: number) => {
       const box = new THREE.BoxGeometry(sx, sy, .20);
       box.translate(x, y, 0);
@@ -581,7 +582,7 @@ export class MansionMasonryDemolition {
     const left = Math.min(width * .94, this.chippedDepths.get(`${index}:-1`) ?? 0);
     const right = Math.min(width * .94, this.chippedDepths.get(`${index}:1`) ?? 0);
     const remaining = Math.max(.008, width - left - right);
-    const bedHeight = Math.max(.005, Math.min(.016, 3 / this.rows - height));
+    const bedHeight = Math.max(.005, Math.min(.016, this.height / this.rows - height));
     const bedPosition = this.position.clone();
     if (this.alongX) bedPosition.x += (left - right) / 2;
     else bedPosition.z += (left - right) / 2;
@@ -745,7 +746,7 @@ export class MansionMasonryDemolition {
       if (this.originalHasBrick(index) && this.remaining[index]) {
         const width = this.alongX ? this.scale.x : this.scale.z;
         const height = this.scale.y;
-        const bedHeight = Math.max(.005, Math.min(.016, 3 / this.rows - height));
+        const bedHeight = Math.max(.005, Math.min(.016, this.height / this.rows - height));
         const bedPosition = this.position.clone();
         bedPosition.y -= height / 2 + bedHeight / 2;
         const bedScale = this.alongX ? new THREE.Vector3(width + .006, bedHeight, .20)

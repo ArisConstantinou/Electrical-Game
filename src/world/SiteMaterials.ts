@@ -14,10 +14,18 @@ function photographedTexture(surface: Surface, repeatX: number, repeatY: number,
   const key = `${surface}:${repeatX}:${repeatY}:${kind}`;
   const cached = materialTextures.get(key);
   if (cached) return cached;
-  const filename = kind === 'albedo' ? `${photographed[surface]}-albedo-512.webp`
+  const filename = surface === 'concrete' ? `concrete-wall-009-${kind}-1k.jpg` : kind === 'albedo' ? `${photographed[surface]}-albedo-512.webp`
     : `${surface === 'floor' ? 'concrete_floor' : photographed[surface]}-normal-512.webp`;
-  const image = textureLoader.load(`${import.meta.env.BASE_URL}assets/site-materials/${filename}`);
-  image.name = `${surface} ${kind} 512 CC0`;
+  const sourceKey = `image:${filename}`;
+  let sourceImage = materialTextures.get(sourceKey);
+  if (!sourceImage) {
+    sourceImage = textureLoader.load(`${import.meta.env.BASE_URL}assets/site-materials/${filename}`);
+    if (kind === 'albedo') sourceImage.colorSpace = THREE.SRGBColorSpace;
+    materialTextures.set(sourceKey, sourceImage);
+  }
+  // Different UV repeats share one decoded image, without sharing transforms.
+  const image = sourceImage.clone();
+  image.name = `${surface} ${kind} ${surface === 'concrete' ? 'cast-009 1k' : '512'} CC0`;
   if (kind === 'albedo') image.colorSpace = THREE.SRGBColorSpace;
   image.wrapS = image.wrapT = THREE.RepeatWrapping;
   image.repeat.set(repeatX, repeatY);
@@ -72,7 +80,7 @@ function source(surface: Surface): HTMLCanvasElement {
 
 export function siteMaterial(surface: Surface, color: number, repeatX = 1, repeatY = 1): THREE.MeshStandardMaterial {
   if (photographed[surface]) {
-    return new THREE.MeshStandardMaterial({
+    const material = new THREE.MeshStandardMaterial({
       name: `Scanned ${surface} surface`,
       color,
       map: photographedTexture(surface, repeatX, repeatY),
@@ -82,6 +90,8 @@ export function siteMaterial(surface: Surface, color: number, repeatX = 1, repea
       roughness: surface === 'concrete' ? .92 : .97,
       metalness: 0,
     });
+    material.userData.constructionTileMeters = surface === 'floor' ? 2.5 : surface === 'concrete' ? 1.8 : 4;
+    return material;
   }
   const texture = new THREE.CanvasTexture(source(surface));
   texture.name = `Procedural ${surface} aggregate`;
@@ -89,7 +99,7 @@ export function siteMaterial(surface: Surface, color: number, repeatX = 1, repea
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
   texture.repeat.set(repeatX, repeatY);
   texture.anisotropy = 4;
-  return new THREE.MeshStandardMaterial({
+  const material = new THREE.MeshStandardMaterial({
     name: `Unfinished ${surface}`,
     color,
     map: texture,
@@ -98,6 +108,8 @@ export function siteMaterial(surface: Surface, color: number, repeatX = 1, repea
     roughness: .98,
     metalness: 0,
   });
+  material.userData.constructionTileMeters = surface === 'floor' ? 2.5 : 4;
+  return material;
 }
 
 /** Continuous cast wall finish without photographic formwork bands or repeated panel boundaries. */
@@ -111,7 +123,7 @@ export function siteSmoothConcreteMaterial(): THREE.MeshStandardMaterial {
     texture.anisotropy = 4;
     materialTextures.set('concrete:smooth', texture);
   }
-  return new THREE.MeshStandardMaterial({
+  const material = new THREE.MeshStandardMaterial({
     name: 'Continuous cast concrete',
     color: 0xc2b9ad,
     map: texture,
@@ -121,6 +133,8 @@ export function siteSmoothConcreteMaterial(): THREE.MeshStandardMaterial {
     metalness: 0,
     side: THREE.DoubleSide,
   });
+  material.userData.constructionTileMeters = 2;
+  return material;
 }
 
 let siteProScreedTexture: THREE.Texture | null = null;
@@ -133,7 +147,7 @@ export function siteProScreedMaterial(): THREE.MeshStandardMaterial {
     siteProScreedTexture.repeat.set(2, 1.9);
     siteProScreedTexture.anisotropy = 4;
   }
-  return new THREE.MeshStandardMaterial({
+  const material = new THREE.MeshStandardMaterial({
     name: 'Site Pro poured screed',
     map: siteProScreedTexture,
     normalMap: photographedTexture('floor', 2, 1.9, 'normal'),
@@ -141,6 +155,8 @@ export function siteProScreedMaterial(): THREE.MeshStandardMaterial {
     roughness: .98,
     metalness: 0,
   });
+  material.userData.constructionTileMeters = 3.8;
+  return material;
 }
 
 export const matteMaterial = (color: number, roughness = .92): THREE.MeshStandardMaterial => new THREE.MeshStandardMaterial({ color, roughness, metalness: 0 });

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { blockPointerLock } from './browser-safety.mjs';
+import {serveTaskBuild} from './serve-task-build.mjs';
 
 const url = process.argv[2] ?? 'http://127.0.0.1:5365/Electrical-Game/?renderer=webgl';
 const out = 'output/mixer-work-profile';
@@ -11,6 +12,7 @@ const report = { url, device: '390x844 DPR3 Chromium mobile emulation', samples:
 try {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 3 });
   await blockPointerLock(context);
+  await serveTaskBuild(context,url);
   const page = await context.newPage();
   page.on('pageerror', error => report.errors.push(error.message));
   await page.goto(url);

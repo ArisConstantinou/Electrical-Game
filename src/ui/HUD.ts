@@ -85,6 +85,7 @@ export class HUD {
               <button id="chisel-tilt" type="button"><span>HAMMER TILT · [ / ]</span><b>15 deg DOWN</b></button>
               <button id="hammer-view-toggle" type="button"><span>HAMMER SIDE · Q</span><b>RIGHT</b></button>
               <button id="hammer-auto-side" type="button" aria-pressed="true"><span>FOLLOW WALL DIRECTION</span><b>AUTO</b></button>
+              <label class="hammer-speed-setting" for="hammer-handle-angle"><span>SIDE HANDLE POSITION</span><output id="hammer-handle-angle-value">45°</output><input id="hammer-handle-angle" type="range" min="-180" max="180" step="15" value="0" aria-label="Rotate SDS Max auxiliary handle around the barrel"><small>Rotate the support grip around the chuck. Both hands move with their grips.</small></label>
               <button id="chisel-side" type="button"><span>TOOL SIDE / J LEFT · K RIGHT</span><b>15 deg RIGHT</b></button>
               <button id="chisel-angle" type="button"><span>EDGE ANGLE · R</span><b>0°</b></button>
               <label class="hammer-speed-setting" for="hammer-speed"><span>CHISEL SPEED · − / +</span><output id="hammer-speed-value">250%</output><input id="hammer-speed" type="range" min="0" max="800" step="25" value="250" aria-label="Chisel destruction speed"><small>0% stop · 100% precise · 250% normal · 400–800% fast. Hold use + A / D to cut along the wall.</small></label>
@@ -108,7 +109,7 @@ export class HUD {
           </section>
           <button id="desktop-key-guide-toggle" type="button" aria-label="Show keyboard controls" aria-expanded="false" aria-controls="desktop-key-guide" title="Show keyboard controls"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="7" width="26" height="18" rx="3"/><path d="M8 13h2m4 0h2m4 0h2M8 18h2m4 0h2m4 0h2M11 22h10"/></svg><span>KEYS</span></button>
           <aside id="desktop-key-guide" class="hud-card" aria-label="Keyboard and mouse controls" hidden>
-            <div><kbd>WASD</kbd><span>MOVE</span><kbd>MOUSE</kbd><span>LOOK</span><kbd>SHIFT</kbd><span>FAST</span><kbd>H</kbd><span>CROUCH / STAND</span></div>
+            <div><kbd>WASD</kbd><span>MOVE</span><kbd>MOUSE</kbd><span>LOOK</span><kbd>SHIFT</kbd><span>FAST</span><kbd>SPACE</kbd><span>JUMP</span><kbd>H</kbd><span>CROUCH / STAND</span></div>
             <div><kbd>LMB</kbd><span>USE / HOLD</span><kbd>E</kbd><span>INTERACT</span><kbd>WHEEL</kbd><span>SWITCH TOOL</span></div>
             <div><kbd>1–9</kbd><span>SELECT TOOL</span><kbd>9 / M</kbd><span>MEASURE / MARK</span><kbd>C</kbd><span>FULL BODY VIEW</span></div>
             <div><kbd>0</kbd><span>DRILL</span><kbd>B</kbd><span>DRIVER</span><kbd>L</kbd><span>LASER</span></div>
@@ -200,6 +201,7 @@ export class HUD {
             <nav id="mobile-stance-controls" aria-label="Player height">
               <button id="mobile-stand" type="button" data-height="stand" aria-label="Stand up" aria-pressed="true"><span>STAND</span></button>
               <button id="mobile-crouch" type="button" data-height="crouch" aria-label="Crouch" aria-pressed="false"><span>CROUCH</span></button>
+              <button id="mobile-jump" type="button" aria-label="Jump" title="Jump"><span>JUMP</span></button>
             </nav>
             <div id="look-joystick" role="button" tabindex="0" aria-label="Drag to aim"><div class="look-joystick-ring"></div><div id="look-joystick-thumb"><span id="mobile-action" aria-hidden="true">AIM</span><small aria-hidden="true">LOOK</small></div><div id="drag-aim-cue" aria-hidden="true"></div><small id="aim-control-label">AIM</small></div>
             <button id="site-pro-use" type="button" aria-label="Hold to use selected tool" aria-pressed="false"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 25h18M12 22V8h8v14M9 8h14M16 3v5"/></svg><span>USE</span><output id="mobile-use-status">READY</output></button>
@@ -351,8 +353,14 @@ export class HUD {
     root.querySelector('#chisel-angle')!.addEventListener('click', () => window.dispatchEvent(new CustomEvent('wirehouse:rotate-chisel')));
     root.querySelector<HTMLInputElement>('#chisel-width')!.addEventListener('input',event=>dispatchEvent(new CustomEvent('wirehouse:chisel-width',{detail:Number((event.target as HTMLInputElement).value)/1000})));
     root.querySelector<HTMLInputElement>('#hammer-speed')!.addEventListener('input',event=>dispatchEvent(new CustomEvent('wirehouse:hammer-speed',{detail:Number((event.target as HTMLInputElement).value)/100})));
+    root.querySelector<HTMLInputElement>('#hammer-handle-angle')!.addEventListener('input',event=>{
+      const angle=Number((event.target as HTMLInputElement).value);
+      root.querySelector<HTMLOutputElement>('#hammer-handle-angle-value')!.value=`${angle+45}°`;
+      dispatchEvent(new CustomEvent('wirehouse:hammer-side-handle',{detail:angle}));
+    });
     root.querySelector('#work-height')!.addEventListener('click',()=>dispatchEvent(new CustomEvent('wirehouse:work-height')));
     root.querySelectorAll<HTMLButtonElement>('#mobile-stance-controls [data-height]').forEach(button=>bindHammerButton(`#${button.id}`,()=>dispatchEvent(new CustomEvent('wirehouse:work-height-set',{detail:button.dataset.height==='crouch'}))));
+    bindHammerButton('#mobile-jump',()=>dispatchEvent(new CustomEvent('wirehouse:jump')));
     root.querySelector('#mortar-angle-down')!.addEventListener('click',()=>dispatchEvent(new CustomEvent('wirehouse:mortar-angle',{detail:-5})));
     root.querySelector('#mortar-angle-up')!.addEventListener('click',()=>dispatchEvent(new CustomEvent('wirehouse:mortar-angle',{detail:5})));
     this.shell = root.querySelector('#game-shell')!;
@@ -679,12 +687,12 @@ export class HUD {
     this.shell.querySelector<HTMLOutputElement>('#chisel-width-value')!.textContent=`${(widthM*100).toFixed(1)} cm`;
     this.shell.querySelector<HTMLElement>('#chisel-width-hint')!.textContent=flat?'1–5 cm · wider blade, broader chips':'Select FLAT to adjust blade width';
   }
-  updateHammerSide(requestedSideDegrees:number,automatic=false):void {
+  updateHammerSide(requestedSideDegrees:number,automatic=false,handedness:'left'|'right'='right'):void {
     const side=requestedSideDegrees>0?'left':requestedSideDegrees<0?'right':'center';
-    if(!this.displayChanged('hammer-side',`${requestedSideDegrees}:${automatic}`))return;
-    this.shell.querySelector('#hammer-view-left')!.setAttribute('aria-pressed',String(side==='left'));
-    this.shell.querySelector('#hammer-view-right')!.setAttribute('aria-pressed',String(side==='right'));
-    this.shell.querySelector('#hammer-view-toggle b')!.textContent=`${automatic?'AUTO · ':''}${side.toUpperCase()}`;
+    if(!this.displayChanged('hammer-side',`${requestedSideDegrees}:${automatic}:${handedness}`))return;
+    this.shell.querySelector('#hammer-view-left')!.setAttribute('aria-pressed',String(handedness==='left'));
+    this.shell.querySelector('#hammer-view-right')!.setAttribute('aria-pressed',String(handedness==='right'));
+    this.shell.querySelector('#hammer-view-toggle b')!.textContent=handedness.toUpperCase();
     this.shell.querySelector('#hammer-auto-side')!.setAttribute('aria-pressed',String(automatic));
     this.shell.querySelector('#hammer-auto-side b')!.textContent=automatic?'AUTO':'MANUAL';
     this.shell.querySelector('#quick-hammer-side b')!.textContent=`${Math.abs(requestedSideDegrees)}° ${side==='left'?'L':side==='right'?'R':'C'}`;

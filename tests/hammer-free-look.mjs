@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'vite';
 import * as THREE from 'three';
 
-const server = await createServer({ server: { middlewareMode: true, hmr: false }, appType: 'custom', logLevel: 'error' });
+const server = await createServer({ server: { middlewareMode: true, hmr: false }, optimizeDeps:{noDiscovery:true,entries:[]}, appType: 'custom', logLevel: 'error' });
 const report = [];
 try {
   const { PlayerController } = await server.ssrLoadModule('/src/player/PlayerController.ts');
@@ -56,6 +56,17 @@ try {
     for (let i = 0; i < 30; i++) frame();
     near(player.yaw, yaw, 'Tool/stance transitions must not turn the view'); near(player.pitch, pitch, 'Tool/stance transitions must not pitch the view');
     report.push({ tilt, initialYaw, retainedYaw: player.yaw, retainedPitch: player.pitch });
+  }
+  // Full-size SDS Max needs this standoff; the former 1.12 m cutoff
+  // silently reset its side angle and swung the rear handle across the eye.
+  for(const distance of [1.15,1.25,1.4])for(const requestedSide of [-15,15]){
+    const camera=new THREE.PerspectiveCamera(72,16/9,.025,60),stance=new HammerWorkStance();
+    camera.position.set(0,1.65,-2.41+distance);camera.rotation.set(-.3,0,0);
+    const before=camera.position.clone(),orientation=camera.quaternion.clone();
+    for(let i=0;i<120;i++)stance.update(camera,1/60,requestedSide,true,15,'hammer');
+    near(stance.sideDegrees,requestedSide,'Full-size working distance must retain selected attack side');
+    near(camera.position.distanceTo(before),0,'Full-size stance must not move eyes');
+    near(1-Math.abs(camera.quaternion.dot(orientation)),0,'Full-size stance must not rotate eyes');
   }
   console.log(JSON.stringify({ passed: true, cases: report.length, checks: ['mouse delta and reversal', 'touch drag and reversal', 'idle after look', 'standoff settling', 'tool change', 'backward release', 'no stance camera rotation'] }, null, 2));
 } finally { await server.close(); }

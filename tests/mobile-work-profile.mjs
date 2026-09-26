@@ -3,6 +3,7 @@ import { mkdir, writeFile, readFile, stat } from 'node:fs/promises';
 import { resolve, extname } from 'node:path';
 import assert from 'node:assert/strict';
 import { blockPointerLock } from './browser-safety.mjs';
+import {serveTaskBuild} from './serve-task-build.mjs';
 
 const url=process.argv[2]??'http://127.0.0.1:5365/Electrical-Game/?renderer=webgl';
 const out=process.argv[3]??'output/mobile-work-profile';await mkdir(out,{recursive:true});
@@ -10,6 +11,7 @@ const browser=await chromium.launch({channel:'chrome',headless:true});
 const report={url,method:'Real RAF, 390x844 touch Chromium with device scale 3. Public tool-selection event and native held USE; controlled sinusoidal camera rotation. Inclusive CPU timings overlap. Emulation, not physical iPhone FPS.',stages:[],errors:[]};
 try{
  const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:3});await blockPointerLock(context);
+ await serveTaskBuild(context,url);
  if(process.argv.includes('--dist')){
   const dist=resolve('dist'),mime={'.html':'text/html','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.webp':'image/webp','.png':'image/png','.jpg':'image/jpeg','.glb':'model/gltf-binary','.woff2':'font/woff2'};
   await context.route('https://arisconstantinou.github.io/Electrical-Game/**',async route=>{

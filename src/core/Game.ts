@@ -13,6 +13,7 @@ import { FPSRig, RIG_TOOLS, type RigTool } from '../player/FPSRig';
 import { Room } from '../world/Room';
 import { SiteOcclusion } from '../world/SiteOcclusion';
 import { MansionMasonryBatch } from '../world/MansionMasonryBatch';
+import { BuildingHeadroom } from '../world/BuildingHeadroom';
 import type { MasonryAim } from '../world/MansionMasonryDemolition';
 import { MissionSystem } from '../systems/MissionSystem';
 import { MarkingSystem } from '../systems/MarkingSystem';
@@ -234,6 +235,8 @@ export class Game {
     root.querySelector('#start-level-current')!.textContent = mansionPreview ? 'MANSION SITE · PREVIEW' : 'ORIGINAL FIRST FIX ROOM';
     if (mansionPreview) this.renderer.scene.fog = new THREE.Fog(0xaab9bd, 22, 88);
     this.room = new Room(this.renderer.scene, mansionPreview);
+    const headroom = new BuildingHeadroom(this.room);
+    this.player.setCeilingProvider((x,z,feetY)=>headroom.ceilingHeight(x,z,feetY));
     this.masonryBatch = this.room.mansionWing ? new MansionMasonryBatch(this.room.mansionWing,
       () => {this.renderer.optimizeSiteInstances(this.room);this.renderer.invalidateMaterialPreparation();}) : null;
     this.renderer.optimizeSiteInstances(this.room);
@@ -460,7 +463,7 @@ export class Game {
     let preparedStages = 0;
     const markPrepared = (): void => {
       if (startButton.dataset.preparing === 'false') return;
-      const percent = Math.round(++preparedStages / (8+viewStages) * 100);
+      const percent = Math.round(++preparedStages / (9+viewStages) * 100);
       startLoadPercent.value = `${percent}%`;
       startLoadPercent.setAttribute('aria-label', `Site preparation ${percent}%`);
       startScreen.style.setProperty('--load-progress', `${percent}%`);
@@ -470,6 +473,7 @@ export class Game {
     this.ready = Promise.all([
       observePreparation(this.renderer.ready),
       observePreparation(this.workerBody.ready),
+      observePreparation(this.fpsRig.hammerReady),
       observePreparation(this.apprentice.ready),
       this.masonryBatch?.ready ?? Promise.resolve(),
     ]).then(async () => {
@@ -606,11 +610,16 @@ export class Game {
     // Use the angle the hands actually hold, including an upward side stroke's
     // shorter reach. Requested tilt can differ substantially near floor/ceiling.
     const upwardSideFeed=.20*Math.max(0,-Math.sin(workTilt))*Math.abs(Math.sin(workSide));
-    this.player.wallWorkDistance=handWork?.46:Math.max(.46,(.38+.55*Math.abs(wallAxisZ)-upwardSideFeed)*Math.max(.2,Math.cos(this.player.yaw)));
+    // Brace using the real grip-to-edge length. The previous fixed 55 cm
+    // span placed the FORGE rear grip almost against the eye. This distance
+    // is taken up only on forward intent; looking/striking never moves eyes.
+    const hammerSpan=this.fpsRig.hammerGripToTipLengthM;
+    this.player.wallWorkDistance=handWork?.46:Math.max(.46,(.32+hammerSpan*Math.abs(wallAxisZ)-upwardSideFeed)*Math.max(.2,Math.cos(this.player.yaw)));
     // Looking around while building a gang must rotate only the view. Do not
     // auto-crouch or retarget the camera from the wall point under the cursor.
     this.player.handWorkTargetY=handWork&&this.selectedTool!=='fitting'?this.boxWorkAim()?.y??null:null;
     if (this.started && !leveling && !this.pvc.focused) this.player.update(Math.min(dt, 0.05));
+    const jumping=this.player.jumpPose.phase!=='grounded';
     if(this.modelInspector.active)this.masonryBatch?.disableForEditor();
     else this.masonryBatch?.update(this.renderer.camera);
     // Outdoors the retained olive canopy and the player's moving body cast
@@ -629,11 +638,10 @@ export class Game {
     if(this.hammerAutoSide&&this.started&&!this.apprentice.ownsInput&&!leveling&&this.selectedTool==='hammer'){
       this.room.brickWall.chiselSideDegrees=this.hammerWorkStance.resolveSide(this.renderer.camera,this.room.brickWall.chiselSideDegrees);
     }
-    this.hammerWorkStance.update(this.renderer.camera, dt, this.room.brickWall.chiselSideDegrees, this.started && !this.apprentice.ownsInput && !leveling && !blockingWork,this.room.brickWall.chiselTiltDegrees,this.selectedTool);
+    this.hammerWorkStance.update(this.renderer.camera, dt, this.room.brickWall.chiselSideDegrees, this.started && !this.apprentice.ownsInput && !leveling && !blockingWork && !jumping,this.room.brickWall.chiselTiltDegrees,this.selectedTool);
     this.fpsRig.workStanceSide = this.hammerWorkStance.sideDegrees / 75;
     this.fpsRig.workHeadLeanM = this.hammerWorkStance.headLeanM;
-    const requestedSide=this.room.brickWall.chiselSideDegrees;
-    if(requestedSide!==0)this.fpsRig.hammerHandedness=requestedSide>0?'left':'right';
+    // Wall angle changes the stroke direction, not the user's dominant hand.
     this.fpsRig.workStanceTiltDegrees = this.hammerWorkStance.actualTiltDegrees;
     this.fpsRig.workPositionLocked=this.player.workPosition.locked;
     this.actionCooldown = this.selectedTool==='hammer'?this.actionCooldown-dt:Math.max(0,this.actionCooldown-dt);
@@ -657,7 +665,7 @@ export class Game {
     const spraying = this.selectedTool === 'spray' && this.input.actionHeld;
     if (this.wasSpraying && !spraying) this.interaction.endSprayStroke();
     this.wasSpraying = spraying;
-    const permitWallActions = !apprenticeOwnedInput && !pvcOwnedInput && !blockingWork && (!mixingOwnedInput || this.selectedTool === 'laser');
+    const permitWallActions = !apprenticeOwnedInput && !pvcOwnedInput && !blockingWork && !(jumping&&this.selectedTool==='hammer') && (!mixingOwnedInput || this.selectedTool === 'laser');
     if (this.started && permitWallActions && !['measure','drill','driver','trowel','hose'].includes(this.selectedTool) && (this.selectedTool !== 'hammer' || this.hammerSpeed > 0) && (requested || repeatable)) {
       this.performAction(repeatable && !requested);
       const interval=this.selectedTool === 'spray' ? 0.045 : this.selectedTool === 'hammer' ? 0.24 / Math.max(.25, this.hammerSpeed) : 0.18;
@@ -724,7 +732,8 @@ export class Game {
     this.audio.setContinuous('trowel',mortarTool&&this.selectedTool==='trowel'&&this.input.actionHeld&&!this.mortar.throwFeedback.overheld,.7+this.mortar.charge*.3);
     this.audio.setContinuous('mixer',this.mixing.mixerRunning);
     setLaserProjection(this.laserLevel.activeHeightM);
-    if (this.selectedTool === 'hammer') {
+    if (this.selectedTool === 'hammer'&&jumping)this.fpsRig.carryHammer(this.renderer.camera);
+    else if (this.selectedTool === 'hammer') {
       const masonry = this.hammerMasonryAim();
       if (masonry) this.fpsRig.contactMasonry(this.renderer.camera, masonry.aim.point);
       else if (this.input.actionHeld && this.lastHammerMasonryAim) {
@@ -739,8 +748,8 @@ export class Game {
       else this.fpsRig.contact(this.renderer.camera, this.room.brickWall);
     }
     else if(this.selectedTool==='trowel')this.fpsRig.poseTrowel(this.renderer.camera,this.mortar.throwFeedback.motion,dt,this.room.brickWall.volume.frontZ);
-    else if(this.selectedTool==='measure')this.fpsRig.poseMeasure(this.renderer.camera,this.heightMeasure.target,this.heightMeasure.targetNormal);
-    else if(this.selectedTool==='drill'||this.selectedTool==='driver')this.fpsRig.poseReferenceTool(this.renderer.camera,this.selectedTool,this.laserLevel.target,this.laserLevel.targetNormal,this.laserLevel.working,dt);
+    else if(this.selectedTool==='measure')this.fpsRig.poseMeasure(this.renderer.camera,jumping?null:this.heightMeasure.target,this.heightMeasure.targetNormal);
+    else if(this.selectedTool==='drill'||this.selectedTool==='driver')this.fpsRig.poseReferenceTool(this.renderer.camera,this.selectedTool,jumping?null:this.laserLevel.target,this.laserLevel.targetNormal,!jumping&&this.laserLevel.working,dt);
     else if(this.selectedTool==='laser')this.fpsRig.poseLaser(this.renderer.camera);
     else this.fpsRig.poseArms(this.renderer.camera);
     this.audio.setContinuous('hammer',this.started&&!apprenticeOwnedInput&&!blockingWork&&!leveling&&this.selectedTool==='hammer'&&this.input.actionHeld&&this.hammerSpeed>0&&this.fpsRig.contactStatus==='ready');
@@ -789,7 +798,7 @@ export class Game {
       this.hud.updateMovementStick(this.movementStickMode);
     }
     this.hud.updateChiselOrientation(this.room.brickWall.chiselEdgeAngle*180/Math.PI,this.fpsRig.actualTiltDegrees,this.room.brickWall.chiselSideDegrees,this.room.brickWall.chiselWidthM,this.room.brickWall.chiselTiltDegrees);
-    this.hud.updateHammerSide(this.room.brickWall.chiselSideDegrees,this.hammerAutoSide);
+    this.hud.updateHammerSide(this.room.brickWall.chiselSideDegrees,this.hammerAutoSide,this.fpsRig.hammerHandedness??'right');
     const wet=mortarTool && waterHit ? this.mortar.moistureAt(waterHit.point) : {pore:0,film:0};
     const waterTelemetry=this.roomWater.telemetry;
     this.hud.updateMortar(mixingOwnedInput?'spray':this.selectedTool,this.mortar.charge,this.mortar.angleDegrees,wet,mortarTool && active ? this.mortar.coverage(active):0,this.mortar.recovery,this.mortar.lastOutcome,waterTelemetry.floorLitres,this.mortar.throwFeedback);
@@ -827,7 +836,7 @@ export class Game {
     // only once at presentation, keeping cheap flat patches within one budget.
     if(present&&this.mortar.flushWetGeometry(64,3)>0){this.room.invalidateSunShadow();this.renderer.invalidateMaterialPreparation();}
     if(present&&this.chasing.flushFragmentRendering(2048,.5)>0){this.room.invalidateSunShadow();this.renderer.invalidateMaterialPreparation();}
-    if(this.chasing.airborneFragmentCount>0||this.mixing.mixerRunning||this.pvc.focused||
+    if(jumping||this.chasing.airborneFragmentCount>0||this.mixing.mixerRunning||this.pvc.focused||
        this.apprentice.mode!=='off'&&this.apprentice.phase!=='idle')this.room.invalidateSunShadow();
     if(this.modelInspector.active)this.siteOcclusion?.restore();
     else this.siteOcclusion?.update(this.renderer.camera,dt);
@@ -863,7 +872,7 @@ export class Game {
       workPosition: this.player.workPosition,
       coordinateSystem: 'metres; origin at room floor centre; +X right, +Y up, -Z toward installation wall',
       mode: !this.started ? 'start' : this.mission.complete ? 'mission-complete' : point?.stage === 'leveling' ? 'leveling' : 'playing',
-      player: { crouched:this.player.eyeHeight<1.1, x: Number(this.renderer.camera.position.x.toFixed(3)), y: Number(this.renderer.camera.position.y.toFixed(3)), z: Number(this.renderer.camera.position.z.toFixed(3)), yaw: Number(this.player.yaw.toFixed(3)), pitch: Number(this.player.pitch.toFixed(3)) },
+      player: { crouched:this.player.eyeHeight<1.1, grounded:this.player.grounded, jumpHeightM:Number(this.player.jumpOffset.toFixed(3)), verticalSpeedMps:Number(this.player.verticalVelocity.toFixed(3)), x: Number(this.renderer.camera.position.x.toFixed(3)), y: Number(this.renderer.camera.position.y.toFixed(3)), z: Number(this.renderer.camera.position.z.toFixed(3)), yaw: Number(this.player.yaw.toFixed(3)), pitch: Number(this.player.pitch.toFixed(3)) },
       mission: { boxPreset:this.mission.boxPreset, boxAssembly:this.boxAssembly.snapshot, boxAssemblyActive:this.boxAssemblyActive, name: 'Living Room First Fix', progressPercent: this.mission.progress, selectedTool: this.selectedTool, complete: this.mission.complete },
       workSurface: { ...this.room.brickWall.telemetry, stanceSideDegrees:this.hammerWorkStance.sideDegrees, stanceCameraOffset:this.hammerWorkStance.offset.toArray(), freeSprayMarks: this.room.brickWall.freeMarkCount, activeFragments: this.chasing.activeFragmentCount, debrisStrikes:this.chasing.debrisStrikeCount, debrisSplits:this.chasing.debrisSplitCount, debrisCrushes:this.chasing.debrisCrushCount, insideFragments: this.chasing.insideFragmentCount, inwardFragments: this.chasing.inwardFragmentCount, physicsMs:this.chasing.lastUpdateMs, peakPhysicsMs:this.chasing.maximumUpdateMs, fragmentBudget:this.chasing.fragmentBudget, chiselTip:{x:this.fpsRig.chiselTipWorld.x,y:this.fpsRig.chiselTipWorld.y,z:this.fpsRig.chiselTipWorld.z,inAir:this.fpsRig.chiselInAir}, airborneFragments: this.chasing.airborneFragmentCount, settledFragments: this.chasing.settledFragmentCount, sprayMode: this.sprayMode, sprayColor: SPRAY_COLORS[this.sprayColorIndex].name, hammerMode: this.hammerMode, chisel: this.room.brickWall.chiselType, chiselEnergyJ: this.room.brickWall.chiselEnergyJ, chiselWidthMm: this.room.brickWall.chiselWidthM*1000, chiselTiltDegrees:this.room.brickWall.chiselTiltDegrees, actualTiltDegrees:this.fpsRig.actualTiltDegrees, chiselSideDegrees:this.room.brickWall.chiselSideDegrees, chiselEdgeDegrees: this.room.brickWall.chiselEdgeAngle*180/Math.PI, aimControlMode:this.aimControlMode, aimInputMode:this.aimInputMode, aimProfile:this.aimProfile, wallAssist:this.wallAssistEnabled, proximityPrecision:Number(this.player.wallAssistAmount.toFixed(3)) },
       activePoint: point ? { id: point.definition.id, kind: point.definition.kind, bottomHeightM: point.boxGroup.getWorldPosition(new THREE.Vector3()).y-point.boxGroup.groupHeight/2, boxes: point.definition.boxes, stage: point.stage, chaseHits: point.chaseHits, chaseCoverage: Number(this.room.brickWall.getChaseCoverage(point.definition.id).toFixed(3)), pipeStep: point.pipeStep, targeted: this.mission.target(this.renderer.camera) === point, tiltDegrees: Number(point.boxGroup.tiltDegrees.toFixed(2)), depthErrorMm: Number((point.boxGroup.depthError * 1000).toFixed(1)), levelPass: point.boxGroup.isLevel, flushPass: point.boxGroup.isFlush } : null,
@@ -1049,11 +1058,18 @@ export class Game {
       this.hud.updateHammerSpeed(this.hammerSpeed);
     };
     addEventListener('wirehouse:hammer-speed',event=>setHammerSpeed((event as CustomEvent<number>).detail));
+    addEventListener('wirehouse:hammer-side-handle',event=>this.fpsRig.setSideHandleAngleDegrees((event as CustomEvent<number>).detail));
     addEventListener('keydown',event=>{
       if(this.selectedTool !== 'hammer' || event.repeat) return;
       if(event.code === 'Minus' || event.code === 'Equal') {event.preventDefault();setHammerSpeed(this.hammerSpeed + (event.code === 'Equal' ? .25 : -.25));}
     });
     addEventListener('wirehouse:work-height',()=>{this.mixing.releaseAutomaticStance();this.player.crouched=!this.player.crouched;this.hud.updateWorkHeight(this.player.crouched);});
+    addEventListener('wirehouse:jump',()=>{
+      if(!this.started||this.levelEditor.active||this.modelInspector.active&&!this.modelInspector.live||
+        this.apprentice.ownsInput||this.mixing.blocksWork||this.mixing.wheelbarrow.busy||this.pvc.blocksWork||
+        this.hud.shell.classList.contains('settings-open'))return;
+      this.mixing.releaseAutomaticStance();this.input.jumpRequested=true;
+    });
     addEventListener('wirehouse:work-height-set',event=>{this.mixing.releaseAutomaticStance();this.player.crouched=Boolean((event as CustomEvent<boolean>).detail);this.hud.updateWorkHeight(this.player.crouched);});
     addEventListener('keydown',event=>{
       if(!this.started||event.code!=='KeyH'||event.repeat||(event.target instanceof Element&&event.target.closest('input,textarea,select,[contenteditable="true"]')))return;
@@ -1117,14 +1133,15 @@ export class Game {
       if(this.selectedTool!=='hammer')return;
       this.hammerAutoSide=false;
       const wall=this.room.brickWall,requested=(event as CustomEvent<number>).detail;
-      const sign=requested?Math.sign(requested):wall.chiselSideDegrees>0?-1:1;
+      const sign=requested?Math.sign(requested):this.fpsRig.hammerHandedness==='left'?-1:1;
+      this.fpsRig.hammerHandedness=sign>0?'left':'right';
       wall.chiselSideDegrees=sign*Math.max(15,Math.abs(wall.chiselSideDegrees));
-      this.hud.updateHammerSide(wall.chiselSideDegrees);
+      this.hud.updateHammerSide(wall.chiselSideDegrees,false,this.fpsRig.hammerHandedness);
       document.querySelector('#chisel-side b')!.textContent=`${Math.abs(wall.chiselSideDegrees)} deg ${wall.chiselSideDegrees>0?'LEFT':'RIGHT'}`;
     });
     addEventListener('wirehouse:hammer-auto-side',()=>{
       this.hammerAutoSide=!this.hammerAutoSide;
-      this.hud.updateHammerSide(this.room.brickWall.chiselSideDegrees,this.hammerAutoSide);
+      this.hud.updateHammerSide(this.room.brickWall.chiselSideDegrees,this.hammerAutoSide,this.fpsRig.hammerHandedness??'right');
     });
     addEventListener('wirehouse:tilt-chisel', event => {
       const wall=this.room.brickWall;

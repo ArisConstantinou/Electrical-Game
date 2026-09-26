@@ -19,8 +19,16 @@ and are licensed CC0: https://polyhaven.com/license
 - `site-pro-screed-v1.webp`: generated for this game with the built-in imagegen tool, then encoded as WebP quality 88. Prompt and validation are in `artifacts/site-pro-04/screed-texture-prompt.md`. This is generated artwork, not a Poly Haven scan.
 
 They are reduced-resolution copies for the in-game construction surfaces.
-The older floor scan repeats at roughly 2.1 m; Site Pro screed repeats at roughly
-3.8 m. Plaster and concrete are scaled to roughly 4 m, following each source
-page's recorded real-world width.
+
+Building upgrade 2026-09-26: `concrete-wall-009-albedo-1k.jpg` and
+`concrete-wall-009-normal-1k.jpg` are the unmodified official 1K Diffuse and
+OpenGL normal of https://polyhaven.com/a/concrete_wall_009 by Charlotte Baglioni,
+CC0, measured width 1.8 m. `concrete-wall-009-provenance.json` retains source URLs,
+verified upstream MD5 and local SHA-256. The matched pair replaces the heavily
+weathered dark concrete on building surfaces. Original files remain retained.
+Current construction mapping uses a 2.5 m floor tile, 1.8 m concrete-wall-009
+tile and 4 m plaster tile. The retained legacy concrete scan represents 4 m;
+the retained Site Pro screed helper uses 3.8 m. The main room now shares the
+matched floor diffuse/normal pair with the circulation spaces.
 The painted-metal scan is mixed lightly into the existing wheelbarrow tray and
 concrete-mixer drum paint. It is not used as the shape of either object.

@@ -18,7 +18,7 @@ export class HammerWorkStance {
     const view=camera.getWorldDirection(new THREE.Vector3());
     const distance=(GAME_CONFIG.room.wallFrontZ-camera.position.z)/view.z;
     const focus=camera.position.clone().addScaledVector(view,distance);
-    if(view.z>=-.2 || distance<=0 || camera.position.z-GAME_CONFIG.room.wallFrontZ>1.12 || Math.abs(focus.x)>2.54 || focus.y<0 || focus.y>3)return requestedSide;
+    if(view.z>=-.2 || distance<=0 || camera.position.z-GAME_CONFIG.room.wallFrontZ>1.45 || Math.abs(focus.x)>2.54 || focus.y<0 || focus.y>3)return requestedSide;
     const viewSide=THREE.MathUtils.radToDeg(Math.atan2(view.x,-view.z));
     return Math.abs(viewSide)>=30 ? Math.sign(viewSide)*Math.max(15,Math.abs(requestedSide)) : requestedSide;
   }
@@ -28,7 +28,7 @@ export class HammerWorkStance {
     const view = camera.getWorldDirection(new THREE.Vector3());
     const distance = (GAME_CONFIG.room.wallFrontZ - camera.position.z) / view.z;
     const focus = camera.position.clone().addScaledVector(view, distance);
-    const workingAtWall = view.z < -.15 && distance > 0 && camera.position.z-GAME_CONFIG.room.wallFrontZ <= 1.12 && Math.abs(focus.x) <= 2.54 && focus.y >= 0 && focus.y <= 3;
+    const workingAtWall = view.z < -.15 && distance > 0 && camera.position.z-GAME_CONFIG.room.wallFrontZ <= 1.45 && Math.abs(focus.x) <= 2.54 && focus.y >= 0 && focus.y <= 3;
     const hammerWork = enabled && workingAtWall && tool === 'hammer';
     // Side adjustment is exact and symmetric about the worker's aim. The
     // default shoulder angle lives in the selected setting, never a hidden bias.

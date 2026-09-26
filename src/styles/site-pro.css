@@ -301,6 +301,9 @@ html, body { background: #151a1d; }
     background: url('../assets/ui/stand-person.svg') center / contain no-repeat;
   }
   #mobile-stance-controls #mobile-crouch::before { background-image: url('../assets/ui/crouch-person.svg'); }
+  #mobile-stance-controls #mobile-jump::before { background-image: url('../assets/ui/jump-person.svg'); }
+  #mobile-stance-controls #mobile-jump:active { background:#ffdc32; }
+  #mobile-stance-controls #mobile-jump:active::before { filter:brightness(0); }
   #mobile-stance-controls button, #site-pro-use, #mobile-interact:not([hidden]) {
     border: 2px solid #ffdc32; color: #ffdc32; background: #1c4738;
   }

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mapBuildingSurfaces } from './BuildingSurfaceMapping';
 import { GAME_CONFIG } from '../data/gameConfig';
 import { INSTALLATION_POINTS } from '../data/installationRules';
 import { BrickWall } from './BrickWall';
@@ -6,7 +7,7 @@ import { brickFacePatch, brickFaceTone } from './BrickFacePatch';
 import { masonryFaceMaterial } from './BrickFaceMaterial';
 import { laidClayGeometry, type LaidClayWear } from './LaidClayDamage';
 import { addLighting } from './Lighting';
-import { matteMaterial, siteMaterial, siteProScreedMaterial } from './SiteMaterials';
+import { matteMaterial, siteMaterial } from './SiteMaterials';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { ExteriorCourtyard } from './ExteriorCourtyard';
 import { MansionGroundWing } from './MansionGroundWing';
@@ -67,7 +68,7 @@ export class Room extends THREE.Group {
     this.referenceWalls.push(this.intactPracticeWall);
     this.add(this.intactPracticeWall);
 
-    const floor = new THREE.Mesh(new THREE.BoxGeometry(GAME_CONFIG.room.width, 0.12, GAME_CONFIG.room.depth), siteProScreedMaterial());
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(GAME_CONFIG.room.width, 0.12, GAME_CONFIG.room.depth), siteMaterial('floor', 0xd4cec3));
     floor.position.y = -0.06;
     floor.name = 'Rough unfinished concrete floor';
     floor.userData.studioEntityId = 'world:floor';
@@ -88,11 +89,6 @@ export class Room extends THREE.Group {
       else ceilingUVs.setXY(i, .37 + (y + GAME_CONFIG.room.height + .08) / 2, (nx > .5 ? z : x) / 2);
     }
     const ceilingMaterial = siteMaterial('concrete', 0xe6e2dc);
-    const ceilingNormal = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}assets/site-materials/concrete-normal-512.webp`);
-    ceilingNormal.name = 'Board-formed concrete normal 512 CC0';
-    ceilingNormal.wrapS = ceilingNormal.wrapT = THREE.RepeatWrapping;
-    ceilingNormal.anisotropy = 4;
-    ceilingMaterial.normalMap = ceilingNormal;
     ceilingMaterial.normalScale.set(.38, .38);
     // A small warm floor bounce reaches the underside of the slab. Keep the
     // photographed shutter marks but avoid a near-black roof over warm clay.
@@ -175,7 +171,12 @@ export class Room extends THREE.Group {
       this.exterior.getObjectByName('Olive tree outside unfinished opening') ?? null,
       this.exterior.getObjectByName('Offset adjacent residential block') ?? null,
     ) : null;
-    if (this.mansionWing) this.add(this.mansionWing);
+    if (this.mansionWing) {
+      this.add(this.mansionWing);
+      this.intactPracticeWall.removeFromParent();
+      this.referenceWalls.splice(this.referenceWalls.indexOf(this.intactPracticeWall),1);
+      this.referenceWalls.push(...this.mansionWing.connectOriginalRoomMasonry(this));
+    }
     // The slab bears over the wall heads and columns. Exposed brick meets its
     // soffit directly, with no decorative inner downstand or shadow band.
     this.addWallHeadContact();
@@ -190,6 +191,7 @@ export class Room extends THREE.Group {
     this.add(createSiteFloorDebris());
     this.mansionWing?.registerOriginalRoomSurfaces(floor, ceiling);
     this.mansionWing?.registerOriginalRoomAssets(this, this.exterior, [this.brickWall, ...this.referenceWalls]);
+    mapBuildingSurfaces(this);
     this.sun = addLighting(scene);
     if (this.mansionPreview) {
       // The mansion spans several bays beyond the original workroom's 10 m map.

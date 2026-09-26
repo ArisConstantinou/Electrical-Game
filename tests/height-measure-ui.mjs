@@ -12,7 +12,10 @@ const browser=await chromium.launch({channel:'chrome',headless:true});
 const step=(page,n=3)=>page.evaluate(n=>{for(let i=0;i<n;i++)window.__heightStep(1/60,1/60,false);},n);
 const press=async(page,selector,mobile)=>{await page.locator(selector)[mobile?'tap':'click']();await step(page);};
 async function tool(page,kind,mobile){
-  if(mobile)await press(page,`[data-tool="${kind}"]`,true);
+  if(mobile){
+    if(!await page.locator('#mobile-tool-slider').isVisible())await page.locator('#worker-bar-handle').tap();
+    const button=page.locator(`#mobile-tool-slider [data-tool="${kind}"]`);await button.scrollIntoViewIfNeeded();await button.tap();await step(page);
+  }
   else {await page.keyboard.press(kind==='measure'?'Digit9':'Digit4');await step(page);}
   await step(page,45);await page.waitForTimeout(1600);
 }
@@ -69,7 +72,7 @@ try {
     const context=await browser.newContext({viewport,isMobile:mobile,hasTouch:mobile});await blockPointerLock(context);await serveTaskBuild(context,url);
     try {
       const page=await context.newPage();page.on('pageerror',e=>report.errors.push(`${name}: ${e.message}`));await page.routeWebSocket('**',()=>{});
-      await page.goto(url);await page.waitForFunction(()=>window.__wireTheHouse?.heightMeasure&&window.__wireTheHouse?.roomWater.waterProActive,undefined,{timeout:120000});
+      await page.goto(url);await page.waitForFunction(()=>window.__wireTheHouse?.heightMeasure&&window.__wireTheHouse?.isReadyForStart,undefined,{timeout:120000});
       await page.locator('#start-button')[mobile?'tap':'click']();await page.locator('#start-screen').waitFor({state:'hidden'});
       await page.evaluate(async()=>{const g=window.__wireTheHouse;window.__heightStep=g.step.bind(g);g.step=()=>{};await g.renderer.waitForFrame();});
       await tool(page,'measure',mobile);await aim(page);
@@ -91,11 +94,11 @@ try {
       if(mobile)await press(page,'#measure-mark',true);else{await page.keyboard.press('KeyM');await step(page);}
       const two=await state(page);assert.equal(two.measurement.count,2);assert.deepEqual(two.measurement.marks[0],marked.measurement.marks[0],'Moving the tape preserves the first wall mark');
       await aim(page,-.8,.8);const lowStanding=await state(page);assert.equal(lowStanding.measurement.heightM,.8);assert.equal(lowStanding.measurement.mode,'ready');
-      if(mobile)await press(page,'#quick-work-height',true);else{await page.keyboard.down('ControlLeft');await step(page,90);}
+      if(mobile)await press(page,'#mobile-crouch',true);else{await page.keyboard.down('ControlLeft');await step(page,90);}
       await aim(page,-.8,.8);const crouched=await state(page);await writeFile(`${out}/${name}-crouched.json`,JSON.stringify(crouched,null,2));
       assert(crouched.eyeHeight<1.05,'Native crouch lowers eye height');assert.equal(crouched.measurement.heightM,lowStanding.measurement.heightM,'Floor reference is unchanged when crouched');assert.equal(crouched.measurement.mode,'ready');assert.equal(crouched.tape.bottom,0);
       await shot(page,`${name}-crouched-080`);
-      if(mobile)await press(page,'#quick-work-height',true);else{await page.keyboard.up('ControlLeft');await step(page,90);}
+      if(mobile)await press(page,'#mobile-stand',true);else{await page.keyboard.up('ControlLeft');await step(page,90);}
       await aim(page,-.8,1.2);
       let nativeAim=null;
       if(mobile){
