@@ -53,63 +53,63 @@
     "title": "Όρθιος με το κάγκο",
     "width": 1280,
     "height": 960,
-    "originalSha256": "59032a9700ccbf82937db617fa5e72da98b63ea86b59f1b8b751bf3102d0bcdf"
+    "originalSha256": "5159ac6f2d89f6583d90b6c84ab523e0664a91f84207bcfa91d28ac0c1e0fb58"
   },
   {
     "id": "02-crouched",
     "title": "Σκυφτός με το κάγκο",
     "width": 1280,
     "height": 960,
-    "originalSha256": "822e2166c21aee6e7520b4aee5d80e9a9e102a26e2744792c40b424c08d24f61"
+    "originalSha256": "2fd5dc537507515b7a413ae938b1edb772b3304384fedffaf6418dec0ca64baf"
   },
   {
     "id": "03-breaking-straight",
     "title": "Σπάσιμο ίσια στον τοίχο",
     "width": 1280,
     "height": 960,
-    "originalSha256": "ec1bd39941d1de89645a953177972657687815e55642f28605622a5e8eec496e"
+    "originalSha256": "c793df11b6fedbe5e07b239d1b833597eb4f96701eae9ec1e932929a01cb1610"
   },
   {
     "id": "04-breaking-side",
     "title": "Πλαϊνή γωνία 45°",
     "width": 1280,
     "height": 960,
-    "originalSha256": "24872114ab4d4d28fe11a5fe2cffcb68a1290959709eebbadd6ef7f95dd13c3a"
+    "originalSha256": "1e9f1b41b96a8a95cb341f3b76f3500d9550bae6923f3fdfbdbae93e2abd76a2"
   },
   {
     "id": "05-breaking-vertical-chisel",
     "title": "Κάθετη κόψη 90°",
     "width": 1280,
     "height": 960,
-    "originalSha256": "99b1a0120a71e5ae8bec5202727f11e1197e78ff84de3051b07355100f4e1f12"
+    "originalSha256": "7475410b841ae2f48100aabc5035cd7d6fbc98b7e174c0932520aae2be486e75"
   },
   {
     "id": "06-breaking-crouched",
     "title": "Χαμηλή εργασία, σκυφτός",
     "width": 1280,
     "height": 960,
-    "originalSha256": "0cfb077d43a77522860eec24bfadc78438f56e2e774d62c6a7b00b62a4123e77"
+    "originalSha256": "90ea2542913bb8c2455945d7308cd2b2af408706b9493d2c5a1fbeeab98e441f"
   },
   {
     "id": "07-jump-takeoff",
     "title": "Άλμα — προετοιμασία",
     "width": 1280,
     "height": 960,
-    "originalSha256": "9e52727c11299b3d162c8eb7be0884cd18d2ecf9f2c662c99a726f314f0650ea"
+    "originalSha256": "db65af69df4dabad8f4df7b7b66965beae9f49be3d96204c6d6b95efcf1936d8"
   },
   {
     "id": "08-jump-apex",
     "title": "Άλμα — στον αέρα",
     "width": 1280,
     "height": 960,
-    "originalSha256": "b8730debd5fa5a954ba0a5ed316ee5704d2e45fd3d5b4de8e9951a01a1bbab1d"
+    "originalSha256": "4268db8a10a435cdc5768af65c2847b915e688fa7daa05d5ad583f8296ed1d9f"
   },
   {
     "id": "09-jump-landing",
     "title": "Άλμα — προσγείωση",
     "width": 1280,
     "height": 960,
-    "originalSha256": "6b7397a115ba7984cd9484091285b55888c16f218a198b8fff594c617df3ccda"
+    "originalSha256": "ae7e99f93b532a56c8c5783ea1c4a7b96c994598b9f1df19d94b56872490d481"
   },
   {
     "id": "arm-before",
@@ -120,9 +120,9 @@
   },
   {
     "id": "arm-after",
-    "title": "Διόρθωση στήριξης και αγκώνα",
+    "title": "Διορθωμένο πλαϊνό σπάσιμο",
     "width": 1280,
     "height": 960,
-    "originalSha256": "67523743a6f45897af97da4c9e5da359d13a47b8deb277c5f2a4953482f7f203"
+    "originalSha256": "1e9f1b41b96a8a95cb341f3b76f3500d9550bae6923f3fdfbdbae93e2abd76a2"
   }
 ]
