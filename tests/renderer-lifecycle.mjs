@@ -9,7 +9,7 @@ const report={cases:[]};
 function fixture(){
  const r=Object.create(Renderer.prototype);let draws=0,rebuilds=0,resizes=0;
  Object.assign(r,{ready:Promise.resolve(),suspended:false,deviceLost:false,contextLost:false,contextRestored:null,recoveryTask:null,renderGeneration:0,recoveryCount:0,renderTask:null,pendingSize:null,waterWasVisible:true,lastRenderTime:performance.now(),roomWater:{surface:{visible:true}},water:{update:()=>Promise.resolve()},gpu:{info:{reset(){}},render(){draws++;}},scene:{},renderCamera:{},renderError:''});
- r.snapshotRenderCamera=()=>{};r.prepareMaterials=()=>{};r.resize=()=>{resizes++;};
+ r.snapshotRenderCamera=()=>{};r.prepareMaterials=()=>{};r.resize=()=>{resizes++;};r.waterInView=()=>true;
  r.rebuildGraphics=async()=>{r.renderGeneration++;r.renderTask=null;rebuilds++;r.recoveryCount++;r.deviceLost=false;};
  return{r,draws:()=>draws,rebuilds:()=>rebuilds,resizes:()=>resizes};
 }

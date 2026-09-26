@@ -1286,7 +1286,7 @@ export class Game {
       this.animationFrame=requestAnimationFrame(this.loop);
     }catch(error){
       this.renderer.renderError=String(error);
-      this.hud.notify('Graphics could not resume. Return to the game to retry.',false,4500);
+      this.hud.notify('Τα γραφικά δεν επανήλθαν. Ανανέωσε τη σελίδα για νέα προσπάθεια.',false,10000);
     }
   }
 
@@ -1303,6 +1303,7 @@ export class Game {
     // Leave recovery time only after a genuinely overloaded frame. A steady
     // 20 ms scene must not be throttled from ~50 to ~40 FPS.
     if(time<this.nextGameFrameAt){this.animationFrame=requestAnimationFrame(this.loop);return;}
+    try{
     const frameStart=performance.now();
     const elapsed = Math.max(0,Math.min((time - this.lastTime) / 1000,.25));
     this.lastTime = time;
@@ -1319,6 +1320,10 @@ export class Game {
     if(time-this.fpsWindowStart>=500){
       this.hud.updateFps(this.fpsFrames*1000/(time-this.fpsWindowStart));
       this.fpsWindowStart=time;this.fpsFrames=0;
+    }
+    }catch(error){
+      if(this.renderer.recoverFromFrameError(error))return;
+      throw error;
     }
     this.animationFrame=requestAnimationFrame(this.loop);
   };

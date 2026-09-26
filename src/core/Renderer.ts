@@ -30,6 +30,10 @@ export class Renderer {
   private recoveryTask:Promise<void>|null=null;
   private renderGeneration=0;
   private recoveryCount=0;
+  private graphicsFault=false;
+  private faultAttempts=0;
+  private recoveryBlocked=false;
+  private readonly graphicsErrors:Array<{atMs:number;message:string}>=[];
   private waterRoots:THREE.Object3D[]=[];
   private warmupFactory:(()=>THREE.Group)|null=null;
   private water:RoomWaterRuntime|null=null;
@@ -51,8 +55,8 @@ export class Renderer {
   private readonly gazeQuaternion=new THREE.Quaternion();
   renderError='';
   /** Gameplay may advance again once all passes using this scene have finished. */
-  get framePending():boolean{return this.renderTask!==null||this.recoveryTask!==null||this.deviceLost||this.suspended;}
-  get lifecycleTelemetry():object{return{suspended:this.suspended,recovering:this.recoveryTask!==null,deviceLost:this.deviceLost,contextLost:this.contextLost,recoveries:this.recoveryCount,generation:this.renderGeneration};}
+  get framePending():boolean{return this.renderTask!==null||this.recoveryTask!==null||this.deviceLost||this.graphicsFault||this.recoveryBlocked||this.suspended;}
+  get lifecycleTelemetry():object{return{suspended:this.suspended,recovering:this.recoveryTask!==null,deviceLost:this.deviceLost,contextLost:this.contextLost,recoveries:this.recoveryCount,generation:this.renderGeneration,graphicsFault:this.graphicsFault,recoveryBlocked:this.recoveryBlocked,graphicsErrors:this.graphicsErrors};}
 
   constructor(container: HTMLElement) {
     this.scene.background = new THREE.Color(0xaab9bd);
@@ -99,14 +103,36 @@ export class Renderer {
   invalidateMaterialPreparation():void{this.materialsDirty=true;}
 
   private bindDeviceLoss():void{
+    const owner=this.gpu,onError=owner.onError;
+    owner.onError=info=>{
+      // r185 sends structured GPU error data; its declaration still says string.
+      const detail=info as unknown as {type?:string;message?:string};
+      this.recordGraphicsError(typeof info==='string'?info:`${detail.type??'GPUError'}: ${detail.message??''}`);
+      onError.call(owner,info);
+    };
     this.gpu.onDeviceLost=()=>{
       this.deviceLost=true;
       window.dispatchEvent(new CustomEvent('wirehouse:graphics-lost'));
     };
   }
+  private recordGraphicsError(message:string):void{
+    this.graphicsErrors.push({atMs:performance.now(),message:message.slice(0,2000)});
+    if(this.graphicsErrors.length>16)this.graphicsErrors.shift();
+  }
+  /** WebKit can throw from an encoder without reporting device loss. That
+   * invalid encoder must be retired; losing the RAF callback is not recovery. */
+  recoverFromFrameError(error:unknown):boolean{
+    const message=String(error);
+    if(!/InvalidStateError/.test(message)||!/GPUCommandEncoder\.(?:beginRenderPass|beginComputePass|finish)/.test(message))return false;
+    this.recordGraphicsError(message);this.renderError=message;this.graphicsFault=true;
+    this.recoveryBlocked=++this.faultAttempts>2;
+    window.dispatchEvent(new CustomEvent('wirehouse:graphics-lost'));
+    return true;
+  }
   setWarmupFactory(factory:()=>THREE.Group):void{this.warmupFactory=factory;}
   suspend():void{this.suspended=true;this.renderGeneration++;}
   async resume():Promise<void>{
+    if(this.recoveryBlocked)throw new Error('Graphics repeatedly failed. Reload the page to retry.');
     this.suspended=false;
     if(this.recoveryTask)return this.recoveryTask;
     this.lastRenderTime=performance.now();
@@ -121,7 +147,7 @@ export class Renderer {
         try{await Promise.race([pending,new Promise<void>(resolve=>{timer=setTimeout(resolve,1200);})]);}
         finally{if(timer!==undefined)clearTimeout(timer);}
       }
-      if(this.deviceLost||this.renderTask===pending&&pending!==null)await this.rebuildGraphics();
+      if(this.deviceLost||this.graphicsFault||this.renderTask===pending&&pending!==null)await this.rebuildGraphics();
       this.lastRenderTime=performance.now();this.waterWasVisible=true;this.resize();
     })();
     this.recoveryTask=recovery;
@@ -147,7 +173,7 @@ export class Renderer {
     this.bindDeviceLoss();await this.gpu.init();this.configureSceneInstancing(this.gpu);this.deviceLost=false;this.resize();
     if(this.roomWater)await this.attachRoomWater(this.roomWater);
     if(this.warmupFactory)await this.prepareToolResources(this.warmupFactory());
-    this.renderError='';this.recoveryCount++;
+    this.graphicsFault=false;this.renderError='';this.recoveryCount++;
   }
 
   private disposePreservingCanvas(renderer:WebGPURenderer):void{
@@ -375,7 +401,7 @@ export class Renderer {
     }
     const generation=this.renderGeneration;
     const task=this.water.update(dt).then(()=>{if(generation===this.renderGeneration&&!this.suspended)this.drawScene(this.scene);}).catch(error=>{
-      if(generation===this.renderGeneration&&!this.deviceLost){this.renderError=String(error);console.error('Room Water Pro rendering failed',error);}
+      if(generation===this.renderGeneration&&!this.deviceLost&&!this.recoverFromFrameError(error)){this.renderError=String(error);console.error('Room Water Pro rendering failed',error);}
     }).finally(()=>{if(this.renderTask===task)this.renderTask=null;});
     this.renderTask=task;
     return true;

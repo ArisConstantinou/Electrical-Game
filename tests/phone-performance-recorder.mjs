@@ -3,12 +3,13 @@ import path from 'node:path';
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
 import {chromium} from 'playwright';
 import {blockPointerLock} from './browser-safety.mjs';
-import {routeBuildingDist} from './building-qa-utils.mjs';
+import {serveTaskBuild} from './serve-task-build.mjs';
+process.env.TASK_BUILD_ROOT??=process.env.QA_DIST_ROOT??'dist';
 const out='output/phone-performance-recorder';await mkdir(out,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:true}),result={errors:[],cases:[]};
 try{
  const context=await browser.newContext({viewport:{width:430,height:932},deviceScaleFactor:3,isMobile:true,hasTouch:true});
- await blockPointerLock(context);await routeBuildingDist(context);
+ await blockPointerLock(context);await serveTaskBuild(context,'http://127.0.0.1:5365/Electrical-Game/');
  await context.route('**/review/performance/**',async route=>{
   const pathname=new URL(route.request().url()).pathname,name=pathname.endsWith('/')?'index.html':path.basename(pathname);
   if(!['index.html','recorder.js'].includes(name))return route.abort();
