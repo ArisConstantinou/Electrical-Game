@@ -39,6 +39,25 @@ try{
  result.cases.push({name:'native-movement-and-resume',frames:report.frames.count,events:report.events,viewport:report.device.viewport});
  await page.locator('#begin').tap();await page.waitForTimeout(600);await page.locator('#stop').tap();
  const second=await page.evaluate(()=>window.performanceRecording.report);assert(second.frames.count>10&&second.frames.count<report.frames.count,'New capture starts clean');assert.equal(second.events.filter(e=>e.type==='recording-started').length,1);
- result.cases.push({name:'fresh-second-capture',frames:second.frames.count});assert.deepEqual(result.errors,[]);result.passed=true;
+ result.cases.push({name:'fresh-second-capture',frames:second.frames.count});
+ await page.locator('#begin').tap();await page.waitForTimeout(600);
+ // Stop only this isolated game's scheduled loop. The browser and recorder
+ // remain alive, matching a frozen game with a continuing parent countdown.
+ await game.evaluate(()=>{const g=window.__wireTheHouse;cancelAnimationFrame(g.animationFrame);g.animationFrame=null;});
+ await page.waitForTimeout(3100);
+ assert.match(await page.locator('#status').textContent(),/Πάγωμα/,'A running countdown must not hide missing game frames');
+ await page.locator('#stop').tap();const stalled=await page.evaluate(()=>window.performanceRecording.report);
+ assert(stalled.finalState.gapMs>3000&&stalled.longestPresentationGapMs>3000);
+ assert(stalled.effectiveFPS<stalled.frames.fps*.5,'Effective FPS includes the frozen tail');
+ assert.equal(stalled.finalState.game.animationFrame,null);assert.equal(stalled.finalState.renderer.pending,false);
+ assert(stalled.finalState.childAnimationGapMs<200,'Independent child animation heartbeat remains alive');
+ assert(stalled.events.some(e=>e.type==='rendering-stalled'));assert(stalled.diagnostics.length>=3);
+ await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.__copiedReport=text;}}}));
+ await page.locator('#copy').tap();const copied=await page.evaluate(()=>window.__copiedReport);
+ assert(copied.includes('Διάγνωση:')&&copied.includes('WebGL2')&&copied.includes('index-')&&copied.includes('"animationFrame":null'),'Copied text includes freeze and served-backend evidence');
+ assert(!await page.locator('#intro').isVisible(),'Results fit the phone without repeated introductory instructions');
+ await page.screenshot({path:`${out}/portrait-stalled.png`});
+ result.cases.push({name:'frozen-game-tail',effectiveFPS:stalled.effectiveFPS,receivedFPS:stalled.frames.fps,gapMs:stalled.finalState.gapMs,finalState:stalled.finalState});
+ assert.deepEqual(result.errors,[]);result.passed=true;
 }finally{await browser.close();await writeFile(`${out}/report.json`,JSON.stringify(result,null,2));}
 console.log(JSON.stringify(result));
