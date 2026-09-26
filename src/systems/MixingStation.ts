@@ -219,9 +219,11 @@ export class MixingStation {
   }
   private stop():void{this.mixingNow=false;this.mixerApproach=null;}
   /** Explicit stance controls override and release an assisted mixer stance. */
-  releaseAutomaticStance():void{
+  releaseAutomaticStance(preserveInput=false):void{
     this.automaticCrouch=false;this.inserted=false;this.cleanSeconds=0;this.stop();
-    this.game.input.resetTransientInput();
+    // Jumping or changing posture must not release a held movement/aim finger
+    // or erase WASD/Shift. Other callers retain the full cancellation policy.
+    if(!preserveInput)this.game.input.resetTransientInput();
   }
   chooseTool(tool:MixingTool):void{
     if(this.apprenticeLease)return;
@@ -299,7 +301,7 @@ export class MixingStation {
   private mixerInstruction(object:THREE.Object3D):string{
     if(this.mixerApproach)return'ΠΑΙΡΝΕΙΣ ΘΕΣΗ';
     if(!this.near(object,1.6))return object===this.models.rinse?'ΠΛΗΣΙΑΣΕ ΤΟ ΝΕΡΟ':'ΠΛΗΣΙΑΣΕ ΤΗ ΣΥΚΛΑ';
-    return object===this.models.rinse?'ΞΕΠΛΥΝΕ ΤΟ ΜΙΞΕΡ':this.mixingNow?'ΑΝΑΚΑΤΕΜΑ':this.inserted?'ΚΡΑΤΑ ΓΙΑ ΑΝΑΜΙΞΗ':'ΒΑΛΕ ΤΟ ΜΙΞΕΡ';
+    return object===this.models.rinse?'ΞΕΠΛΥΝΕ ΤΟ ΜΙΞΕΡ':this.mixingNow?'ΑΝΑΚΑΤΕΜΑ':this.inserted?matchMedia('(pointer:coarse)').matches?'TAP AIM ΓΙΑ ΑΝΑΜΙΞΗ':'ΚΡΑΤΑ ΓΙΑ ΑΝΑΜΙΞΗ':'ΒΑΛΕ ΤΟ ΜΙΞΕΡ';
   }
   private recipeHint():string|undefined{
     if(this.tool!=='mixer')return;
@@ -307,7 +309,7 @@ export class MixingStation {
     if(b.massKg<1e-6)return'Η σύκλα είναι άδεια · πρόσθεσε νερό, τσιμέντο και άμμο.';
     const missing=[b.waterLitres<=0?'νερό':'',b.cementScoops<=0?'τσιμέντο':'',b.sandScoops<=0?'άμμο':''].filter(Boolean);
     if(missing.length)return`Για πυλό χρειάζεται ακόμη ${missing.join(' και ')}.`;
-    if(!b.ready)return`Ανάμιξη ${Math.round(b.mixProgress*100)}% · κράτα USE ή INTERACT.`;
+    if(!b.ready)return`Ανάμιξη ${Math.round(b.mixProgress*100)}% · ${matchMedia('(pointer:coarse)').matches?'tap AIM για έναρξη / διακοπή.':'κράτα USE ή INTERACT.'}`;
   }
   canOpenFromInteract():boolean{
     return Boolean(this.aimedObject());
@@ -498,7 +500,7 @@ export class MixingStation {
   }
   get bondFactor():number{const b=this.supplyBatch;return !b||b.quality==='balanced'?1:b.quality==='wet'?.45:b.quality==='dry'?.55:.65;}
   private promptFor(target:StationTarget|null):string{
-    const key=matchMedia('(pointer:coarse)').matches?'INTERACT':'E';
+    const key=matchMedia('(pointer:coarse)').matches?'TAP AIM':'E';
     if(this.wheelbarrow.driving)return`${key} · ΑΦΗΣΕ ΤΟ ΚΑΡΟΤΣΙ`;
     if(this.wheelbarrow.state==='righting')return'ΕΠΑΝΑΦΟΡΑ ΚΑΡΟΤΣΙΟΥ';
     if(target?.kind==='wheelbarrow')return this.wheelbarrow.state==='tipping'?'':this.wheelbarrow.state==='flipped'?`${key} · ΣΗΚΩΣΕ ΤΟ ΚΑΡΟΤΣΙ`:this.active&&this.tool==='shovel'&&this.wheelbarrow.shovelKg>0?`${key} · ΡΙΞΕ ΤΟΝ ΠΥΛΟ ΣΤΟ ΚΑΡΟΤΣΙ`:`${key} · ΠΙΑΣΕ ΤΟ ΚΑΡΟΤΣΙ`;

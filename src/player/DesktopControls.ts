@@ -33,7 +33,10 @@ export class DesktopControls {
         input.actionHeld = false;
         input.actionRequested = false;
         if(surface.dataset.boxAssembly==='true')window.dispatchEvent(new CustomEvent('wirehouse:box-place-assembly'));
-        else window.dispatchEvent(new CustomEvent('wirehouse:exit-leveling'));
+        else {
+          window.dispatchEvent(new CustomEvent('wirehouse:exit-leveling'));
+          window.dispatchEvent(new CustomEvent('wirehouse:jump'));
+        }
         if (document.pointerLockElement !== this.lockTarget) this.requestLock(false);
         return;
       }

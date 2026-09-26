@@ -22,12 +22,20 @@ export class MobileControls {
   private moveY = 0;
   private lastMoveX = 0;
   private lastMoveY = 0;
+  private moveTap: { x:number; y:number; time:number; travel:number; eligible:boolean } | null = null;
+  private lastMoveTap: { x:number; y:number; time:number } | null = null;
+  private jumpHoldTimer: ReturnType<typeof setTimeout> | null = null;
+  private jumpHoldX=0;
+  private jumpHoldY=0;
+  private rightPressTime=0;
+  private rightTapEligible=false;
+  private tapPulseTimer:ReturnType<typeof setTimeout>|null=null;
   private aimProfile: MobileAimProfile = 'normal';
   private aimInputMode: AimInputMode = 'stick';
   private movementStickMode: MovementStickMode = 'fixed';
   private readonly captures = new Map<number, HTMLElement>();
 
-  constructor(private readonly surface: HTMLElement, private readonly input: Input, private readonly player: PlayerController, _selectedToolIsContinuous: () => boolean) {
+  constructor(private readonly surface: HTMLElement, private readonly input: Input, private readonly player: PlayerController, private readonly selectedToolIsContinuous: () => boolean) {
     surface.addEventListener('pointerdown', this.onPointerDown, { passive: false });
     surface.addEventListener('pointermove', this.onPointerMove, { passive: false });
     addEventListener('pointerup', this.onPointerUp, { passive: false });
@@ -138,6 +146,7 @@ export class MobileControls {
 
   /** Browser toolbars can resize the viewport without ending a finger press. */
   private recenterActiveJoystick(): void {
+    this.cancelJumpHold();
     if (this.joystickPointer === null || this.movementStickMode !== 'fixed') return;
     const rect = this.surface.querySelector<HTMLElement>('#joystick')?.getBoundingClientRect();
     if (!rect) return;
@@ -148,6 +157,7 @@ export class MobileControls {
 
   /** Cancellation discards a pending cast; ordinary USE release still casts. */
   cancelActiveGestures(): void {
+    this.lastMoveTap=null;this.moveTap=null;
     this.releaseAction(true);
     this.releaseInteraction(true);
     this.releaseAim();
@@ -185,6 +195,16 @@ export class MobileControls {
       this.actionX = event.clientX; this.actionY = event.clientY;
       this.capture(action, event.pointerId);
       action.classList.add('active'); action.setAttribute('aria-pressed', 'true');
+      const pointer=event.pointerId;
+      this.jumpHoldX=event.clientX;this.jumpHoldY=event.clientY;
+      this.rightPressTime=performance.now();this.rightTapEligible=true;
+      this.jumpHoldTimer=setTimeout(()=>{
+        this.jumpHoldTimer=null;this.rightTapEligible=false;
+        if(this.lookActionPointer===pointer&&!this.surface.classList.contains('settings-open')){
+          this.releaseAction(true);
+          window.dispatchEvent(new CustomEvent('wirehouse:jump'));
+        }
+      },350);
       if (this.aimInputMode === 'stick') this.updateLookJoystick(event, action);
       return;
     }
@@ -195,6 +215,11 @@ export class MobileControls {
       const joystick = this.surface.querySelector<HTMLElement>('#joystick');
       if (this.movementStickMode === 'fixed' && joystick && !joystick.contains(target)) return;
       this.joystickPointer = event.pointerId;
+      const now=performance.now(),last=this.lastMoveTap;
+      const doubleTap=Boolean(last&&now-last.time<=300&&Math.hypot(event.clientX-last.x,event.clientY-last.y)<=24);
+      this.lastMoveTap=null;
+      this.moveTap={x:event.clientX,y:event.clientY,time:now,travel:0,eligible:!doubleTap};
+      if(doubleTap)window.dispatchEvent(new CustomEvent('wirehouse:work-height'));
       if (joystick) {
         if (this.movementStickMode === 'floating') {
           const width = joystick.getBoundingClientRect().width;
@@ -221,14 +246,35 @@ export class MobileControls {
     const action = this.surface.querySelector<HTMLElement>('#site-pro-use');
     action?.classList.add('active'); action?.setAttribute('aria-pressed', 'true');
   }
+  private tapPrimaryAction():void {
+    // A tap toggles duration-based work. A discrete placement/pickup gets one
+    // short pulse, so the same joystick still supports charge/release tools.
+    const continuous=this.selectedToolIsContinuous();
+    if(continuous&&this.usePointer===-2&&(this.input.actionHeld||this.input.interactionHeld)){
+      this.releaseAction(false);return;
+    }
+    if(this.usePointer===-2)this.releaseAction(true);
+    this.usePointer=-2;
+    const interact=this.surface.dataset.mixingInteract==='true';
+    if(!interact&&this.surface.dataset.activeTool==='measure'){
+      this.usePointer=null;window.dispatchEvent(new CustomEvent('wirehouse:measure-mark'));return;
+    }
+    this.input.actionRequested=!interact;this.input.interactionRequested=interact;
+    this.input.actionHeld=true;this.input.interactionHeld=interact;
+    if(!continuous)this.tapPulseTimer=setTimeout(()=>{
+      this.tapPulseTimer=null;if(this.usePointer===-2)this.releaseAction(false);
+    },120);
+  }
   private onPointerMove = (event: PointerEvent): void => {
     if (event.pointerType === 'mouse') return;
     if (event.pointerId === this.joystickPointer) {
       event.preventDefault();
+      if(this.moveTap)this.moveTap.travel=Math.max(this.moveTap.travel,Math.hypot(event.clientX-this.moveTap.x,event.clientY-this.moveTap.y));
       this.lastMoveX = event.clientX; this.lastMoveY = event.clientY;
       this.updateMovement(event.clientX, event.clientY);
     } else if (event.pointerId === this.lookActionPointer) {
       event.preventDefault();
+      if(Math.hypot(event.clientX-this.jumpHoldX,event.clientY-this.jumpHoldY)>10)this.cancelJumpHold();
       const action = this.surface.querySelector<HTMLElement>('#look-joystick');
       if (this.aimInputMode === 'stick' && action) this.updateLookJoystick(event, action);
       else {
@@ -252,18 +298,31 @@ export class MobileControls {
   };
   private onPointerUp = (event: PointerEvent): void => {
     if (event.pointerType === 'mouse') return;
-    if (event.pointerId === this.joystickPointer) { event.preventDefault(); this.releaseJoystick(); }
+    if (event.pointerId === this.joystickPointer) {
+      event.preventDefault();
+      const tap=this.moveTap,now=performance.now();
+      this.lastMoveTap=event.type==='pointerup'&&tap?.eligible&&tap.travel<=10&&
+        Math.hypot(event.clientX-tap.x,event.clientY-tap.y)<=10&&now-tap.time<=220
+        ?{x:tap.x,y:tap.y,time:now}:null;
+      this.releaseJoystick();
+    }
     if (event.pointerId === this.lookPointer) { event.preventDefault(); this.releaseLook(); }
-    if (event.pointerId === this.lookActionPointer) { event.preventDefault(); this.releaseAim(); }
+    if (event.pointerId === this.lookActionPointer) {
+      event.preventDefault();
+      const tap=event.type==='pointerup'&&this.rightTapEligible&&performance.now()-this.rightPressTime<350&&
+        Math.hypot(event.clientX-this.jumpHoldX,event.clientY-this.jumpHoldY)<=10;
+      this.releaseAim();if(tap)this.tapPrimaryAction();
+    }
     if (event.pointerId === this.usePointer) { event.preventDefault(); this.releaseAction(event.type === 'pointercancel'); }
   };
   private onLostCapture = (event: PointerEvent): void => {
-    if (event.pointerId === this.joystickPointer) this.releaseJoystick();
+    if (event.pointerId === this.joystickPointer) {this.lastMoveTap=null;this.releaseJoystick();}
     if (event.pointerId === this.lookPointer) this.releaseLook();
     if (event.pointerId === this.lookActionPointer) this.releaseAim();
     if (event.pointerId === this.usePointer) this.releaseAction(true);
   };
   private releaseJoystick(): void {
+    this.moveTap=null;
     const pointer = this.joystickPointer; this.joystickPointer = null; this.input.resetMobileMove();
     const joystick = this.surface.querySelector<HTMLElement>('#joystick');
     if (joystick) { for (const property of ['left', 'top', 'right', 'bottom', 'transform']) joystick.style.removeProperty(property); joystick.classList.remove('active'); }
@@ -274,6 +333,7 @@ export class MobileControls {
     const pointer = this.lookPointer; this.lookPointer = null; this.releaseCapture(pointer);
   }
   private releaseAim(): void {
+    this.cancelJumpHold();
     if (this.lookActionPointer === null) return;
     const pointer = this.lookActionPointer; this.lookActionPointer = null;
     this.input.resetMobileLook();
@@ -281,6 +341,11 @@ export class MobileControls {
     action?.classList.remove('active'); action?.setAttribute('aria-pressed', 'false');
     const thumb = this.surface.querySelector<HTMLElement>('#look-joystick-thumb'); if (thumb) thumb.style.transform = 'translate(-50%, -50%)';
     this.releaseCapture(pointer);
+  }
+  private cancelJumpHold(): void {
+    this.rightTapEligible=false;
+    if(this.jumpHoldTimer!==null)clearTimeout(this.jumpHoldTimer);
+    this.jumpHoldTimer=null;
   }
   private updateMovement(clientX: number, clientY: number): void {
     const joystick = this.surface.querySelector<HTMLElement>('#joystick');
@@ -293,9 +358,11 @@ export class MobileControls {
     if (thumb) thumb.style.transform = `translate(calc(-50% + ${x * .52}px), calc(-50% + ${y * .52}px))`;
   }
   private releaseAction(cancel: boolean): void {
+    if(this.tapPulseTimer!==null)clearTimeout(this.tapPulseTimer);this.tapPulseTimer=null;
     if (this.usePointer === null) return;
     const pointer = this.usePointer; this.usePointer = null;
     this.input.actionHeld = false; if (cancel) this.input.actionRequested = false;
+    if(pointer===-2){this.input.interactionHeld=false;if(cancel)this.input.interactionRequested=false;}
     const action = this.surface.querySelector<HTMLElement>('#site-pro-use');
     action?.classList.remove('active'); action?.setAttribute('aria-pressed', 'false');
     if (cancel) window.dispatchEvent(new CustomEvent('wirehouse:cancel-mobile-action'));
