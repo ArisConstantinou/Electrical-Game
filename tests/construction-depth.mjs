@@ -27,12 +27,14 @@ await runManagedClient(session,240000,async()=>{
   const ceiling=g.room.getObjectByName('Concrete slab ceiling');if(ceiling)ceiling.visible=false;
   e.orbit.target.set(-2.72,1.5,-2.46);e.camera.position.set(-2.72,4,-2.46);e.camera.up.set(0,0,-1);e.camera.lookAt(e.orbit.target);e.orbit.update();
   const columns=[...g.room.mansionWing.editableAssets.values()].filter(a=>a.userData.constructionColumnAxes).map(a=>({name:a.userData.levelEditorLabel,axes:a.userData.constructionColumnAxes,depths:a.userData.constructionColumnAxes.map(axis=>new Box().setFromObject(a).getSize(a.position.clone())[axis])}));
-  return {id:column.name,columnDepth:bounds.max.z-bounds.min.z,columnFront:bounds.max.z,columnBack:bounds.min.z,brickDepth:Math.abs(a.z-b.z),brickFront:a.z,brickBack:b.z,columns,wingDepths:[...g.room.mansionWing.editableWalls.values()].filter(a=>a.userData.levelEditorKind==='brick-wall').map(a=>.24*Math.abs(a.scale[a.userData.alongX?'z':'x']))};
+  const jambs=[];g.room.traverse(o=>{if(o.name==='Exposed concrete passage jamb'){const box=new Box().setFromObject(o),size=box.getSize(o.position.clone());jambs.push({width:size.x,depth:size.z,clearEdge:Math.min(Math.abs(box.min.x),Math.abs(box.max.x))});}});
+  return {id:column.name,columnDepth:bounds.max.z-bounds.min.z,columnFront:bounds.max.z,columnBack:bounds.min.z,brickDepth:Math.abs(a.z-b.z),brickFront:a.z,brickBack:b.z,columns,jambs,wingDepths:[...g.room.mansionWing.editableWalls.values()].filter(a=>a.userData.levelEditorKind==='brick-wall').map(a=>.24*Math.abs(a.scale[a.userData.alongX?'z':'x']))};
  });
  await page.waitForTimeout(500);await page.screenshot({path:path.join(out,'default-top.png')});await writeFile(path.join(out,'initial.json'),JSON.stringify(result.initial,null,2));
  const near=(a,b)=>assert(Math.abs(a-b)<.001,`${a} must equal ${b}`);
  near(result.initial.columnDepth,.15);near(result.initial.brickDepth,.10);near(result.initial.columnFront-result.initial.brickFront,.025);near(result.initial.brickBack-result.initial.columnBack,.025);assert(result.initial.wingDepths.every(d=>Math.abs(d-.1)<.001));result.cases.push('default-10cm-brick-15cm-column-both-2.5cm-projections');
  assert(result.initial.columns.length>50);for(const c of result.initial.columns)for(const d of c.depths)near(d,.15);result.cases.push('all-authored-columns-and-concrete-opening-supports');
+ assert.equal(result.initial.jambs.length,2);for(const jamb of result.initial.jambs){near(jamb.width,.15);near(jamb.depth,.15);near(jamb.clearEdge,1.35);}result.cases.push('both-passage-jamb-normals-15cm-with-clear-opening-retained');
  result.workWall=await page.evaluate(()=>{
   const g=window.__wireTheHouse,w=g.room.brickWall,point=g.mission.points[0],camera=g.renderer.camera.clone(false),front=w.volume.frontZ;
   camera.position.set(.8,1.3,front+.5);camera.lookAt(.8,1.3,front);camera.updateMatrixWorld(true);

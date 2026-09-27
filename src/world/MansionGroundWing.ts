@@ -50,9 +50,9 @@ export class MansionGroundWing extends THREE.Group {
     // 3.62 m start ran through the jamb and exposed a second clay edge.
     for (const side of [-1, 1]) {
       const jamb = this.passageJambs.find(box => Math.sign(box.min.x + box.max.x) === side);
-      // The inside clay face follows the clear opening, rather than putting
-      // half the block beyond the jamb where a false cut face stays exposed.
-      const x = jamb ? (side < 0 ? jamb.max.x : jamb.min.x) + side * CONSTRUCTION_DEFAULTS.brickDepth / 2 : side * 1.35;
+      // Centre the 10 cm masonry on the 15 cm concrete, leaving 2.5 cm on
+      // each face; its end still terminates at the concrete contact.
+      const x = jamb ? (jamb.min.x + jamb.max.x) / 2 : side * 1.35;
       this.wall(`Passage ${side < 0 ? 'west' : 'east'} fired-clay partition`, x, jamb?.max.z ?? 3.62, x, 7.65, 0, 3, jamb ? [0] : []);
     }
     this.wall('Foyer west fired-clay partition', -1.35, 7.65, -1.35, 15.5);
@@ -347,9 +347,10 @@ export class MansionGroundWing extends THREE.Group {
     const eastJamb=this.passageJambs.find(box=>box.min.x>0);
     // End both clay and mortar at the outer jamb face, keeping the same wall
     // IDs and deriving fracture/picking/collision from the shortened wall.
-    infill('Original room rear west infill',-3.8,3.68,westJamb?.min.x??-1.35,3.68,0,3,westJamb?[1]:[]);
-    infill('Original room rear east infill',eastJamb?.max.x??1.35,3.68,3.8,3.68,0,3,eastJamb?[0]:[]);
-    infill('Original room rear lintel infill',-1.35,3.68,1.35,3.68,2.638,.362);
+    const rearZ=westJamb?(westJamb.min.z+westJamb.max.z)/2:eastJamb?(eastJamb.min.z+eastJamb.max.z)/2:3.68;
+    infill('Original room rear west infill',-3.8,rearZ,westJamb?.min.x??-1.35,rearZ,0,3,westJamb?[1]:[]);
+    infill('Original room rear east infill',eastJamb?.max.x??1.35,rearZ,3.8,rearZ,0,3,eastJamb?[0]:[]);
+    infill('Original room rear lintel infill',-1.35,rearZ,1.35,rearZ,2.638,.362);
     return names.map(name=>this.editableWalls.get(name)!);
   }
 

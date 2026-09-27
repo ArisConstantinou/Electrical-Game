@@ -373,6 +373,11 @@ export class Room extends THREE.Group {
         const jamb = new THREE.Mesh(new RoundedBoxGeometry(.26, GAME_CONFIG.room.height, .26, 2, .012), frameMaterial);
         jamb.name = 'Exposed concrete passage jamb';
         jamb.position.set(x, GAME_CONFIG.room.height / 2, rearZ + .07);
+        jamb.userData.constructionOriginalPosition = jamb.position.toArray();
+        // Rear infill and passage meet at right angles: 15 cm concrete in
+        // both wall normals, with the existing 2.7 m clear opening retained.
+        jamb.userData.constructionColumnAxes = ['x', 'z'];
+        jamb.position.x = Math.sign(x) * (openingHalfWidth + CONSTRUCTION_DEFAULTS.columnDepth / 2);
         jamb.castShadow = jamb.receiveShadow = true;
         rearGroup.add(jamb);
       }

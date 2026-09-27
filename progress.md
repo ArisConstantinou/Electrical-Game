@@ -1796,6 +1796,13 @@ Final startup acceptance also verifies a delayed real tree request holds READY, 
 
 - Combined candidate preserves mixer transport fixes through 0a431aa. Serial matched 1366x768 Chrome runs: simulation mean 2.062 -> 2.140 ms, P95 3.5 -> 4.0 ms; rendered FPS 208.6 -> 215.0, frame P95 8.4 -> 8.3 ms, maximum 12.7 -> 12.5 ms. Draw calls 224 -> 229, triangles +2000, geometries +2, textures unchanged at 78. These are short Windows PC measurements, not physical-phone proof. Full receipts: output/pipe-interactions/ and output/manual-pvc/after/.
 
+## 2026-09-27 · Centred column and masonry contacts
+- User correction: concrete thickness 15 cm, brick thickness 10 cm, concrete projects 2.5 cm on each face. At the right-angle passage supports both wall normals must be fitted; preserve the 2.7 m clear opening and authored widths of other parallel supports.
+- Protected base cb690c9 includes the approved pipe notes, loading/menu and first-turn performance fixes. Isolated codex/centered-column-joints reuses the existing task worktree; sole 5365 listener remains unchanged.
+- Before runtime regression fails: rear masonry projects 1.5/3.5 cm, passage masonry is flush against one face of a 26 cm jamb. Same-camera receipts are in output/centered-column-joints/before/.
+- Candidate fits both passage-jamb normals to 15 cm and derives perpendicular masonry centres from the concrete bounds. Four contacts now measure exactly 2.5 cm per face, retain the opening, and have zero solid overlap; exposed clay caps stay absent at closed contacts.
+- Build/typecheck, eight construction/editor cases (201 supports, 137 walls, save/reload and retained custom dimensions), building contract (143 wall targets, native chisel work and damage restoration), joint work and mobile viewport checks pass. The original game skill client reaches gameplay and leaves no owned browser processes. Candidate images and receipts: output/centered-column-joints/.
+
 
 ## 2026-09-27 · Loading recovery and main-menu Performance Test
 

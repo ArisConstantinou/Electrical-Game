@@ -29,7 +29,8 @@ try{
     const backing=new Box().setFromObject(wall.backing),overlap=backing.clone().intersect(jamb);
     const point=wall.group.localToWorld(g.renderer.camera.position.clone().set(wall.alongX?(side<0?wall.length/2:-wall.length/2):0,1.5,wall.alongX?0:-wall.length/2));
     const ends=wall.group.getObjectByName('Four-chamber exposed hollow clay block ends');
-    return {name,axis,side,jamb:{min:jamb.min.toArray(),max:jamb.max.toArray()},backing:{min:backing.min.toArray(),max:backing.max.toArray()},overlapM:overlap.isEmpty()?0:overlap.max[axis]-overlap.min[axis],contactM:point[axis],expectedContactM:wall.alongX?(side<0?jamb.min.x:jamb.max.x):jamb.max.z,cutEnds:ends.children.reduce((n,o)=>n+o.count,0),expectedCutEnds:wall.rows};
+    const normal=wall.alongX?'z':'x',brickDepth=.24*Math.abs(wall.group.scale[normal]),centre=wall.group.position[normal];
+    return {name,axis,side,jamb:{min:jamb.min.toArray(),max:jamb.max.toArray()},columnDepth:jamb.max[normal]-jamb.min[normal],brickDepth,frontProjection:jamb.max[normal]-(centre+brickDepth/2),backProjection:(centre-brickDepth/2)-jamb.min[normal],clearOpening:side<0?-jamb.max.x*2:jamb.min.x*2,backing:{min:backing.min.toArray(),max:backing.max.toArray()},overlapM:overlap.isEmpty()?0:overlap.max[axis]-overlap.min[axis],contactM:point[axis],expectedContactM:wall.alongX?(side<0?jamb.min.x:jamb.max.x):jamb.max.z,cutEnds:ends.children.reduce((n,o)=>n+o.count,0),expectedCutEnds:wall.rows};
    });
   });
  });
@@ -49,6 +50,12 @@ try{
  });
  for(const joint of report.joints){assert(joint.overlapM<.0001,`${joint.name}: ${joint.overlapM*1000} mm overlap with concrete`);assert(Math.abs(joint.contactM-joint.expectedContactM)<.0001,`${joint.name}: wall must terminate at concrete face`);assert.equal(joint.cutEnds,joint.expectedCutEnds,'Concrete contact must not display exposed hollow clay ends');}
  report.checks.push('both rear infills and passage partitions terminate at concrete with zero solid overlap');
+ for(const joint of report.joints){
+  const near=(value,expected,label)=>assert(Math.abs(value-expected)<.0001,`${joint.name}: ${label} ${value*100} cm must equal ${expected*100} cm`);
+  near(joint.columnDepth,.15,'column thickness');near(joint.brickDepth,.10,'brick thickness');
+  near(joint.frontProjection,.025,'front projection');near(joint.backProjection,.025,'back projection');near(joint.clearOpening,2.7,'clear passage opening');
+ }
+ report.checks.push('15cm concrete and centred 10cm masonry leave 2.5cm on both faces and retain 2.7m clear opening');
  report.work=await page.evaluate(()=>{
   const g=window.__wireTheHouse,wing=g.room.mansionWing,c=g.renderer.camera,Box=g.pvc.targetGuideBounds.constructor,results=[];
   for(const side of [-1,1]){

@@ -14,7 +14,7 @@ export function fitBrickDepth(object: THREE.Object3D, axis: 'x' | 'z', baseDepth
 }
 
 /** Preserve height and along-wall width; set the normal depth, including both
- * normals at a corner. Free-standing supports keep their authored width. */
+ * normals at a corner. Opening supports can explicitly request both normals. */
 export function fitColumns(root: THREE.Object3D, walls: readonly THREE.Group[] = []): void {
   const columns: THREE.Mesh[] = [];
   root.traverse(object => {
@@ -35,7 +35,7 @@ export function fitColumns(root: THREE.Object3D, walls: readonly THREE.Group[] =
       if (distance > .18 || Math.abs(centre[along] - wall.position[along]) > wall.userData.length / 2 + .18) continue;
       if (!matches.has(normal) || matches.get(normal)!.distance > distance) matches.set(normal, { distance, centre: wall.position[normal] });
     }
-    const axes = matches.size ? [...matches.keys()] : ['z' as const];
+    const axes: ('x'|'z')[] = mesh.userData.constructionColumnAxes ?? (matches.size ? [...matches.keys()] : ['z']);
     mesh.userData.constructionColumnAxes = axes;
     mesh.userData.constructionLegacySize = oldSize.toArray();
     mesh.userData.constructionLegacyPosition = mesh.userData.constructionOriginalPosition ?? centre.toArray();
