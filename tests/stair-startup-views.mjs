@@ -13,7 +13,7 @@ const session=await launchManagedBrowser(chromium,{channel:'chrome',headless:tru
 await runManagedClient(session,240000,async()=>{
  for(const version of (process.env.QA_STARTUP_ORDER??'before,after').split(',')){
   const context=await session.browser.newContext({viewport:{width:430,height:745},deviceScaleFactor:3,isMobile:true,hasTouch:true});
-  await routeBuildingDist(context,path.resolve(version==='before'?'output/mobile-stalls-baseline-dist':'dist'));await blockPointerLock(context);
+  await routeBuildingDist(context,path.resolve(version==='before'?(process.env.QA_STARTUP_BASE??'output/mobile-stalls-baseline-dist'):'dist'));await blockPointerLock(context);
   const page=await context.newPage();page.on('pageerror',e=>report.errors.push({version,message:e.message}));
   const began=Date.now();await page.goto('http://127.0.0.1:5365/Electrical-Game/');
   await page.waitForFunction(()=>window.__wireTheHouse?.isReadyForStart,null,{timeout:120000});const readyMs=Date.now()-began;

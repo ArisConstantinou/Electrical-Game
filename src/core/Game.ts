@@ -464,7 +464,7 @@ export class Game {
     }
     loadingIcons.forEach((icon, index) => { icon.style.animationDelay = `${iconOrder[index] * .85}s`; });
     const viewStages=mansionPreview&&this.room.mansionWing&&sceneParams.get('template')!=='blank'&&
-      !sceneParams.has('level')&&sceneParams.get('editor')!=='1'?11:0;
+      !sceneParams.has('level')&&sceneParams.get('editor')!=='1'?13:0;
     let preparedStages = 0;
     const markPrepared = (): void => {
       if (startButton.dataset.preparing === 'false') return;
@@ -511,8 +511,13 @@ export class Game {
             // stair-facing pipeline. Prepare the reported approaches before
             // READY, yielding and fencing each existing one-pixel draw.
             [6.5,1.65,11.6,0], [6.5,4.95,11.6,0], [6.5,11.55,11.6,-4.6],
+            // The work room's rear infill and equipment face the launch
+            // passage. A view from inside the room misses those pipelines.
+            // Prepare the first turn at its real position/pitch, after the
+            // other route views, so Start does not upload them during play.
+            [0,1.65,5.2,-Math.PI/2,-.08], [0,1.65,5.2,0,-.08],
           ]){
-            this.player.camera.position.set(view[0],view[1],view[2]);this.player.yaw=view[3];this.player.pitch=.15;
+            this.player.camera.position.set(view[0],view[1],view[2]);this.player.yaw=view[3];this.player.pitch=view[4]??.15;
             this.step(0,0,false);
             await this.renderer.prepareSiteFrame();markPrepared();
           }

@@ -1,5 +1,13 @@
 Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web game named WIRE THE HOUSE, based on real Cyprus residential first-fix practices, editable in Web Game Studio, playable on desktop/mobile, deployed to arisconstantinou/Electrical-Game via GitHub Pages, and ending at FIRST FIX COMPLETE without cable pulling.
 
+## 2026-09-27 · First-turn work-room preparation
+
+- User confirmed the PC slowdown occurs only on the first turn into the small room behind the initial view. Protected production base: d88cc85; reused clean managed worktree stairs-fps-20260927 on codex/start-turn-fps. Primary dirty checkout preserved. Sole strict-port 5365 listener remains owned by the integration checkout; candidate QA intercepts compiled files on the same origin.
+- Reproduced the cold shader/resource spike from the actual launch position, independently of the heavier steady room view. Added only two actual-position/pitch views at the end of the existing pre-READY preparation, retaining rendering quality and gameplay. Exact initial spawn/orientation/tool/zero water/READY are verified before and after.
+- Production WebGPU regression fails before (23 new shader builds) and passes after (zero). Two serial pairs reduce first-turn maximum intervals from 212/252 ms to 18/21 ms. WebGL also passes with a 20 ms maximum. READY varies with host load; one matched pair adds about 1.3 seconds of preparation. Steady WebGPU room cost remains about 602 draw calls / 3.61 million triangles and 70-80 FPS at 1718x1259 on Core Ultra 9 285K / RTX 5080.
+- Build/typecheck, restored-start-state/stair views and actual develop-web-game client checks pass. The client adapter maps its ArrowUp action to this game's native W key, blocks Pointer Lock, and closes only its owned Chrome. Portrait checks are PC emulation, not physical-phone proof. Evidence and regression commands: docs/START_TURN_PERFORMANCE.md; raw receipts are retained under output/start-turn-* and output/first-turn-production-*.
+- Final live/public acceptance and publication are coordinated with the approved loading/menu task, preserving its changes and the newer concrete-passage fix 6ce8401. No second port, dependency upgrade, graphics downgrade, paid API or helper agent. Latest account weekly usage checkpoint: 11% consumed; task-attributed usage and credits cost are unavailable.
+
 ## 2026-09-27 · Concrete mixer transport-wheel direction
 
 - Requested correction uses the user's actual game screenshot and orange mixer reference. Protected base: `889ef055c11dc90b1a0c0eb41e785e90d3429f51`; isolated worktree `stairs-fps-20260927`, branch `codex/mixer-wheel-axis`. Primary dirty checkout preserved; sole live integration listener remains on strict port 5365.
