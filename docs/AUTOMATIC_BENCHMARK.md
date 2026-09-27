@@ -2,7 +2,7 @@
 
 Approved scope: one START BENCHMARK gesture, loading and menu timings, automatic normal-physics traversal of the original mansion, no countdown, explicit minimum FPS and stalled-frame evidence, bounded screenshots and a local report with a final sharing action. The user separately authorized commit and push on 2026-09-27.
 
-Entry points: `/Electrical-Game/perf/` and `/Electrical-Game/review/performance/`. The short entry preserves renderer/level query parameters. Loading starts only after the gesture, before the game iframe navigates. The existing graphics configuration and apprentice selection are retained. A new benchmark reloads the iframe and starts cleanly. Saved/editor layouts do not pretend to complete the fixed mansion route.
+The only entry point is `/Electrical-Game/perf/`, which serves the benchmark directly without a JavaScript redirect. The retired `/Electrical-Game/review/performance/` directory has been removed. Renderer/level/version query parameters are preserved for the game iframe. Loading starts only after the gesture, before the game iframe navigates. The existing graphics configuration and apprentice selection are retained. A new benchmark reloads the iframe and starts cleanly while the parent stays at `/perf/`. Saved/editor layouts do not pretend to complete the fixed mansion route.
 
 The Vite development middleware maps these two public-directory routes to their actual index documents, preserving query strings and adding a missing trailing slash. Otherwise Vite's SPA fallback serves the game instead of the benchmark; the production build fixture alone could not reveal this local routing mismatch.
 

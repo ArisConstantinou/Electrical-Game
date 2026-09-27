@@ -13,8 +13,8 @@ await runManagedClient(session,180000,async()=>{
  const context=await session.browser.newContext({viewport:{width:430,height:745},isMobile:true,hasTouch:true});await blockPointerLock(context);await routeBuildingDist(context);
  // Test-local short route exercises the real phase transition without a
  // second long tour. It never establishes room coverage or performance gains.
- const source=await readFile('public/review/performance/tour.js','utf8'),needle='const route=createRoute(options);';assert(source.includes(needle));
- await context.route('**/review/performance/tour.js*',route=>route.fulfill({contentType:'text/javascript',body:source.replace(needle,"const route=[{x:0,z:2,floor:0,label:'Short test fixture',kind:'walk',phase:'performance',pass:1}];")}));
+ const source=await readFile('public/perf/tour.js','utf8'),needle='const route=createRoute(options);';assert(source.includes(needle));
+ await context.route('**/perf/tour.js*',route=>route.fulfill({contentType:'text/javascript',body:source.replace(needle,"const route=[{x:0,z:2,floor:0,label:'Short test fixture',kind:'walk',phase:'performance',pass:1}];")}));
  const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('http://127.0.0.1:5365/Electrical-Game/perf/?renderer=webgl');await page.locator('#begin').click();await page.waitForFunction(()=>window.performanceRecording.phase==='functional',null,{timeout:120000});
  const framesAtBoundary=await page.evaluate(()=>JSON.parse(window.render_game_to_text()).frames);await page.waitForFunction(()=>!window.performanceRecording.active,null,{timeout:30000});
  const report=await page.evaluate(()=>window.performanceRecording.report);await writeFile(path.join(out,'report.json'),JSON.stringify(report,null,2));await page.screenshot({path:path.join(out,'results.png')});

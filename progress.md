@@ -1,5 +1,13 @@
 Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web game named WIRE THE HOUSE, based on real Cyprus residential first-fix practices, editable in Web Game Studio, playable on desktop/mobile, deployed to arisconstantinou/Electrical-Game via GitHub Pages, and ending at FIRST FIX COMPLETE without cable pulling.
 
+## 2026-09-27 · Canonical benchmark address
+
+- User clarified the issue as the `/perf/` redirect and explicitly requested removal of `/review/performance/`. Scope is direct address delivery, not graphics lifecycle or benchmark behavior changes.
+- Protected base `704bddb`, isolated branch `codex/benchmark-diagnostics`; primary dirty checkout untouched, integration uses PID 42244 and sole port 5365.
+- Baseline address regression fails with actual `/Electrical-Game/review/performance/`; screenshot and navigation evidence saved in `output/benchmark-address-before/`.
+- Benchmark files move into `public/perf`, relative game URL becomes `../`, recorder version 4.0.1, and legacy directory is removed. Tests and documentation follow the new path. Candidate address/start-stop-new-run and saved-results restoration pass, along with all 414 route checkpoints, six separate functional checks, metrics/diagnostics/capture-budget tests and typecheck/build. The original address regression fails before and passes after. Actual skill gameplay client screenshot/state were inspected. Integration/publication receipts are recorded in `output/benchmark-address-release.json`; physical iPhone performance remains a user device test.
+
+
 ## 2026-09-27 · Benchmark diagnostics v4 (in progress)
 
 - User approved additional diagnostics, visible FPS/top navigation and inspection of every room. Isolated branch `codex/benchmark-diagnostics` starts at `beca275` in the existing managed worktree. The integration listener remains PID 42244 on sole port 5365; unrelated dirty primary files stay protected.

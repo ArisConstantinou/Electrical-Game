@@ -1,10 +1,10 @@
-import {number,stats,worstWindow} from './metrics.js?v=diagnostics-4';
-import {createTour} from './tour.js?v=diagnostics-4';
-import {RECORDER_VERSION,coverage,compareVisits,diagnose,supportFor,appendResourceSnapshot} from './diagnostics.js?v=diagnostics-4';
-import {observeMainThread} from './observers.js?v=diagnostics-4';
-import {createFunctionalChecks} from './functional.js?v=diagnostics-4';
+import {number,stats,worstWindow} from './metrics.js?v=diagnostics-4.0.1';
+import {createTour} from './tour.js?v=diagnostics-4.0.1';
+import {RECORDER_VERSION,coverage,compareVisits,diagnose,supportFor,appendResourceSnapshot} from './diagnostics.js?v=diagnostics-4.0.1';
+import {observeMainThread} from './observers.js?v=diagnostics-4.0.1';
+import {createFunctionalChecks} from './functional.js?v=diagnostics-4.0.1';
 const $=id=>document.getElementById(id),frame=$('game'),panel=$('panel');
-const gameURL=new URL('../../',location.href);
+const gameURL=new URL('../',location.href);
 for(const key of ['renderer','level','v'])if(new URL(location.href).searchParams.has(key))gameURL.searchParams.set(key,new URL(location.href).searchParams.get(key));
 let active=false,game=null,report=null,timer=null,startedAt=0,run=0,tour=null;
 let phase='loading',functional=null,functionalAt=0,functionalHiddenAt=0,resourceSamples=[],tasks=[],observer=null,support={},overhead={tourCpuMs:0,recorderCpuMs:0,monitorCpuMs:0},panelUpdatedAt=-Infinity;

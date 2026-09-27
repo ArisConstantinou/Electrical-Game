@@ -15,7 +15,7 @@ await runManagedClient(session,180000,async()=>{
  await page.waitForFunction(()=>window.__wireTheHouse?.isReadyForStart,null,{timeout:120000});
  await page.locator('#start-button').click();
  const result=await page.evaluate(async()=>{
-  const {createTour}=await import('./review/performance/tour.js');const {coverage}=await import('./review/performance/diagnostics.js');const g=window.__wireTheHouse;
+  const {createTour}=await import('./perf/tour.js');const {coverage}=await import('./perf/diagnostics.js');const g=window.__wireTheHouse;
   cancelAnimationFrame(g.animationFrame);g.animationFrame=null;g.input.resetTransientInput();
   const checkpoints=[];let completed=false,failure=null;
   const tour=createTour(g,c=>checkpoints.push(c),()=>completed=true,f=>failure=f);

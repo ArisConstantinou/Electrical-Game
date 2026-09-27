@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {stats,worstWindow} from '../public/review/performance/metrics.js';
+import {stats,worstWindow} from '../public/perf/metrics.js';
 const slow=stats([16,16,378,16]);
 assert.equal(slow.minInstantFPS,2.6,'378 ms must explicitly expose the approximately 3 FPS instant');
 assert.equal(slow.maxMs,378);

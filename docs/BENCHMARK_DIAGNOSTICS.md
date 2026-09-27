@@ -2,6 +2,8 @@
 
 The recorder now inspects every authored room in the default mansion, rather than a main room on each floor. It runs two measurement passes, followed by separate controlled functional checks. It preserves the game's renderer, resolution, geometry, materials, graphics settings, movement speed, collisions and stair profiles. No server, telemetry upload or paid service is added.
 
+The benchmark is served directly at `/Electrical-Game/perf/`. The previous `/review/performance/` directory and redirect are removed. The parent stays at `/perf/` when a new measurement reloads only its game iframe.
+
 ## Coverage
 
 - Ground: original work room, foyer, garage, courtyard and exterior.
@@ -16,7 +18,7 @@ Two passes take longer than the previous short tour. The interface shows phase a
 
 ## Diagnostics
 
-Report schema 4 includes recorder version `4.0.0`, room identifiers, pass, camera pose, frame intervals, P95/P99, counts over 50/100/250 ms and over the nominal 60 FPS budget. CPU game-step and CPU render-submission measurements are distinct; neither is an isolated GPU timing. The full raw intervals and rolling no-frame windows remain available.
+Report schema 4 includes recorder version `4.0.1`, room identifiers, pass, camera pose, frame intervals, P95/P99, counts over 50/100/250 ms and over the nominal 60 FPS budget. CPU game-step and CPU render-submission measurements are distinct; neither is an isolated GPU timing. The full raw intervals and rolling no-frame windows remain available.
 
 Findings distinguish observed exceptions, resource-load errors, graphics loss, no-frame stalls and route failures from correlated CPU-heavy, long-task or capture-overhead indications. Unexplained frame delays remain unresolved, rather than being assigned to the GPU. Relevant nearby renderer lifecycle telemetry, resource timing and thumbnails accompany slow-frame evidence. Findings are bounded, while raw sample data retains the rest.
 
@@ -54,6 +56,7 @@ Reports and screenshots remain local to the device until the user chooses share/
 - `tests/benchmark-faults.mjs`: real 180 ms CPU blocking, runtime exception, failed image request, incomplete route, and supported/unsupported measurement paths.
 - `tests/benchmark-controls.mjs`: existing stop/loading, no-frame-tail, delayed restart, share/cancel/download and capture-budget regressions.
 - `tests/benchmark-capture-total.mjs`: runs the actual production capture function with a controlled CPU clock. The previous per-portion rule misses 20+20 ms; the new aggregate rule stops further images. Real browser readback made the attempted sub-budget UI fixture unreliable in two runs, so it is retained as diagnostic evidence, not a passing test. Real browser capture stopping remains covered by `benchmark-controls.mjs`.
+- `tests/benchmark-address.mjs`: direct `/perf/` entry and start/stop/new-run stay on the same parent page, game-root/query preservation, and absence of requests to the removed directory.
 - `tests/benchmark-public-smoke.mjs`: actual served prompt, version, HUD visibility, route manifest, bounded report and pause while reviewing, without candidate interception.
 - `tests/benchmark-full-tour.mjs`: a complete real-time two-pass run with room coverage, measured per-room samples and all functional checks; no time scaling or generated FPS data. `QA_LIVE=1` skips candidate interception for final listener verification; `QA_BENCH_URL` selects the published benchmark.
 

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import {coverage,compareVisits,diagnose,supportFor,appendResourceSnapshot} from '../public/review/performance/diagnostics.js';
-import {inspectionManifest} from '../public/review/performance/tour.js';
+import {coverage,compareVisits,diagnose,supportFor,appendResourceSnapshot} from '../public/perf/diagnostics.js';
+import {inspectionManifest} from '../public/perf/tour.js';
 const spaces=inspectionManifest();assert.equal(spaces.filter(s=>s.room).length,24);assert.equal(spaces.length,30);
 assert.deepEqual(spaces.filter(s=>s.room).map(s=>s.roomId).sort(),['G-work','G-foyer','G-garage','L1-west','L1-main','L1-front','L1-east-south','L1-east-north','L2-west','L2-main','L2-front','L2-east-south','L3-west','L3-main','L3-front','L4-west','L4-main','L4-front','B1-corridor','B1-garage','B1-service','B2-corridor','B2-garage','B2-service'].sort(),'Independent room catalogue must match the authored building');
 assert(spaces.some(s=>s.roomId==='L1-east-north'));assert(spaces.some(s=>s.roomId==='L4-west'));assert(spaces.some(s=>s.roomId==='B2-service'));
