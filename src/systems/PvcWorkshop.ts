@@ -5,7 +5,7 @@ import type { InstallationPoint } from '../electrical/InstallationPoint';
 import { buildToolModel } from '../player/ToolModels';
 import { workerHand,workerArm,poseWorkerArm,workerGripTarget,hideLegacyWorkerArm,type WorkerArm,type WorkerGripTarget } from '../player/WorkerArm';
 import { PvcBend,PVC,type PipeRecipe } from './PvcBend';
-import { PvcStock,PvcTube,part,pvcMaterial } from './PvcModels';
+import { PvcStock,PvcTube,part,pvcMaterial,pvcStockMaterial } from './PvcModels';
 import { springLeadPoint } from './PvcLead';
 import {DEFAULT_PVC_PRESETS,PVC_PRESET_KEY,readPvcPresets,type PvcPreset} from './PvcPresets';
 import {buildHeldRebar,buildPvcDrill12,buildRebarHug,buildRebarPliers} from './PvcSecuringModels';
@@ -489,7 +489,7 @@ export class PvcWorkshop {
       this.insertion=1-Math.min(1,this.elapsed/1.5);
       if(this.insertion===0){
         const count=Math.min(this.rawCount,Math.max(1,this.quantity));
-        for(let i=0;i<count;i++){const mesh=new PvcTube();mesh.update(this.bend);const pipe:StockPipe={recipe:this.bend.recipe(),mesh,cutFrom:0,bundle:this.activeBundle,originBundle:this.activeBundle};this.addPreparedHighlight(pipe);this.prepared.push(pipe);this.preparedRoot.add(mesh);}
+        for(let i=0;i<count;i++){const mesh=new PvcTube(pvcStockMaterial);mesh.update(this.bend);const pipe:StockPipe={recipe:this.bend.recipe(),mesh,cutFrom:0,bundle:this.activeBundle,originBundle:this.activeBundle};this.addPreparedHighlight(pipe);this.prepared.push(pipe);this.preparedRoot.add(mesh);}
         this.rawCount-=count;
         // Production completes in the player's hand. One bent pipe continues
         // directly to installation; only the remainder is laid on the stack.
@@ -498,7 +498,7 @@ export class PvcWorkshop {
         this.arrangePrepared();this.focused=false;this.transition(this.carried?'carrying':'batch');
       }
     }else if(this.phase==='cutting'&&this.elapsed>=.45){
-      const offcut=new PvcTube();offcut.update(this.bend,this.cutFrom,this.cutS);const p=this.target!.boxGroup.getWorldPosition(v());
+      const offcut=new PvcTube(pvcStockMaterial);offcut.update(this.bend,this.cutFrom,this.cutS);const p=this.target!.boxGroup.getWorldPosition(v());
       offcut.position.set(p.x+.16+this.offcuts.length*.025,.015,p.z+.27);offcut.rotation.y=.3;this.game.renderer.scene.add(offcut);this.offcuts.push(offcut);
       this.cutFrom=this.cutS;this.cutErrorMm=this.fitError();this.transition('cut');
       if(this.carried){this.carried.cutFrom=this.cutFrom;this.carried.mesh.update(this.bend,this.cutFrom);}
