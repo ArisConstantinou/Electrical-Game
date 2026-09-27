@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { wallWorkDirection, type WallWorkPlane } from './WallWorkPlane';
 import { batchStaticVisuals } from '../world/StaticVisualBatch';
 import { buildToolModel } from './ToolModels';
 import { buildForgeHammerModel } from './ForgeHammerModel';
@@ -429,11 +430,11 @@ export class FPSRig extends THREE.Group {
 
   /** Seat the same physical hammer model on an authored masonry wall outside
    * the original mission room. No original-wall coordinates are involved. */
-  contactMasonry(camera: THREE.Camera, point: THREE.Vector3): boolean {
+  contactMasonry(camera: THREE.Camera, point: THREE.Vector3, plane?: WallWorkPlane, solid=true): boolean {
     this.selectedTool = 'hammer';
     const hammer = this.tools.get('hammer')!;
     const eye = camera.getWorldPosition(new THREE.Vector3());
-    if (eye.distanceTo(point) > 1.25) {
+    if (eye.distanceTo(point) > (plane?2.4:1.25)) {
       this.restHammer(camera);
       this.contactStatus = 'out-of-reach';
       this.reachReason = 'Move closer to the masonry.';
@@ -444,7 +445,7 @@ export class FPSRig extends THREE.Group {
     // The full-length tool cannot seat its motor between the eye and a wall
     // this close. Do not report a ready strike while the bit is visibly off
     // the aim after the finite-arm constraint moves the whole hammer aside.
-    if (forwardDistance < .68) {
+    if (!plane && forwardDistance < .68) {
       this.restHammer(camera);
       this.contactStatus = 'too-close';
       this.reachReason = 'Too close. Step back slightly to give the hammer room.';
@@ -452,13 +453,29 @@ export class FPSRig extends THREE.Group {
     }
     // Seat the 400 mm exposed bit on the actual impact point. The remaining
     // grip-to-tip span includes the motor, not additional chisel length.
-    const visualPoint = point;
+    const visualPoint = point.clone();
+    if(plane){
+      const view=camera.getWorldDirection(new THREE.Vector3());
+      const distance=plane.point.clone().sub(eye).dot(plane.normal)/view.dot(plane.normal);
+      const entry=eye.clone().addScaledVector(view,distance),desired=point.clone().sub(entry);
+      if(!solid&&this.presentedFeedOffset)desired.copy(this.presentedFeedOffset);
+      if(this.workPositionLocked&&this.presentedFeedOffset){
+        const advance=desired.clone().sub(this.presentedFeedOffset).clampLength(0,this.contactFeedBudgetM);
+        const tangent=new THREE.Vector3(0,1,0).cross(plane.normal).normalize();
+        const lateral=advance.dot(tangent),limited=THREE.MathUtils.clamp(lateral,-this.lateralFeedBudgetM,this.lateralFeedBudgetM);
+        advance.addScaledVector(tangent,limited-lateral);
+        this.presentedFeedOffset.add(advance);
+        this.contactFeedBudgetM=Math.max(0,this.contactFeedBudgetM-advance.length());
+        this.lateralFeedBudgetM=Math.max(0,this.lateralFeedBudgetM-Math.abs(limited));
+      }else this.presentedFeedOffset=desired;
+      visualPoint.copy(entry).add(this.presentedFeedOffset);
+    }
     const portrait=innerWidth<innerHeight;
     const lateral=portrait?.10:.22;
     const motorGoal = eye.clone().addScaledVector(forward, .45)
       .addScaledVector(right, THREE.MathUtils.lerp(lateral,-lateral,this.hammerGripBlend));
     motorGoal.y -= portrait?.25:.14;
-    const towardTip = visualPoint.clone().sub(motorGoal).normalize();
+    const towardTip = plane?wallWorkDirection(plane.normal,this.workStanceSide*75,this.workStanceTiltDegrees??15):visualPoint.clone().sub(motorGoal).normalize();
     // A shortest-arc rotation from local -Z can roll the housing upside down
     // on a wall behind the starting orientation. Keep the barrel's up axis
     // aligned to gravity on every wall, just as on the original work wall.
@@ -467,7 +484,7 @@ export class FPSRig extends THREE.Group {
     const barrelUp=barrelBack.clone().cross(barrelRight).normalize();
     const orientation=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(barrelRight,barrelUp,barrelBack));
     hammer.quaternion.copy(this.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(orientation));
-    hammer.position.copy(this.worldToLocal(visualPoint)).sub(this.tipAnchor.clone().applyQuaternion(hammer.quaternion));
+    hammer.position.copy(this.worldToLocal(visualPoint.clone())).sub(this.tipAnchor.clone().applyQuaternion(hammer.quaternion));
     hammer.updateWorldMatrix(true, true);
     // Feed the braced shoulders as on the original wall. Translating the
     // whole tool to fit the arms moved the visible blade away from its hit.
@@ -477,15 +494,17 @@ export class FPSRig extends THREE.Group {
     this.chiselTipWorld.copy(hammer.localToWorld(this.tipAnchor.clone()));
     // Judge both finite grip reaches with the blade still anchored.
     const reachable = this.gripsReachable(camera, hammer);
-    if (!reachable) {
+    if (!reachable && !this.workPositionLocked) {
       this.restHammer(camera);
       this.chiselTipWorld.copy(hammer.localToWorld(this.tipAnchor.clone()));
     }
     this.reachable = reachable;
     this.chiselInAir = !reachable;
-    this.contactStatus = reachable ? 'ready' : 'out-of-reach';
+    const feeding=solid&&visualPoint.distanceTo(point)>.003;
+    const regripping=this.hammerGripBlend>0&&this.hammerGripBlend<1||Math.abs(this.sideHandleTarget-this.sideHandleAngle)>.02;
+    this.contactStatus = !reachable?'out-of-reach':feeding?'feeding':regripping?'regripping':'ready';
     this.reachReason = reachable ? 'Chisel in contact. Hold to hammer.' : 'Move closer to the masonry.';
-    return reachable;
+    return reachable&&!feeding&&!regripping;
   }
 
   constructor() {

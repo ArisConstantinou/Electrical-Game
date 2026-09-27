@@ -3,6 +3,7 @@ import type { Input } from '../core/Input';
 import { GAME_CONFIG } from '../data/gameConfig';
 import { resolveEquipmentCollisions, type PlayerObstacle } from './EquipmentCollision';
 import { JumpMotion } from './JumpMotion';
+import { wallWorkTangent, type WallWorkPlane } from './WallWorkPlane';
 
 export type MobileAimProfile = 'precise' | 'normal' | 'fast';
 
@@ -10,6 +11,8 @@ export class PlayerController {
   lookHandler:((dx:number,dy:number)=>boolean)|null=null;
   wallWorkEnabled = false;
   wallWorkDistance = .76;
+  wallWorkSnap = false;
+  wallWorkPlane: WallWorkPlane | null = null;
   /** Feed along the wall while the hammer is held; null retains free walking. */
   wallToolTravelSpeedMps: number | null = null;
   readonly workPosition = { locked: false, distanceM: 0, targetDistanceM: .76, released: false };
@@ -18,6 +21,7 @@ export class PlayerController {
   handWorkTargetY:number|null=null;
   private handWorkEyeHeight:number|null=null;
   private wasHandWork=false;
+  private wasHammerWork=false;
   get eyeHeight(): number { return this.crouched || this.input.pressed('ControlLeft') || this.input.pressed('ControlRight') ? this.lowPickup ? .68 : .95 : this.handWorkEyeHeight ?? GAME_CONFIG.player.eyeHeight; }
   yaw = 0;
   pitch = -0.62;
@@ -70,7 +74,14 @@ export class PlayerController {
     const jumpRequested=this.input.jumpRequested;this.input.jumpRequested=false;
     const enteringHandWork=this.handWorkTargetY!==null&&!this.wasHandWork;
     this.wasHandWork=this.handWorkTargetY!==null;
-    const wallDistance = Math.abs(this.camera.position.z - GAME_CONFIG.room.wallFrontZ);
+    const enteringHammerWork=this.wallWorkSnap&&!this.wasHammerWork;
+    const leavingHammerWork=!this.wallWorkSnap&&this.wasHammerWork;
+    this.wasHammerWork=this.wallWorkSnap;
+    const plane=this.wallWorkPlane;
+    const normal=plane?.normal??new THREE.Vector3(0,0,1);
+    const wallPoint=plane?.point??new THREE.Vector3(0,0,GAME_CONFIG.room.wallFrontZ);
+    const tangent=wallWorkTangent(normal);
+    const wallDistance = Math.abs(this.camera.position.clone().sub(wallPoint).dot(normal));
     const canBrace=this.grounded&&!jumpRequested&&this.jumpPreparationLeft<=0;
     const handWork=canBrace&&this.handWorkTargetY!==null&&this.wallWorkEnabled&&Math.cos(this.yaw)>.65&&wallDistance<.94&&!this.workPosition.released;
     // Bend knees/hips for low hand work. The body never rises above standing
@@ -115,28 +126,31 @@ export class PlayerController {
     this.camera.position.addScaledVector(this.velocity, dt);
     const work=this.workPosition;
     const wasLocked=work.locked;
-    const wallDistanceNow=this.camera.position.z-GAME_CONFIG.room.wallFrontZ;
-    const facingWall=Math.cos(this.yaw)>.2;
+    const wallDistanceNow=this.camera.position.clone().sub(wallPoint).dot(normal);
+    const facingWall=forward.dot(normal)<-.2;
     if(!this.wallWorkEnabled || !facingWall || !canBrace){work.locked=false;}
     // Backward intent explicitly releases the stance. Do not immediately snap
     // back while the player is standing inside the entry zone after release.
     if(work.locked && y<-.12){work.locked=false;work.released=true;}
-    if(wallDistanceNow>1.15 || y>.2)work.released=false;
-    if(canBrace&&this.wallWorkEnabled && facingWall && !work.released && !work.locked && y>=-.12 && wallDistanceNow<(this.handWorkTargetY===null?1.10:.94) && wallDistanceNow>.30)work.locked=true;
+    if(wallDistanceNow>Math.max(1.15,this.wallWorkDistance+.15) || y>.2)work.released=false;
+    const entryDistance=this.wallWorkSnap?Math.min(1.45,Math.max(1.10,this.wallWorkDistance+.15)):this.handWorkTargetY===null?1.10:.94;
+    if(canBrace&&this.wallWorkEnabled && facingWall && !work.released && !work.locked && y>=-.12 && wallDistanceNow<entryDistance && wallDistanceNow>.20)work.locked=true;
     // Looking or changing a tool pose must not pull the camera to a newly
     // calculated standoff. Take up a new distance on approach/forward intent;
     // once braced, keep that distance until the player deliberately moves.
     // A hammer braces the body farther away than a hand-held box. Switching
     // to hand work takes up that shorter reach once, while later aim changes
     // retain the chosen stance and the same wall point stays under the reticle.
-    if(!work.locked||y>.12||enteringHandWork)work.targetDistanceM=this.wallWorkDistance;
-    else if(!wasLocked)work.targetDistanceM=this.handWorkTargetY!==null?this.wallWorkDistance:wallDistanceNow;
+    if(!work.locked||y>.12||enteringHandWork||enteringHammerWork||leavingHammerWork&&this.wallWorkEnabled)work.targetDistanceM=this.wallWorkDistance;
+    else if(!wasLocked)work.targetDistanceM=this.wallWorkSnap||this.handWorkTargetY!==null?this.wallWorkDistance:wallDistanceNow;
     if(work.locked){
-      if(this.wallToolTravelSpeedMps!==null && y>=0){
+      if((this.wallToolTravelSpeedMps!==null||this.wallWorkSnap) && y>=0){
         // A/D follow the wall tangent at the cutting feed rate, independent of
         // view yaw. Free walking would jump past several blade widths per hit.
-        this.camera.position.x=previousX+x*this.wallToolTravelSpeedMps*dt;
-        this.velocity.set(x*this.wallToolTravelSpeedMps,0,0);
+        const travel=x*(this.wallToolTravelSpeedMps??speed);
+        this.camera.position.x=previousX+tangent.x*travel*dt;
+        this.camera.position.z=previousZ+tangent.z*travel*dt;
+        this.velocity.copy(tangent).multiplyScalar(travel);
       }
       // Bracing absorbs forward input even when looking diagonally along the
       // wall. Only an explicit strafe moves the worker sideways in this stance.
@@ -144,13 +158,14 @@ export class PlayerController {
         this.camera.position.x-=forward.x*y*speed*dt;
         this.velocity.copy(right).multiplyScalar(x*speed);
       }
-      const target=GAME_CONFIG.room.wallFrontZ+work.targetDistanceM;
-      this.camera.position.z=THREE.MathUtils.damp(previousZ,target,18,dt);
-      if(Math.abs(this.camera.position.z-target)<.002)this.camera.position.z=target;
+      const current=this.camera.position.clone().sub(wallPoint).dot(normal);
+      let seated=THREE.MathUtils.damp(current,work.targetDistanceM,18,dt);
+      if(Math.abs(seated-work.targetDistanceM)<.002)seated=work.targetDistanceM;
+      this.camera.position.addScaledVector(normal,seated-current);
       // Bracing may move the body to the physical tool distance, but it must
       // never overwrite the yaw/pitch supplied by mouse or touch input.
       // Forward force is absorbed by the stance; sideways walking remains free.
-      if(y>=0)this.velocity.z=0;
+      if(y>=0)this.velocity.addScaledVector(normal,-this.velocity.dot(normal));
     }
     this.collisionContacts=resolveEquipmentCollisions(this.camera.position,GAME_CONFIG.player.radius,this.obstacleProvider?.()??[]);
     if(this.collisionContacts.length&&dt>0){
@@ -185,7 +200,7 @@ export class PlayerController {
       this.velocity.x = this.velocity.z = 0;
       nextFloor = oldFloor;
     }
-    work.distanceM=this.camera.position.z-GAME_CONFIG.room.wallFrontZ;
+    work.distanceM=this.camera.position.clone().sub(wallPoint).dot(normal);
     this.supportFloorY=nextFloor;
     if(jumpRequested&&this.grounded&&this.jumpPreparationLeft<=0)this.jumpPreparationLeft=.075;
     const preparing=this.jumpPreparationLeft>0;

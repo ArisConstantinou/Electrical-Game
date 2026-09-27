@@ -3,6 +3,7 @@ import { Renderer } from './Renderer';
 import { Input } from './Input';
 import { AssetManager } from './AssetManager';
 import { HammerWorkStance } from '../player/HammerWorkStance';
+import { wallWorkDirection } from '../player/WallWorkPlane';
 import { PlayerController } from '../player/PlayerController';
 import { WorkerBody } from '../player/WorkerBody';
 import { HoseSupplyLine } from '../player/HoseSupplyLine';
@@ -147,56 +148,32 @@ export class Game {
   private lastHammerMasonryAim: MasonryAim | null = null;
   private failedHammerMasonry: { aim: MasonryAim; attempts: number } | null = null;
 
-  /** Keep a held chisel on surviving clay at the edge of its own fresh hole. */
+  /** Keep the shaft on one working line instead of hunting neighbouring edges. */
   private hammerMasonryAim(): { aim: MasonryAim; direction?: THREE.Vector3 } | null {
-    const wing = this.room.mansionWing;
-    if (!wing) return null;
-    const camera = this.renderer.camera;
-    const failed = this.failedHammerMasonry;
-    // The object directly under the crosshair always owns the next strike.
-    const direct = wing.aimMasonry(camera);
-    if (direct) {
-      this.lastHammerMasonryAim = direct;
-      if (failed && failed.attempts >= 2 && failed.aim.wall === direct.wall && failed.aim.index === direct.index) return null;
-      return { aim: direct };
-    }
-    const previous = this.lastHammerMasonryAim;
-    if (!this.input.actionHeld || !previous) return null;
-    if (!previous.wall.group.visible || !previous.wall.group.parent) {
-      this.lastHammerMasonryAim = null;
-      return null;
-    }
-    const eye = camera.getWorldPosition(new THREE.Vector3());
-    const view = camera.getWorldDirection(new THREE.Vector3());
-    const toPrevious = previous.point.clone().sub(eye);
-    const distance = toPrevious.length();
-    if (distance > 1.25 || distance < .15 || view.dot(toPrevious.divideScalar(distance)) < .97) {
-      this.lastHammerMasonryAim = null;
-      return null;
-    }
-    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
-    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
-    // These rays are smaller than one brick at normal working distance. No
-    // impact is invented: each candidate must hit the surviving volume.
-    for (const radius of [.025, .05, .085, .12]) {
-      let best: { aim: MasonryAim; direction: THREE.Vector3 } | null = null;
-      let bestDistance = Infinity;
-      for (const [x, y] of [[0, -1], [-1, 0], [1, 0], [0, 1], [-.707, -.707], [.707, -.707], [-.707, .707], [.707, .707]]) {
-        const direction = view.clone().addScaledVector(right, x * radius).addScaledVector(up, y * radius).normalize();
-        const aim = previous.wall.aim(camera, 1.25, eye, direction);
-        if (!aim) continue;
-        // A ray can still report a thin shell after its impact has become
-        // empty. Do not keep choosing that same dead spot on every strike.
-        if (failed && failed.attempts >= 2 && failed.aim.wall === aim.wall && failed.aim.index === aim.index) continue;
-        const continuity = aim.point.distanceToSquared(previous.point);
-        if (continuity < bestDistance) { best = { aim, direction }; bestDistance = continuity; }
-      }
-      if (best) {
-        this.lastHammerMasonryAim = best.aim;
-        return best;
-      }
-    }
-    return null;
+    const wing=this.room.mansionWing;
+    if(!wing)return null;
+    const camera=this.renderer.camera,eye=camera.getWorldPosition(new THREE.Vector3()),view=camera.getWorldDirection(new THREE.Vector3());
+    const direct=wing.aimMasonry(camera),previous=this.lastHammerMasonryAim;
+    let wall=direct?.wall;
+    // Removing a brick can expose a wall behind it. Keep the braced facade
+    // while holding the same aim, rather than snapping the body through a hole.
+    if(previous&&this.input.actionHeld&&this.player.workPosition.locked&&view.dot(previous.point.clone().sub(eye).normalize())>.995)wall=previous.wall;
+    wall??=previous?.wall;
+    if(!wall)return null;
+    if(!wall.group.visible||!wall.group.parent){this.lastHammerMasonryAim=null;return null;}
+    const plane=wall.workPlane(eye),facing=view.dot(plane.normal);
+    const standoff=eye.clone().sub(plane.point).dot(plane.normal);
+    if(facing>=-.2||standoff<0||standoff>1.45){this.lastHammerMasonryAim=null;return null;}
+    const entry=eye.clone().addScaledVector(view,-standoff/facing);
+    const direction=wallWorkDirection(plane.normal,this.hammerWorkStance.sideDegrees,this.hammerWorkStance.actualTiltDegrees);
+    const origin=entry.clone().addScaledVector(direction,-.02);
+    const reach=Math.min(.65,.24/Math.max(.04,-direction.dot(plane.normal)));
+    const aim=wall.aim(camera,reach,origin,direction,.001);
+    if(!aim)return null;
+    this.lastHammerMasonryAim=aim;
+    const failed=this.failedHammerMasonry;
+    if(failed&&failed.attempts>=2&&failed.aim.wall===aim.wall&&failed.aim.index===aim.index&&failed.aim.point.distanceToSquared(aim.point)<.000004)return null;
+    return {aim,direction};
   }
 
   constructor(root: HTMLElement) {
@@ -632,20 +609,38 @@ export class Game {
       &&Math.hypot(point.position.x-this.renderer.camera.position.x,point.position.z-this.renderer.camera.position.z)<1.25);
     this.player.lowPickup=Boolean(nearbyFloorBox&&(this.player.lowPickup||floorBoxAimed));
     this.player.wallWorkEnabled=(this.selectedTool==='hammer'||handWork)&&!leveling&&!blockingWork&&!this.apprentice.ownsInput;
+    const hammerSelected=this.selectedTool==='hammer';
+    this.renderer.camera.rotation.set(this.player.pitch,this.player.yaw,0);
+    const masonryWork=hammerSelected?this.hammerMasonryAim():null;
+    const masonryWall=masonryWork?.aim.wall??(hammerSelected?this.lastHammerMasonryAim?.wall:null);
+    const plane=masonryWall?.workPlane(this.renderer.camera.position)??null;
+    const oldPlane=this.player.wallWorkPlane;
+    if(Boolean(oldPlane)!==Boolean(plane)||oldPlane&&plane&&(oldPlane.normal.dot(plane.normal)<.999||Math.abs(oldPlane.point.clone().sub(plane.point).dot(plane.normal))>.01)){
+      this.player.workPosition.locked=false;
+    }
+    this.player.wallWorkPlane=plane;
+    if(hammerSelected&&!plane){
+      const ray=this.renderer.camera.getWorldDirection(new THREE.Vector3());
+      const distance=(this.room.brickWall.volume.frontZ-this.renderer.camera.position.z)/ray.z;
+      const focus=this.renderer.camera.position.clone().addScaledVector(ray,distance);
+      this.player.wallWorkEnabled&&=ray.z<-.2&&distance>0&&Math.abs(focus.x)<=2.54&&focus.y>=0&&focus.y<=3;
+    }
+    if(this.hammerAutoSide&&this.started&&!this.apprentice.ownsInput&&!leveling&&hammerSelected){
+      this.room.brickWall.chiselSideDegrees=this.hammerWorkStance.resolveSide(this.renderer.camera,this.room.brickWall.chiselSideDegrees,plane);
+      this.fpsRig.hammerHandedness=this.room.brickWall.chiselSideDegrees>0?'left':'right';
+    }
+    this.hammerWorkStance.update(this.renderer.camera,dt,this.room.brickWall.chiselSideDegrees,this.started&&!this.apprentice.ownsInput&&!leveling&&!blockingWork&&this.player.grounded,this.room.brickWall.chiselTiltDegrees,this.selectedTool,plane);
+    this.player.wallWorkSnap=hammerSelected;
     const cuttingStep=(this.room.brickWall.chiselType==='flat'?this.room.brickWall.chiselWidthM:.01)*.36;
     this.player.wallToolTravelSpeedMps=this.selectedTool==='hammer'&&this.input.actionHeld
       ?Math.min(.6,cuttingStep*this.hammerSpeed/.24):null;
-    const workTilt=THREE.MathUtils.degToRad(this.hammerWorkStance.actualTiltDegrees);
-    const workSide=THREE.MathUtils.degToRad(this.hammerWorkStance.sideDegrees);
-    const wallAxisZ=Math.cos(workTilt)*Math.cos(workSide);
-    // Use the angle the hands actually hold, including an upward side stroke's
-    // shorter reach. Requested tilt can differ substantially near floor/ceiling.
-    const upwardSideFeed=.20*Math.max(0,-Math.sin(workTilt))*Math.abs(Math.sin(workSide));
-    // Brace using the real grip-to-edge length. The previous fixed 55 cm
-    // span placed the FORGE rear grip almost against the eye. This distance
-    // is taken up only on forward intent; looking/striking never moves eyes.
+    // Reserve rear-grip clearance along the sightline, then project that
+    // distance onto the facade. Multiplying two wall cosines underestimates
+    // clearance when the worker looks and chisels along the same wall side.
     const hammerSpan=this.fpsRig.hammerGripToTipLengthM;
-    this.player.wallWorkDistance=handWork?.46:Math.max(.46,(.32+hammerSpan*Math.abs(wallAxisZ)-upwardSideFeed)*Math.max(.2,Math.cos(this.player.yaw)));
+    const normal=plane?.normal??new THREE.Vector3(0,0,1),view=this.renderer.camera.getWorldDirection(new THREE.Vector3());
+    const axis=wallWorkDirection(normal,this.hammerWorkStance.targetSideDegrees,this.hammerWorkStance.targetTiltDegrees);
+    this.player.wallWorkDistance=handWork?.46:Math.max(.46,(.32+hammerSpan*Math.max(.2,axis.dot(view)))*Math.max(.2,-view.dot(normal)));
     // Looking around while building a gang must rotate only the view. Do not
     // auto-crouch or retarget the camera from the wall point under the cursor.
     this.player.handWorkTargetY=handWork&&this.selectedTool!=='fitting'?this.boxWorkAim()?.y??null:null;
@@ -660,16 +655,12 @@ export class Game {
        this.player.camera.position.z<16 &&
        (this.player.velocity.lengthSq()>.001 || Math.hypot(this.player.camera.position.x-13.35,this.player.camera.position.z-11.35)<4))
       this.room.invalidateSunShadow();
-    this.fpsRig.beginFrame(dt, this.selectedTool==='hammer' && this.input.actionHeld && Math.abs(this.player.velocity.x)>1e-6
-      ? this.player.velocity.x*Math.min(dt,.05) : null,this.selectedTool==='hammer'&&(this.input.actionHeld||this.input.actionRequested));
+    this.fpsRig.beginFrame(dt, hammerSelected&&this.input.actionHeld&&this.player.velocity.lengthSq()>1e-12
+      ?this.player.velocity.length()*Math.min(dt,.05):null,hammerSelected&&(this.input.actionHeld||this.input.actionRequested));
     this.renderer.camera.rotation.set(this.player.pitch, this.player.yaw, 0);
     const sceneActions=this.pendingSceneActions.splice(0);
     for(const action of sceneActions)action();
     if(sceneActions.length){this.room.invalidateSunShadow();this.renderer.invalidateMaterialPreparation();}
-    if(this.hammerAutoSide&&this.started&&!this.apprentice.ownsInput&&!leveling&&this.selectedTool==='hammer'){
-      this.room.brickWall.chiselSideDegrees=this.hammerWorkStance.resolveSide(this.renderer.camera,this.room.brickWall.chiselSideDegrees);
-    }
-    this.hammerWorkStance.update(this.renderer.camera, dt, this.room.brickWall.chiselSideDegrees, this.started && !this.apprentice.ownsInput && !leveling && !blockingWork && !jumping,this.room.brickWall.chiselTiltDegrees,this.selectedTool);
     this.fpsRig.workStanceSide = this.hammerWorkStance.sideDegrees / 75;
     this.fpsRig.workHeadLeanM = this.hammerWorkStance.headLeanM;
     // Wall angle changes the stroke direction, not the user's dominant hand.
@@ -766,11 +757,11 @@ export class Game {
     if (this.selectedTool === 'hammer'&&jumping)this.fpsRig.carryHammer(this.renderer.camera);
     else if (this.selectedTool === 'hammer') {
       const masonry = this.hammerMasonryAim();
-      if (masonry) this.fpsRig.contactMasonry(this.renderer.camera, masonry.aim.point);
-      else if (this.input.actionHeld && this.lastHammerMasonryAim) {
+      if (masonry) this.fpsRig.contactMasonry(this.renderer.camera, masonry.aim.point,masonry.aim.wall.workPlane(this.renderer.camera.position));
+      else if (this.player.wallWorkPlane && this.lastHammerMasonryAim) {
         // A completely cleared opening is air. Hold the tool by its previous
         // work point instead of snapping it into the unrelated room-wall pose.
-        this.fpsRig.contactMasonry(this.renderer.camera, this.lastHammerMasonryAim.point);
+        this.fpsRig.contactMasonry(this.renderer.camera, this.lastHammerMasonryAim.point,this.lastHammerMasonryAim.wall.workPlane(this.renderer.camera.position),false);
         this.fpsRig.reachable = false;
         this.fpsRig.chiselInAir = true;
         this.fpsRig.contactStatus = 'no-solid';
@@ -917,11 +908,13 @@ export class Game {
     if (this.selectedTool === 'hammer') {
       const masonry = this.hammerMasonryAim();
       if (masonry) {
-        const inReach = this.fpsRig.contactMasonry(this.renderer.camera, masonry.aim.point);
-        const struck = inReach && masonry.aim.wall.strikeAt(masonry.aim.index, this.renderer.camera, this.hammerMode, masonry.direction);
+        const inReach = this.fpsRig.contactMasonry(this.renderer.camera, masonry.aim.point,masonry.aim.wall.workPlane(this.renderer.camera.position));
+        const direction=wallWorkDirection(masonry.aim.wall.workPlane(this.renderer.camera.position).normal,this.fpsRig.workStanceSide*75,this.fpsRig.workStanceTiltDegrees??15);
+        const origin=this.fpsRig.chiselTipWorld.clone().addScaledVector(direction,-.02);
+        const struck = inReach && masonry.aim.wall.strikeAt(masonry.aim.index, this.renderer.camera, this.hammerMode,direction,origin);
         if (inReach) {
           if (struck) this.failedHammerMasonry = null;
-          else if (this.failedHammerMasonry?.aim.wall === masonry.aim.wall && this.failedHammerMasonry.aim.index === masonry.aim.index)
+          else if (this.failedHammerMasonry?.aim.wall === masonry.aim.wall && this.failedHammerMasonry.aim.index === masonry.aim.index && this.failedHammerMasonry.aim.point.distanceToSquared(masonry.aim.point)<.000004)
             this.failedHammerMasonry.attempts++;
           else this.failedHammerMasonry = { aim: masonry.aim, attempts: 1 };
         }
@@ -935,7 +928,7 @@ export class Game {
         }
         return;
       }
-      if (this.lastHammerMasonryAim && this.input.actionHeld) return;
+      if (this.lastHammerMasonryAim && this.player.wallWorkPlane) return;
     }
     if(['spring','cutter'].includes(this.selectedTool)){this.hud.notify('Πήγαινε στη μάτσα PVC και πάτησε E για χειροκίνητη προετοιμασία.',false,1800);return;}
     if(['measure','drill','driver'].includes(this.selectedTool))return;

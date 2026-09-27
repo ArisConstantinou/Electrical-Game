@@ -6,6 +6,7 @@ import { damagedMasonryMaterial } from './BrickFaceMaterial';
 import { MansionBreakoutRubble } from './MansionBreakoutRubble';
 import type { MeshData } from './masonryMesher';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import type { WallWorkPlane } from '../player/WallWorkPlane';
 
 export interface MasonryAim {
   wall: MansionMasonryDemolition;
@@ -83,6 +84,13 @@ export class MansionMasonryDemolition {
 
   get damaged(): boolean { return this.removedCount > 0 || this.broken.size > 0; }
   get partialDamageCount(): number { return this.broken.size; }
+  workPlane(eye: THREE.Vector3): WallWorkPlane {
+    this.group.updateWorldMatrix(true,false);
+    const local=this.group.worldToLocal(eye.clone());
+    const sign=Math.sign(this.alongX?local.z:local.x)||1;
+    const normal=new THREE.Vector3(this.alongX?0:sign,0,this.alongX?sign:0);
+    return {point:this.group.localToWorld(normal.clone().multiplyScalar(.12)),normal:normal.transformDirection(this.group.matrixWorld)};
+  }
   get removedClayNodes(): number { let count = 0; for (const entry of this.broken.values()) count += entry.volume.removedNodeCount; return count; }
   damageSnapshot(): MansionBrickDamage[] {
     return [...this.broken].map(([index, entry]) => ({ index,
@@ -124,7 +132,7 @@ export class MansionMasonryDemolition {
 
   /** Test only the visible face. A camera ray through a cut-out does not hit
    * an invisible backing and can reach the next wall behind it. */
-  aim(camera: THREE.Camera, maxDistance = 2.4, eye?: THREE.Vector3, view?: THREE.Vector3): MasonryAim | null {
+  aim(camera: THREE.Camera, maxDistance = 2.4, eye?: THREE.Vector3, view?: THREE.Vector3, minimumDistance = .15): MasonryAim | null {
     for(let node:THREE.Object3D|null=this.group;node;node=node.parent)if(!node.visible)return null;
     const origin = eye ?? camera.getWorldPosition(new THREE.Vector3());
     if (this.obstacle.segments?.length !== 0 &&
@@ -140,7 +148,7 @@ export class MansionMasonryDemolition {
     if (!this.localRay.intersectBox(this.localBox, this.localHit)) return null;
     const point = this.localHit.clone().applyMatrix4(this.group.matrixWorld);
     const distance = origin.distanceTo(point);
-    if (distance > maxDistance || distance < .15) return null;
+    if (distance > maxDistance || distance < minimumDistance) return null;
     const row = Math.min(this.rows - 1, Math.max(0, Math.floor(this.localHit.y / (this.height / this.rows))));
     const coordinate = this.alongX ? this.localHit.x : this.localHit.z;
     let best = -1, bestDistance = .31;
@@ -198,13 +206,14 @@ export class MansionMasonryDemolition {
 
   /** The original work wall's material lattice is allocated only for bricks
    * actually struck. The intact instanced wall stays cheap and unchanged. */
-  strikeAt(index: number, camera: THREE.Camera, mode: 'chase' | 'demolish' = 'demolish', aimedDirection?: THREE.Vector3): boolean {
+  strikeAt(index: number, camera: THREE.Camera, mode: 'chase' | 'demolish' = 'demolish', aimedDirection?: THREE.Vector3, aimedOrigin?: THREE.Vector3): boolean {
     if (!this.remaining[index]) return false;
     let entry = this.broken.get(index);
     if (!entry) entry = this.createBrokenBrick(index);
     this.group.updateWorldMatrix(true, false);
     this.inverse.copy(this.group.matrixWorld).invert();
-    const wallCamera = camera.getWorldPosition(new THREE.Vector3()).applyMatrix4(this.inverse);
+    const wallEye=camera.getWorldPosition(new THREE.Vector3()).applyMatrix4(this.inverse);
+    const wallCamera = aimedOrigin?aimedOrigin.clone().applyMatrix4(this.inverse):wallEye;
     const origin = wallCamera.clone().sub(entry.origin).applyQuaternion(entry.rotation.clone().invert());
     const wallDirection = (aimedDirection?.clone() ?? camera.getWorldDirection(new THREE.Vector3())).transformDirection(this.inverse);
     const direction = wallDirection.clone().applyQuaternion(entry.rotation.clone().invert());
@@ -219,7 +228,7 @@ export class MansionMasonryDemolition {
       if (!this.broken.has(index)) this.disposeBrokenBrick(entry);
       return false;
     }
-    this.firstBreakSide ??= (this.alongX ? wallCamera.z : wallCamera.x) < 0 ? -1 : 1;
+    this.firstBreakSide ??= (this.alongX ? wallEye.z : wallEye.x) < 0 ? -1 : 1;
     this.broken.set(index, entry);
     if (joint) {
       entry.mortarRemoved[joint.segment] = 1;

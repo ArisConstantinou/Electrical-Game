@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "test:hammer-flow": "node tests/hammer-wall-snap.mjs && node tests/hammer-flow-ui.mjs",
     "dev:pvc": "node scripts/start-worker-preview.mjs",
     "test:pvc": "node tests/manual-pvc-logic.mjs && node tests/manual-pvc-ui.mjs",
     "test:pvc-interactions": "node tests/pipe-interactions-ui.mjs",
