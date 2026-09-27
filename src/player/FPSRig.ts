@@ -229,6 +229,8 @@ export class FPSRig extends THREE.Group {
   private holdHammerFeed=false;
   private readonly lastHammerEntry=new THREE.Vector3(Infinity,Infinity,Infinity);
   private readonly lastHammerDirection=new THREE.Vector3();
+  private readonly lastHammerView=new THREE.Vector3();
+  private jointEntryOffset:THREE.Vector3|null=null;
   readonly hammerFit={housingCameraZ:0,wristReachM:[] as number[],feedM:0,postureY:0};
 
   /** Contact can be queried several times per impact; advance the pose once per frame. */
@@ -289,6 +291,8 @@ export class FPSRig extends THREE.Group {
     // The actual wrist spheres below decide reach, rather than ray length.
     if (!Number.isFinite(distance) || distance < 0 || direction.z >= -.04) { this.restHammer(camera); return null; }
     const entry = eye.clone().addScaledVector(view,distance);
+    if(!this.workPositionLocked||view.distanceToSquared(this.lastHammerView)>1e-10||direction.distanceToSquared(this.lastHammerDirection)>1e-10)this.jointEntryOffset=null;
+    this.lastHammerView.copy(view);
     // Releasing percussion parks the bit at its presented depth. The newly
     // exposed shell must not keep pulling it sideways/down through a cavity.
     // A deliberate change of aim/attack resumes normal contact positioning.
@@ -309,11 +313,19 @@ export class FPSRig extends THREE.Group {
       // Seat the shaft through the visible joint instead. Trace from outside
       // the wall so a nearer lip still blocks the real blade; never teleport
       // contact through intact masonry to the selected backing.
-      const visible=wall.volume.raycast(eye,view,distance+.28/Math.max(.08,Math.abs(view.z)));
-      if(visible?.material===MaterialId.Mortar){
-        const travel=(wall.volume.frontZ-visible.point.z)/Math.max(.04,-direction.z)+.02;
-        origin.set(visible.point.x,visible.point.y,visible.point.z).addScaledVector(direction,-travel);
+      if(this.jointEntryOffset===null){
+        const visible=wall.volume.raycast(eye,view,distance+.28/Math.max(.08,Math.abs(view.z)));
+        this.jointEntryOffset=new THREE.Vector3();
+        if(visible?.material===MaterialId.Mortar){
+          const travel=(wall.volume.frontZ-visible.point.z)/Math.max(.04,-direction.z)+.02;
+          const seated=new THREE.Vector3(visible.point.x,visible.point.y,visible.point.z).addScaledVector(direction,-travel);
+          this.jointEntryOffset.copy(seated).sub(origin);
+        }
       }
+      // A fresh recessed joint must not move the whole barrel toward the
+      // head on every strike. Preserve the chosen shaft line while strafing;
+      // a deliberate look/attack change can seat a different joint again.
+      origin.add(this.jointEntryOffset);
     }
     const rayOrigin=upward?eye:origin,rayDirection=upward?view:direction;
     const reach=upward?distance+.28/Math.max(.08,Math.abs(view.z)):Math.min(.38,.24/Math.abs(direction.z));
@@ -1066,6 +1078,7 @@ export class FPSRig extends THREE.Group {
     this.masonryBraced=false;
     this.reachable=false;this.chiselInAir=true;
     this.presentedFeedOffset=null;
+    this.jointEntryOffset=null;
     this.feedOffset.set(0,0,0);
     this.hammerFeedOffset.set(0,0,0);this.hammerFit.feedM=0;
     const hammer=this.tools.get('hammer')!;
