@@ -79,6 +79,7 @@ export class PvcWorkshop {
   private markingActive=false;
   private fitZoomed=false;
   private supportS:number|null=null;
+  private cutterRetreat=0;
   private fastenerAim={x:-.72,y:.72};
   private fastenerHoles:FastenerHole[]=[];
   private fastenerPairs:FastenerPair[]=[];
@@ -230,7 +231,7 @@ export class PvcWorkshop {
     if(this.phase==='carrying'&&tool==='cutter'){this.interact();return false;}
     this.message=this.instruction('Άφησε τη σωλήνα στη μάτσα ή πάτησε ESC για παύση.','Άφησε τη σωλήνα στη μάτσα ή πάτησε ΠΙΣΩ για παύση.');return false;
   }
-  private transition(phase:Phase):void{this.phase=phase;this.elapsed=0;this.message='';this.shapeKey='';if(phase!=='marking')this.markingActive=false;if(!['fitting','cutting','cut'].includes(phase))this.supportS=null;}
+  private transition(phase:Phase):void{this.phase=phase;this.elapsed=0;this.message='';this.shapeKey='';if(phase!=='marking')this.markingActive=false;if(!['fitting','cutting','cut'].includes(phase)){this.supportS=null;this.cutterRetreat=0;}}
   private stockPoint(x:number,y:number,z:number):THREE.Vector3{return this.stock.markingPoint(this.activeBundle,x,y,z);}
   private selectBundle(index:number):void{
     if(index===this.activeBundle)return;
@@ -368,7 +369,15 @@ export class PvcWorkshop {
         // Up raises the support toward the free end; down follows the pipe
         // through its radius. This focused action never moves the player.
         const input=this.game.input,move=this.touch?input.mobileMove.y:Number(input.pressed('KeyS'))-Number(input.pressed('KeyW'));
-        this.supportS=THREE.MathUtils.clamp((this.supportS??this.bend.mark-PVC.springLength/2-.025)+move*.24*dt,this.cutFrom+.025,this.bend.mark+.04);
+        const old=this.supportS??this.initialSupportS(),next=THREE.MathUtils.clamp(old+move*.24*dt,this.cutFrom+.025,this.bend.mark+.04);
+        // During a cut the loaded support stops before the blade. During
+        // adjustment the shears pull aside so the hand can pass either side.
+        this.supportS=this.phase==='cutting'&&Math.abs(this.supportPlaneGap(next))<.115?old:next;
+        const gap=Math.abs(this.supportPlaneGap(this.supportS)),approaching=gap<Math.abs(this.supportPlaneGap(old))-.00001;
+        const retreat=this.phase!=='cutting'&&(gap<.105||approaching&&gap<.145)?1:0;
+        this.cutterRetreat=THREE.MathUtils.damp(this.cutterRetreat,retreat,25,dt);
+        if(retreat===0&&this.cutterRetreat<.004)this.cutterRetreat=0;
+        if(this.cutterReady&&this.message==='Μετακίνησε το αριστερό χέρι πιο μακριά από τον κόφτη.')this.message='';
       }
       const c=this.game.renderer.camera,t=1-Math.exp(-8*dt);c.position.lerp(this.cameraDestination,t);c.quaternion.slerp(this.targetRotation,t);
       this.game.player.yaw=c.rotation.y;this.game.player.pitch=c.rotation.x;this.game.player.velocity.set(0,0,0);
@@ -408,7 +417,27 @@ export class PvcWorkshop {
   }
   private setCut(value:number):void{
     if(this.phase!=='fitting'||!Number.isFinite(value))return;
-    this.cutS=THREE.MathUtils.clamp(value,this.cutFrom,Math.max(this.cutFrom,this.bend.mark-.22));
+    let cut=THREE.MathUtils.clamp(value,this.cutFrom,Math.max(this.cutFrom,this.bend.mark-.22));
+    if(this.supportS!==null){
+      const before=this.supportPlaneGap(this.supportS),after=this.supportPlaneGap(this.supportS,cut);
+      if(Math.abs(after)<.105||before*after<=0){
+        let lo=0,hi=1;for(let i=0;i<18;i++){const t=(lo+hi)/2,gap=this.supportPlaneGap(this.supportS,THREE.MathUtils.lerp(this.cutS,cut,t));if(Math.abs(gap)<.105||before*gap<=0)hi=t;else lo=t;}
+        cut=THREE.MathUtils.lerp(this.cutS,cut,lo);
+      }
+    }
+    this.cutS=cut;
+  }
+  private supportPlaneGap(s:number,cutS=this.cutS):number{
+    const hand=this.bend.at(s),cut=this.bend.at(cutS);
+    return (hand.x-cut.x)*Math.cos(cut.angle)+(hand.y-cut.y)*Math.sin(cut.angle);
+  }
+  private initialSupportS():number{
+    const max=this.bend.mark+.04;let s=Math.max(this.cutFrom+.025,this.bend.mark-PVC.springLength/2-.025);
+    while(s<max&&this.supportPlaneGap(s)<.125)s=Math.min(max,s+.005);
+    return s;
+  }
+  private get cutterReady():boolean{
+    return Math.abs(this.supportPlaneGap(this.supportS??this.initialSupportS()))>=.105&&this.cutterRetreat===0;
   }
   private use():void{
     if(!this.focused)return;
@@ -421,6 +450,7 @@ export class PvcWorkshop {
     if(this.touch&&this.phase==='bending'&&this.bend.ready){this.transition('review');return;}
     if(this.phase==='fitting'){
       if(this.cutS<=this.cutFrom+.001){this.message='Μετακίνησε το cutter στο σημείο που θέλεις να κόψεις.';return;}
+      if(!this.cutterReady){this.message='Μετακίνησε το αριστερό χέρι πιο μακριά από τον κόφτη.';return;}
       this.transition('cutting');this.game.audio.play('cutter');
     }
   }
@@ -652,7 +682,7 @@ export class PvcWorkshop {
     const cutting=this.cutter.visible&&this.work.visible;
     return this.arms.map(arm=>{
       const cutter=cutting&&arm.side>0;
-      return {...workerGripTarget(arm,this.work.visible&&this.phase!=='fastener-marking'&&(this.phase!=='carrying'||arm.side>0)),section:(cutter?[.035,.014]:this.phase.startsWith('fastener-')?(arm.side<0?[.005,.005]:[.011,.011]):[.01,.01]) as [number,number],shape:cutter?'box' as const:'round' as const,contactLocked:true,surfaceContact:true,cutter:cutter?this.cutter:undefined,thumbWrap:this.phase==='carrying',firstPersonClearance:this.phase==='carrying'?.28:cutting?.20:clearFirstPerson?.42:undefined};
+      return {...workerGripTarget(arm,this.work.visible&&this.phase!=='fastener-marking'&&(this.phase!=='carrying'||arm.side>0)),section:(cutter?[.020,.014]:this.phase.startsWith('fastener-')?(arm.side<0?[.005,.005]:[.011,.011]):[.01,.01]) as [number,number],shape:cutter?'box' as const:'round' as const,contactLocked:true,surfaceContact:true,cutter:cutter?this.cutter:undefined,thumbWrap:this.phase==='carrying',firstPersonClearance:this.phase==='carrying'?.28:cutting?.20:clearFirstPerson?.42:undefined};
     });
   }
   useAnatomicalBody():void{
@@ -750,9 +780,10 @@ export class PvcWorkshop {
       const normal=v(before.x-after.x,before.y-after.y,0).normalize().applyQuaternion(root.quaternion);
       const tip=c.worldToLocal(world.clone()),q=c.quaternion.clone().invert().multiply(new THREE.Quaternion().setFromUnitVectors(v(0,0,1),normal));
       this.cutter.quaternion.copy(q);this.cutter.position.copy(tip).sub(v().fromArray(this.cutter.userData.tipPoint).applyQuaternion(q));
+      this.cutter.position.add(v(.23,0,.025).multiplyScalar(this.cutterRetreat));
       // Keep the support hand low on the retained run, just before its bend.
       // The lower fingers straddle the start of the radius as the shears close.
-      const lower=this.bend.at(this.supportS??Math.max(this.cutFrom+.025,this.bend.mark-PVC.springLength/2-.025));
+      const lower=this.bend.at(this.supportS??this.initialSupportS());
       left.copy(c.worldToLocal(v(lower.x,lower.y,0).applyQuaternion(root.quaternion).add(root.position)));
       const supportAxis=v(-Math.cos(lower.angle),-Math.sin(lower.angle),0).applyQuaternion(root.quaternion);
       leftQ.copy(c.quaternion).invert().multiply(new THREE.Quaternion().setFromUnitVectors(v(0,1,0),supportAxis));
