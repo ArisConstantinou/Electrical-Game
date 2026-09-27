@@ -2,13 +2,14 @@ import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {mkdir, writeFile} from 'node:fs/promises';
 import {blockPointerLock} from './browser-safety.mjs';
+import {serveTaskBuild} from './serve-task-build.mjs';
 const url=process.argv.find(x=>x.startsWith('http'))??'http://127.0.0.1:5365/Electrical-Game/';
 const baseline=process.argv.includes('--baseline');
 const out=`output/manual-pvc/${baseline?'before':'after'}`;await mkdir(out,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const report={url,baseline,errors:[],checks:[]};
 try{
- const context=await browser.newContext({viewport:{width:1366,height:768}});await blockPointerLock(context);
+ const context=await browser.newContext({viewport:{width:1366,height:768}});await blockPointerLock(context);await serveTaskBuild(context,url);
  const page=await context.newPage();page.on('pageerror',e=>report.errors.push(e.message));
  page.on('console',m=>{if(m.type()==='error')report.errors.push(m.text());});
  await page.goto(url);await page.locator('#start-button').click({timeout:120000});await page.waitForTimeout(600);

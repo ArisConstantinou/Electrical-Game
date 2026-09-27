@@ -2,13 +2,14 @@ import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {blockPointerLock} from './browser-safety.mjs';
+import {serveTaskBuild} from './serve-task-build.mjs';
 
 const url=process.argv.find(value=>/^https?:/.test(value))??'http://127.0.0.1:5365/Electrical-Game/';
 const out='output/mixing-tool-highlights';await mkdir(out,{recursive:true});
 const report={url,cases:[],errors:[],passed:false};
 const browser=await chromium.launch({channel:'chrome',headless:true});
 try{
-  const context=await browser.newContext({viewport:{width:1366,height:768}});await blockPointerLock(context);
+  const context=await browser.newContext({viewport:{width:1366,height:768}});await blockPointerLock(context);await serveTaskBuild(context,url);
   const page=await context.newPage();page.on('pageerror',error=>report.errors.push(error.message));page.on('console',message=>{if(message.type()==='error')report.errors.push(message.text());});
   await page.goto(url);await page.waitForFunction(()=>window.__wireTheHouse?.mixing,undefined,{timeout:120000});await page.locator('#start-button').click();await page.waitForTimeout(350);
   await page.evaluate(()=>{const game=window.__wireTheHouse;window.__highlightStep=game.step.bind(game);game.step=()=>{};});

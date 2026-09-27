@@ -28,7 +28,7 @@
 #mixing-panel .mix-feedback{min-height:20px;margin:4px 0 0;color:#ffe0a2;font-size:14px;line-height:1.35}
 #mixing-panel .mix-help{font-size:13px;color:#c5cabb}
 #mixing-panel input,#mixing-panel select{display:none}
-#mixing-world-prompt{position:absolute;z-index:36;left:50%;top:56%;transform:translate(-50%,-50%);max-width:min(88vw,420px);padding:10px 16px;border:2px solid #f0c36f;border-radius:8px;background:rgba(25,34,30,.92);color:#fff4dc;font:800 16px/1.25 'Barlow Condensed',Arial,sans-serif;letter-spacing:.04em;text-align:center;pointer-events:none;box-shadow:0 8px 24px #0008}
+:is(#mixing-world-prompt,#pvc-prompt.pvc-world-action){position:absolute;z-index:36;left:50%;top:56%;transform:translate(-50%,-50%);max-width:min(88vw,420px);padding:10px 16px;border:2px solid #f0c36f;border-radius:8px;background:rgba(25,34,30,.92);color:#fff4dc;font:800 16px/1.25 'Barlow Condensed',Arial,sans-serif;letter-spacing:.04em;text-align:center;pointer-events:none;box-shadow:0 8px 24px #0008}
 #mixing-finish{position:absolute;z-index:37;left:50%;bottom:90px;transform:translateX(-50%);min-width:220px;min-height:62px;padding:10px 18px;border:2px solid #ffe09c;border-radius:10px;background:#28704d;color:#fff;pointer-events:auto;touch-action:manipulation;box-shadow:0 9px 25px #0008}
 #mixing-finish b{display:block;font-size:20px;letter-spacing:.12em}#mixing-finish small{display:block;margin-top:3px;font-size:12px;color:#e6ffed}
 #mixing-toolbelt{position:absolute;z-index:35;left:50%;bottom:12px;transform:translateX(-50%);display:flex;gap:7px;padding:6px;background:rgba(24,23,20,.94);border:1px solid #bc9a62;border-radius:8px;pointer-events:auto}
@@ -36,9 +36,9 @@
 #mixing-toolbelt[hidden]{display:none}#mixing-toolbelt button{width:104px;min-height:62px;padding:5px;border:1px solid #675d4e;background:#302d27;color:#e8e2d5;touch-action:manipulation}#mixing-toolbelt button[aria-pressed=true]{background:#8c4a2b;border-color:#f0b178;color:#fff}#mixing-toolbelt b{display:block;font-size:25px;line-height:1}#mixing-toolbelt span{display:block;margin-top:4px;font:800 12px/1 'Barlow Condensed',Arial,sans-serif}
 .mixing-active #mortar-panel,.mixing-active #tool-status,.mixing-active #aim-quick-controls,.mixing-stage #tool-quick-controls,.mixing-stage #mobile-tool-slider,.mixing-active #chisel-orientation,.mixing-active #desktop-key-guide{visibility:hidden}
 .mixing-active #box-supply,.mixing-target #box-supply,.mixing-active #interaction-prompt,.mixing-target #interaction-prompt{display:none!important}
-@media(max-width:700px){#mixing-panel{left:8px;bottom:82px;width:calc(100% - 16px);padding:9px 11px}#mixing-panel .mix-readout{font-size:14px}#mixing-panel .mix-feedback{font-size:14px}#mixing-world-prompt{top:42%;font-size:15px}#mixing-finish{bottom:158px;min-width:210px}#mixing-toolbelt{left:8px;right:8px;bottom:7px;transform:none;gap:4px}#mixing-toolbelt button{width:auto;flex:1;min-width:0;min-height:64px;padding:4px 2px}#mixing-toolbelt span{font-size:12px}}
+@media(max-width:700px){#mixing-panel{left:8px;bottom:82px;width:calc(100% - 16px);padding:9px 11px}#mixing-panel .mix-readout{font-size:14px}#mixing-panel .mix-feedback{font-size:14px}:is(#mixing-world-prompt,#pvc-prompt.pvc-world-action){top:42%;font-size:15px}#mixing-finish{bottom:158px;min-width:210px}#mixing-toolbelt{left:8px;right:8px;bottom:7px;transform:none;gap:4px}#mixing-toolbelt button{width:auto;flex:1;min-width:0;min-height:64px;padding:4px 2px}#mixing-toolbelt span{font-size:12px}}
 @media(pointer:coarse){.mixing-target #mixing-world-prompt{display:none!important}}
-@media(max-height:540px){#mixing-panel{left:8px;bottom:78px;width:300px;max-width:42vw}#mixing-world-prompt{top:42%;font-size:14px}#mixing-finish{bottom:82px;left:63%}#mixing-toolbelt{left:8px;right:8px;transform:none;justify-content:center}}
+@media(max-height:540px){#mixing-panel{left:8px;bottom:78px;width:300px;max-width:42vw}:is(#mixing-world-prompt,#pvc-prompt.pvc-world-action){top:42%;font-size:14px}#mixing-finish{bottom:82px;left:63%}#mixing-toolbelt{left:8px;right:8px;transform:none;justify-content:center}}
 @media(max-height:540px) and (min-width:540px){.mixing-stage #mixing-world-prompt{left:calc(50% + 150px);max-width:calc(100% - 330px)}}
 @media (pointer:coarse), (max-width:760px) {
   #game-shell.mixing-stage[data-tools-open="false"] #mixing-toolbelt {display:none}
@@ -69,3 +69,5 @@
   #game-shell.mixing-stage #mixing-toolbelt button[aria-pressed="true"] b {border-color:#ffdf36;background:#ffdf36;color:#203127}
   #game-shell.mixing-stage #mixing-toolbelt span {display:none}
 }
+
+#pvc-prompt.pvc-world-action{bottom:auto;width:auto;min-height:44px;cursor:pointer;pointer-events:auto;text-shadow:none;touch-action:manipulation}

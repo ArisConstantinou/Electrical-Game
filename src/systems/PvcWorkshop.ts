@@ -12,7 +12,9 @@ import {buildHeldRebar,buildPvcDrill12,buildRebarHug,buildRebarPliers} from './P
 import '../ui/PvcWorkshop.css';
 
 type Phase='sealed'|'opening'|'loose'|'spreading'|'marking'|'spring'|'inserting'|'bending'|'review'|'extracting'|'batch'|'carrying'|'fitting'|'cutting'|'cut'|'pipe-install-ready'|'installing'|'fastener-marking'|'fastener-drilling'|'fastener-insert-ready'|'fastener-inserting'|'fastener-tighten-ready'|'fastener-tightening';
-interface StockPipe{recipe:PipeRecipe;mesh:PvcTube;cutFrom:number}
+interface StockPipe{recipe:PipeRecipe;mesh:PvcTube;cutFrom:number;bundle:number;originBundle:number;highlight?:THREE.Mesh}
+interface BundleWork{phase:Phase;bend:PvcBend;markingProgress:number;markingActive:boolean;insertion:number;quantity:number;cutFrom:number;elapsed:number}
+type StockTarget={bundle:number;prepared:StockPipe|null};
 interface FastenerHole{side:-1|1;y:number;marker:THREE.Group;drilled:boolean;paired:boolean}
 interface FastenerPair{left:FastenerHole;right:FastenerHole;rebar:THREE.Group}
 const v=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z);
@@ -50,7 +52,11 @@ export class PvcWorkshop {
   bend=new PvcBend();
   phase:Phase='sealed';
   focused=false;
-  rawCount:number=PVC.count;
+  activeBundle=0;
+  private readonly bundleWork=new Map<number,BundleWork>();
+  private readonly installedByBundle=Array<number>(this.stock.bundleRoots.length).fill(0);
+  get rawCount():number{return this.stock.bundleRemaining[this.activeBundle];}
+  set rawCount(count:number){this.stock.setBundleRemaining(this.activeBundle,count);}
   apprenticeLease=false;
   installedCount=0;
   quantity=1;
@@ -82,9 +88,9 @@ export class PvcWorkshop {
   private readonly targetRotation=new THREE.Quaternion();
   private readonly turnDummy=new THREE.Object3D();
   private readonly ray=new THREE.Raycaster();
-  private readonly stockAimBounds=new THREE.Box3();
-  private readonly stockAimMatrix=new THREE.Matrix4();
-  private stockAimBoundsReady=false;
+  private readonly occlusionBounds=new WeakMap<THREE.Object3D,{box:THREE.Box3;matrix:THREE.Matrix4}>();
+  private readonly occlusionHit=v();
+  private stockAimCache:{key:string;at:number;target:StockTarget|null}|null=null;
   private idleUiPresented=false;
   private readonly previewRoot=new THREE.Group();
   private readonly cutRing:THREE.Mesh;
@@ -103,8 +109,7 @@ export class PvcWorkshop {
   releaseApprentice():void{this.apprenticeLease=false;}
   consumeRawForApprentice(bundle:number):boolean{
     if(!this.apprenticeLease||bundle<0||bundle>=this.stock.bundleRemaining.length)return false;
-    const available=bundle===0?this.rawCount:this.stock.bundleRemaining[bundle];if(available<=0)return false;
-    if(bundle===0)this.rawCount--;
+    const available=this.stock.bundleRemaining[bundle];if(available<=0)return false;
     this.stock.setBundleRemaining(bundle,available-1);return true;
   }
 
@@ -205,7 +210,7 @@ export class PvcWorkshop {
     catch{this.message='Το preset ισχύει προσωρινά· ο browser δεν επέτρεψε αποθήκευση.';}
   }
   private aimsInstalledPipe():boolean{
-    const c=this.game.renderer.camera;c.updateMatrixWorld(true);this.ray.setFromCamera(new THREE.Vector2(),c);
+    const c=this.game.renderer.camera;c.updateMatrixWorld(true);this.ray.setFromCamera(new THREE.Vector2(),c);this.ray.far=2.5;
     return this.ray.intersectObjects(this.game.mission.points.flatMap(p=>p.conduit?[p.conduit]:[]),true).some(h=>h.distance<2.5);
   }
   private toggleTransparent():void{
@@ -218,7 +223,14 @@ export class PvcWorkshop {
     this.message=this.instruction('Άφησε τη σωλήνα στη μάτσα ή πάτησε ESC για παύση.','Άφησε τη σωλήνα στη μάτσα ή πάτησε ΠΙΣΩ για παύση.');return false;
   }
   private transition(phase:Phase):void{this.phase=phase;this.elapsed=0;this.message='';this.shapeKey='';if(phase!=='marking')this.markingActive=false;}
-  private stockPoint(x:number,y:number,z:number):THREE.Vector3{return this.stock.sitePoint(x,y,z);}
+  private stockPoint(x:number,y:number,z:number):THREE.Vector3{return this.stock.markingPoint(this.activeBundle,x,y,z);}
+  private selectBundle(index:number):void{
+    if(index===this.activeBundle)return;
+    this.bundleWork.set(this.activeBundle,{phase:this.phase,bend:this.bend,markingProgress:this.markingProgress,markingActive:this.markingActive,insertion:this.insertion,quantity:this.quantity,cutFrom:this.cutFrom,elapsed:this.elapsed});
+    this.activeBundle=index;const work=this.bundleWork.get(index);
+    this.transition(work?.phase??'sealed');this.bend=work?.bend??new PvcBend();this.markingProgress=work?.markingProgress??0;this.markingActive=work?.markingActive??false;this.insertion=work?.insertion??0;this.quantity=work?.quantity??1;this.cutFrom=work?.cutFrom??0;this.elapsed=work?.elapsed??0;
+  }
+  private bundlePhase(index:number):Phase{return index===this.activeBundle?this.phase:this.bundleWork.get(index)?.phase??'sealed';}
   private setStockCamera():void{
     this.cameraDestination.copy(this.stockPoint(2.20,.95,this.bend.mark-.35+.31));
     this.cameraFocus.copy(this.stockPoint(2.20,.025,this.bend.mark-.35+(innerWidth<700?.20:0)));
@@ -252,24 +264,54 @@ export class PvcWorkshop {
     if(this.target&&['fitting','cut'].includes(this.phase)){this.target=null;this.transition('carrying');}
     this.message=this.instruction('Η εργασία κρατήθηκε. Στόχευσε τη μάτσα ή το κουτί και πάτησε E για συνέχεια.','Η εργασία κρατήθηκε. Στόχευσε τη μάτσα ή το κουτί και άγγιξε την οδηγία για συνέχεια.');
   }
-  private stockAimed():boolean{
-    const c=this.game.renderer.camera;c.updateMatrixWorld(true);
-    // Only the original bundle is raycast when no prepared pipes are present.
-    // Its world bounds also follow any editor translation, rotation or scale.
-    if(this.preparedRoot.children.length===0){
-      const bundle=this.stock.bundleRoots[0];bundle.updateWorldMatrix(true,true);
-      if(!this.stockAimBoundsReady||!bundle.matrixWorld.equals(this.stockAimMatrix)){
-        this.stockAimBounds.setFromObject(bundle);this.stockAimMatrix.copy(bundle.matrixWorld);this.stockAimBoundsReady=true;
+  private stockTarget():StockTarget|null{
+    const c=this.game.renderer.camera;c.updateMatrixWorld(true);const eye=c.getWorldPosition(v());
+    this.stock.updateWorldMatrix(true,false);
+    const now=performance.now(),key=[...c.matrixWorld.elements,...this.stock.matrixWorld.elements,this.phase,this.activeBundle,this.prepared.length,this.game.room.children.length,...this.stock.bundleRemaining,...this.stock.bundleSpread,...this.stock.bundleRoots.flatMap(root=>[root.visible,...root.position.toArray(),...root.quaternion.toArray(),...root.scale.toArray()]),...this.game.mixing.models.group.children.flatMap(root=>[root.visible,...root.position.toArray(),...root.quaternion.toArray()])].join(',');
+    if(this.stockAimCache?.target&&this.stockAimCache.key===key&&now-this.stockAimCache.at<100&&!this.game.mixing.blocksWork)return this.stockAimCache.target;
+    const remember=(target:StockTarget|null)=>{this.stockAimCache={key,at:now,target};return target;};
+    // One coarse gate covers the standing bundles and laid rows, also after
+    // editor transforms. Distant wall work never pays for pipe/room raycasts.
+    if(this.stock.sitePoint(1.8,1.2,1.15).distanceTo(eye)>6*this.stock.getWorldScale(v()).length()/Math.sqrt(3))return remember(null);
+    this.stock.updateMatrixWorld(true);this.preparedRoot.updateMatrixWorld(true);this.ray.setFromCamera(new THREE.Vector2(),c);this.ray.far=3;
+    const visible=(object:THREE.Object3D)=>{for(let node:THREE.Object3D|null=object;node;node=node.parent)if(!node.visible)return false;return true;};
+    const bundle=this.stock.bundleAt(c,3),preparedHit=this.ray.intersectObject(this.preparedRoot,true).find(h=>h.distance<3&&visible(h.object));
+    const prepared=preparedHit?this.prepared.find(p=>p.mesh===preparedHit.object)??null:null;
+    const preparedWins=prepared&&(!bundle||preparedHit!.distance<eye.distanceTo(bundle.point));
+    const distance=preparedWins?preparedHit!.distance:bundle?eye.distanceTo(bundle.point):Infinity;
+    if(!Number.isFinite(distance))return remember(null);
+    this.ray.far=distance-.001;
+    // Broad-phase each independent room/equipment root before detailed hits.
+    // Unchanged roots reuse world bounds; editor translations invalidate them.
+    const roots=[...this.game.room.children,...this.game.mixing.models.group.children].filter(root=>{
+      if(!visible(root))return false;
+      let bounds=this.occlusionBounds.get(root);
+      if(!bounds||root.parent===this.game.mixing.models.group||!bounds.matrix.equals(root.matrixWorld)){
+        // Some editor groups expose a semantic `geometry` descriptor. Bound
+        // actual render meshes only, rather than treating that descriptor as
+        // a Three.js BufferGeometry in Box3.setFromObject().
+        const box=new THREE.Box3();root.traverse(object=>{
+          if(!(object instanceof THREE.Mesh)||!object.geometry?.isBufferGeometry)return;
+          if(object instanceof THREE.InstancedMesh){if(!object.boundingBox)object.computeBoundingBox();if(object.boundingBox)box.union(object.boundingBox.clone().applyMatrix4(object.matrixWorld));}
+          else{if(!object.geometry.boundingBox)object.geometry.computeBoundingBox();if(object.geometry.boundingBox)box.union(object.geometry.boundingBox.clone().applyMatrix4(object.matrixWorld));}
+        });
+        bounds={box,matrix:root.matrixWorld.clone()};this.occlusionBounds.set(root,bounds);
       }
-      if(this.stockAimBounds.distanceToPoint(c.getWorldPosition(v()))>3)return false;
-    }
-    this.stock.updateMatrixWorld(true);this.preparedRoot.updateMatrixWorld(true);
-    this.ray.setFromCamera(new THREE.Vector2(),c);
-    const hits=this.ray.intersectObjects([...this.stock.pipes.filter(p=>p.visible),...this.preparedRoot.children],true);
-    const hit=hits.find(h=>h.distance<3&&h.object.visible);
-    if(!hit)return false;
-    const wall=this.game.room.brickWall.aim(c);
-    return !wall||c.position.distanceTo(v(wall.point.x,wall.point.y,wall.point.z))>=hit.distance-.01;
+      return bounds.box.containsPoint(eye)||Boolean(this.ray.ray.intersectBox(bounds.box,this.occlusionHit)&&eye.distanceTo(this.occlusionHit)<=this.ray.far);
+    });
+    const blocker=this.ray.intersectObjects(roots,true).find(h=>visible(h.object));if(blocker)return remember(null);
+    return remember(preparedWins?{bundle:prepared.bundle,prepared}:bundle?{bundle:bundle.index,prepared:null}:null);
+  }
+  private stockAimed():boolean{return this.stockTarget()!==null;}
+  private addPreparedHighlight(pipe:StockPipe):void{
+    const geometry=pipe.mesh.geometry.clone();geometry.scale(1.035,1.035,1.035);
+    const shell=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({color:0xffd43b,side:THREE.BackSide,depthTest:true,depthWrite:false,transparent:true,opacity:.94,toneMapped:false}));
+    shell.name='Prepared PVC interaction highlight';shell.renderOrder=20;shell.raycast=()=>{};pipe.mesh.add(shell);pipe.highlight=shell;
+  }
+  private takePrepared(pipe:StockPipe):void{
+    this.selectBundle(pipe.originBundle);this.prepared.splice(this.prepared.indexOf(pipe),1);this.carried=pipe;pipe.mesh.removeFromParent();
+    if(pipe.highlight)pipe.highlight.visible=false;
+    this.bend=PvcBend.from(pipe.recipe);this.cutFrom=pipe.cutFrom;this.transition('carrying');
   }
   private fastenerPrepTarget():InstallationPoint|null{
     if(this.focused||this.game.selectedTool!=='drill')return null;
@@ -292,6 +334,7 @@ export class PvcWorkshop {
   handleInput(dt:number,action:boolean,interaction:boolean):boolean{
     if(!this.game.started)return false;
     if(this.apprenticeLease&&!this.focused)return false;
+    if(action||interaction||this.queue.length)this.stockAimCache=null;
     for(const command of this.queue.splice(0))command();
     const wasBlocking=this.blocksWork;
     let startedFasteners=false;
@@ -368,6 +411,11 @@ export class PvcWorkshop {
   }
   private interact():void{
     if(!this.game.started)return;
+    const stockTarget=this.stockTarget();
+    if(!this.focused&&this.phase!=='carrying'&&stockTarget){
+      if(stockTarget.prepared){this.takePrepared(stockTarget.prepared);return;}
+      this.selectBundle(stockTarget.bundle);
+    }
     if(!this.blocksWork&&workPhases.includes(this.phase)){
       if(!this.stockAimed()&&!(this.target&&this.game.boxPlacement.target(this.game.renderer.camera)===this.target))return;
       this.setFocus();return;
@@ -387,11 +435,14 @@ export class PvcWorkshop {
     }
     if(this.phase==='review'){this.transition('extracting');return;}
     if(this.phase==='batch'&&this.stockAimed()){
-      if(this.prepared.length){this.carried=this.prepared.shift()!;this.carried.mesh.removeFromParent();this.bend=PvcBend.from(this.carried.recipe);this.cutFrom=this.carried.cutFrom;this.transition('carrying');return;}
+      const prepared=this.prepared.find(p=>p.bundle===this.activeBundle);if(prepared){this.takePrepared(prepared);return;}
       if(this.rawCount){this.bend=new PvcBend();this.markingProgress=0;this.transition('marking');this.setFocus();}return;
     }
     if(this.phase==='carrying'){
-      if(this.stockAimed()){if(this.carried){this.prepared.unshift(this.carried);this.preparedRoot.add(this.carried.mesh);this.carried=null;this.arrangePrepared();}this.transition('batch');return;}
+      if(stockTarget){
+        if(this.carried){const pipe=this.carried;pipe.bundle=stockTarget.bundle;this.prepared.unshift(pipe);this.preparedRoot.add(pipe.mesh);if(pipe.highlight){pipe.highlight.geometry.dispose();pipe.highlight.geometry=pipe.mesh.geometry.clone();pipe.highlight.geometry.scale(1.035,1.035,1.035);pipe.highlight.visible=true;}this.carried=null;this.arrangePrepared();}
+        this.transition('batch');return;
+      }
       const p=this.game.boxPlacement.targetNear(this.game.renderer.camera);
       if(!p){this.message=this.instruction('Στόχευσε το κουτί όπου θα εφαρμόσεις τη σωλήνα.','Βρες το κουτί με το πορτοκαλί περίγραμμα και φέρε το στο κέντρο.');return;}
       if(p.conduit||p.stage==='complete'){this.message='Αυτό το κουτί έχει ήδη σωλήνα.';return;}
@@ -426,11 +477,11 @@ export class PvcWorkshop {
   private animate(dt:number):void{
     this.elapsed+=dt;
     if(this.phase==='opening'){
-      this.stock.straps.forEach((s,i)=>s.visible=this.elapsed<(i+1)*.65);
-      if(this.elapsed>1.95){this.transition('loose');this.focused=false;this.game.audio.play('cutter');}
+      this.stock.bundleStraps(this.activeBundle).forEach((s,i)=>s.visible=this.elapsed<(i+1)*.65);
+      if(this.elapsed>1.95){this.stock.bundleOpened[this.activeBundle]=true;this.transition('loose');this.focused=false;this.game.audio.play('cutter');}
     }else if(this.phase==='spreading'){
-      this.stock.layout(THREE.MathUtils.smoothstep(this.elapsed,0,1.6));
-      if(this.elapsed>=1.6){this.stock.layout(1);this.transition('marking');this.setFocus();}
+      this.stock.layout(THREE.MathUtils.smoothstep(this.elapsed,0,1.6),this.activeBundle);
+      if(this.elapsed>=1.6){this.stock.layout(1,this.activeBundle);this.transition('marking');this.setFocus();}
     }else if(this.phase==='inserting'){
       this.insertion=Math.min(1,this.elapsed/1.6);
       if(this.insertion===1){this.transition('bending');this.game.audio.play('spring');}
@@ -438,12 +489,12 @@ export class PvcWorkshop {
       this.insertion=1-Math.min(1,this.elapsed/1.5);
       if(this.insertion===0){
         const count=Math.min(this.rawCount,Math.max(1,this.quantity));
-        for(let i=0;i<count;i++){const mesh=new PvcTube();mesh.update(this.bend);this.prepared.push({recipe:this.bend.recipe(),mesh,cutFrom:0});this.preparedRoot.add(mesh);}
-        this.rawCount-=count;this.stock.setBundleRemaining(0,this.rawCount);
+        for(let i=0;i<count;i++){const mesh=new PvcTube();mesh.update(this.bend);const pipe:StockPipe={recipe:this.bend.recipe(),mesh,cutFrom:0,bundle:this.activeBundle,originBundle:this.activeBundle};this.addPreparedHighlight(pipe);this.prepared.push(pipe);this.preparedRoot.add(mesh);}
+        this.rawCount-=count;
         // Production completes in the player's hand. One bent pipe continues
         // directly to installation; only the remainder is laid on the stack.
         this.carried=this.prepared.shift()??null;
-        if(this.carried){this.carried.mesh.removeFromParent();this.bend=PvcBend.from(this.carried.recipe);this.cutFrom=this.carried.cutFrom;}
+        if(this.carried){this.carried.mesh.removeFromParent();if(this.carried.highlight)this.carried.highlight.visible=false;this.bend=PvcBend.from(this.carried.recipe);this.cutFrom=this.carried.cutFrom;}
         this.arrangePrepared();this.focused=false;this.transition(this.carried?'carrying':'batch');
       }
     }else if(this.phase==='cutting'&&this.elapsed>=.45){
@@ -482,7 +533,8 @@ export class PvcWorkshop {
     }
   }
   private arrangePrepared():void{
-    this.prepared.forEach((p,i)=>{p.mesh.position.set(2.65+i*.03,.026,-.35);p.mesh.rotation.set(Math.PI/2,0,Math.PI/2);});
+    const counts=Array<number>(this.stock.bundleRoots.length).fill(0);
+    this.prepared.forEach(p=>{const i=counts[p.bundle]++;p.mesh.position.set(2.65+i*.03-p.bundle*.58,.026,-.35);p.mesh.rotation.set(Math.PI/2,0,Math.PI/2);});
   }
   private fitError():number{
     return this.fitErrorAt(this.cutFrom);
@@ -529,7 +581,7 @@ export class PvcWorkshop {
   }
   private finishFasteners():void{
     if(!this.target)return;this.target.pipeStep='done';this.target.setStage('complete');this.target.userData.pvcFasteners={holeCount:this.fastenerHoles.length,pairCount:this.fastenerPairs.length,drillBitMm:12,sequence:'marked-drilled-open-wire-pipe-inserted-twisted'};
-    this.stagedFasteners.delete(this.target);this.installedCount++;this.carried?.mesh.geometry.dispose();this.carried=null;this.target=null;this.focused=false;this.transition('batch');this.game.audio.play('box');
+    this.stagedFasteners.delete(this.target);this.installedCount++;if(this.carried){this.installedByBundle[this.carried.originBundle]++;this.carried.highlight?.geometry.dispose();(this.carried.highlight?.material as THREE.Material|undefined)?.dispose();this.carried.mesh.geometry.dispose();}this.carried=null;this.target=null;this.focused=false;this.transition('batch');this.game.audio.play('box');
   }
   private boxBottomHeight():number|null{
     if(!this.target)return null;const p=this.target.boxGroup.getWorldPosition(v());return Math.max(0,p.y-this.target.boxGroup.groupHeight/2);
@@ -555,7 +607,7 @@ export class PvcWorkshop {
     const active=this.blocksWork;
     this.work.visible=active&&this.phase!=='spreading';
     this.arms.forEach(a=>{a.group.visible=a.hand.visible=this.work.visible;});
-    this.stock.markAt(this.bend.mark,this.markingProgress);
+    this.stock.markAt(this.bend.mark,this.markingProgress,this.activeBundle);
     this.stock.straightedge.visible=this.focused&&this.phase==='marking';
     this.stock.liveMarks.visible=this.stock.straightedge.visible&&this.markingProgress<1;
     this.previewRoot.visible=this.focused&&Boolean(this.target);
@@ -694,7 +746,10 @@ export class PvcWorkshop {
     }
   }
   private renderUI():void{
-    const near=this.game.started&&this.stockAimed(),show=this.focused,nearBox=this.phase==='carrying'?this.game.boxPlacement.targetNear(this.game.renderer.camera):null;
+    const aimed=this.game.started&&!this.focused&&!this.apprenticeLease?this.stockTarget():null;
+    const near=Boolean(aimed),show=this.focused,nearBox=this.phase==='carrying'?this.game.boxPlacement.targetNear(this.game.renderer.camera):null;
+    this.stock.updateInteractionHighlights(aimed&&!aimed.prepared?aimed.bundle:null);
+    for(const pipe of this.prepared){const material=pipe.highlight?.material as THREE.MeshBasicMaterial|undefined;if(material){const color=pipe===aimed?.prepared?0x36a8ff:0xffd43b;if(material.color.getHex()!==color)material.color.setHex(color);}}
     // The idle, out-of-reach bundle has no changing prompt or controls. Run
     // its full DOM update once, then resume immediately when aim/state changes.
     const idleUi=this.game.started&&!show&&!near&&!nearBox&&this.phase==='sealed'&&!this.fastenerPrepAvailable;
@@ -704,7 +759,7 @@ export class PvcWorkshop {
     this.controls.hidden=!show||(this.touch&&!touchModifiers);this.controls.dataset.phase=this.phase;
     this.game.hud.shell.classList.toggle('pvc-working',this.blocksWork);
     this.game.hud.shell.classList.toggle('pvc-focused',this.focused);
-    this.prompt.hidden=!this.game.started||this.touch||(!show&&!near&&this.phase!=='carrying')||(this.phase==='carrying'&&!near&&!nearBox);
+    this.prompt.hidden=!this.game.started||(this.touch&&show)||(!show&&!near&&this.phase!=='carrying')||(this.phase==='carrying'&&!near&&!nearBox);
     const tips:Partial<Record<Phase,string>>={
       marking:'Mouse: γωνία · E: σημάδεψε όλες τις σωλήνες · P: preset · Tab: επόμενο',
       spring:'LMB: βάλε το spring · R: διαφάνεια · ESC: πίσω',
@@ -733,12 +788,16 @@ export class PvcWorkshop {
       'fastener-drilling':'Τρύπημα 12 mm · μία οπή τη φορά','fastener-insert-ready':'Tap AIM · ΠΕΡΑΣΕ ΣΥΡΜΑ','fastener-inserting':'Πέρασμα ανοικτού σύρματος','fastener-tighten-ready':'Tap AIM · ΣΤΡΙΨΕ ΜΕ ΠΕΝΣΑ','fastener-tightening':'Στρίψιμο ένα-ένα',
     });
     const key=this.touch?'ΑΓΓΙΞΕ':'E';
+    const aimedPhase=aimed?this.bundlePhase(aimed.bundle):this.phase;
+    const ready=aimed?this.prepared.filter(p=>p.bundle===aimed.bundle).length:this.prepared.length;
     const hint=show?(this.message||tips[this.phase]||`${key}: συνέχεια`):
-      this.phase==='sealed'?`${key} · ΚΟΨΕ ΤΑ ΔΕΣΙΜΑΤΑ · 20 × 3 m`:this.phase==='loose'?`${key} · ΑΠΛΩΣΕ ΤΙΣ ΣΩΛΗΝΕΣ`:
-      this.phase==='batch'?`${key} · ${this.prepared.length?'ΠΑΡΕ ΣΩΛΗΝΑ':'ΝΕΑ ΠΡΟΕΤΟΙΜΑΣΙΑ'} · ${this.prepared.length} έτοιμες / ${this.rawCount} άκοπες`:
-      this.phase==='carrying'?(this.message||(near?`${key} · ΕΠΙΣΤΡΟΦΗ ΣΤΗ ΜΑΤΣΑ`:nearBox?`${key} · ΕΦΑΡΜΟΣΕ ΣΤΟ ΚΟΥΤΙ`:'')):`${key} · ΣΥΝΕΧΙΣΕ`;
+      this.phase==='carrying'?(near?`${key} · ΕΠΙΣΤΡΟΦΗ ΣΤΗ ΜΑΤΣΑ`:this.message||`${key} · ΕΦΑΡΜΟΣΕ ΣΤΟ ΚΟΥΤΙ`):
+      aimed?.prepared?`${key} · ΠΑΡΕ ΣΩΛΗΝΑ`:aimedPhase==='sealed'?`${key} · ΚΟΨΕ ΤΑ ΔΕΣΙΜΑΤΑ · ${this.stock.bundleRemaining[aimed?.bundle??this.activeBundle]} × 3 m`:
+      aimedPhase==='loose'?`${key} · ΑΠΛΩΣΕ ΤΙΣ ΣΩΛΗΝΕΣ`:
+      aimedPhase==='batch'?`${key} · ${ready?'ΠΑΡΕ ΣΩΛΗΝΑ':'ΝΕΑ ΠΡΟΕΤΟΙΜΑΣΙΑ'} · ${ready} έτοιμες / ${this.stock.bundleRemaining[aimed?.bundle??this.activeBundle]} άκοπες`:`${key} · ΣΥΝΕΧΙΣΕ`;
     this.prompt.dataset.phase=this.phase;
-    this.prompt.classList.toggle('pvc-primary-action',this.touch&&!show&&['sealed','loose','batch','carrying'].includes(this.phase));
+    this.prompt.classList.remove('pvc-primary-action');
+    this.prompt.classList.toggle('pvc-world-action',!show);
     if(!this.touch)this.markConfirm.textContent='E · ΣΗΜΑΔΕΨΕ ΤΙΣ ΣΩΛΗΝΕΣ';
     this.controls.querySelector('[data-pvc="confirm"]')!.textContent=this.phase==='review'?`ΕΤΟΙΜΑΣΕ ×${this.quantity} ΚΑΙ ΚΡΑΤΑ 1`:this.phase==='cut'?'ΕΦΑΡΜΟΣΕ':'ΕΛΕΓΧΟΣ';
     if(this.prompt.textContent!==hint)this.prompt.textContent=hint;
@@ -780,5 +839,5 @@ export class PvcWorkshop {
       mobileAction.textContent='AIM';mobileDetail.textContent=this.game.input.actionHeld?'STOP':'JUMP';joystick.setAttribute('aria-label',`Drag to aim; tap to ${action==='AIM'?'use':action}; hold still to jump`);
     }
   }
-  get telemetry(){const fitError=this.fitErrorAt(this.phase==='fitting'?this.cutS:this.cutFrom);return{phase:this.phase,focused:this.focused,raw:this.rawCount,prepared:this.prepared.length,carrying:Boolean(this.carried),installed:this.installedCount,total:this.rawCount+this.prepared.length+Number(Boolean(this.carried))+this.installedCount,markCm:this.bend.mark*100,markingProgress:this.markingProgress,markingActive:this.markingActive,springInsertion:this.insertion,springCentreM:this.bend.mark,springLengthM:PVC.springLength,retrievalCableM:PVC.cableLength,grip:this.bend.grip,angle:this.bend.angle,radiusMm:this.bend.radius?this.bend.radius*1000:null,ready:this.bend.ready,angles:[...this.bend.angles],quantity:this.quantity,target:this.target?.definition.id??null,guideTarget:this.guideTarget?.definition.id??null,boxBottomCm:this.boxBottomHeight()===null?null:this.boxBottomHeight()!*100,cutCm:this.cutS*100,cutFromCm:this.cutFrom*100,fitErrorMm:fitError,fitReady:fitError>=-SHORT_PIPE_TOLERANCE_MM&&fitError<=BOX_ENTRY_ALLOWANCE_MM,boxEntryAllowanceMm:BOX_ENTRY_ALLOWANCE_MM,offcuts:this.offcuts.length,message:this.message,preview:this.pipe.visible,fasteners:{holes:this.fastenerHoles.length,pairs:this.fastenerPairs.length,drilled:this.fastenerHoles.filter(h=>h.drilled).length,index:this.fastenerIndex,progress:this.fastenerProgress,bitDiameterMm:12,aim:{...this.fastenerAim},positions:this.fastenerHoles.map(h=>({side:h.side,x:h.marker.position.x,y:h.y,z:h.marker.position.z})),rebars:this.fastenerPairs.map(p=>({visible:p.rebar.visible,position:p.rebar.position.toArray(),scale:p.rebar.scale.toArray(),left:p.rebar.userData.leftHole,right:p.rebar.userData.rightHole}))},arms:this.arms.map(a=>({side:a.side,reach:a.shoulder.distanceTo(a.wrist)}))};}
+  get telemetry(){const fitError=this.fitErrorAt(this.phase==='fitting'?this.cutS:this.cutFrom);return{phase:this.phase,focused:this.focused,activeBundle:this.activeBundle,aimedBundle:this.game.started&&!this.focused?this.stockTarget()?.bundle??null:null,stockHighlights:this.stock.interactionHighlights.map(h=>(h.material as THREE.MeshBasicMaterial).color.getHex()===0x36a8ff?'blue':'yellow'),bundles:this.stock.bundleRemaining.map((remaining,index)=>({remaining,opened:this.stock.bundleOpened[index],spread:this.stock.bundleSpread[index],phase:this.bundlePhase(index)})),raw:this.rawCount,prepared:this.prepared.length,carrying:Boolean(this.carried),installed:this.installedCount,total:this.rawCount+this.prepared.filter(p=>p.originBundle===this.activeBundle).length+Number(this.carried?.originBundle===this.activeBundle)+this.installedByBundle[this.activeBundle],totalAll:this.stock.bundleRemaining.reduce((a,b)=>a+b,0)+this.prepared.length+Number(Boolean(this.carried))+this.installedCount,markCm:this.bend.mark*100,markingProgress:this.markingProgress,markingActive:this.markingActive,springInsertion:this.insertion,springCentreM:this.bend.mark,springLengthM:PVC.springLength,retrievalCableM:PVC.cableLength,grip:this.bend.grip,angle:this.bend.angle,radiusMm:this.bend.radius?this.bend.radius*1000:null,ready:this.bend.ready,angles:[...this.bend.angles],quantity:this.quantity,target:this.target?.definition.id??null,guideTarget:this.guideTarget?.definition.id??null,boxBottomCm:this.boxBottomHeight()===null?null:this.boxBottomHeight()!*100,cutCm:this.cutS*100,cutFromCm:this.cutFrom*100,fitErrorMm:fitError,fitReady:fitError>=-SHORT_PIPE_TOLERANCE_MM&&fitError<=BOX_ENTRY_ALLOWANCE_MM,boxEntryAllowanceMm:BOX_ENTRY_ALLOWANCE_MM,offcuts:this.offcuts.length,message:this.message,preview:this.pipe.visible,fasteners:{holes:this.fastenerHoles.length,pairs:this.fastenerPairs.length,drilled:this.fastenerHoles.filter(h=>h.drilled).length,index:this.fastenerIndex,progress:this.fastenerProgress,bitDiameterMm:12,aim:{...this.fastenerAim},positions:this.fastenerHoles.map(h=>({side:h.side,x:h.marker.position.x,y:h.y,z:h.marker.position.z})),rebars:this.fastenerPairs.map(p=>({visible:p.rebar.visible,position:p.rebar.position.toArray(),scale:p.rebar.scale.toArray(),left:p.rebar.userData.leftHole,right:p.rebar.userData.rightHole}))},arms:this.arms.map(a=>({side:a.side,reach:a.shoulder.distanceTo(a.wrist)}))};}
 }

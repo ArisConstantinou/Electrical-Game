@@ -56,12 +56,19 @@ export class PvcStock extends THREE.Group{
   readonly pipes:THREE.Group[]=[];readonly straps:THREE.Mesh[]=[];
   readonly bundleRoots:THREE.Group[]=[];
   readonly bundleRemaining=Array<number>(PVC_BUNDLE_COUNT).fill(PVC.count);
+  readonly bundleSpread=Array<number>(PVC_BUNDLE_COUNT).fill(0);
+  readonly bundleOpened=Array<boolean>(PVC_BUNDLE_COUNT).fill(false);
+  readonly interactionHighlights:THREE.InstancedMesh[]=[];
   private readonly reserveMeshes:Array<{pipes:THREE.InstancedMesh;ends:THREE.InstancedMesh;straps:THREE.Mesh[]}>=[];
+  private readonly reserveMarks:THREE.InstancedMesh[]=[];
+  private readonly reserveMarkDistance:number[]=[];
   private readonly stockBarrels:THREE.InstancedMesh;
   private readonly stockEnds:THREE.InstancedMesh;
   readonly bundleHighlight:THREE.Box3Helper;
   private readonly bundleBox=new THREE.Box3();
   private readonly bundleRay=new THREE.Raycaster();
+  private readonly pickBox=new THREE.Box3();
+  private readonly pickHit=new THREE.Vector3();
   readonly straightedge=new THREE.Group();readonly marks:THREE.Mesh[]=[];
   readonly ruler=new THREE.Group();
   readonly liveMarks=new THREE.Group();
@@ -111,6 +118,15 @@ export class PvcStock extends THREE.Group{
       const bands:THREE.Mesh[]=[];
       for(const y of [.4,1.5,2.6]){const band=part(root,new THREE.TorusGeometry(.055,.004,5,32),bandMaterial,'Rounded factory plastic strap',[0,y,0]);band.rotation.x=Math.PI/2;bands.push(band);}
       this.reserveMeshes.push({pipes:barrels,ends,straps:bands});
+      const marks=new THREE.InstancedMesh(this.marks[0].geometry,this.marks[0].material,PVC.count);marks.name=`Bundle ${bundle+1} permanent marker rings`;marks.count=0;marks.raycast=()=>{};marks.frustumCulled=false;this.add(marks);this.reserveMarks.push(marks);
+    }
+    const outlineGeometry=pipeG.clone();outlineGeometry.scale(1.12,1,1.12);
+    for(let index=0;index<PVC_BUNDLE_COUNT;index++){
+      const material=new THREE.MeshBasicMaterial({color:0xffd43b,side:THREE.BackSide,depthTest:true,depthWrite:false,transparent:true,opacity:.94,toneMapped:false});
+      const shell=new THREE.InstancedMesh(outlineGeometry,material,PVC.count);
+      shell.name=`PVC bundle ${index+1} interaction highlight`;shell.renderOrder=20;shell.raycast=()=>{};shell.frustumCulled=false;
+      shell.instanceMatrix.copy(index===0?this.stockBarrels.instanceMatrix:this.reserveMeshes[index-1].pipes.instanceMatrix);
+      this.bundleRoots[index].add(shell);this.interactionHighlights.push(shell);
     }
     this.bundleHighlight=new THREE.Box3Helper(this.bundleBox,0xffda35);this.bundleHighlight.name='Selected PVC bundle highlight';this.bundleHighlight.visible=false;this.bundleHighlight.raycast=()=>{};this.add(this.bundleHighlight);
     const metal=new THREE.MeshStandardMaterial({color:0xa6b4b4,roughness:.4,metalness:.6});
@@ -137,14 +153,35 @@ export class PvcStock extends THREE.Group{
     const remaining=Math.max(0,Math.min(PVC.count,Math.floor(count)));this.bundleRemaining[index]=remaining;
     if(index===0){this.pipes.forEach((pipe,i)=>pipe.visible=i<remaining);this.stockBarrels.count=remaining;this.stockEnds.count=remaining*2;this.straps.forEach(strap=>strap.visible=remaining>0);}
     else{const bundle=this.reserveMeshes[index-1];bundle.pipes.count=remaining;bundle.ends.count=remaining*2;bundle.straps.forEach(strap=>strap.visible=remaining>0);}
+    this.bundleStraps(index).forEach(strap=>strap.visible=remaining>0&&!this.bundleOpened[index]);
+    this.interactionHighlights[index].count=remaining;
+  }
+  bundleStraps(index:number):THREE.Mesh[]{return index===0?this.straps:this.reserveMeshes[index-1].straps;}
+  markingPoint(index:number,x:number,y:number,z:number):THREE.Vector3{return this.sitePoint(x-index*.58,y,z);}
+  updateInteractionHighlights(index:number|null):void{
+    this.interactionHighlights.forEach((shell,i)=>{
+      const material=shell.material as THREE.MeshBasicMaterial,color=i===index?0x36a8ff:0xffd43b;
+      if(material.color.getHex()!==color)material.color.setHex(color);
+    });
   }
   bundleCenter(index:number):THREE.Vector3{
     if(!Number.isInteger(index)||index<0||index>=PVC_BUNDLE_COUNT)throw new RangeError('Unknown PVC bundle');
     return this.sitePoint(STOCK_CENTER.x,STOCK_CENTER.y,index===0?STOCK_CENTER.z:RESERVE_BUNDLE_Z[index-1]);
   }
   bundleAt(camera:THREE.Camera,maxDistance=4.2):{index:number;point:THREE.Vector3}|null{
-    camera.updateMatrixWorld(true);this.updateMatrixWorld(true);this.bundleRay.setFromCamera(new THREE.Vector2(),camera);
-    const hit=this.bundleRay.intersectObjects(this.bundleRoots,true).find(hit=>hit.distance<=maxDistance);
+    camera.updateMatrixWorld(true);this.updateMatrixWorld(true);this.bundleRay.setFromCamera(new THREE.Vector2(),camera);this.bundleRay.far=maxDistance;
+    // The visible instanced tube bodies cover every pipe. Do not pick the
+    // duplicate first-bundle proxies, marks, end rings or outline shells.
+    const candidates=[this.stockBarrels,...this.reserveMeshes.map(bundle=>bundle.pipes)].filter(mesh=>{
+      if(!mesh.count)return false;if(!mesh.boundingBox)mesh.computeBoundingBox();
+      this.pickBox.copy(mesh.boundingBox!).applyMatrix4(mesh.matrixWorld);
+      return this.pickBox.containsPoint(this.bundleRay.ray.origin)||Boolean(this.bundleRay.ray.intersectBox(this.pickBox,this.pickHit)&&this.bundleRay.ray.origin.distanceTo(this.pickHit)<=maxDistance);
+    });
+    const hit=this.bundleRay.intersectObjects(candidates,false).find(hit=>{
+      if(hit.distance>maxDistance)return false;
+      for(let node:THREE.Object3D|null=hit.object;node;node=node.parent)if(!node.visible)return false;
+      return true;
+    });
     if(!hit)return null;
     let node:THREE.Object3D|null=hit.object;while(node&&!Number.isInteger(node.userData.pvcBundleIndex))node=node.parent;
     return node?{index:node.userData.pvcBundleIndex as number,point:hit.point.clone()}:null;
@@ -155,7 +192,23 @@ export class PvcStock extends THREE.Group{
     this.bundleBox.setFromObject(this.bundleRoots[index]);this.updateWorldMatrix(true,false);
     this.bundleBox.applyMatrix4(this.matrixWorld.clone().invert());this.bundleBox.expandByScalar(.015);this.bundleHighlight.updateMatrixWorld(true);
   }
-  layout(progress:number):void{
+  layout(progress:number,index=0):void{
+    this.bundleSpread[index]=progress;
+    if(index!==0){
+      const root=this.bundleRoots[index],bundle=this.reserveMeshes[index-1],transform=new THREE.Matrix4(),local=new THREE.Matrix4(),dummy=new THREE.Object3D();
+      root.updateMatrix();const inverse=root.matrix.clone().invert();
+      for(let i=0;i<PVC.count;i++){
+        const offset=STOCK_BUNDLE_OFFSETS[i];
+        dummy.position.set(THREE.MathUtils.lerp(STOCK_CENTER.x+offset.x,1.94+i*.028-index*.58,progress),STOCK_CENTER.y,THREE.MathUtils.lerp(RESERVE_BUNDLE_Z[index-1]+offset.y,-.35,progress));
+        dummy.rotation.set(progress*Math.PI/2,0,THREE.MathUtils.lerp(-STOCK_LEAN,0,progress));dummy.updateMatrix();
+        local.makeTranslation(0,1.5,0);transform.copy(inverse).multiply(dummy.matrix).multiply(local);bundle.pipes.setMatrixAt(i,transform);
+        for(let end=0;end<2;end++){local.makeRotationX(Math.PI/2);local.setPosition(0,end*3,0);transform.copy(inverse).multiply(dummy.matrix).multiply(local);bundle.ends.setMatrixAt(i*2+end,transform);}
+      }
+      bundle.pipes.instanceMatrix.needsUpdate=bundle.ends.instanceMatrix.needsUpdate=true;
+      bundle.pipes.computeBoundingBox();bundle.pipes.computeBoundingSphere();bundle.ends.computeBoundingSphere();
+      this.interactionHighlights[index].instanceMatrix.copy(bundle.pipes.instanceMatrix);this.interactionHighlights[index].instanceMatrix.needsUpdate=true;
+      return;
+    }
     this.spread=progress;
     const transform=new THREE.Matrix4(),local=new THREE.Matrix4(),rotation=new THREE.Quaternion();
     for(let i=0;i<PVC.count;i++){
@@ -171,6 +224,8 @@ export class PvcStock extends THREE.Group{
       }
     }
     this.stockBarrels.instanceMatrix.needsUpdate=this.stockEnds.instanceMatrix.needsUpdate=true;
+    this.interactionHighlights[0].instanceMatrix.copy(this.stockBarrels.instanceMatrix);this.interactionHighlights[0].instanceMatrix.needsUpdate=true;
+    this.stockBarrels.computeBoundingBox();this.stockBarrels.computeBoundingSphere();this.stockEnds.computeBoundingSphere();
     this.ruler.visible=progress===1;
     this.presetMarks.visible=progress===1;
   }
@@ -186,9 +241,18 @@ export class PvcStock extends THREE.Group{
     }
     this.presetMarks.visible=this.spread===1;
   }
-  markAt(distance:number,stroke:number):void{
-    this.straightedge.visible=this.spread===1;this.straightedge.position.set(2.20,.042,-.35+distance+.04);
-    this.liveMarks.position.z=-.35+distance;
-    this.marks.forEach((mesh,i)=>{mesh.position.y=distance;mesh.visible=(i+1)/PVC.count<=stroke;});
+  markAt(distance:number,stroke:number,index=0):void{
+    this.ruler.position.x=1.84-index*.58;this.ruler.visible=this.presetMarks.visible=this.bundleSpread[index]===1;
+    this.presetMarks.position.x=-index*.58;
+    this.straightedge.visible=this.bundleSpread[index]===1;this.straightedge.position.set(2.20-index*.58,.042,-.35+distance+.04);
+    this.liveMarks.position.set(-index*.58,0,-.35+distance);
+    if(index===0)this.marks.forEach((mesh,i)=>{mesh.position.y=distance;mesh.visible=i<this.bundleRemaining[0]&&(i+1)/PVC.count<=stroke;});
+    else{
+      const marks=this.reserveMarks[index-1];marks.count=Math.min(this.bundleRemaining[index],Math.floor(stroke*PVC.count));
+      if(this.reserveMarkDistance[index]!==distance){
+        this.reserveMarkDistance[index]=distance;const dummy=new THREE.Object3D();dummy.rotation.x=Math.PI/2;
+        for(let i=0;i<PVC.count;i++){dummy.position.set(1.94+i*.028-index*.58,.02,-.35+distance);dummy.updateMatrix();marks.setMatrixAt(i,dummy.matrix);}marks.instanceMatrix.needsUpdate=true;
+      }
+    }
   }
 }
