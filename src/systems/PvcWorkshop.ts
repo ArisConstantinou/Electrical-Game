@@ -641,7 +641,7 @@ export class PvcWorkshop {
   }
   anatomicalGrips():WorkerGripTarget[]{
     const clearFirstPerson=['carrying','fitting','cutting','cut','installing'].includes(this.phase)||this.phase.startsWith('fastener-');
-    return this.arms.map(arm=>({...workerGripTarget(arm,this.work.visible&&this.phase!=='fastener-marking'&&(this.phase!=='carrying'||arm.side>0)),section:(this.phase.startsWith('fastener-')?(arm.side<0?[.005,.005]:[.011,.011]):[.01,.01]) as [number,number],shape:'round' as const,contactLocked:true,surfaceContact:true,firstPersonClearance:clearFirstPerson?.42:undefined}));
+    return this.arms.map(arm=>({...workerGripTarget(arm,this.work.visible&&this.phase!=='fastener-marking'&&(this.phase!=='carrying'||arm.side>0)),section:(this.phase.startsWith('fastener-')?(arm.side<0?[.005,.005]:[.011,.011]):[.01,.01]) as [number,number],shape:'round' as const,contactLocked:true,surfaceContact:true,thumbWrap:this.phase==='carrying',firstPersonClearance:this.phase==='carrying'?.28:clearFirstPerson?.42:undefined}));
   }
   useAnatomicalBody():void{
     // Legacy arm geometry is only a transform driver, never a visible fallback.
@@ -663,9 +663,15 @@ export class PvcWorkshop {
     this.pipe.position.set(bending?-(support.x+working.x)/2:-mark.x,bending?.015+(support.y+working.y)/2:-.23-mark.y,bending?-.46:-.39);this.pipe.rotation.set(bending?Math.PI:0,0,0);
     this.bendHighlight.update(this.bend,this.focused&&['spring','inserting','bending','review'].includes(this.phase),this.phase==='bending');
     if(this.phase==='spring'||this.phase==='inserting')this.pipe.position.x=THREE.MathUtils.lerp(-.08,-mark.x,this.insertion);
+    // A carried pipe is held on a straight section, clear of the elbow and
+    // open end. Use this same material point for the tube and anatomical grip.
+    let carryGrip:ReturnType<PvcBend['at']>|null=null;
     if(this.phase==='carrying'){
-      this.pipe.rotation.z=-1.2;const grip=this.bend.at(Math.min(this.bend.mark,.6));
-      this.pipe.position.copy(v(.19,-.28,-.43).sub(v(grip.x,grip.y).applyQuaternion(this.pipe.quaternion)));
+      const before=this.bend.mark-PVC.springLength/2,after=this.bend.mark+PVC.springLength/2;
+      const s=PVC.length-Math.max(after,this.cutFrom)>=.18?Math.max(after,this.cutFrom)+.09:before-.09;
+      carryGrip=this.bend.at(Math.min(PVC.length-.09,s));
+      this.pipe.rotation.z=-1.2;
+      this.pipe.position.copy(v(.12,-.10,-.36).sub(v(carryGrip.x,carryGrip.y).applyQuaternion(this.pipe.quaternion)));
     }
     this.spring.visible=this.cable.visible=bending;
     this.markRing.visible=bending;
@@ -700,6 +706,10 @@ export class PvcWorkshop {
     this.heldRebar.visible=['fastener-insert-ready','fastener-inserting'].includes(this.phase);
     this.rebarPliers.visible=['fastener-insert-ready','fastener-inserting','fastener-tighten-ready','fastener-tightening'].includes(this.phase);
     const left=v(-.21,-.20,-.43),right=v(.20,-.21,-.43),leftQ=new THREE.Quaternion(),rightQ=new THREE.Quaternion();
+    if(carryGrip){
+      right.copy(v(carryGrip.x,carryGrip.y).applyQuaternion(this.pipe.quaternion).add(this.pipe.position));
+      rightQ.setFromUnitVectors(v(0,1,0),v(Math.cos(carryGrip.angle),Math.sin(carryGrip.angle),0).applyQuaternion(this.pipe.quaternion));
+    }
     if(bending){
       // Both hands bracket the active spring section while feeding the pipe.
       // Downward pressure stays between the two physical contacts.

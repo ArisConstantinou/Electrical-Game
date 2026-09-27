@@ -81,6 +81,7 @@ export class WorkerBody extends THREE.Group {
   private sprayGrip={across:0,back:.055,height:.065,tilt:1.25};
   private thumbOpposition=new Map<string,THREE.Vector3>();
   private thumbSurface=new Map<string,{mesh:THREE.SkinnedMesh;index:number}[]>();
+  private thumbPads=new Map<string,{mesh:THREE.SkinnedMesh;index:number}[]>();
   private thumbPoseCache=new Map<string,{key:string;angles:number[]}>();
   private boxFingerPoseCache=new Map<string,{key:string;angles:number[]}>();
   private boxFingerAxes=new Map<string,THREE.Vector3>();
@@ -141,6 +142,13 @@ export class WorkerBody extends THREE.Group {
           }
         });
         this.thumbSurface.set(side,samples);
+        const distalName='thumb.03.'+side,distal=this.bone(distalName),tipAxis=Y.clone().applyQuaternion(distal.getWorldQuaternion(new THREE.Quaternion())),tipBase=this.point(distalName),tipLength=this.lengths.get(distalName)!;
+        this.thumbPads.set(side,samples.filter(sample=>{
+          const indices=sample.mesh.geometry.attributes.skinIndex,weights=sample.mesh.geometry.attributes.skinWeight;
+          let padWeight=0;for(let j=0;j<4;j++)if(sample.mesh.skeleton.bones[indices.getComponent(sample.index,j)]===distal)padWeight+=weights.getComponent(sample.index,j);
+          const vertex=new THREE.Vector3();sample.mesh.getVertexPosition(sample.index,vertex);vertex.applyMatrix4(sample.mesh.matrixWorld).sub(tipBase);
+          return padWeight>=.6&&vertex.dot(tipAxis)>=tipLength*.55;
+        }));
         const hand=this.bone('hand.'+side),q=hand.getWorldQuaternion(new THREE.Quaternion());
         const long=this.point('middle.01.'+side).sub(this.point('hand.'+side)).normalize().applyQuaternion(q.clone().invert());
         const radial=this.point('index.01.'+side).sub(this.point('little.01.'+side)).applyQuaternion(q.clone().invert());radial.addScaledVector(long,-radial.dot(long)).normalize();
@@ -677,7 +685,7 @@ export class WorkerBody extends THREE.Group {
     this.gripErrors[side]=this.point('hand.'+side).distanceTo(wrist);
     const back=long.clone().multiplyScalar(-sign).cross(pipeAxis).normalize(),across=pipeAxis.clone().cross(back);
     const rotation=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(across,pipeAxis,back));
-    this.wrapGrip(side,grip.center,rotation,grip.section,false,working,'round',undefined,undefined,true);
+    this.wrapGrip(side,grip.center,rotation,grip.section,false,working,'round',undefined,undefined,true,grip.thumbWrap);
     const actualFore=this.point('hand.'+side).sub(this.point('forearm.'+side)).normalize();
     const neutralFore=Y.clone().applyQuaternion(q.clone().multiply(frame.foreToHand.clone().invert()));
     this.fingerFit[(hammer?'hammerWrist':'pipeWrist')+side]={bendDegrees:THREE.MathUtils.radToDeg(actualFore.angleTo(neutralFore))};
@@ -924,7 +932,7 @@ export class WorkerBody extends THREE.Group {
     this.worldRotation(upper,upperQ);
     this.worldRotation(fore,foreQ);this.worldRotation(this.bone('hand.'+side),q);
   }
-  private wrapGrip(side:string,center:THREE.Vector3,rotation:THREE.Quaternion,section:[number,number],spray:boolean,working:boolean,shape:'round'|'box'='round',trigger?:THREE.Vector3,buttonTarget?:THREE.Vector3,contactCylinder=false):void {
+  private wrapGrip(side:string,center:THREE.Vector3,rotation:THREE.Quaternion,section:[number,number],spray:boolean,working:boolean,shape:'round'|'box'='round',trigger?:THREE.Vector3,buttonTarget?:THREE.Vector3,contactCylinder=false,thumbWrap=false):void {
     const sign=side==='R'?1:-1,axis=Y.clone().applyQuaternion(rotation),across=new THREE.Vector3(1,0,0).applyQuaternion(rotation),back=new THREE.Vector3(0,0,1).applyQuaternion(rotation);
     for(const digit of spray||trigger?['middle','ring','little']:['index','middle','ring','little'])this.closeFinger(digit,side,center,rotation,section,shape);
     if(trigger)this.fitFinger('index',side,trigger);
@@ -941,7 +949,7 @@ export class WorkerBody extends THREE.Group {
       offset.addScaledVector(axis,-offset.dot(axis)).normalize();
       tip.copy(center).addScaledVector(axis,height).addScaledVector(offset,section[0]+.012);
     }
-    this.fitThumb(side,tip,spray||contactCylinder?{center,axis,radius:section[0]}:undefined,contactCylinder);
+    this.fitThumb(side,tip,spray||contactCylinder?{center,axis,radius:section[0]}:undefined,contactCylinder,thumbWrap);
     const thumbEnd=this.bone('thumb.03.'+side),end=this.point('thumb.03.'+side).add(Y.clone().applyQuaternion(thumbEnd.getWorldQuaternion(new THREE.Quaternion())).multiplyScalar(this.lengths.get('thumb.03.'+side)!));
     this.fingerFit['thumbContact'+side]={center:center.toArray(),axis:axis.toArray(),across:across.toArray(),back:back.toArray(),tip:end.toArray(),section};
   }
@@ -966,14 +974,17 @@ export class WorkerBody extends THREE.Group {
       this.orient(name,outline(angle-sign*(low+high)/2));
     }
   }
-  private fitThumb(side:string,target:THREE.Vector3,cylinder?:{center:THREE.Vector3;axis:THREE.Vector3;radius:number},reuseSurfaceContact=false):void {
+  private fitThumb(side:string,target:THREE.Vector3,cylinder?:{center:THREE.Vector3;axis:THREE.Vector3;radius:number},reuseSurfaceContact=false,thumbWrap=false):void {
     const sign=side==='R'?1:-1,names=[1,2,3].map(j=>`thumb.0${j}.${side}`),angles=[0,0,.3,.3];
-    const axes=[this.thumbOpposition.get(side)!,this.fingerAxes.get(names[0])!,this.fingerAxes.get(names[1])!,this.fingerAxes.get(names[2])!],indices=[0,0,1,2],limits=[[-.85,.85],[-.65,.65],[0,cylinder?.95:.70],[0,cylinder?.12:.35]];
+    const axes=[this.thumbOpposition.get(side)!,this.fingerAxes.get(names[0])!,this.fingerAxes.get(names[1])!,this.fingerAxes.get(names[2])!],indices=[0,0,1,2],limits=[[-.85,.85],[-.65,.65],[0,thumbWrap?1.3:cylinder?.95:.70],[0,thumbWrap?1.1:cylinder?.12:.35]];
+    // Carrying needs opposition at the distal pad. Contact at the thumb's
+    // base alone permits the old upright thumb even though skin touches PVC.
+    const samples=(thumbWrap?this.thumbPads:this.thumbSurface).get(side)!;
     const pose=()=>{for(let j=0;j<3;j++){const b=this.bone(names[j]);b.quaternion.copy(this.rest.get(b)!.q);if(j===0)b.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(axes[0],angles[0])).multiply(new THREE.Quaternion().setFromAxisAngle(axes[1],angles[1]));else b.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(axes[j+1],sign*angles[j+1]));b.updateWorldMatrix(false,true);}};
     const tip=()=>{const b=this.bone(names[2]);return this.point(names[2]).add(Y.clone().applyQuaternion(b.getWorldQuaternion(new THREE.Quaternion())).multiplyScalar(this.lengths.get(names[2])!));};
     // The contact geometry is expressed in palm space. Crouch/yaw do not
     // invalidate it; normalize signed zero to avoid needless cache misses.
-    const hand=this.bone('hand.'+side),key=cylinder?[...hand.worldToLocal(target.clone()).toArray(),...hand.worldToLocal(cylinder.center.clone()).toArray(),...cylinder.axis.clone().applyQuaternion(hand.getWorldQuaternion(new THREE.Quaternion()).invert()).toArray()].map(n=>Math.round(n*10000)/10000).join(','):'';
+    const hand=this.bone('hand.'+side),key=cylinder?Number(thumbWrap)+':'+[...hand.worldToLocal(target.clone()).toArray(),...hand.worldToLocal(cylinder.center.clone()).toArray(),...cylinder.axis.clone().applyQuaternion(hand.getWorldQuaternion(new THREE.Quaternion()).invert()).toArray()].map(n=>Math.round(n*10000)/10000).join(','):'';
     const cached=this.thumbPoseCache.get(side);
     if(cylinder&&cached?.key===key){angles.splice(0,4,...cached.angles);pose();this.fingerFit['thumb'+side]={error:tip().distanceTo(target),angles:angles.map(a=>a*180/Math.PI)};return;}
     if(cylinder&&cached&&reuseSurfaceContact){
@@ -981,7 +992,7 @@ export class WorkerBody extends THREE.Group {
       // contact usually remains valid. Verify the actual skin once before
       // running the much more expensive full surface fit again.
       angles.splice(0,4,...cached.angles);pose();const vertex=new THREE.Vector3();
-      const surfaceGap=()=>{let gap=Infinity;for(const sample of this.thumbSurface.get(side)!){sample.mesh.getVertexPosition(sample.index,vertex);vertex.applyMatrix4(sample.mesh.matrixWorld).sub(cylinder.center);const h=vertex.dot(cylinder.axis);if(Math.abs(h)>.08)continue;vertex.addScaledVector(cylinder.axis,-h);gap=Math.min(gap,vertex.length()-cylinder.radius);}return gap;};
+      const surfaceGap=()=>{let gap=Infinity;for(const sample of samples){sample.mesh.getVertexPosition(sample.index,vertex);vertex.applyMatrix4(sample.mesh.matrixWorld).sub(cylinder.center);const h=vertex.dot(cylinder.axis);if(Math.abs(h)>.08)continue;vertex.addScaledVector(cylinder.axis,-h);gap=Math.min(gap,vertex.length()-cylinder.radius);}return gap;};
       let gap=surfaceGap();
       // Follow the previous contact with a small bounded correction. A full
       // fit from rest is reserved for acquisition or a large discontinuity.
@@ -1030,7 +1041,7 @@ export class WorkerBody extends THREE.Group {
       }
       // Finish against deformed thumb skin, not just bone centres. The
       // thumb pad is not a circular capsule, especially with a bent elbow.
-      const vertex=new THREE.Vector3(),samples=this.thumbSurface.get(side)!;
+      const vertex=new THREE.Vector3();
       const skinCost=()=>{
         let closest=Infinity;
         for(const sample of samples){
