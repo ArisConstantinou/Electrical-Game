@@ -4,7 +4,7 @@ import {mkdir,writeFile} from 'node:fs/promises';
 import {blockPointerLock} from './browser-safety.mjs';
 import {serveTaskBuild} from './serve-task-build.mjs';
 const baseline=process.argv.includes('--baseline'),live=process.argv.includes('--live');
-const out=process.env.PVC_FALL_OUT??`output/pvc-full-cut-fall/${baseline?'before':'after'}`,url='http://127.0.0.1:5365/Electrical-Game/';
+const out=process.env.PVC_FALL_OUT??`output/pvc-full-cut-fall/${baseline?'before':'after'}`,url=process.env.GAME_URL??'http://127.0.0.1:5365/Electrical-Game/';
 await mkdir(out,{recursive:true});const report={baseline,url,errors:[],cases:[]};
 const browser=await chromium.launch({channel:'chrome',headless:true});
 try{for(const viewport of [{width:1095,height:1139},{width:390,height:844}]){

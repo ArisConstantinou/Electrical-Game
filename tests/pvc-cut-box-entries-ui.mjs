@@ -7,7 +7,7 @@ import {serveTaskBuild} from './serve-task-build.mjs';
 const baseline=process.argv.includes('--baseline'),live=process.argv.includes('--live');
 const performanceOnly=process.argv.includes('--performance-only'),desktopOnly=process.argv.includes('--desktop-only')||performanceOnly;
 const out=process.env.PVC_CUT_OUT??`output/pvc-cut-box-entries/${baseline?'before':live?'live':'after'}`;
-const url='http://127.0.0.1:5365/Electrical-Game/';
+const url=process.env.GAME_URL??'http://127.0.0.1:5365/Electrical-Game/';
 await mkdir(out,{recursive:true});
 const report={baseline,live,url,sourceRef:process.env.PVC_SOURCE_REF??null,environment:'Windows Chrome headless; Core Ultra 9 285K / RTX 5080 and Intel Graphics host; touch cases are emulation, not a physical phone',errors:[],cases:[]};
 report.performanceOnly=performanceOnly;
