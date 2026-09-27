@@ -57,10 +57,11 @@ try{
     await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await step();await cdp.detach();
     assert.equal((await state()).fasteners.holes,1,'Dragging must aim without drilling');
    }
+   if(!touch){const before=await page.evaluate(()=>window.__wireTheHouse.player.yaw);await page.mouse.move(viewport.width/2+16,viewport.height/2+6);await step();assert(Math.abs(await page.evaluate(()=>window.__wireTheHouse.player.yaw)-before)>.01,'Native mouse movement must keep aiming the actual camera while drilling');await page.mouse.move(viewport.width/2,viewport.height/2);await step();}
    for(let i=1;i<holes.length;i++){
-    await aim(holes[i]);report.aimHits.push(await page.evaluate(()=>{const g=window.__wireTheHouse,c=g.renderer.camera;return g.room.brickWall.volume.raycast(c.getWorldPosition(c.position.clone()),c.getWorldDirection(c.position.clone()),1.8)?.point;}));if(touch){await mark();await step(60);}else{await page.mouse.down();await step(60);await page.mouse.up();await step();}
+    const masonryBefore=await page.evaluate(()=>window.__wireTheHouse.room.brickWall.volume.removedNodeCount);await aim(holes[i]);report.aimHits.push(await page.evaluate(()=>{const g=window.__wireTheHouse,c=g.renderer.camera;return g.room.brickWall.volume.raycast(c.getWorldPosition(c.position.clone()),c.getWorldDirection(c.position.clone()),1.8)?.point;}));if(touch){await mark();await step(60);}else{await page.mouse.down();await step(60);await page.mouse.up();await step();}
     report.directStep={i,state:await state()};assert.equal(report.directStep.state.fasteners.drilled,i+1,JSON.stringify(report.directStep));
-    assert.equal((await state()).phase,i%2?'fastener-insert-ready':'fastener-marking');
+    assert(await page.evaluate(before=>window.__wireTheHouse.room.brickWall.volume.removedNodeCount>before,masonryBefore),'Each direct action must remove real masonry at its selected point');assert.equal((await state()).phase,i%2?'fastener-insert-ready':'fastener-marking');
    }
    const drilled=(await state()).fasteners;assert.equal(drilled.holes,4);assert.equal(drilled.pairs,2);
    report.aimHits.forEach((point,i)=>{assert(point);assert(Math.abs(drilled.positions[i].x-point.x)<.001,'Hole X must match the actual surface under the crosshair');assert(Math.abs(drilled.positions[i].y-point.y)<.001,'Hole Y must match the actual surface under the crosshair');assert(Math.abs(drilled.positions[i].z-point.z)<.001,'Hole must contact real masonry instead of an empty reference plane');});

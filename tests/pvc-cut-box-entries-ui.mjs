@@ -29,14 +29,20 @@ try{
   const click=async selector=>{if(mobile)await page.locator(selector).tap();else await page.locator(selector).click();await step();};
   const cut=async()=>{if(!baseline)await click('#pvc-cut-confirm');else{await page.mouse.down();await step(2);await page.mouse.up();}await step(32);};
   const snap=async label=>{await page.evaluate(async()=>{const r=window.__wireTheHouse.renderer;await r.waitForFrame();r.render();await r.waitForFrame();});await page.screenshot({path:`${out}/${name}-${label}.png`});};
+  const primary=async()=>{if(mobile)await page.locator('#look-joystick').tap();else{await page.mouse.down();await step(2);await page.mouse.up();}await step(3);};
+  const drillPair=async()=>{
+   await page.mouse.move(viewport.width/2,viewport.height/2);await step(2);
+   const targets=await page.evaluate(()=>{const g=window.__wireTheHouse,area=g.pvc.fastenerArea(),volume=g.room.brickWall.volume;return[[-.72,.80],[.60,.35]].map(([x,y])=>{const side=x<0?-1:1,offset=side*(area.innerX+Math.abs(x)*((side<0?area.outerLeft:area.outerRight)-area.innerX)),hit=volume.raycast({x:area.centreX+offset,y:area.minY+(area.maxY-area.minY)*y,z:volume.frontZ+.1},{x:0,y:0,z:-1},1);if(!hit)throw new Error('Real masonry required');return[hit.point.x,hit.point.y,hit.point.z];});});
+   for(const point of targets){await page.evaluate(point=>{const g=window.__wireTheHouse,c=g.renderer.camera;c.lookAt(...point);g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;c.updateMatrixWorld(true);},point);await step(2);await primary();assert.equal((await state()).phase,'fastener-drilling');await step(55);}
+   assert.equal((await state()).fasteners.drilled,2);assert.equal((await state()).phase,'fastener-insert-ready');assert.equal(await page.locator('#pvc-drill-holes').isVisible(),false);
+  };
   const row={name,viewport,checks:[]};report.cases.push(row);
   const check=(name,pass,detail)=>{row.checks.push({name,pass,detail});if(!baseline)assert(pass,`${name}: ${JSON.stringify(detail)}`);};
   const staged=name==='portrait';
   if(!baseline&&staged){
    await page.evaluate(()=>{const g=window.__wireTheHouse,c=g.renderer.camera,p=g.mission.points[1],pos=p.boxGroup.getWorldPosition(c.position.clone());window.dispatchEvent(new CustomEvent('wirehouse:select-tool',{detail:'drill'}));c.position.set(pos.x,.22,pos.z+.90);c.lookAt(pos.x,.16,pos.z-.03);g.player.pitch=c.rotation.x;g.player.yaw=c.rotation.y;c.updateMatrixWorld(true);});
    await key('KeyE');assert.equal((await state()).phase,'fastener-marking');
-   await key('KeyE');await key('KeyE');await click('#pvc-drill-holes');await step(150);
-   await key('KeyE');await step(95);assert.equal((await state()).phase,'sealed');row.staged=await state();
+   await drillPair();await primary();await step(95);assert.equal((await state()).phase,'sealed');row.staged=await state();
   }
   await page.evaluate(()=>{
    const g=window.__wireTheHouse,p=g.mission.points[1],pvc=g.pvc,c=g.renderer.camera,pos=p.boxGroup.getWorldPosition(c.position.clone());
@@ -97,9 +103,7 @@ try{
    await step(50);
    assert.equal((await state()).phase,'fastener-marking',JSON.stringify(await state()));
    assert(await page.evaluate(()=>Boolean(window.__wireTheHouse.mission.points[1].conduit)),'Pipe stays fitted while marking');
-   await key('KeyE');await key('KeyE');assert.equal((await state()).fasteners.pairs,1);
-   row.marked=await state();await click('#pvc-drill-holes');await step(150);assert.equal((await state()).phase,'fastener-insert-ready');
-   await key('KeyE');await step(95);assert.equal((await state()).phase,'fastener-tighten-ready');
+   await drillPair();assert.equal((await state()).fasteners.pairs,1);row.marked=await state();await primary();await step(95);assert.equal((await state()).phase,'fastener-tighten-ready');
   }
   if(staged){await key('KeyE');await step(50);}assert.equal((await state()).phase,'fastener-tighten-ready');
   const installed=await page.evaluate(()=>{const g=window.__wireTheHouse,p=g.mission.points[1],V=g.renderer.camera.position.constructor,world=p.conduit.getWorldPosition(new V()),entry=g.pvc.telemetry.entryPosition;return{position:world.toArray(),entry,recipe:p.conduit.userData.pvcRecipe};});

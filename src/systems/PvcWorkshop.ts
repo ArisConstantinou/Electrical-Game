@@ -12,7 +12,7 @@ import { PvcBendHUD } from '../ui/PvcBendHUD';
 import { PvcStock,PvcTube,part,pvcMaterial,pvcStockMaterial } from './PvcModels';
 import { springLeadPoint } from './PvcLead';
 import {DEFAULT_PVC_PRESETS,PVC_PRESET_KEY,readPvcPresets,type PvcPreset} from './PvcPresets';
-import {buildHeldRebar,buildPvcDrill12,buildRebarHug,buildRebarPliers} from './PvcSecuringModels';
+import {buildHeldRebar,buildPvcDrill12,buildRebarHug,buildRebarPliers,setRebarDepth} from './PvcSecuringModels';
 import '../ui/PvcWorkshop.css';
 
 type Phase='sealed'|'opening'|'loose'|'spreading'|'marking'|'spring'|'inserting'|'bending'|'review'|'extracting'|'batch'|'carrying'|'fitting'|'cutting'|'cut'|'pipe-install-ready'|'installing'|'fastener-marking'|'fastener-drilling'|'fastener-insert-ready'|'fastener-inserting'|'fastener-tighten-ready'|'fastener-tightening';
@@ -206,7 +206,7 @@ export class PvcWorkshop {
       if(this.phase==='review'&&['Equal','NumpadAdd','Minus','NumpadSubtract'].includes(e.code)){e.preventDefault();this.queue.push(()=>this.changeQuantity(['Equal','NumpadAdd'].includes(e.code)?1:-1));}
     },{capture:true});
     game.hud.shell.addEventListener('contextmenu',()=>{if(this.focused)this.queue.push(()=>this.pause());});
-    game.player.lookHandler=(dx,dy)=>{
+    game.player.lookHandler=(_dx,dy)=>{
       if(!this.focused)return false;
       if(this.phase.startsWith('fastener-'))return false;
       if(this.phase==='marking')this.setMark(this.bend.mark+dy*.0015);
@@ -643,8 +643,9 @@ export class PvcWorkshop {
     }else if(this.phase==='fastener-tightening'){
       const duration=1.15,index=Math.min(this.fastenerPairs.length-1,Math.floor(this.elapsed/duration));this.fastenerIndex=index;this.fastenerProgress=THREE.MathUtils.clamp((this.elapsed-index*duration)/duration,0,1);
       const jaw=this.rebarPliers.getObjectByName('rebar-plier-moving-jaw');if(jaw)jaw.rotation.z=-this.fastenerProgress*.30;
-      const pair=this.fastenerPairs[index],twist=pair.rebar.getObjectByName('tie-wire-twist');pair.rebar.scale.z=1-THREE.MathUtils.smoothstep(this.fastenerProgress,0,1)*.90;if(twist){twist.visible=this.fastenerProgress>.55;twist.scale.y=THREE.MathUtils.smoothstep(this.fastenerProgress,.55,1);twist.rotation.y=this.fastenerProgress*Math.PI*3;}
-      if(this.elapsed>=this.fastenerPairs.length*duration)this.finishFasteners();
+      const pair=this.fastenerPairs[index],twist=pair.rebar.getObjectByName('tie-wire-twist');setRebarDepth(pair.rebar,1-THREE.MathUtils.smoothstep(this.fastenerProgress,0,1)*.90);if(twist){twist.visible=this.fastenerProgress>.55;twist.scale.y=THREE.MathUtils.smoothstep(this.fastenerProgress,.55,1);twist.rotation.y=this.fastenerProgress*Math.PI*3;}
+      for(let completed=0;completed<index;completed++)setRebarDepth(this.fastenerPairs[completed].rebar,.10);
+      if(this.elapsed>=this.fastenerPairs.length*duration){this.fastenerPairs.forEach(p=>setRebarDepth(p.rebar,.10));this.finishFasteners();}
     }
   }
   private arrangePrepared():void{
