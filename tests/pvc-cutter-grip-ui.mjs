@@ -40,8 +40,9 @@ try{
    samples.sort((a,b)=>a-b);intervals.sort((a,b)=>a-b);return{environment:'Windows Chrome with real rendering, 45 warmup and 105 sampled frames; touch is PC emulation',simulationMeanMs:samples.reduce((a,b)=>a+b,0)/samples.length,simulationP95Ms:samples[Math.floor(samples.length*.95)],frameP95Ms:intervals[Math.floor(intervals.length*.95)],frameMaxMs:intervals.at(-1),over50ms:intervals.filter(ms=>ms>50).length,...resources};
   })});
   const ready=await capture('ready');
+  let moveHand;
   if(!baseline){
-   const camera=ready.camera,moveHand=async(direction,n)=>{
+   const camera=ready.camera;moveHand=async(direction,n)=>{
     if(!mobile){await page.keyboard.down(direction<0?'KeyW':'KeyS');await step(n);await page.keyboard.up(direction<0?'KeyW':'KeyS');await step(2);}
     else{const box=await page.locator('#joystick').boundingBox(),cdp=await context.newCDPSession(page),x=box.x+box.width/2,y=box.y+box.height/2;await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{id:1,x,y}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{id:1,x,y:y+direction*box.height*.45}]});await step(n);await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await step(2);await cdp.detach();}
    };
@@ -52,7 +53,7 @@ try{
    await page.evaluate(s=>window.__wireTheHouse.pvc.supportS=s,ready.supportS);await step(15);const stopped=await page.evaluate(()=>{const p=window.__wireTheHouse.pvc,saved=p.cutS;window.__wireTheHouse.player.lookHandler(0,(p.supportS-p.cutS)/.0006);return{saved,cut:p.cutS,gap:Math.abs(p.supportPlaneGap(p.supportS))};});assert(stopped.gap>=.105,'Moving the cutter must stop before the support hand');await step(3);await capture('cutter-stop');await page.evaluate(s=>window.__wireTheHouse.pvc.setCut(s),stopped.saved);await step(15);report.controls.push({mobile,upS:up.supportS,downS:down.supportS,arrows:mobile});
   }
   if(mobile)await page.locator('#look-joystick').tap();else{await page.mouse.down();await step(1);await page.mouse.up();}
-  await step(12);await capture('squeeze');await step(25);const cut=await capture('cut');assert.equal(cut.phase,'cut');assert.equal(cut.offcuts,1);assert.equal(cut.cutFrom,cut.cutS);
+  await step(12);await capture('squeeze');if(!baseline){await moveHand(-1,8);await capture('cut-hand-stop');}await step(25);const cut=await capture('cut');assert.equal(cut.phase,'cut');assert.equal(cut.offcuts,1);assert.equal(cut.cutFrom,cut.cutS);
   if(!baseline){
    await page.evaluate(()=>{const p=window.__wireTheHouse.pvc;p.cutS=.281;p.cutFrom=0;p.supportS=null;p.transition('fitting');});
    await step(40);await capture('near-bend');
