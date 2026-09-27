@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { CONSTRUCTION_DEFAULTS } from '../data/constructionDefaults';
+import { fitColumns } from './ConstructionDimensions';
 import { castStairFlight } from './CastStairFlight';
 import { addCourtyardWings } from './CourtyardWings';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
@@ -102,6 +104,7 @@ export class MansionGroundWing extends THREE.Group {
     this.castFrame(-1.35, 15.5);
     this.castFrame(9, 15.5);
     this.finishStairCirculation();
+    fitColumns(this, [...this.editableWalls.values()]);
     this.registerAuthoredAssets();
   }
 
@@ -132,6 +135,8 @@ export class MansionGroundWing extends THREE.Group {
       const pivot = new THREE.Group();
       pivot.name = id;
       pivot.userData.levelEditorKind = 'asset';
+      for (const key of ['constructionColumnAxes','constructionLegacySize','constructionLegacyPosition','constructionDefaultPosition'])
+        if (object.userData[key]) pivot.userData[key] = object.userData[key];
       pivot.userData.levelEditorGround = /\b(?:ground|terrain|soil|floor)\b/i.test(object.name);
       if (object.name.startsWith('B1 ')) pivot.userData.levelEditorFloor = 5;
       if (object.name.startsWith('B2 ')) pivot.userData.levelEditorFloor = 6;
@@ -261,6 +266,8 @@ export class MansionGroundWing extends THREE.Group {
       pivot.name = id;
       pivot.userData.levelEditorKind = 'asset';
       pivot.userData.levelEditorLabel = `${object.name || 'Site part'}${count > 1 ? ` · ${count}` : ''}`;
+      for (const key of ['constructionColumnAxes','constructionLegacySize','constructionLegacyPosition','constructionDefaultPosition'])
+        if (object.userData[key]) pivot.userData[key] = object.userData[key];
       const structuralColumn = locked.has(object) && typeof object.userData.studioEntityId === 'string' &&
         object.userData.studioEntityId.startsWith('world:column:');
       const structuralSideWall = locked.has(object) &&
@@ -923,6 +930,9 @@ export class MansionGroundWing extends THREE.Group {
     editable.userData.length = length;
     editable.userData.height = height;
     editable.userData.alongX = alongX;
+    // Keep the mature brick/damage lattice and apply a real 10 cm transform.
+    // Rendering, fracture geometry, picking and collision share this transform.
+    editable.scale[alongX ? 'z' : 'x'] = CONSTRUCTION_DEFAULTS.brickDepth / .24;
     editable.position.set(centreX, baseY, centreZ);
     this.add(editable);
     this.editableWalls.set(name, editable);

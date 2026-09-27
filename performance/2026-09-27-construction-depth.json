@@ -1,0 +1,72 @@
+{
+  "environment": "Windows Chrome headless, WebGL, 1280x900; PC rendering sample, not physical phone performance",
+  "gpuTime": "unavailable",
+  "vram": "unavailable",
+  "cases": [
+    {
+      "version": "before",
+      "scene": "ground-column",
+      "readyMs": 3591,
+      "hardware": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "frames": 319,
+      "fps": 99.42782103140452,
+      "p95Ms": 13.699999928474426,
+      "maxMs": 16,
+      "renderCpuP95Ms": 10,
+      "drawCalls": 757,
+      "triangles": 4162741,
+      "geometries": 1839,
+      "textures": 83,
+      "error": ""
+    },
+    {
+      "version": "before",
+      "scene": "l1-angle",
+      "readyMs": 3591,
+      "hardware": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "frames": 415,
+      "fps": 128.77138413685847,
+      "p95Ms": 10.399999976158142,
+      "maxMs": 15,
+      "renderCpuP95Ms": 7,
+      "drawCalls": 347,
+      "triangles": 1649353,
+      "geometries": 1854,
+      "textures": 83,
+      "error": ""
+    },
+    {
+      "version": "after",
+      "scene": "ground-column",
+      "readyMs": 2948,
+      "hardware": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "frames": 324,
+      "fps": 100.7203218068544,
+      "p95Ms": 14.399999976158142,
+      "maxMs": 20.399999976158142,
+      "renderCpuP95Ms": 10.900000095367432,
+      "drawCalls": 759,
+      "triangles": 4142131,
+      "geometries": 1840,
+      "textures": 83,
+      "error": ""
+    },
+    {
+      "version": "after",
+      "scene": "l1-angle",
+      "readyMs": 2948,
+      "hardware": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "frames": 441,
+      "fps": 137.17848791894,
+      "p95Ms": 10.899999976158142,
+      "maxMs": 17.100000023841858,
+      "renderCpuP95Ms": 7.299999952316284,
+      "drawCalls": 348,
+      "triangles": 1649365,
+      "geometries": 1855,
+      "textures": 83,
+      "error": ""
+    }
+  ],
+  "errors": []
+}

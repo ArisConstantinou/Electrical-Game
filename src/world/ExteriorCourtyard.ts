@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { CONSTRUCTION_DEFAULTS } from '../data/constructionDefaults';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { siteMaterial } from './SiteMaterials';
 import { brickFacePatch, brickFaceTone } from './BrickFacePatch';
@@ -140,15 +141,15 @@ export class ExteriorCourtyard extends THREE.Group {
     pads.receiveShadow = true; pads.raycast = () => undefined; pads.computeBoundingSphere(); this.add(pads);
     block('Raised planted verge', concrete, -6.6, .11, 2.80, 3.25, .22, .62);
     block('Dry soil in planted verge', vergeSoil, -6.6, .23, 2.80, 3.12, .025, .53, false);
-    block('Courtyard boundary wall', new THREE.MeshStandardMaterial({color:0x898176,roughness:1}), -11.6, .63, 2.72, .36, 1.26, 3.8);
+    block('Courtyard boundary wall', new THREE.MeshStandardMaterial({color:0x898176,roughness:1}), -11.6, .63, 2.72, CONSTRUCTION_DEFAULTS.brickDepth - .01, 1.26, 3.8);
     block('Cast coping on boundary wall', concrete, -11.6, 1.31, 2.72, .49, .09, 3.95);
-    const boundaryGeometry = new THREE.BoxGeometry(.045, .091, .235);
+    const boundaryGeometry = new THREE.BoxGeometry(CONSTRUCTION_DEFAULTS.brickDepth, .091, .235);
     const boundaryPatches = new Float32Array(168 * 4);
     boundaryGeometry.setAttribute('brickPatch', new THREE.InstancedBufferAttribute(boundaryPatches, 4));
     const boundaryBricks = new THREE.InstancedMesh(boundaryGeometry, masonryFaceMaterial, 168);
     for (let i = 0; i < 168; i++) {
       const row = Math.floor(i / 14), column = i % 14;
-      matrix.makeTranslation(-11.385, .075 + row * .101, .91 + column * .263 + (row % 2) * .09);
+      matrix.makeTranslation(-11.6, .075 + row * .101, .91 + column * .263 + (row % 2) * .09);
       boundaryBricks.setMatrixAt(i, matrix);
       boundaryPatches.set(brickFacePatch(row, column, 4), i * 4);
     }

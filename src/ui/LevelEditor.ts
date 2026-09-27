@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { CONSTRUCTION_DEFAULTS } from '../data/constructionDefaults';
 import { mapBuildingSurfaces } from '../world/BuildingSurfaceMapping';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
@@ -15,6 +16,7 @@ type WallRecord = {
   position: [number, number, number];
   rotationY: number;
   scale: [number, number, number];
+  thickness?: number;
   chainId?: string;
   sectionIndex?: number;
   curveRadius?: number;
@@ -29,7 +31,7 @@ type SurfaceRecord = {
   rotationY: number;
   scale: [number, number, number];
 };
-type AssetRecord = { id: string; position: [number, number, number]; rotationY: number; scale: [number, number, number]; hidden?: boolean };
+type AssetRecord = { id: string; position: [number, number, number]; rotationY: number; scale: [number, number, number]; dimensions?: [number, number, number]; hidden?: boolean };
 type GroupRecord = { id: string; name: string; members: string[] };
 type LevelDocument = { version: 1; name?: string; template?: 'mansion' | 'blank'; walls: WallRecord[]; surfaces: SurfaceRecord[]; assets?: AssetRecord[]; groups?: GroupRecord[]; demolition?: Record<string, number[]>; demolitionSides?: Record<string, -1 | 1>; masonryDamage?: ReturnType<NonNullable<Game['room']['mansionWing']>['masonryDamageSnapshot']>; hiddenWalls?: string[]; playerStart: [number, number, number]; playerStartYaw: number; apprenticeStart: [number, number, number]; apprenticeStarts: [number, number, number][]; apprenticeStartYaws: number[] };
 export type LevelSlot = { id: string; name: string; updatedAt: string; template: 'mansion' | 'blank' };
@@ -2227,6 +2229,7 @@ export class LevelEditor {
       position: wall.position.toArray() as [number, number, number],
       rotationY: wall.rotation.y,
       scale: wall.scale.toArray() as [number, number, number],
+      thickness: .24 * Math.abs(wall.scale[wall.userData.alongX ? 'z' : 'x']),
       chainId: typeof wall.userData.wallChainId === 'string' ? wall.userData.wallChainId : undefined,
       sectionIndex: Number.isFinite(wall.userData.wallSectionIndex) ? Number(wall.userData.wallSectionIndex) : undefined,
       curveRadius: Number.isFinite(wall.userData.curveRadius) ? Number(wall.userData.curveRadius) : undefined,
@@ -2245,6 +2248,7 @@ export class LevelEditor {
       if (asset.userData.levelEditorMissionPoint) continue;
       assets.push({ id: asset.name, position: asset.position.toArray() as [number, number, number],
         rotationY: asset.rotation.y, scale: asset.scale.toArray() as [number, number, number],
+        dimensions: asset.userData.constructionColumnAxes ? (asset.userData.baseSize as number[]).map((size,index)=>size*Math.abs(asset.scale.getComponent(index))) as [number,number,number] : undefined,
         hidden: asset.userData.levelEditorOpeningSill ? asset.userData.levelEditorHidden === true : undefined });
     }
     const hiddenWalls = [...this.game.room.mansionWing?.editableWalls.values() ?? []]
@@ -2375,6 +2379,21 @@ export class LevelEditor {
         asset.position.fromArray(record.position);
         asset.rotation.y = record.rotationY;
         if (!asset.userData.levelEditorScaleLocked) asset.scale.fromArray(record.scale);
+        if (asset.userData.constructionColumnAxes) {
+          const base = asset.userData.baseSize as number[];
+          if (finiteTriplet(record.dimensions) && record.dimensions.every(size=>size>.001)) {
+            record.dimensions.forEach((size,index)=>asset.scale.setComponent(index,Math.sign(record.scale[index])*size/base[index]));
+          } else {
+            const legacySize = asset.userData.constructionLegacySize as number[];
+            const legacyPosition = asset.userData.constructionLegacyPosition as number[];
+            const defaultPosition = asset.userData.constructionDefaultPosition as number[];
+            for (const axis of asset.userData.constructionColumnAxes as ('x'|'z')[]) {
+              const index = axis === 'x' ? 0 : 2;
+              if (Math.abs(record.scale[index]-1)>.00001) asset.scale[axis]=record.scale[index]*legacySize[index]/base[index];
+              if (Math.abs(record.position[index]-legacyPosition[index])<.00001) asset.position[axis]=defaultPosition[index];
+            }
+          }
+        }
       }
       this.game.mixing.wheelbarrow.syncEditorPlacement();
       this.game.mixing.syncEditorRestPositions();
@@ -2390,9 +2409,12 @@ export class LevelEditor {
           this.added.add(wall.name);
         }
         if (!wall) continue;
+        const normal = wall.userData.alongX ? 'z' : 'x';
         wall.position.fromArray(record.position);
         wall.rotation.y = record.rotationY;
         wall.scale.fromArray(record.scale);
+        if (Number.isFinite(record.thickness) && record.thickness! > .001) wall.scale[normal]=Math.sign(wall.scale[normal]) * record.thickness!/.24;
+        else if (record.kind==='brick-wall' && Math.abs(wall.scale[normal]-1)<.00001) wall.scale[normal]=CONSTRUCTION_DEFAULTS.brickDepth/.24;
         wall.userData.wallChainId = typeof record.chainId === 'string' ? record.chainId : undefined;
         wall.userData.wallSectionIndex = Number.isFinite(record.sectionIndex) ? record.sectionIndex : undefined;
         wall.userData.curveRadius = Number.isFinite(record.curveRadius) ? record.curveRadius : undefined;

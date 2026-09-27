@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { CONSTRUCTION_DEFAULTS } from '../data/constructionDefaults';
+import { fitBrickDepth, fitColumns } from './ConstructionDimensions';
 import { StableSunShadow } from './StableSunShadow';
 import { mapBuildingSurfaces } from './BuildingSurfaceMapping';
 import { GAME_CONFIG } from '../data/gameConfig';
@@ -56,12 +58,13 @@ export class Room extends THREE.Group {
     super();
     this.name = 'Living room first-fix site';
     this.userData.studioEntityId = 'world:living-room';
-    this.brickWall = new BrickWall(INSTALLATION_POINTS);
+    // Installation and mortar systems query this volume in world metres.
+    this.brickWall = new BrickWall(INSTALLATION_POINTS, { depth: CONSTRUCTION_DEFAULTS.brickDepth });
     this.add(this.brickWall);
 
     // Preserve the former untouched masonry as a separate right-hand practice
     // surface while the main installation wall starts at the PVC phase.
-    this.intactPracticeWall = new BrickWall([]);
+    this.intactPracticeWall = new BrickWall([], { depth: CONSTRUCTION_DEFAULTS.brickDepth });
     this.intactPracticeWall.name = 'Untouched right-hand masonry practice wall';
     this.intactPracticeWall.setStudioEntityId('world:intact-practice-wall');
     this.intactPracticeWall.rotation.y = -Math.PI / 2;
@@ -144,6 +147,7 @@ export class Room extends THREE.Group {
       this.addSideBrickCourses(side, x, x < 0);
       this.referenceWalls.push(side);
       this.add(side);
+      fitBrickDepth(side, 'x', .24, Math.sign(x) * (GAME_CONFIG.room.width / 2 + .10));
     }
     this.exterior = new ExteriorCourtyard();
     this.add(this.exterior);
@@ -156,6 +160,8 @@ export class Room extends THREE.Group {
     for (const x of [-2.72, 2.72]) {
       const column = new THREE.Mesh(new RoundedBoxGeometry(0.36, GAME_CONFIG.room.height, 0.38, 2, .009), columnMaterial);
       column.position.set(x, GAME_CONFIG.room.height / 2, -2.37);
+      column.userData.constructionOriginalPosition = column.position.toArray();
+      column.position.z = GAME_CONFIG.room.wallFrontZ - CONSTRUCTION_DEFAULTS.brickDepth / 2;
       column.name = 'Structural concrete column';
       column.userData.studioEntityId = `world:column:${x}`;
       column.castShadow = true;
@@ -168,6 +174,7 @@ export class Room extends THREE.Group {
     this.addFormworkMarks();
     this.addConstructionJoints();
     this.addRearWall();
+    fitColumns(this);
     this.mansionWing = this.mansionPreview ? new MansionGroundWing(
       this.exterior.getObjectByName('Olive tree outside unfinished opening') ?? null,
       this.exterior.getObjectByName('Offset adjacent residential block') ?? null,
@@ -358,7 +365,7 @@ export class Room extends THREE.Group {
       for (const x of [-openingHalfWidth - .13, openingHalfWidth + .13]) {
         const jamb = new THREE.Mesh(new RoundedBoxGeometry(.26, GAME_CONFIG.room.height, .26, 2, .012), frameMaterial);
         jamb.name = 'Exposed concrete passage jamb';
-        jamb.position.set(x, GAME_CONFIG.room.height / 2, rearZ + .035);
+        jamb.position.set(x, GAME_CONFIG.room.height / 2, rearZ + .07);
         jamb.castShadow = jamb.receiveShadow = true;
         rearGroup.add(jamb);
       }
@@ -414,12 +421,13 @@ export class Room extends THREE.Group {
     rearGroup.add(bricks);
     this.referenceWalls.push(rearGroup);
     this.add(rearGroup);
+    fitBrickDepth(rearGroup, 'z', .18, rearZ + .07);
 
     const cornerMaterial = siteMaterial('concrete', 0xf0ede7, .075, .75);
-    const corners = new THREE.InstancedMesh(new THREE.BoxGeometry(.28, GAME_CONFIG.room.height, .30), cornerMaterial, 2);
+    const corners = new THREE.InstancedMesh(new THREE.BoxGeometry(CONSTRUCTION_DEFAULTS.columnDepth, GAME_CONFIG.room.height, CONSTRUCTION_DEFAULTS.columnDepth), cornerMaterial, 2);
     corners.name = 'Poured rear corner pilasters';
-    for (const [index, x] of [-GAME_CONFIG.room.width / 2 + .14, GAME_CONFIG.room.width / 2 - .14].entries()) {
-      corners.setMatrixAt(index, matrix.makeTranslation(x, GAME_CONFIG.room.height / 2, rearZ - .015));
+    for (const [index, x] of [-GAME_CONFIG.room.width / 2 - .10, GAME_CONFIG.room.width / 2 + .10].entries()) {
+      corners.setMatrixAt(index, matrix.makeTranslation(x, GAME_CONFIG.room.height / 2, rearZ + .07));
     }
     corners.castShadow = corners.receiveShadow = true;
     corners.raycast = () => undefined;
