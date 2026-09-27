@@ -270,9 +270,11 @@ export class PvcWorkshop {
   }
   private setFitCamera():void{
     if(!this.target)return;const p=this.target.boxGroup.getWorldPosition(v());
-    // Both zoom levels remain perfectly square and level to the wall.
-    const cutY=this.bend.topHeight-this.bend.at(this.cutS).x,y=THREE.MathUtils.clamp(p.y,cutY-.14,cutY+.14);
-    this.cameraDestination.set(p.x,y,p.z+(this.fitZoomed?.50:.68));this.cameraFocus.set(p.x,y,p.z+.02);
+    // Flush work keeps the original square, level box view. Free trimming
+    // follows the cutter; floor work keeps the eye above the supporting hand.
+    const cutY=this.bend.topHeight-this.bend.at(this.cutS).x,focusY=cutY+p.y-(this.entry()?.position.y??p.y-this.target.boxGroup.groupHeight/2);
+    const distance=THREE.MathUtils.lerp(this.fitZoomed?.50:.68,.33,THREE.MathUtils.smoothstep(cutY,.45,.95));
+    this.cameraDestination.set(p.x,Math.max(.30,focusY),p.z+distance);this.cameraFocus.set(p.x,focusY,p.z+.02);
     const camera=new THREE.PerspectiveCamera();camera.position.copy(this.cameraDestination);camera.lookAt(this.cameraFocus);this.targetRotation.copy(camera.quaternion);
   }
   private setFastenerCamera():void{
@@ -793,7 +795,7 @@ export class PvcWorkshop {
       const cut=this.bend.at(this.cutS),world=v(cut.x,cut.y,0).applyQuaternion(root.quaternion).add(root.position);
       const tangent=v(Math.cos(cut.angle),Math.sin(cut.angle),0).applyQuaternion(root.quaternion);
       this.cutRing.position.copy(world);this.cutRing.quaternion.setFromUnitVectors(v(0,0,1),tangent);this.cutRing.visible=this.phase==='fitting';
-      const tip=c.worldToLocal(world),localTangent=tangent.applyQuaternion(c.quaternion.clone().invert());
+      const tip=c.worldToLocal(world.clone()),localTangent=tangent.applyQuaternion(c.quaternion.clone().invert());
       this.cutter.quaternion.setFromUnitVectors(v(0,-1,0),localTangent);
       this.cutter.position.copy(tip).sub(v().fromArray(this.cutter.userData.tipPoint).applyQuaternion(this.cutter.quaternion));
       right.copy(v().fromArray(this.cutter.userData.gripPoint).applyQuaternion(this.cutter.quaternion).add(this.cutter.position));left.copy(tip).add(v(-.015,world.y < .16 ? .08 : -.13,0));
