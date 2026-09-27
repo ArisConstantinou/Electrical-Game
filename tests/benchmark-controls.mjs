@@ -40,7 +40,12 @@ await runManagedClient(session,180000,async()=>{
  await page.evaluate(()=>Object.defineProperty(navigator,'canShare',{configurable:true,value:()=>false}));const downloading=page.waitForEvent('download');await page.locator('#share').click();const downloaded=await downloading;await downloaded.saveAs(path.join(out,'fallback.json'));assert.equal(JSON.parse(await readFile(path.join(out,'fallback.json'),'utf8')).schema,3);result.cases.push('share-download-fallback');
  const landscape=await session.browser.newContext({viewport:{width:844,height:390},isMobile:true,hasTouch:true});await routeBuildingDist(landscape);
  const lp=await landscape.newPage();await lp.goto('http://127.0.0.1:5365/Electrical-Game/perf/');await lp.locator('#begin').waitFor();
- assert.equal(await lp.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await lp.screenshot({path:path.join(out,'landscape-prompt.png')});await landscape.close();
+ assert.equal(await lp.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await lp.screenshot({path:path.join(out,'landscape-prompt.png')});
+ // A genuinely expensive JPEG encode must stop subsequent capture attempts.
+ await lp.evaluate(()=>{const native=HTMLCanvasElement.prototype.toDataURL;HTMLCanvasElement.prototype.toDataURL=function(...args){const until=performance.now()+40;while(performance.now()<until){}return native.apply(this,args);};});
+ await lp.locator('#begin').tap();await lp.waitForFunction(()=>window.performanceRecording.tour,null,{timeout:120000});await lp.waitForTimeout(9000);await lp.locator('#stop').tap();
+ const capped=await lp.evaluate(()=>window.performanceRecording.report);await writeFile(path.join(out,'capture-budget.json'),JSON.stringify(capped,null,2));assert.equal(capped.device.backend,'WebGPU');assert(capped.events.some(e=>e.type==='capture-budget-exceeded'),JSON.stringify(capped.capture));assert(capped.capture.count<=1);assert(capped.capture.totalCpuMs>=40);assert(capped.samples.some(s=>s.previousCaptureCpuMs>=40));result.cases.push('asynchronous-webgpu-capture-budget');
+ await landscape.close();
  assert.deepEqual(result.errors,[]);result.passed=true;await context.close();
 });
 await writeFile(path.join(out,'report.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));

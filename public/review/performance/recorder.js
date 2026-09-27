@@ -2,12 +2,12 @@ import {number,stats,worstWindow} from './metrics.js';
 import {createTour} from './tour.js';
 const $=id=>document.getElementById(id),frame=$('game'),panel=$('panel');
 const gameURL=new URL('../../',location.href);
-for(const key of ['renderer','level'])if(new URL(location.href).searchParams.has(key))gameURL.searchParams.set(key,new URL(location.href).searchParams.get(key));
+for(const key of ['renderer','level','v'])if(new URL(location.href).searchParams.has(key))gameURL.searchParams.set(key,new URL(location.href).searchParams.get(key));
 let active=false,game=null,report=null,timer=null,startedAt=0,run=0,tour=null;
 let samples=[],events=[],errors=[],diagnostics=[],checkpoints=[],captures=[],hudSamples=[],segments=[],loading={},settings={};
 let disposers=[],pendingCPU=0,last=0,first=0,activeStep=null,visibleMs=0,visibleAt=0,presentations=0,longestGap=0,stallAt=0;
 let heartbeat=0,heartbeatAt=0,heartbeatRequest=0,currentSegment=null,currentDocument=null,previousDocument=null,bootAttempted=false;
-let lastCaptureAt=-Infinity,captureRequest=null,captureBytes=0,captureCost=0,captureNextMs=0,captureFailure='',hudFPS=null,restoreRuntime=()=>{},hiddenAt=0,loadingHiddenMs=0;
+let lastCaptureAt=-Infinity,captureRequest=null,captureJob=false,captureBytes=0,captureCost=0,captureNextMs=0,captureFailure='',hudFPS=null,restoreRuntime=()=>{},hiddenAt=0,loadingHiddenMs=0;
 const elapsed=()=>performance.now()-startedAt;
 const eligible=()=>!!game?.started&&!document.hidden&&!frame.contentDocument?.hidden&&!game.lifecyclePaused;
 function accountTime(){const now=performance.now();if(visibleAt)visibleMs+=now-visibleAt;visibleAt=first&&eligible()?now:0;}
@@ -34,10 +34,24 @@ function snapshot(){
 // Bounded event-driven thumbnails; no continuous video encoder or readback loop.
 // Drawing and JPEG encoding costs remain visible in raw metrics and are labelled.
 function capture(reason,frameMs=0,sample=null){
+ if(!active||!game||captureFailure||captureJob||elapsed()-lastCaptureAt<3000)return;
+ const source=game.renderer.webgl.domElement;
+ if(!game.renderer.webgl.backend.device||typeof createImageBitmap!=='function'){copyCapture(reason,frameMs,sample);return;}
+ // Snapshot while the WebGPU texture is valid, then copy/encode the retained
+ // bitmap outside Game.step. Waiting for the queue can lose that texture.
+ const generation=run,begin=performance.now();captureJob=true;
+ let image;
+ try{image=createImageBitmap(source);}catch(error){captureJob=false;copyCapture(reason,frameMs,sample);return;}
+ const cost=performance.now()-begin;captureCost+=cost;captureNextMs+=cost;if(sample)sample.captureCpuMs=number(cost);
+ image.then(bitmap=>{
+  try{if(active&&run===generation)copyCapture(reason,frameMs,null,bitmap);}finally{bitmap.close();}
+ }).catch(error=>{if(active&&run===generation){captureFailure=String(error);note('capture-unavailable',captureFailure);}}).finally(()=>{if(run===generation){captureJob=false;if(cost>32&&!captureFailure){captureFailure=`Οι επόμενες λήψεις σταμάτησαν επειδή το στιγμιότυπο κόστισε ${number(cost)} ms.`;note('capture-budget-exceeded',{cpuMs:number(cost)});}}});
+}
+function copyCapture(reason,frameMs=0,sample=null,retainedImage=null){
  if(!active||!game||captureFailure||elapsed()-lastCaptureAt<3000)return;
  const before=performance.now();lastCaptureAt=elapsed();
  try{
-  const source=game.renderer.webgl.domElement,canvas=document.createElement('canvas');
+  const source=retainedImage??game.renderer.webgl.domElement,canvas=document.createElement('canvas');
   canvas.width=Math.min(320,source.width);canvas.height=Math.round(source.height*canvas.width/source.width);
   const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(source,0,0,canvas.width,canvas.height);
   const pixels=ctx.getImageData(0,0,canvas.width,canvas.height).data;
@@ -50,11 +64,11 @@ function capture(reason,frameMs=0,sample=null){
   if(captureBytes+dataURL.length>3*1024*1024){note('capture-limit','Οι εικόνες έφτασαν το όριο αποθήκευσης.');return;}
   captureBytes+=dataURL.length;captures.push(item);
  }catch(error){captureFailure=String(error);note('capture-unavailable',captureFailure);}
- finally{const cost=performance.now()-before;captureCost+=cost;captureNextMs+=cost;if(sample)sample.captureCpuMs=number(cost);}
+ finally{const cost=performance.now()-before;captureCost+=cost;captureNextMs+=cost;if(sample)sample.captureCpuMs=number(cost);if(cost>32&&!captureFailure){captureFailure=`Οι επόμενες λήψεις σταμάτησαν επειδή μία λήψη κόστισε ${number(cost)} ms.`;note('capture-budget-exceeded',{cpuMs:number(cost)});}}
 }
 function installRuntime(g){
  game=g;const originalStep=g.step,originalDraw=g.renderer.drawScene,originalFps=g.hud.updateFps;
- const wrappedFps=function(value){hudFPS=number(value);hudSamples.push({atMs:number(elapsed()),fps:number(value),area:area(),checkpoint:tour?.current?.label});return originalFps.call(this,value);};
+ const wrappedFps=function(value){hudFPS=Math.max(0,Math.round(value));hudSamples.push({atMs:number(elapsed()),fps:hudFPS,rawFPS:number(value),area:area(),checkpoint:tour?.current?.label});return originalFps.call(this,value);};
  const wrappedStep=function(...args){
   if(active&&eligible())tour?.update(args[0]);
   const current={begin:performance.now(),previousCPU:pendingCPU,drawn:false,sample:null};activeStep=current;
@@ -127,7 +141,7 @@ function start(){
  if(active)return;run++;active=true;game=null;report=null;tour=null;startedAt=performance.now();
  samples=[];events=[];errors=[];diagnostics=[];checkpoints=[];captures=[];hudSamples=[];segments=[];loading={};settings={};
  pendingCPU=0;last=0;first=0;visibleMs=0;visibleAt=0;presentations=0;longestGap=0;stallAt=0;heartbeat=0;heartbeatAt=0;currentSegment=null;currentDocument=null;bootAttempted=false;
- captureBytes=0;captureCost=0;captureNextMs=0;lastCaptureAt=-Infinity;captureRequest=null;captureFailure='';hudFPS=null;restoreRuntime=()=>{};hiddenAt=0;loadingHiddenMs=0;
+ captureBytes=0;captureCost=0;captureNextMs=0;lastCaptureAt=-Infinity;captureRequest=null;captureJob=false;captureFailure='';hudFPS=null;restoreRuntime=()=>{};hiddenAt=0;loadingHiddenMs=0;
  panel.classList.remove('completed');panel.classList.add('compact');frame.hidden=false;frame.style.pointerEvents='none';
  $('stop').hidden=false;$('results').hidden=true;$('route-progress').hidden=false;$('status').textContent='Φόρτωση παιχνιδιού…';
  listen(document,'visibilitychange',()=>{if(document.hidden)hiddenAt=performance.now();else if(hiddenAt){loadingHiddenMs+=performance.now()-hiddenAt;hiddenAt=0;}note(document.hidden?'hidden':'visible');});
