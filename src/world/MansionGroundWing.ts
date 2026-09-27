@@ -43,9 +43,13 @@ export class MansionGroundWing extends THREE.Group {
     super();
     this.name = 'Mansion ground circulation construction slice';
     this.userData.studioEntityId = 'world:mansion-ground-wing';
-    this.slab('Rough supported passage slab', 2.7, 4.1, 0, 5.65);
-    this.slab('Ground foyer slab', 10.35, 5.0, 3.825, 10.1, true);
-    this.slab('Shaded north circulation return', 10.35, 2.9, 3.825, 14.05);
+    const westJamb=this.passageJambs.find(box=>box.max.x<0),eastJamb=this.passageJambs.find(box=>box.min.x>0);
+    const westX=westJamb?(westJamb.min.x+westJamb.max.x)/2:-1.35,eastX=eastJamb?(eastJamb.min.x+eastJamb.max.x)/2:1.35;
+    // Carry the fitted wall centres into the adjoining route and its support
+    // slabs, so centring the masonry cannot leave a lateral step or floor gap.
+    this.slab('Rough supported passage slab', eastX-westX, 4.1, (eastX+westX)/2, 5.65);
+    this.slab('Ground foyer slab', 9-westX, 5.0, (9+westX)/2, 10.1, true);
+    this.slab('Shaded north circulation return', 9-westX, 2.9, (9+westX)/2, 14.05);
     // The passage masonry starts at the actual fitted concrete face. Its old
     // 3.62 m start ran through the jamb and exposed a second clay edge.
     for (const side of [-1, 1]) {
@@ -55,8 +59,8 @@ export class MansionGroundWing extends THREE.Group {
       const x = jamb ? (jamb.min.x + jamb.max.x) / 2 : side * 1.35;
       this.wall(`Passage ${side < 0 ? 'west' : 'east'} fired-clay partition`, x, jamb?.max.z ?? 3.62, x, 7.65, 0, 3, jamb ? [0] : []);
     }
-    this.wall('Foyer west fired-clay partition', -1.35, 7.65, -1.35, 15.5);
-    this.wall('Foyer north fired-clay perimeter', -1.35, 15.5, 9, 15.5);
+    this.wall('Foyer west fired-clay partition', westX, 7.65, westX, 15.5);
+    this.wall('Foyer north fired-clay perimeter', westX, 15.5, 9, 15.5);
     // The 2.4 m opening is a true route into the open courtyard. Structural
     // piers and lintel are visible; there is no glazing or fitted door.
     this.wall('Courtyard west masonry pier before aperture', 9, 6, 9, 13);
@@ -72,9 +76,9 @@ export class MansionGroundWing extends THREE.Group {
     // The isolated garage-off view retains the original foyer wall for a
     // same-camera construction comparison; ordinary preview keeps the route.
     if (new URLSearchParams(location.search).get('garage') === 'off') {
-      this.wall('Foyer south fired-clay partition', 1.35, 7.65, 9, 7.65);
+      this.wall('Foyer south fired-clay partition', eastX, 7.65, 9, 7.65);
     } else {
-      this.wall('Foyer south masonry west of garage passage', 1.35, 7.65, 2.2, 7.65);
+      this.wall('Foyer south masonry west of garage passage', eastX, 7.65, 2.2, 7.65);
       this.wall('Foyer south masonry east of garage passage', 8.45, 7.65, 9, 7.65);
       this.addGroundGarage();
     }
@@ -104,12 +108,12 @@ export class MansionGroundWing extends THREE.Group {
       { id: 'mansion-rear-west', minX: -3.8, maxX: -1.35, minZ: 3.52, maxZ: 3.78 },
       { id: 'mansion-rear-east', minX: 1.35, maxX: 3.8, minZ: 3.52, maxZ: 3.78 },
     );
-    this.castFrame(-1.35, 7.65);
-    this.castFrame(1.35, 7.65);
-    this.castFrame(-1.35, 12.6);
+    this.castFrame(westX, 7.65);
+    this.castFrame(eastX, 7.65);
+    this.castFrame(westX, 12.6);
     this.castFrame(9, 12.6);
     this.castFrame(9, 7.65);
-    this.castFrame(-1.35, 15.5);
+    this.castFrame(westX, 15.5);
     this.castFrame(9, 15.5);
     this.finishStairCirculation();
     fitColumns(this, [...this.editableWalls.values()]);
@@ -901,8 +905,9 @@ export class MansionGroundWing extends THREE.Group {
 
   private slab(name: string, width: number, depth: number, x: number, z: number, stairVoid = false): void {
     const concrete = siteMaterial('floor', 0xd1cbc1, width / 2.5, depth / 2.5);
+    const westEdge=x-width/2;
     const panels = stairVoid ? [
-      { w: 6.05, d: 5, x: 1.675, z: 10.1 },
+      { w: 4.7-westEdge, d: 5, x: (4.7+westEdge)/2, z: 10.1 },
       { w: .6, d: 5, x: 8.7, z: 10.1 },
       { w: 3.7, d: .4, x: 6.55, z: 7.8 },
       { w: 3.7, d: .4, x: 6.55, z: 12.4 },
@@ -915,7 +920,7 @@ export class MansionGroundWing extends THREE.Group {
       this.add(floor);
       // Give the worker's head room beside the flight, including a jump at
       // the edge of a tread. The floor edge remains supported below.
-      const roofPanel = stairVoid ? (panel.x < 4 ? {w:5.7,d:5,x:1.5,z:10.1}
+      const roofPanel = stairVoid ? (panel.x < 4 ? {w:4.35-westEdge,d:5,x:(4.35+westEdge)/2,z:10.1}
         : panel.x > 8 ? {w:.35,d:5,x:8.825,z:10.1}
         : panel.z > 12 ? {w:4.3,d:.1,x:6.5,z:12.55} : panel) : panel;
       const roof = new THREE.Mesh(new RoundedBoxGeometry(roofPanel.w, .18, roofPanel.d, 2, .012), siteMaterial('concrete', 0xc9c3b8, roofPanel.w / 2.2, roofPanel.d / 2.2));

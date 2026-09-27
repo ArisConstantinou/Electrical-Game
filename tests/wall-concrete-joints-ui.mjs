@@ -34,11 +34,20 @@ try{
    });
   });
  });
+ report.circulation=await page.evaluate(()=>{
+  const g=window.__wireTheHouse,wing=g.room.mansionWing,Box=g.pvc.targetGuideBounds.constructor;
+  const west=wing.editableWalls.get('Passage west fired-clay partition'),east=wing.editableWalls.get('Passage east fired-clay partition'),foyer=wing.editableWalls.get('Foyer west fired-clay partition');
+  const floor=new Box().setFromObject(g.room.getObjectByName('Rough supported passage slab'));
+  const supports=[];g.room.traverse(o=>{if(o.name==='Exposed cast concrete structural column'){const b=new Box().setFromObject(o),c=b.getCenter(o.position.clone());if(Math.abs(c.z-7.65)<.001&&c.x<2)supports.push({x:c.x,min:b.min.x,max:b.max.x});}});
+  return {westX:west.position.x,eastX:east.position.x,foyerX:foyer.position.x,floorMinX:floor.min.x,floorMaxX:floor.max.x,westInnerX:west.position.x+.05,eastInnerX:east.position.x-.05,supports};
+ });
  const pose=async(side,exterior=false)=>{
   await page.evaluate(({side,exterior})=>{const g=window.__wireTheHouse,c=g.renderer.camera;c.position.set(side*(exterior?1.2:1.18),1.65,exterior?4.15:3.12);c.lookAt(side*1.48,1.5,3.7);g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;c.updateMatrixWorld(true);}, {side,exterior});
   await page.evaluate(async()=>{const r=window.__wireTheHouse.renderer;await r.waitForFrame();r.render();await r.waitForFrame();});
  };
  for(const side of [-1,1])for(const exterior of [false,true]){await pose(side,exterior);await page.screenshot({path:`${out}/${side<0?'west':'east'}-${exterior?'outside':'inside'}.png`});}
+ await page.evaluate(async()=>{const g=window.__wireTheHouse,c=g.renderer.camera;c.position.set(-1.1,1.65,7.05);c.lookAt(-1.425,1.5,7.65);c.updateMatrixWorld(true);await g.renderer.waitForFrame();g.renderer.render();await g.renderer.waitForFrame();});
+ await page.screenshot({path:`${out}/foyer-continuation.png`});
  await pose(1);
  report.performance=await page.evaluate(async()=>{
   const g=window.__wireTheHouse,samples=[];for(let i=0;i<35;i++)window.jointStep(1/60);
@@ -56,6 +65,11 @@ try{
   near(joint.frontProjection,.025,'front projection');near(joint.backProjection,.025,'back projection');near(joint.clearOpening,2.7,'clear passage opening');
  }
  report.checks.push('15cm concrete and centred 10cm masonry leave 2.5cm on both faces and retain 2.7m clear opening');
+ assert(Math.abs(report.circulation.westX-report.circulation.foyerX)<.0001,'Passage and foyer wall centres must remain continuous');
+ assert(report.circulation.floorMinX<=report.circulation.westInnerX&&report.circulation.floorMaxX>=report.circulation.eastInnerX,'Slab must reach both inside masonry faces');
+ assert.equal(report.circulation.supports.length,2);
+ for(const support of report.circulation.supports){const centre=support.x<0?report.circulation.westX:report.circulation.eastX;assert(Math.abs(support.max-(centre+.05)-.025)<.0001);assert(Math.abs(centre-.05-support.min-.025)<.0001);}
+ report.checks.push('passage continues into centred foyer supports with its floor supported to both masonry faces');
  report.work=await page.evaluate(()=>{
   const g=window.__wireTheHouse,wing=g.room.mansionWing,c=g.renderer.camera,Box=g.pvc.targetGuideBounds.constructor,results=[];
   for(const side of [-1,1]){

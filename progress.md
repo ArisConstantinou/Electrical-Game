@@ -1802,6 +1802,7 @@ Final startup acceptance also verifies a delayed real tree request holds READY, 
 - Before runtime regression fails: rear masonry projects 1.5/3.5 cm, passage masonry is flush against one face of a 26 cm jamb. Same-camera receipts are in output/centered-column-joints/before/.
 - Candidate fits both passage-jamb normals to 15 cm and derives perpendicular masonry centres from the concrete bounds. Four contacts now measure exactly 2.5 cm per face, retain the opening, and have zero solid overlap; exposed clay caps stay absent at closed contacts.
 - Build/typecheck, eight construction/editor cases (201 supports, 137 walls, save/reload and retained custom dimensions), building contract (143 wall targets, native chisel work and damage restoration), joint work and mobile viewport checks pass. The original game skill client reaches gameplay and leaves no owned browser processes. Candidate images and receipts: output/centered-column-joints/.
+- A continuity regression also catches the next foyer joint and the slab edge after centring the passage. Carry the actual fitted centres into its continuation walls, supporting columns and floor/roof panels while retaining the stair aperture. This removes the lateral mismatch and supports both inside brick faces; the regression fails on the first candidate and passes after the adjoining geometry is updated.
 
 
 ## 2026-09-27 · Loading recovery and main-menu Performance Test
