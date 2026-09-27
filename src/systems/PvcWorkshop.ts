@@ -6,6 +6,7 @@ import type { BoxConduitEntry } from '../electrical/BoxGroup';
 import { buildToolModel } from '../player/ToolModels';
 import { workerHand,workerArm,poseWorkerArm,workerGripTarget,hideLegacyWorkerArm,type WorkerArm,type WorkerGripTarget } from '../player/WorkerArm';
 import { PvcBend,PVC,type PipeRecipe } from './PvcBend';
+import { PvcOffcuts } from './PvcOffcuts';
 import { PvcBendHighlight } from './PvcBendHighlight';
 import { PvcBendHUD } from '../ui/PvcBendHUD';
 import { PvcStock,PvcTube,part,pvcMaterial,pvcStockMaterial } from './PvcModels';
@@ -107,6 +108,7 @@ export class PvcWorkshop {
   private readonly markRing:THREE.Mesh;
   private cableKey='';
   private readonly offcuts:THREE.Mesh[]=[];
+  private readonly offcutMotion=new PvcOffcuts();
   private readonly queue:Array<()=>void>=[];
 
   private get touch():boolean{return matchMedia('(pointer:coarse)').matches;}
@@ -276,7 +278,7 @@ export class PvcWorkshop {
     // Flush work keeps the original square, level box view. Free trimming
     // follows the cutter; floor work keeps the eye above the supporting hand.
     const cutY=this.bend.topHeight-this.bend.at(this.cutS).x,focusY=cutY+p.y-(this.entry()?.position.y??p.y-this.target.boxGroup.groupHeight/2);
-    const distance=THREE.MathUtils.lerp(this.fitZoomed?.50:.68,.33,THREE.MathUtils.smoothstep(cutY,.45,.95));
+    const distance=THREE.MathUtils.lerp(this.fitZoomed?.38:.50,.33,THREE.MathUtils.smoothstep(cutY,.45,.95));
     this.cameraDestination.set(p.x,Math.max(.30,focusY),p.z+distance);this.cameraFocus.set(p.x,focusY,p.z+.02);
     const camera=new THREE.PerspectiveCamera();camera.position.copy(this.cameraDestination);camera.lookAt(this.cameraFocus);this.targetRotation.copy(camera.quaternion);
   }
@@ -358,6 +360,7 @@ export class PvcWorkshop {
     this.fastenerReturnPhase=['sealed','loose','batch'].includes(this.phase)?this.phase:'batch';this.transition('fastener-marking');this.setFocus();this.message='Σημάδεψε ελεύθερα τουλάχιστον δύο οπές μέσα στο chase.';
   }
   handleInput(dt:number,action:boolean,interaction:boolean):boolean{
+    this.offcutMotion.update(dt);
     if(!this.game.started)return false;
     if(this.apprenticeLease&&!this.focused)return false;
     if(action||interaction||this.queue.length)this.stockAimCache=null;
@@ -386,7 +389,7 @@ export class PvcWorkshop {
         // Up raises the support toward the free end; down follows the pipe
         // through its radius. This focused action never moves the player.
         const input=this.game.input,move=this.touch?input.mobileMove.y:Number(input.pressed('KeyS'))-Number(input.pressed('KeyW'));
-        const old=this.supportS??this.initialSupportS(),next=THREE.MathUtils.clamp(old+move*.24*dt,this.cutFrom+.025,this.bend.mark+.04);
+        const old=this.supportS??this.initialSupportS(),next=THREE.MathUtils.clamp(old+move*.24*dt,Math.min(this.cutLimit(),this.cutFrom+.025),this.cutLimit());
         // During a cut the loaded support stops before the blade. During
         // adjustment the shears pull aside so the hand can pass either side.
         this.supportS=this.phase==='cutting'&&Math.abs(this.supportPlaneGap(next))<.115?old:next;
@@ -434,9 +437,15 @@ export class PvcWorkshop {
   }
   private setCut(value:number):void{
     if(!['fitting','cut'].includes(this.phase)||!Number.isFinite(value))return;
-    const next=THREE.MathUtils.clamp(value,this.cutFrom,this.cutLimit());
-    if(next<=this.cutFrom+.001&&this.phase==='cut')return;
-    if(this.phase==='cut')this.transition('fitting');
+    let next=THREE.MathUtils.clamp(value,this.cutFrom,this.cutLimit());
+    const support=this.supportS??this.initialSupportS(),before=this.supportPlaneGap(support),after=this.supportPlaneGap(support,next);
+    // The only occupied band is the independently positioned support hand.
+    // Stop before its blade plane; moving W/S can free either side again.
+    if(Math.abs(before)>=.105&&(Math.abs(after)<.105||before*after<=0)){
+      let low=0,high=1;for(let i=0;i<24;i++){const t=(low+high)/2,gap=this.supportPlaneGap(support,THREE.MathUtils.lerp(this.cutS,next,t));if(Math.abs(gap)<.105||before*gap<=0)high=t;else low=t;}
+      next=THREE.MathUtils.lerp(this.cutS,next,low);
+    }
+    if(this.phase==='cut'&&next>this.cutFrom+.001)this.transition('fitting');
     this.cutS=next;this.cutSnapped=false;this.message='';this.setFitCamera();
   }
   private cutLimit():number{
@@ -596,8 +605,8 @@ export class PvcWorkshop {
         this.arrangePrepared();this.focused=false;this.transition(this.carried?'carrying':'batch');
       }
     }else if(this.phase==='cutting'&&this.elapsed>=.45){
-      const offcut=new PvcTube(pvcStockMaterial);offcut.update(this.bend,this.cutFrom,this.cutS);const p=this.target!.boxGroup.getWorldPosition(v());
-      offcut.position.set(p.x+.16+this.offcuts.length*.025,.015,p.z+.27);offcut.rotation.y=.3;this.game.renderer.scene.add(offcut);this.offcuts.push(offcut);
+      const offcut=new PvcTube(pvcStockMaterial);offcut.update(this.bend,this.cutFrom,this.cutS);this.orientAtBox(offcut,.07);
+      this.offcutMotion.release(offcut);this.game.renderer.scene.add(offcut);this.offcuts.push(offcut);
       this.cutFrom=this.cutS;this.cutErrorMm=this.fitError();this.transition('cut');
       if(this.carried){this.carried.cutFrom=this.cutFrom;this.carried.mesh.update(this.bend,this.cutFrom);}
     }else if(this.phase==='installing'&&this.elapsed>=.6){
@@ -837,11 +846,12 @@ export class PvcWorkshop {
       const root=new THREE.Object3D();this.orientAtBox(root,this.phase==='installing'?.07*(1-this.elapsed/.6):.07);
       this.pipe.position.copy(c.worldToLocal(root.position.clone()));this.pipe.quaternion.copy(c.quaternion.clone().invert().multiply(root.quaternion));
       const cut=this.bend.at(this.cutS),world=v(cut.x,cut.y,0).applyQuaternion(root.quaternion).add(root.position);
-      this.cutRing.position.copy(world);this.cutRing.quaternion.setFromUnitVectors(v(0,0,1),v(0,1,0));this.cutRing.visible=this.phase==='fitting';
+      this.cutRing.position.copy(world);this.cutRing.visible=this.phase==='fitting';
       // The blade lies in model XY. Its normal follows the pipe's local
       // tangent, so a vertical installed run is cut with horizontal shears.
       const before=this.bend.at(Math.max(0,this.cutS-.001)),after=this.bend.at(this.cutS+.001);
       const normal=v(before.x-after.x,before.y-after.y,0).normalize().applyQuaternion(root.quaternion);
+      this.cutRing.quaternion.setFromUnitVectors(v(0,0,1),normal);
       const tip=c.worldToLocal(world.clone()),q=c.quaternion.clone().invert().multiply(new THREE.Quaternion().setFromUnitVectors(v(0,0,1),normal));
       this.cutter.quaternion.copy(q);this.cutter.position.copy(tip).sub(v().fromArray(this.cutter.userData.tipPoint).applyQuaternion(q));
       this.cutter.position.add(v(.23,0,.025).multiplyScalar(this.cutterRetreat));

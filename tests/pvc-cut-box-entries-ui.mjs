@@ -59,16 +59,21 @@ try{
    row.performance=await measure(page);continue;
   }
   // Trimming remains available after a successful cut, independent of fitting.
+  // The support is now independent: move it clear with native W/S before
+  // asking the blade to travel across its occupied band.
+  await page.evaluate(()=>{window.__wireTheHouse.pvc.supportS=.85;});
   await page.evaluate(()=>{const g=window.__wireTheHouse;g.player.lookHandler(0,.015/.0006);});await step(2);
   assert.equal((await state()).phase,'fitting');await cut();assert.equal((await state()).offcuts,2);
   await key('KeyE');assert.equal((await state()).phase,'cut','A deliberately short pipe may be cut but cannot be installed');
   check('short free cuts are retained instead of undone',/κοντή/.test((await state()).message),await state());
-  await page.evaluate(()=>{const g=window.__wireTheHouse,p=g.pvc;g.player.lookHandler(0,(p.bend.mark+.2-.004-p.cutS)/.0006);});await step(70);
+  await page.evaluate(()=>{const g=window.__wireTheHouse,p=g.pvc;p.supportS=p.cutFrom+.025;g.player.lookHandler(0,(p.bend.mark+.2-.004-p.cutS)/.0006);});await step(70);
   check('lowest curved cut keeps both hands above the floor',await page.evaluate(()=>window.__wireTheHouse.pvc.arms.every(a=>a.wrist.y>=.015)),await state());
   await cut();check('complete low cut through the upright curve',(await state()).phase==='cut'&&(await state()).cutHeightCm<3,await state());await snap('lowest-cut');
   // Restore an uncut stock pipe for the independent flush / install scenario.
-  await page.evaluate(()=>{const p=window.__wireTheHouse.pvc;p.cutFrom=0;p.carried.cutFrom=0;p.carried.mesh.update(p.bend);p.phase='fitting';});await step(2);
+  await page.evaluate(()=>{const p=window.__wireTheHouse.pvc;p.cutFrom=0;p.carried.cutFrom=0;p.carried.mesh.update(p.bend);p.phase='fitting';p.cutS=p.flushCut();p.supportS=null;});await step(2);
   await page.evaluate(()=>{const g=window.__wireTheHouse;g.player.lookHandler(0,(.02-g.pvc.cutS)/.0006);});await step(70);
+  // Keep the independent support below the high blade and within arm reach.
+  await page.evaluate(()=>{window.__wireTheHouse.pvc.supportS=.45;});await step(3);
   await snap('high-cut');
   row.highPose=await page.evaluate(()=>{const g=window.__wireTheHouse,p=g.pvc,point=p.pipe.localToWorld(g.renderer.camera.position.clone().set(p.bend.at(p.cutS).x,p.bend.at(p.cutS).y,0)).project(g.renderer.camera);return{point:point.toArray(),body:g.workerBody.telemetry,hands:['L','R'].map(s=>g.workerBody.point('hand.'+s).toArray()),camera:g.renderer.camera.position.toArray(),drivers:p.arms.map(a=>({side:a.side,shoulder:a.shoulder.toArray(),wrist:a.wrist.toArray()}))};});
   check('high cuts remain visible and retain actual worker hand contact',Math.abs(row.highPose.point[0])<1&&Math.abs(row.highPose.point[1])<1&&Object.values(row.highPose.body.gripReachErrors).every(e=>e<.008),row.highPose);
