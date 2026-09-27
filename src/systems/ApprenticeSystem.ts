@@ -575,6 +575,12 @@ export class ApprenticeSystem {
     for(const mate of this.crew)if(this.phase!=='blocked'||this.blockedFrom!=='pipe')mate.update(dt,this.game.started&&mate.index<=this.count);
     this.body.visible=this.game.started&&this.count>=1;this.hammer.visible=this.count>=1;this.camera.visible=this.game.started&&this.count>=1;
     if(!this.game.started||this.count===0||!this.body.loaded){this.presentUI();return;}
+    const wasHammerHeld=this.hasHammer&&this.rig.visible;
+    if(!this.hasHammer&&!this.workTool&&['idle','done','directed'].includes(this.phase)){
+      // The existing world tool is prepared before READY. Equip that same
+      // model at START and after other jobs, using its real two-hand grips.
+      this.hammerParent.attach(this.hammer);this.hasHammer=true;
+    }
     dt=Math.min(dt,.05);this.elapsed+=dt;this.waiting=false;this.velocity.set(0,0,0);
     if(this.phase==='directed'&&this.groundTarget){
       if(this.moveTo(this.groundTarget,dt))this.finishGroundOrder();
@@ -590,13 +596,27 @@ export class ApprenticeSystem {
     }
     if(this.phase==='lifting'){this.camera.position.y=THREE.MathUtils.damp(this.camera.position.y,1.65,4,dt);if(this.elapsed>1){this.phase='walking';this.path=[];this.message='Μεταφέρω το κάγκο στην επιβεβαιωμένη περιοχή';}}
     if(this.phase==='walking'&&this.job){this.camera.position.y=THREE.MathUtils.damp(this.camera.position.y,1.65,6,dt);if(this.moveTo({x:this.job.anchor.x,z:FRONT+.8},dt)){this.phase='breaking';this.elapsed=0;this.cooldown=0;}}
-    this.rig.visible=this.hasHammer||this.phase==='picking-up';this.rig.beginFrame(dt,null,this.phase==='breaking');this.rig.update(dt,this.velocity.lengthSq()>.01);this.rig.show('hammer');
+    this.rig.visible=(this.hasHammer||this.phase==='picking-up')&&!this.workTool;this.rig.beginFrame(dt,null,this.phase==='breaking');this.rig.update(dt,this.velocity.lengthSq()>.01);this.rig.show('hammer');
     if(this.phase==='breaking'&&this.job)this.breakWall(dt);
     if(this.phase==='construction')this.updateConstruction(dt);
     if(this.phase==='pipe')this.updatePipe(dt);
-    else if(this.phase!=='breaking'&&this.hasHammer){
+    this.rig.visible=(this.hasHammer||this.phase==='picking-up')&&!this.workTool;
+    if(this.phase!=='breaking'&&this.hasHammer&&!this.workTool){
+      if(this.phase!=='lifting'&&this.phase!=='picking-up'){
+        // Leave the low cutting posture before carrying again. Preserve the
+        // horizontal facing as yaw so a pitched lookAt cannot roll the body.
+        const facing=this.camera.getWorldDirection(new THREE.Vector3());
+        this.camera.position.y=THREE.MathUtils.damp(this.camera.position.y,1.65,6,dt);
+        this.camera.rotation.set(THREE.MathUtils.damp(Math.asin(THREE.MathUtils.clamp(facing.y,-1,1)),0,8,dt),Math.atan2(-facing.x,-facing.z),0,'YXZ');
+        // Finish standing before presenting the heavy tool in both hands;
+        // its standing carry grips cannot be reached from the low cut pose.
+        this.rig.visible=this.camera.position.y>=1.55&&Math.abs(this.camera.rotation.x)<.25;
+      }
       this.rig.restHammer(this.camera);
       const target=this.hammer.getWorldPosition(new THREE.Vector3()),rotation=this.hammer.getWorldQuaternion(new THREE.Quaternion()),alpha=1-Math.exp(-8*dt);
+      if(!wasHammerHeld&&this.phase!=='lifting'){
+        this.carriedPosition.copy(target);this.carriedRotation.copy(rotation);
+      }
       this.carriedPosition.lerp(target,alpha);this.carriedRotation.slerp(rotation,alpha);
       this.hammer.position.copy(this.hammer.parent!.worldToLocal(this.carriedPosition.clone()));
       this.hammer.quaternion.copy(this.hammer.parent!.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(this.carriedRotation));this.hammer.updateWorldMatrix(false,true);this.rig.poseArms(this.camera);
@@ -629,9 +649,9 @@ export class ApprenticeSystem {
       job.step='approach';job.elapsed=0;this.path=[];
     }
     if(job.step==='approach'){
-      this.camera.position.y=THREE.MathUtils.damp(this.camera.position.y,job.kind==='socket'?.95:1.70,5,dt);
       const approach=pvc.stock.sitePoint(localCentre.x-.31,localCentre.y,localCentre.z-.10);
       if(!this.moveTo({x:approach.x,z:approach.z},dt))return;
+      this.camera.position.y=THREE.MathUtils.damp(this.camera.position.y,job.kind==='socket'?.95:1.70,5,dt);
       job.step='cut';job.elapsed=0;this.holdWorkTool('cutter');
     }
     if(job.step==='wait-crew'){
