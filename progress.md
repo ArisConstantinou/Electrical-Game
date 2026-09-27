@@ -1,5 +1,14 @@
 Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web game named WIRE THE HOUSE, based on real Cyprus residential first-fix practices, editable in Web Game Studio, playable on desktop/mobile, deployed to arisconstantinou/Electrical-Game via GitHub Pages, and ending at FIRST FIX COMPLETE without cable pulling.
 
+## 2026-09-27 · Stair-view frame deadline correction
+
+- Isolated from public `619380c` on `codex/stairs-fps-20260927`; primary dirty work and the sole 5365 listener are protected. Candidate tests intercept the existing origin's requests rather than replacing the shared preview.
+- The RAF timestamp can precede callback execution. Comparing it with the previous frame's completion deadline skipped available frames. Compare the deadline with `performance.now()` while retaining RAF simulation time, the existing overload recovery interval, pending-GPU protection and bounded physics steps.
+- The production-loop regression fails on the baseline and passes after correction. Same-page clock-only runtime pairs improve 46.0→51.4 and 47.1→53.6 FPS; separate WebGPU landing sweep 63.3→74.4 FPS, p95 23.7→16.9 ms. Separate-run variance prevents extrapolating these gains to a phone. Build `index-CHjxVmch.js` passes; details and complete timing summary: `docs/STAIRS_FPS_TASK.md`, `docs/performance/2026-09-27-stairs.json`.
+- Sector splitting, additional camera-frustum compaction and authored-asset caching did not deliver reliable net FPS gains and were discarded. The final change does not alter visuals, resolution or gameplay.
+- Physical-phone FPS and the exact user PC 110→30 drop remain unverified. Public promotion is pending acceptance; a source correction alone does not establish constant 60 FPS.
+- Final candidate checks pass building packing/editor restoration, desktop/touch stair circulation, demolition and save restoration, touch hose freeze/resume on WebGL/WebGPU, and the real develop-web-game client. Queued input passes in a scoped optical-boundary fixture; stale legacy lifecycle selectors/startup fixtures are disclosed in the report. All 25 managed browser ownership reports show clean closure. First-view landing spikes up to 92.9 ms remain; this is a targeted timing correction, not a verified cure for every mobile slowdown.
+
 ## 2026-09-26 · Combined delivery and performance repair
 
 - User explicitly requested completion, whole-game FPS/glitch checks, and commit/push of all latest poses, tools and visual upgrades.

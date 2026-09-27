@@ -1322,9 +1322,10 @@ export class Game {
     // positions and shadows. Keep elapsed time until the next accepted frame;
     // keyboard/touch intent and mouse angles continue to accumulate meanwhile.
     if(this.renderer.framePending){this.animationFrame=requestAnimationFrame(this.loop);return;}
-    // Leave recovery time only after a genuinely overloaded frame. A steady
-    // 20 ms scene must not be throttled from ~50 to ~40 FPS.
-    if(time<this.nextGameFrameAt){this.animationFrame=requestAnimationFrame(this.loop);return;}
+    // RAF's timestamp describes the animation frame, not when this callback
+    // actually runs. Compare the recovery deadline with execution time so a
+    // delayed callback does not discard an already available frame.
+    if(performance.now()<this.nextGameFrameAt){this.animationFrame=requestAnimationFrame(this.loop);return;}
     try{
     const frameStart=performance.now();
     const elapsed = Math.max(0,Math.min((time - this.lastTime) / 1000,.25));

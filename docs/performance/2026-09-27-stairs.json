@@ -1,0 +1,555 @@
+{
+  "date": "2026-09-27",
+  "base": "619380c02ae961b8df286ba3b118c260214e7abe",
+  "build": "index-CHjxVmch.js",
+  "hardware": "Intel Core Ultra 9 285K; NVIDIA RTX 5080; Windows Chrome headless",
+  "scope": "The fix changes only the recovery-deadline clock comparison. No rendering quality or simulation parameters changed.",
+  "clockAblation": {
+    "note": "Same baseline build, fixed landing camera, 5 apprentices; only deadline clock comparison changed at runtime. Recovery wait retained.",
+    "results": [
+      {
+        "mode": "before",
+        "fps": 46.00722970780275,
+        "p95": 25.600000023841858,
+        "cpuMs": 19.266304348473962
+      },
+      {
+        "mode": "correct-clock",
+        "fps": 51.44469695139052,
+        "p95": 22.800000071525574,
+        "cpuMs": 18.867149760757666
+      },
+      {
+        "mode": "before",
+        "fps": 47.095368120725176,
+        "p95": 24.899999976158142,
+        "cpuMs": 18.837566138575315
+      },
+      {
+        "mode": "correct-clock",
+        "fps": 53.59992022273738,
+        "p95": 22,
+        "cpuMs": 18.10694444510672
+      }
+    ]
+  },
+  "profiles": [
+    {
+      "name": "deadline-before-pc-desktop-webgpu",
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "dpr": 1,
+      "method": "5 apprentices; hammer; 3.4 s yaw sweep; production build served by browser request interception on sole port 5365",
+      "readyMs": 9247,
+      "errors": [],
+      "cases": [
+        {
+          "name": "foyer-stairs",
+          "fps": 76.48917634071486,
+          "frameMs": {
+            "samples": 259,
+            "mean": 13.07374517337696,
+            "p50": 13.099999904632568,
+            "p95": 16.5,
+            "max": 17.799999952316284
+          },
+          "stepMs": {
+            "samples": 260,
+            "mean": 10.63923076574619,
+            "p50": 10.5,
+            "p95": 13.700000047683716,
+            "max": 15.899999976158142
+          },
+          "drawCalls": 417,
+          "triangles": 3798251,
+          "canvas": [
+            1366,
+            768
+          ],
+          "camera": [
+            3.8,
+            1.65,
+            8.5
+          ],
+          "firstView": {
+            "frames": 41,
+            "maxIntervalMs": 16.899999976158142
+          },
+          "gpu": "WebGPU",
+          "heapMB": 458.95211601257324,
+          "longTasks": []
+        },
+        {
+          "name": "ground-landing-down",
+          "fps": 63.34335042041705,
+          "frameMs": {
+            "samples": 215,
+            "mean": 15.78697674440783,
+            "p50": 14.800000071525574,
+            "p95": 23.700000047683716,
+            "max": 39.299999952316284
+          },
+          "stepMs": {
+            "samples": 216,
+            "mean": 13.270370369708097,
+            "p50": 12.5,
+            "p95": 20.299999952316284,
+            "max": 34.5
+          },
+          "drawCalls": 504,
+          "triangles": 4052911,
+          "canvas": [
+            1366,
+            768
+          ],
+          "camera": [
+            6.5,
+            3.3,
+            11.6
+          ],
+          "firstView": {
+            "frames": 42,
+            "maxIntervalMs": 17
+          },
+          "gpu": "WebGPU",
+          "heapMB": 467.26197052001953,
+          "longTasks": []
+        }
+      ]
+    },
+    {
+      "name": "deadline-after-pc-desktop-webgpu",
+      "viewport": {
+        "width": 1366,
+        "height": 768
+      },
+      "dpr": 1,
+      "method": "5 apprentices; hammer; 3.4 s yaw sweep; production build served by browser request interception on sole port 5365",
+      "readyMs": 9044,
+      "errors": [],
+      "cases": [
+        {
+          "name": "foyer-stairs",
+          "fps": 79.69885010257929,
+          "frameMs": {
+            "samples": 271,
+            "mean": 12.54723247214877,
+            "p50": 12.5,
+            "p95": 15.399999976158142,
+            "max": 21.600000023841858
+          },
+          "stepMs": {
+            "samples": 272,
+            "mean": 10.18639705680749,
+            "p50": 10,
+            "p95": 13,
+            "max": 19.399999976158142
+          },
+          "drawCalls": 417,
+          "triangles": 3798251,
+          "canvas": [
+            1366,
+            768
+          ],
+          "camera": [
+            3.8,
+            1.65,
+            8.5
+          ],
+          "firstView": {
+            "frames": 44,
+            "maxIntervalMs": 17
+          },
+          "gpu": "WebGPU",
+          "heapMB": 455.15210914611816,
+          "longTasks": []
+        },
+        {
+          "name": "ground-landing-down",
+          "fps": 74.35821776335203,
+          "frameMs": {
+            "samples": 252,
+            "mean": 13.448412698412698,
+            "p50": 13.399999976158142,
+            "p95": 16.899999976158142,
+            "max": 21.299999952316284
+          },
+          "stepMs": {
+            "samples": 253,
+            "mean": 11.201976288919864,
+            "p50": 10.799999952316284,
+            "p95": 14.399999976158142,
+            "max": 18.799999952316284
+          },
+          "drawCalls": 505,
+          "triangles": 4051305,
+          "canvas": [
+            1366,
+            768
+          ],
+          "camera": [
+            6.5,
+            3.3,
+            11.6
+          ],
+          "firstView": {
+            "frames": 32,
+            "maxIntervalMs": 92.89999997615814
+          },
+          "gpu": "WebGPU",
+          "heapMB": 471.8979949951172,
+          "longTasks": []
+        }
+      ]
+    },
+    {
+      "name": "final-before-portrait-webgl",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "dpr": 2,
+      "method": "5 apprentices; hammer; 3.4 s yaw sweep; production build served by browser request interception on sole port 5365",
+      "readyMs": 12692,
+      "errors": [],
+      "cases": [
+        {
+          "name": "foyer-stairs",
+          "fps": 69.64939204393241,
+          "frameMs": {
+            "samples": 236,
+            "mean": 14.357627118543043,
+            "p50": 14.199999928474426,
+            "p95": 18.09999990463257,
+            "max": 22.899999976158142
+          },
+          "stepMs": {
+            "samples": 237,
+            "mean": 12.252742608891257,
+            "p50": 12,
+            "p95": 14.600000023841858,
+            "max": 20.200000047683716
+          },
+          "drawCalls": 293,
+          "triangles": 3123701,
+          "canvas": [
+            682,
+            1477
+          ],
+          "camera": [
+            3.8,
+            1.65,
+            8.5
+          ],
+          "firstView": {
+            "frames": 32,
+            "maxIntervalMs": 46.199999928474426
+          },
+          "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+          "heapMB": 411.73546981811523,
+          "longTasks": []
+        },
+        {
+          "name": "ground-flight-up",
+          "fps": 72.51930900198751,
+          "frameMs": {
+            "samples": 246,
+            "mean": 13.789430894502779,
+            "p50": 13.5,
+            "p95": 17.5,
+            "max": 23.600000023841858
+          },
+          "stepMs": {
+            "samples": 247,
+            "mean": 11.829959509343754,
+            "p50": 11.5,
+            "p95": 14.600000023841858,
+            "max": 22.300000071525574
+          },
+          "drawCalls": 177,
+          "triangles": 2975724,
+          "canvas": [
+            682,
+            1477
+          ],
+          "camera": [
+            5.5,
+            2.55,
+            9.5
+          ],
+          "firstView": {
+            "frames": 38,
+            "maxIntervalMs": 42.200000047683716
+          },
+          "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+          "heapMB": 427.0381202697754,
+          "longTasks": []
+        },
+        {
+          "name": "ground-landing-down",
+          "fps": 49.93647135371602,
+          "frameMs": {
+            "samples": 169,
+            "mean": 20.025443786700098,
+            "p50": 16.199999928474426,
+            "p95": 20,
+            "max": 267.89999997615814
+          },
+          "stepMs": {
+            "samples": 181,
+            "mean": 16.128176793867713,
+            "p50": 13.200000047683716,
+            "p95": 16.299999952316284,
+            "max": 266.10000002384186
+          },
+          "drawCalls": 482,
+          "triangles": 3696794,
+          "canvas": [
+            682,
+            1477
+          ],
+          "camera": [
+            6.5,
+            3.3,
+            11.6
+          ],
+          "firstView": {
+            "frames": 34,
+            "maxIntervalMs": 23.5
+          },
+          "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+          "heapMB": 446.3868293762207,
+          "longTasks": [
+            {
+              "start": 25797.699999928474,
+              "duration": 266
+            },
+            {
+              "start": 26085.199999928474,
+              "duration": 143
+            },
+            {
+              "start": 26297.699999928474,
+              "duration": 218
+            }
+          ]
+        },
+        {
+          "name": "L2-stairwell",
+          "fps": 68.54981680700696,
+          "frameMs": {
+            "samples": 232,
+            "mean": 14.587931034379992,
+            "p50": 14.399999976158142,
+            "p95": 18.5,
+            "max": 28.300000071525574
+          },
+          "stepMs": {
+            "samples": 233,
+            "mean": 12.458369098507795,
+            "p50": 12.199999928474426,
+            "p95": 14.899999976158142,
+            "max": 24.600000023841858
+          },
+          "drawCalls": 255,
+          "triangles": 3096642,
+          "canvas": [
+            682,
+            1477
+          ],
+          "camera": [
+            7.5,
+            8.25,
+            8
+          ],
+          "firstView": {
+            "frames": 43,
+            "maxIntervalMs": 17.5
+          },
+          "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+          "heapMB": 455.12755584716797,
+          "longTasks": []
+        }
+      ]
+    },
+    {
+      "name": "deadline-after-portrait-webgl",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "dpr": 2,
+      "method": "5 apprentices; hammer; 3.4 s yaw sweep; production build served by browser request interception on sole port 5365",
+      "readyMs": 11669,
+      "errors": [],
+      "cases": [
+        {
+          "name": "foyer-stairs",
+          "fps": 102.02581517672738,
+          "frameMs": {
+            "samples": 347,
+            "mean": 9.80144092225891,
+            "p50": 9.399999976158142,
+            "p95": 13.5,
+            "max": 18.699999928474426
+          },
+          "stepMs": {
+            "samples": 348,
+            "mean": 9.481609198896365,
+            "p50": 9.100000023841858,
+            "p95": 13.100000023841858,
+            "max": 18.399999976158142
+          },
+          "drawCalls": 293,
+          "triangles": 3123701,
+          "canvas": [
+            682,
+            1477
+          ],
+          "camera": [
+            3.8,
+            1.65,
+            8.5
+          ],
+          "firstView": {
+            "frames": 59,
+            "maxIntervalMs": 15.200000047683716
+          },
+          "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+          "heapMB": 424.06855392456055,
+          "longTasks": []
+        },
+        {
+          "name": "ground-flight-up",
+          "fps": 107.24569547798446,
+          "frameMs": {
+            "samples": 365,
+            "mean": 9.324383561905115,
+            "p50": 8.800000071525574,
+            "p95": 12.899999976158142,
+            "max": 17.600000023841858
+          },
+          "stepMs": {
+            "samples": 366,
+            "mean": 9.01393443020315,
+            "p50": 8.5,
+            "p95": 12.5,
+            "max": 17.399999976158142
+          },
+          "drawCalls": 177,
+          "triangles": 2975724,
+          "canvas": [
+            682,
+            1477
+          ],
+          "camera": [
+            5.5,
+            2.55,
+            9.5
+          ],
+          "firstView": {
+            "frames": 62,
+            "maxIntervalMs": 13.200000047683716
+          },
+          "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+          "heapMB": 425.52293395996094,
+          "longTasks": []
+        },
+        {
+          "name": "ground-landing-down",
+          "fps": 78.20338782923199,
+          "frameMs": {
+            "samples": 265,
+            "mean": 12.787169811410724,
+            "p50": 10.700000047683716,
+            "p95": 13.799999952316284,
+            "max": 211.70000004768372
+          },
+          "stepMs": {
+            "samples": 275,
+            "mean": 11.828000005375255,
+            "p50": 10.300000071525574,
+            "p95": 13.299999952316284,
+            "max": 211.5
+          },
+          "drawCalls": 482,
+          "triangles": 3696794,
+          "canvas": [
+            682,
+            1477
+          ],
+          "camera": [
+            6.5,
+            3.3,
+            11.6
+          ],
+          "firstView": {
+            "frames": 45,
+            "maxIntervalMs": 18.5
+          },
+          "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+          "heapMB": 441.2977981567383,
+          "longTasks": [
+            {
+              "start": 25056.799999952316,
+              "duration": 212
+            },
+            {
+              "start": 25290,
+              "duration": 107
+            },
+            {
+              "start": 25547.199999928474,
+              "duration": 164
+            }
+          ]
+        },
+        {
+          "name": "L2-stairwell",
+          "fps": 105.66790924374631,
+          "frameMs": {
+            "samples": 360,
+            "mean": 9.463611111044884,
+            "p50": 9.199999928474426,
+            "p95": 12.5,
+            "max": 17.199999928474426
+          },
+          "stepMs": {
+            "samples": 361,
+            "mean": 9.161218835376307,
+            "p50": 8.899999976158142,
+            "p95": 12,
+            "max": 17
+          },
+          "drawCalls": 255,
+          "triangles": 3096642,
+          "canvas": [
+            682,
+            1477
+          ],
+          "camera": [
+            7.5,
+            8.25,
+            8
+          ],
+          "firstView": {
+            "frames": 64,
+            "maxIntervalMs": 12.099999904632568
+          },
+          "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+          "heapMB": 462.5713005065918,
+          "longTasks": []
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "Desktop-host portrait emulation is not physical-phone evidence.",
+    "Separate runs varied with machine load; use the repeated same-page clock ablation as the strongest causal FPS evidence.",
+    "The exact user 110-to-30 drop was not reproduced on this test hardware.",
+    "60 FPS is not sustained in every observed workload; expensive scene traversal, draws and first-view preparation remain.",
+    "Snapshots show instantaneous HUD FPS; report numbers describe the camera-sweep sample."
+  ]
+}
