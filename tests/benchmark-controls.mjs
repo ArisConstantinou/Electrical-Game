@@ -33,11 +33,11 @@ await runManagedClient(session,180000,async()=>{
  result.cases.push('delayed-fresh-navigation');
  await page.evaluate(()=>{Object.defineProperty(navigator,'canShare',{configurable:true,value:()=>true});Object.defineProperty(navigator,'share',{configurable:true,value:async data=>{window.__shareEvidence=await Promise.all(data.files.map(async f=>({name:f.name,type:f.type,size:f.size,text:f.type==='text/plain'?await f.text():null})));}});});
  await page.locator('#share').click();await page.waitForFunction(()=>window.__shareEvidence);
- const shared=await page.evaluate(()=>window.__shareEvidence);assert.equal(JSON.parse(shared[0].text).schema,3);assert(shared[0].name.endsWith('.txt'));
+ const shared=await page.evaluate(()=>window.__shareEvidence);assert.equal(JSON.parse(shared[0].text).schema,4);assert(shared[0].name.endsWith('.txt'));
  assert(shared.slice(1).every(f=>f.type==='image/jpeg'&&f.size>100));result.cases.push('native-share-bundle-with-images');
  await page.evaluate(()=>Object.defineProperty(navigator,'share',{configurable:true,value:async()=>{throw new DOMException('Cancelled','AbortError');}}));
  let downloads=0;page.on('download',()=>downloads++);await page.locator('#share').click();await page.waitForTimeout(200);assert.equal(downloads,0,'Cancel does not silently download');result.cases.push('share-cancellation');
- await page.evaluate(()=>Object.defineProperty(navigator,'canShare',{configurable:true,value:()=>false}));const downloading=page.waitForEvent('download');await page.locator('#share').click();const downloaded=await downloading;await downloaded.saveAs(path.join(out,'fallback.json'));assert.equal(JSON.parse(await readFile(path.join(out,'fallback.json'),'utf8')).schema,3);result.cases.push('share-download-fallback');
+ await page.evaluate(()=>Object.defineProperty(navigator,'canShare',{configurable:true,value:()=>false}));const downloading=page.waitForEvent('download');await page.locator('#share').click();const downloaded=await downloading;await downloaded.saveAs(path.join(out,'fallback.json'));assert.equal(JSON.parse(await readFile(path.join(out,'fallback.json'),'utf8')).schema,4);result.cases.push('share-download-fallback');
  const landscape=await session.browser.newContext({viewport:{width:844,height:390},isMobile:true,hasTouch:true});await routeBuildingDist(landscape);
  const lp=await landscape.newPage();await lp.goto('http://127.0.0.1:5365/Electrical-Game/perf/');await lp.locator('#begin').waitFor();
  assert.equal(await lp.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await lp.screenshot({path:path.join(out,'landscape-prompt.png')});

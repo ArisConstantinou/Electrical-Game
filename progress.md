@@ -1,5 +1,15 @@
 Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web game named WIRE THE HOUSE, based on real Cyprus residential first-fix practices, editable in Web Game Studio, playable on desktop/mobile, deployed to arisconstantinou/Electrical-Game via GitHub Pages, and ending at FIRST FIX COMPLETE without cable pulling.
 
+## 2026-09-27 · Benchmark diagnostics v4 (in progress)
+
+- User approved additional diagnostics, visible FPS/top navigation and inspection of every room. Isolated branch `codex/benchmark-diagnostics` starts at `beca275` in the existing managed worktree. The integration listener remains PID 42244 on sole port 5365; unrelated dirty primary files stay protected.
+- Baseline mobile screenshot/test proves overlap with FPS and top rail. Candidate passes 430×745, 320×740, 844×390 and 1366×768, including actual FPS/navigation visibility.
+- Normal-physics feasibility completes 414 checkpoints over two passes, covering 24 internal spaces and six exterior/veranda spaces. L1/L2 east access uses its real 3.5 m z doorway centre; collisions were preserved.
+- Full real-time QA completed in 970.7 seconds: both inspections of all 30 spaces, 83,372 performance intervals, all six functional checks passed and no application errors. Geometry/texture endpoints stayed at 1,467/89. Periodic QA screenshots affect raw timings; this is not physical-iPhone performance proof.
+- Actual CPU-blocking, exception, failed-image, unsupported-API, partial-coverage, restart/share/capture-budget cases pass. The short test-only route proves functional FPS/HUD samples stay outside performance measurement. The actual skill client ran and its screenshot/state were inspected. Final integration/publication receipts are recorded separately in `output/benchmark-release.json`.
+- Capture budgeting now combines snapshot and encoding CPU cost; late pass endpoints replace periodic resource history if its bounded buffer fills. Dedicated regression checks cover these boundaries.
+- Design and measurement boundaries: `docs/BENCHMARK_DIAGNOSTICS.md`. No agents, installation, dependency, model or graphics-quality changes. Physical iPhone stable 60 FPS remains unverified.
+
 ## 2026-09-27 · Mobile FPS continuation
 
 - User authorized continuing after the physical 48.9 FPS iPhone report. Reused the clean managed worktree on `codex/mobile-frame-stalls` from protected `1b1caa7`; sole 5365 listener and dirty primary checkout remain untouched during candidate QA. No agents/install/model change.
