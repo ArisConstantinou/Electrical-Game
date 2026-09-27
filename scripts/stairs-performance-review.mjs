@@ -12,10 +12,11 @@ const portrait = process.argv.includes('--portrait'), webgl = process.argv.inclu
 const label = option('--label') ?? 'published';
 const dist = option('--dist');
 const tool = option('--tool') ?? 'hammer';
+const iphoneViewport = process.argv.includes('--iphone-viewport');
 const out = path.resolve('output/stairs-performance', label + (portrait ? '-portrait' : '-desktop') + (webgl ? '-webgl' : '-webgpu'));
 await mkdir(out, { recursive: true });
 const report = { label, dist, environment: 'Windows Chrome headless; portrait is viewport emulation, not a physical phone',
-  viewport: portrait ? { width: 390, height: 844 } : { width: 1366, height: 768 }, dpr: portrait ? 2 : 1, cases: [], errors: [] };
+  viewport: iphoneViewport ? { width: 430, height: 745 } : portrait ? { width: 390, height: 844 } : { width: 1366, height: 768 }, dpr: iphoneViewport ? 3 : portrait ? 2 : 1, cases: [], errors: [] };
 const session = await launchManagedBrowser(chromium, { channel: 'chrome', headless: true, screenshotDir: out });
 await runManagedClient(session, 210000, async () => {
   const context = await session.browser.newContext({ viewport: report.viewport, deviceScaleFactor: report.dpr, isMobile: portrait, hasTouch: portrait });
@@ -33,7 +34,7 @@ await runManagedClient(session, 210000, async () => {
   await page.goto(`${origin}/Electrical-Game/${webgl ? '?renderer=webgl' : ''}`);
   await page.waitForFunction(() => window.__wireTheHouse?.isReadyForStart && !document.querySelector('#start-button')?.disabled, null, { timeout: 120000 });
   report.readyMs = Date.now() - started;
-  await page.locator('#apprentice-count').selectOption('5');
+  await page.locator('#apprentice-count').selectOption(option('--apprentices') ?? '5');
   await page.locator('#start-button').click();
   report.assetTransforms = await page.evaluate(async () => {
     const g = window.__wireTheHouse, assets = g.room.mansionWing.editableAssets;
@@ -60,6 +61,8 @@ await runManagedClient(session, 210000, async () => {
     { name: 'L2-stairwell', x: 7.5, y: 8.25, z: 8, yaw: Math.PI, pitch: -.5 },
     { name: 'B1-stairwell', x: 5.5, y: -1.0, z: 9.5, yaw: Math.PI, pitch: .2 },
     { name: 'street', x: 23, y: 1.65, z: -14, yaw: 2.54, pitch: .15 },
+    { name: 'courtyard', x: 13, y: 1.7, z: 12, yaw: -1.5, pitch: -.1 },
+    { name: 'L3-landing', x: 6.5, y: 9.9, z: 11.6, yaw: -4.6, pitch: -.1 },
   ];
   if (process.argv.includes('--brief')) poses.splice(2);
   if (process.argv.includes('--landing-only')) poses.splice(0, poses.length, poses[3]);
@@ -123,6 +126,7 @@ await runManagedClient(session, 210000, async () => {
       const frameMs = stats(intervals), backend = g.renderer.webgl.backend, gl = backend.gl;
       let gpu = 'WebGPU'; if (gl) { const ext = gl.getExtension('WEBGL_debug_renderer_info'); gpu = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER); }
       return { mode: p.turn ? 'turning' : 'stationary', fps: intervals.length ? 1000 / frameMs.mean : 0, frameMs,
+        minimumInstantFps: frameMs.max ? 1000 / frameMs.max : 0, intervalsOver50Ms: intervals.filter(ms => ms > 50).length,
         stepMs: stats(stepTimes), spans: Object.fromEntries(Object.entries(spans).map(([k, v]) => [k, stats(v)])),
         drawCalls: Math.max(0, ...calls), triangles: Math.max(0, ...triangles), camera: g.renderer.camera.position.toArray(),
         canvas: [g.renderer.webgl.domElement.width, g.renderer.webgl.domElement.height], gpu,

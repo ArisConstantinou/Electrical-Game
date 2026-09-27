@@ -475,6 +475,17 @@ export class Renderer {
     this.submittedFrames.add(task);
   }
   private drawScene(scene:THREE.Scene):void{
+    // Three renders each requested shadow by entering render(scene, camera)
+    // again. The scene cannot change within this synchronous colour/shadow
+    // submission, so update its world transforms once for all those passes.
+    // Keep camera updates, render callbacks and later optical draws intact.
+    const automatic=scene.matrixWorldAutoUpdate;
+    if(automatic)scene.updateMatrixWorld();
+    scene.matrixWorldAutoUpdate=false;
+    try{this.drawPreparedScene(scene);}
+    finally{scene.matrixWorldAutoUpdate=automatic;}
+  }
+  private drawPreparedScene(scene:THREE.Scene):void{
     const rect=this.modelViewport;if(!rect){this.gpu.render(scene,this.activeRenderCamera);this.fenceSubmittedFrame();return;}
     const viewport=this.gpu.getViewport(new THREE.Vector4()),scissor=this.gpu.getScissor(new THREE.Vector4()),test=this.gpu.getScissorTest();
     try{this.gpu.setViewport(rect.x,rect.y,rect.width,rect.height);this.gpu.setScissor(rect.x,rect.y,rect.width,rect.height);this.gpu.setScissorTest(true);this.gpu.render(scene,this.activeRenderCamera);}

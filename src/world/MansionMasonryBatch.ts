@@ -2,8 +2,9 @@ import * as THREE from 'three';
 import type { MansionGroundWing } from './MansionGroundWing';
 import { ConstructionRenderBatch } from './ConstructionRenderBatch';
 import { StaticConstructionTransforms } from './StaticConstructionTransforms';
+import { captureStaticInstanceBounds, restoreStaticInstanceBounds, type StaticInstanceBounds } from './StaticInstanceBounds';
 
-interface WallSource { wall: THREE.Group; original: THREE.InstancedMesh; batch: THREE.InstancedMesh; start: number; matrices: THREE.Matrix4[]; batched: boolean }
+interface WallSource { wall: THREE.Group; original: THREE.InstancedMesh; batch: THREE.InstancedMesh; start: number; matrices: THREE.Matrix4[]; bounds: StaticInstanceBounds; batched: boolean }
 interface BatchStorage { matrices: Float32Array; colors: Float32Array; patches?: Float32Array; sources: WallSource[] }
 interface Bucket { geometry: THREE.BufferGeometry; material: THREE.Material; total: number; patches: number[]; hasPatch: boolean; sources: Array<{ wall: THREE.Group; original: THREE.InstancedMesh }> }
 
@@ -76,7 +77,8 @@ export class MansionMasonryBatch {
           original.getColorAt(index, this.color);
           batch.setColorAt(next + index, this.color);
         }
-        this.sources.push({ wall, original, batch, start: next, matrices, batched: true });
+        const bounds = captureStaticInstanceBounds(batch.geometry, batch.instanceMatrix.array, next, original.count);
+        this.sources.push({ wall, original, batch, start: next, matrices, bounds, batched: true });
         original.visible = false;
         next += original.count;
       }
@@ -158,8 +160,12 @@ export class MansionMasonryBatch {
       batch.instanceMatrix.needsUpdate = true;
       batch.instanceColor!.needsUpdate = true;
       if (saved.patches) patch.needsUpdate = true;
-      batch.computeBoundingBox();
-      batch.computeBoundingSphere();
+      this.refreshBounds(batch);
     }
+  }
+
+  private refreshBounds(batch: THREE.InstancedMesh): void {
+    const saved = this.storage.get(batch)!;
+    restoreStaticInstanceBounds(batch, saved.sources.filter(source => source.batched).map(source => source.bounds));
   }
 }

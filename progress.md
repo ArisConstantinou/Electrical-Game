@@ -1,5 +1,13 @@
 Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web game named WIRE THE HOUSE, based on real Cyprus residential first-fix practices, editable in Web Game Studio, playable on desktop/mobile, deployed to arisconstantinou/Electrical-Game via GitHub Pages, and ending at FIRST FIX COMPLETE without cable pulling.
 
+## 2026-09-27 · Mobile FPS continuation
+
+- User authorized continuing after the physical 48.9 FPS iPhone report. Reused the clean managed worktree on `codex/mobile-frame-stalls` from protected `1b1caa7`; sole 5365 listener and dirty primary checkout remain untouched during candidate QA. No agents/install/model change.
+- Shared synchronous colour/shadow scene transforms remove a redundant full traversal. Cached static masonry bounds preserve exact original boxes and sphere union order while reducing the measured 29,034-instance CPU operation from approximately 11 ms to 2.5 ms.
+- Specific ground/L1/L3 stair resource views prepare during existing bounded LOADING. Matched PC cold maxima: ground 114.6 -> 47.8 ms, L3 141.6 -> 22.8 ms; reverse order confirms 160.4 -> 53.0 ms and 161.2 -> 24.5 ms. READY increases 0.167-0.466 seconds, initial state restored. Stable 60 FPS on physical iPhone remains unverified.
+- State and limitations: `docs/MOBILE_FRAME_STALLS.md`. Exact-bounds, actual renderer before/after failure, graphics lifecycle, pacing, shadow, occlusion and batch/editor checks pass. Raw UI/performance/owned-browser cleanup evidence retained in ignored `output/`.
+- Actual skill gameplay client, 112 tour checkpoints, native desktop/touch stair ascent/descent and room passage, masonry demolition and all ten editor menu/save/cancel cases pass without page errors. The same posed WebGPU courtyard screenshots differ by zero pixels. Comparable evidence: `docs/performance/2026-09-27-mobile-stalls.json`; publication and device retest are separate acceptance steps.
+
 ## 2026-09-27 · Editor return to main menu
 
 - User requested an attractive top-right X/back button, a main-menu-themed save/discard/cancel prompt for unsaved work, and authorized proceeding. Isolated changes on `codex/editor-menu-return` in the existing free `stairs-fps-20260927` worktree, from clean `bf4e7fb`. The primary dirty checkout and the sole 5365 integration listener remain protected.

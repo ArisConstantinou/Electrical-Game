@@ -1,0 +1,699 @@
+{
+  "base": "1b1caa7b4dda4b8746f2acc83ef127b65c65784a",
+  "date": "2026-09-27",
+  "hardware": "Windows Core Ultra 9 285K / RTX 5080; Chrome headless",
+  "physicalPhoneVerified": false,
+  "scope": "Targeted CPU work reduction and three bounded stair resource warmups, preserving geometry, materials, shadows, controls and framebuffer",
+  "limitations": [
+    "Initial WebGPU ablation maxCalls read the cumulative render-pass counter. Omitted; fixed per-frame proxy in the test and WebGL run.",
+    "Separate-process steady FPS sweeps varied substantially; do not attribute their larger differences to these changes.",
+    "This does not prove constant 60 FPS on a physical iPhone, or remove every shader/resource first-use stall."
+  ],
+  "coldFirstViews": {
+    "forward": {
+      "environment": "Windows Chrome WebGPU; 430x745 DPR3, actual 752x1303 framebuffer; not a physical iPhone",
+      "cases": [
+        {
+          "version": "before",
+          "readyMs": 10072,
+          "initial": {
+            "position": [
+              0,
+              1.65,
+              5.2
+            ],
+            "yaw": 3.141592653589793,
+            "pitch": -0.08,
+            "tool": "spray",
+            "waterLitres": 0,
+            "progress": "READY",
+            "backend": "webgpu"
+          },
+          "scenes": [
+            {
+              "name": "ground-landing",
+              "frames": 133,
+              "maxMs": 114.60000002384186,
+              "p95Ms": 17.40000009536743,
+              "over50Ms": 2,
+              "maxCpuMs": 71.70000004768372,
+              "maxRenderMs": 67.60000002384186,
+              "geometries": 973,
+              "actualCamera": [
+                6.5,
+                3.3,
+                11.6
+              ]
+            },
+            {
+              "name": "L3-landing",
+              "frames": 154,
+              "maxMs": 141.60000002384186,
+              "p95Ms": 15.799999952316284,
+              "over50Ms": 2,
+              "maxCpuMs": 57.199999928474426,
+              "maxRenderMs": 42.5,
+              "geometries": 982,
+              "actualCamera": [
+                6.5,
+                9.899999999999999,
+                11.6
+              ]
+            }
+          ]
+        },
+        {
+          "version": "after",
+          "readyMs": 10239,
+          "initial": {
+            "position": [
+              0,
+              1.65,
+              5.2
+            ],
+            "yaw": 3.141592653589793,
+            "pitch": -0.08,
+            "tool": "spray",
+            "waterLitres": 0,
+            "progress": "READY",
+            "backend": "webgpu"
+          },
+          "scenes": [
+            {
+              "name": "ground-landing",
+              "frames": 141,
+              "maxMs": 47.799999952316284,
+              "p95Ms": 19.100000023841858,
+              "over50Ms": 0,
+              "maxCpuMs": 39.10000002384186,
+              "maxRenderMs": 16,
+              "geometries": 1035,
+              "actualCamera": [
+                6.5,
+                3.3,
+                11.6
+              ]
+            },
+            {
+              "name": "L3-landing",
+              "frames": 186,
+              "maxMs": 22.799999952316284,
+              "p95Ms": 14.200000047683716,
+              "over50Ms": 0,
+              "maxCpuMs": 22.799999952316284,
+              "maxRenderMs": 11,
+              "geometries": 1036,
+              "actualCamera": [
+                6.5,
+                9.9,
+                11.6
+              ]
+            }
+          ]
+        }
+      ],
+      "errors": []
+    },
+    "reverse": {
+      "environment": "Windows Chrome WebGPU; 430x745 DPR3, actual 752x1303 framebuffer; not a physical iPhone",
+      "cases": [
+        {
+          "version": "after",
+          "readyMs": 10396,
+          "initial": {
+            "position": [
+              0,
+              1.65,
+              5.2
+            ],
+            "yaw": 3.141592653589793,
+            "pitch": -0.08,
+            "tool": "spray",
+            "waterLitres": 0,
+            "progress": "READY",
+            "backend": "webgpu"
+          },
+          "scenes": [
+            {
+              "name": "ground-landing",
+              "frames": 137,
+              "maxMs": 53,
+              "p95Ms": 18.600000023841858,
+              "over50Ms": 1,
+              "maxCpuMs": 24.300000071525574,
+              "maxRenderMs": 19.90000009536743,
+              "geometries": 1035,
+              "actualCamera": [
+                6.5,
+                3.3,
+                11.6
+              ]
+            },
+            {
+              "name": "L3-landing",
+              "frames": 181,
+              "maxMs": 24.5,
+              "p95Ms": 14.899999976158142,
+              "over50Ms": 0,
+              "maxCpuMs": 21.600000023841858,
+              "maxRenderMs": 10.600000023841858,
+              "geometries": 1036,
+              "actualCamera": [
+                6.5,
+                9.900000000000002,
+                11.6
+              ]
+            }
+          ]
+        },
+        {
+          "version": "before",
+          "readyMs": 9930,
+          "initial": {
+            "position": [
+              0,
+              1.65,
+              5.2
+            ],
+            "yaw": 3.141592653589793,
+            "pitch": -0.08,
+            "tool": "spray",
+            "waterLitres": 0,
+            "progress": "READY",
+            "backend": "webgpu"
+          },
+          "scenes": [
+            {
+              "name": "ground-landing",
+              "frames": 100,
+              "maxMs": 160.39999997615814,
+              "p95Ms": 26.800000071525574,
+              "over50Ms": 3,
+              "maxCpuMs": 91.79999995231628,
+              "maxRenderMs": 73.79999995231628,
+              "geometries": 973,
+              "actualCamera": [
+                6.5,
+                3.3,
+                11.6
+              ]
+            },
+            {
+              "name": "L3-landing",
+              "frames": 150,
+              "maxMs": 161.20000004768372,
+              "p95Ms": 15.600000023841858,
+              "over50Ms": 2,
+              "maxCpuMs": 61.799999952316284,
+              "maxRenderMs": 46,
+              "geometries": 982,
+              "actualCamera": [
+                6.5,
+                9.900000000000002,
+                11.6
+              ]
+            }
+          ]
+        }
+      ],
+      "errors": []
+    }
+  },
+  "sameLoadedSceneTraversal": {
+    "webgpu": {
+      "environment": "Windows Chrome headless, Core Ultra 9 285K / RTX 5080; touch emulation is not physical iPhone proof",
+      "backend": "webgpu",
+      "errors": [],
+      "cases": [
+        {
+          "name": "landing",
+          "results": [
+            {
+              "mode": "original-traversal",
+              "fps": 63.935813456906416,
+              "p95Ms": 19.800000071525574,
+              "maxMs": 171.60000002384186,
+              "over50Ms": 2,
+              "cpuMs": 12.211004783662313,
+              "sceneTraversalsPerFrame": 1,
+              "maxTriangles": 3662402
+            },
+            {
+              "mode": "shared-traversal",
+              "fps": 68.22734101304457,
+              "p95Ms": 19,
+              "maxMs": 21.699999928474426,
+              "over50Ms": 0,
+              "cpuMs": 12.417351598064648,
+              "sceneTraversalsPerFrame": 1,
+              "maxTriangles": 3662414
+            },
+            {
+              "mode": "original-traversal",
+              "fps": 69.83590128919892,
+              "p95Ms": 19,
+              "maxMs": 22,
+              "over50Ms": 0,
+              "cpuMs": 12.013839287417275,
+              "sceneTraversalsPerFrame": 1,
+              "maxTriangles": 3662414
+            },
+            {
+              "mode": "shared-traversal",
+              "fps": 65.75445408049114,
+              "p95Ms": 20.299999952316284,
+              "maxMs": 24.5,
+              "over50Ms": 0,
+              "cpuMs": 12.997630334013445,
+              "sceneTraversalsPerFrame": 1,
+              "maxTriangles": 3662414
+            }
+          ],
+          "canvas": [
+            752,
+            1303
+          ],
+          "lifecycle": {
+            "suspended": false,
+            "recovering": false,
+            "deviceLost": false,
+            "contextLost": false,
+            "recoveries": 0,
+            "generation": 0,
+            "graphicsFault": false,
+            "recoveryBlocked": false,
+            "queuedFrames": 2,
+            "queueWaitMaxMs": 836,
+            "graphicsErrors": []
+          }
+        },
+        {
+          "name": "courtyard",
+          "results": [
+            {
+              "mode": "original-traversal",
+              "fps": 56.536214585073246,
+              "p95Ms": 23.199999928474426,
+              "maxMs": 26.899999976158142,
+              "over50Ms": 0,
+              "cpuMs": 15.552486185869459,
+              "sceneTraversalsPerFrame": 2,
+              "maxTriangles": 5894011
+            },
+            {
+              "mode": "shared-traversal",
+              "fps": 66.99587959463028,
+              "p95Ms": 19.799999952316284,
+              "maxMs": 23.40000009536743,
+              "over50Ms": 0,
+              "cpuMs": 12.694859815535144,
+              "sceneTraversalsPerFrame": 1,
+              "maxTriangles": 5894011
+            },
+            {
+              "mode": "original-traversal",
+              "fps": 62.87537537396859,
+              "p95Ms": 21.600000023841858,
+              "maxMs": 26,
+              "over50Ms": 0,
+              "cpuMs": 13.887128710746765,
+              "sceneTraversalsPerFrame": 2,
+              "maxTriangles": 5894011
+            },
+            {
+              "mode": "shared-traversal",
+              "fps": 62.701821486976876,
+              "p95Ms": 20.399999976158142,
+              "maxMs": 23,
+              "over50Ms": 0,
+              "cpuMs": 13.810945269480273,
+              "sceneTraversalsPerFrame": 1,
+              "maxTriangles": 5894011
+            }
+          ],
+          "canvas": [
+            752,
+            1303
+          ],
+          "lifecycle": {
+            "suspended": false,
+            "recovering": false,
+            "deviceLost": false,
+            "contextLost": false,
+            "recoveries": 0,
+            "generation": 0,
+            "graphicsFault": false,
+            "recoveryBlocked": false,
+            "queuedFrames": 2,
+            "queueWaitMaxMs": 836,
+            "graphicsErrors": []
+          }
+        },
+        {
+          "name": "L3-landing",
+          "results": [
+            {
+              "mode": "original-traversal",
+              "fps": 72.09127382200313,
+              "p95Ms": 18.100000023841858,
+              "maxMs": 167.20000004768372,
+              "over50Ms": 2,
+              "cpuMs": 10.534042551162395,
+              "sceneTraversalsPerFrame": 1,
+              "maxTriangles": 3212958
+            },
+            {
+              "mode": "shared-traversal",
+              "fps": 73.7671469367745,
+              "p95Ms": 17.700000047683716,
+              "maxMs": 21,
+              "over50Ms": 0,
+              "cpuMs": 11.338559312840639,
+              "sceneTraversalsPerFrame": 1,
+              "maxTriangles": 3212958
+            },
+            {
+              "mode": "original-traversal",
+              "fps": 90.34160419152228,
+              "p95Ms": 15.5,
+              "maxMs": 20.5,
+              "over50Ms": 0,
+              "cpuMs": 8.894809684126434,
+              "sceneTraversalsPerFrame": 1,
+              "maxTriangles": 3212958
+            },
+            {
+              "mode": "shared-traversal",
+              "fps": 90.17753702803958,
+              "p95Ms": 15.199999928474426,
+              "maxMs": 18.600000023841858,
+              "over50Ms": 0,
+              "cpuMs": 9.062629757455475,
+              "sceneTraversalsPerFrame": 1,
+              "maxTriangles": 3212958
+            }
+          ],
+          "canvas": [
+            752,
+            1303
+          ],
+          "lifecycle": {
+            "suspended": false,
+            "recovering": false,
+            "deviceLost": false,
+            "contextLost": false,
+            "recoveries": 0,
+            "generation": 0,
+            "graphicsFault": false,
+            "recoveryBlocked": false,
+            "queuedFrames": 2,
+            "queueWaitMaxMs": 836,
+            "graphicsErrors": []
+          }
+        }
+      ],
+      "readyMs": 10123,
+      "bounds": {
+        "instances": 29034,
+        "batches": 69,
+        "geometryScanMs": [
+          11.600000023841858,
+          10.100000023841858,
+          11.299999952316284,
+          11.700000047683716,
+          11,
+          10.600000023841858,
+          10.799999952316284,
+          12.399999976158142
+        ],
+        "cachedBoundsMs": [
+          2.399999976158142,
+          3.200000047683716,
+          2.5,
+          2.399999976158142,
+          2.299999952316284,
+          2.700000047683716,
+          3.200000047683716,
+          2.399999976158142
+        ],
+        "exactlyEqual": true
+      }
+    },
+    "webgl": {
+      "environment": "Windows Chrome headless, Core Ultra 9 285K / RTX 5080; touch emulation is not physical iPhone proof",
+      "backend": "webgl",
+      "errors": [],
+      "cases": [
+        {
+          "name": "landing",
+          "results": [
+            {
+              "mode": "original-traversal",
+              "fps": 63.36658510666339,
+              "p95Ms": 19,
+              "maxMs": 289.5,
+              "over50Ms": 3,
+              "cpuMs": 14.545023692727653,
+              "sceneTraversalsPerFrame": 1,
+              "maxCalls": 463,
+              "maxTriangles": 3662402
+            },
+            {
+              "mode": "shared-traversal",
+              "fps": 78.56831078190223,
+              "p95Ms": 17.300000071525574,
+              "maxMs": 20.199999928474426,
+              "over50Ms": 0,
+              "cpuMs": 12.366798416899128,
+              "sceneTraversalsPerFrame": 1,
+              "maxCalls": 463,
+              "maxTriangles": 3662414
+            },
+            {
+              "mode": "original-traversal",
+              "fps": 80.57464084946908,
+              "p95Ms": 16.899999976158142,
+              "maxMs": 19.699999928474426,
+              "over50Ms": 0,
+              "cpuMs": 12.049034747838054,
+              "sceneTraversalsPerFrame": 1,
+              "maxCalls": 463,
+              "maxTriangles": 3662414
+            },
+            {
+              "mode": "shared-traversal",
+              "fps": 76.48840186012812,
+              "p95Ms": 16.699999928474426,
+              "maxMs": 20.600000023841858,
+              "over50Ms": 0,
+              "cpuMs": 12.73089431504893,
+              "sceneTraversalsPerFrame": 1,
+              "maxCalls": 463,
+              "maxTriangles": 3662402
+            }
+          ],
+          "canvas": [
+            752,
+            1303
+          ],
+          "lifecycle": {
+            "suspended": false,
+            "recovering": false,
+            "deviceLost": false,
+            "contextLost": false,
+            "recoveries": 0,
+            "generation": 0,
+            "graphicsFault": false,
+            "recoveryBlocked": false,
+            "queuedFrames": 0,
+            "queueWaitMaxMs": 0,
+            "graphicsErrors": []
+          }
+        },
+        {
+          "name": "courtyard",
+          "results": [
+            {
+              "mode": "original-traversal",
+              "fps": 68.32433781650953,
+              "p95Ms": 19.59999990463257,
+              "maxMs": 22.600000023841858,
+              "over50Ms": 0,
+              "cpuMs": 14.265454548055475,
+              "sceneTraversalsPerFrame": 2,
+              "maxCalls": 540,
+              "maxTriangles": 5894011
+            },
+            {
+              "mode": "shared-traversal",
+              "fps": 71.05238555056995,
+              "p95Ms": 17.800000071525574,
+              "maxMs": 21.100000023841858,
+              "over50Ms": 0,
+              "cpuMs": 13.725327513623967,
+              "sceneTraversalsPerFrame": 1,
+              "maxCalls": 540,
+              "maxTriangles": 5894011
+            },
+            {
+              "mode": "original-traversal",
+              "fps": 66.17946868335969,
+              "p95Ms": 19,
+              "maxMs": 21.399999976158142,
+              "over50Ms": 0,
+              "cpuMs": 14.756132074684468,
+              "sceneTraversalsPerFrame": 2,
+              "maxCalls": 540,
+              "maxTriangles": 5894011
+            },
+            {
+              "mode": "shared-traversal",
+              "fps": 74.78266288432091,
+              "p95Ms": 16.899999976158142,
+              "maxMs": 19.899999976158142,
+              "over50Ms": 0,
+              "cpuMs": 13.004564314462337,
+              "sceneTraversalsPerFrame": 1,
+              "maxCalls": 540,
+              "maxTriangles": 5894011
+            }
+          ],
+          "canvas": [
+            752,
+            1303
+          ],
+          "lifecycle": {
+            "suspended": false,
+            "recovering": false,
+            "deviceLost": false,
+            "contextLost": false,
+            "recoveries": 0,
+            "generation": 0,
+            "graphicsFault": false,
+            "recoveryBlocked": false,
+            "queuedFrames": 0,
+            "queueWaitMaxMs": 0,
+            "graphicsErrors": []
+          }
+        },
+        {
+          "name": "L3-landing",
+          "results": [
+            {
+              "mode": "original-traversal",
+              "fps": 70.0525394040311,
+              "p95Ms": 15.899999976158142,
+              "maxMs": 259.10000002384186,
+              "over50Ms": 3,
+              "cpuMs": 13.07787234275899,
+              "sceneTraversalsPerFrame": 1,
+              "maxCalls": 402,
+              "maxTriangles": 3212958
+            },
+            {
+              "mode": "shared-traversal",
+              "fps": 100.92461996552264,
+              "p95Ms": 14.099999904632568,
+              "maxMs": 16.399999976158142,
+              "over50Ms": 0,
+              "cpuMs": 9.587616098554511,
+              "sceneTraversalsPerFrame": 1,
+              "maxCalls": 402,
+              "maxTriangles": 3212958
+            },
+            {
+              "mode": "original-traversal",
+              "fps": 99.37385128115346,
+              "p95Ms": 13.5,
+              "maxMs": 17.399999976158142,
+              "over50Ms": 0,
+              "cpuMs": 9.718125001713634,
+              "sceneTraversalsPerFrame": 1,
+              "maxCalls": 402,
+              "maxTriangles": 3212958
+            },
+            {
+              "mode": "shared-traversal",
+              "fps": 95.5523047720994,
+              "p95Ms": 14,
+              "maxMs": 16.299999952316284,
+              "over50Ms": 0,
+              "cpuMs": 10.131493506106464,
+              "sceneTraversalsPerFrame": 1,
+              "maxCalls": 402,
+              "maxTriangles": 3212958
+            }
+          ],
+          "canvas": [
+            752,
+            1303
+          ],
+          "lifecycle": {
+            "suspended": false,
+            "recovering": false,
+            "deviceLost": false,
+            "contextLost": false,
+            "recoveries": 0,
+            "generation": 0,
+            "graphicsFault": false,
+            "recoveryBlocked": false,
+            "queuedFrames": 0,
+            "queueWaitMaxMs": 0,
+            "graphicsErrors": []
+          }
+        }
+      ],
+      "readyMs": 11048,
+      "actualBackend": "webgl",
+      "bounds": {
+        "instances": 29034,
+        "batches": 69,
+        "geometryScanMs": [
+          4.100000023841858,
+          3.600000023841858,
+          3.899999976158142,
+          4.100000023841858,
+          3.6999999284744263,
+          3.700000047683716,
+          3.9000000953674316,
+          3.600000023841858
+        ],
+        "cachedBoundsMs": [
+          1.100000023841858,
+          0.7999999523162842,
+          0.7000000476837158,
+          0.8999999761581421,
+          0.7000000476837158,
+          0.5999999046325684,
+          0.7999999523162842,
+          0.6000000238418579
+        ],
+        "exactlyEqual": true
+      }
+    }
+  },
+  "matchedPixels": {
+    "webgpu": 0
+  },
+  "verification": {
+    "transformRegressionFailsBefore": true,
+    "exactBounds": true,
+    "frameDeadline": true,
+    "rendererLifecycle": true,
+    "encoderRecovery": true,
+    "hiddenTransforms": true,
+    "shadowStability": true,
+    "occlusion": true,
+    "benchmarkMetrics": true,
+    "nativeFrameResume": [
+      "webgl",
+      "webgpu"
+    ],
+    "nativeTourCheckpoints": 112,
+    "desktopTouchStairs": true,
+    "demolition": true,
+    "editorMenuCases": 10,
+    "actualSkillClient": true,
+    "build": true
+  }
+}
