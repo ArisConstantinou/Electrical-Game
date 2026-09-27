@@ -6,6 +6,8 @@
   "scripts": {
     "dev:pvc": "node scripts/start-worker-preview.mjs",
     "test:pvc": "node tests/manual-pvc-logic.mjs && node tests/manual-pvc-ui.mjs",
+    "test:pvc-cut-entries": "node tests/box-conduit-entries.mjs && node tests/pvc-cut-box-entries-ui.mjs",
+    "test:pvc-cut-fall": "node tests/pvc-offcut-motion.mjs && node tests/pvc-full-cut-fall-ui.mjs",
     "test:pvc-interactions": "node tests/pipe-interactions-ui.mjs",
     "test:pvc-cutter-grip": "node tests/pvc-cutter-grip-ui.mjs",
     "test:wall-joints": "node tests/wall-concrete-joints-ui.mjs",
