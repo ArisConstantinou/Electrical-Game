@@ -3,6 +3,7 @@ import template from './performance-test.html?raw';
 /** Lazy menu mode: no parent game or second renderer while the test runs. */
 export async function openPerformanceTest(root: HTMLElement): Promise<void> {
   document.title = 'Electrical-Game · Performance Test';
+  document.documentElement.lang = 'el';
   root.innerHTML = template;
   const begin = root.querySelector<HTMLButtonElement>('#begin')!;
   const close = root.querySelector<HTMLButtonElement>('#close')!;
