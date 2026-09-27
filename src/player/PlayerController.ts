@@ -70,6 +70,17 @@ export class PlayerController {
     // applies the latest angles at the next simulation/render boundary.
   }
 
+  updateLook(dt: number): void {
+    const wallDistance = this.wallWorkPlane?Math.abs(this.camera.position.clone().sub(this.wallWorkPlane.point).dot(this.wallWorkPlane.normal)):Math.abs(this.camera.position.z - GAME_CONFIG.room.wallFrontZ);
+    this.wallAssistAmount = this.wallAssistEnabled ? 1 - THREE.MathUtils.smoothstep(wallDistance, 0.6, 1.7) : 0;
+    if (this.input.mobileLook.x !== 0 || this.input.mobileLook.y !== 0) {
+      const assistedAimSpeed = THREE.MathUtils.lerp(this.mobileAimSpeed, Math.min(this.mobileAimSpeed, 0.82), this.wallAssistAmount);
+      const assistedVertical = THREE.MathUtils.lerp(this.mobileVerticalScale, Math.min(this.mobileVerticalScale, 0.5), this.wallAssistAmount);
+      this.look(this.input.mobileLook.x * dt, this.input.mobileLook.y * dt * assistedVertical, assistedAimSpeed);
+    }
+    this.camera.rotation.set(this.pitch,this.yaw,0);
+  }
+
   update(dt: number): void {
     const jumpRequested=this.input.jumpRequested;this.input.jumpRequested=false;
     const enteringHandWork=this.handWorkTargetY!==null&&!this.wasHandWork;
@@ -87,13 +98,7 @@ export class PlayerController {
     // Bend knees/hips for low hand work. The body never rises above standing
     // eye height, and distant or high wall areas still require repositioning.
     this.handWorkEyeHeight=handWork?THREE.MathUtils.clamp(this.handWorkTargetY!+.34,.68,GAME_CONFIG.player.eyeHeight):null;
-    this.wallAssistAmount = this.wallAssistEnabled ? 1 - THREE.MathUtils.smoothstep(wallDistance, 0.6, 1.7) : 0;
-    if (this.input.mobileLook.x !== 0 || this.input.mobileLook.y !== 0) {
-      const assistedAimSpeed = THREE.MathUtils.lerp(this.mobileAimSpeed, Math.min(this.mobileAimSpeed, 0.82), this.wallAssistAmount);
-      const assistedVertical = THREE.MathUtils.lerp(this.mobileVerticalScale, Math.min(this.mobileVerticalScale, 0.5), this.wallAssistAmount);
-      this.look(this.input.mobileLook.x * dt, this.input.mobileLook.y * dt * assistedVertical, assistedAimSpeed);
-    }
-    this.camera.rotation.set(this.pitch,this.yaw,0);
+    this.updateLook(dt);
     const view=this.camera.getWorldDirection(new THREE.Vector3());
     const handFocus=handWork?this.camera.position.clone().addScaledVector(view,(GAME_CONFIG.room.wallFrontZ-this.camera.position.z)/view.z):null;
     const previousX=this.camera.position.x;

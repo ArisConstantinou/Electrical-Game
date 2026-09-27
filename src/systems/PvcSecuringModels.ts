@@ -50,16 +50,30 @@ export function buildHeldRebar():THREE.Group{
   group.userData.gripPoint=[0,-.02,0];return group;
 }
 
-export function buildRebarHug(left:THREE.Vector3,right:THREE.Vector3,frontZ:number):THREE.Group{
+export function buildRebarHug(left:THREE.Vector3,right:THREE.Vector3,frontZ:number,pipeX?:number):THREE.Group{
   // Store vertices around the strap centre. Scaling during tightening must
   // deform the bow without scaling its absolute wall coordinates toward 0.
-  const middle=left.clone().add(right).multiplyScalar(.5),local=(point:THREE.Vector3)=>point.clone().sub(middle),curve=new THREE.CatmullRomCurve3([
-    local(left),local(new THREE.Vector3(left.x+.025,left.y,frontZ)),local(new THREE.Vector3(middle.x-.021,middle.y,frontZ+.030)),
-    local(new THREE.Vector3(middle.x,middle.y,frontZ+.038)),local(new THREE.Vector3(middle.x+.021,middle.y,frontZ+.030)),local(new THREE.Vector3(right.x-.025,right.y,frontZ)),local(right),
+  const middle=left.clone().add(right).multiplyScalar(.5),centreX=pipeX??middle.x,local=(point:THREE.Vector3)=>point.clone().sub(middle),curve=new THREE.CatmullRomCurve3([
+    local(left),local(new THREE.Vector3(Math.min(left.x+.025,centreX-.012),left.y,frontZ)),local(new THREE.Vector3(centreX-.012,middle.y,frontZ+.030)),
+    local(new THREE.Vector3(centreX,middle.y,frontZ+.038)),local(new THREE.Vector3(centreX+.012,middle.y,frontZ+.030)),local(new THREE.Vector3(Math.max(right.x-.025,centreX+.012),right.y,frontZ)),local(right),
   ]);
   const group=new THREE.Group();group.name='Galvanized conduit tying wire';group.position.copy(middle);group.userData.leftHole=left.toArray();group.userData.rightHole=right.toArray();
   const wire=new THREE.Mesh(new THREE.TubeGeometry(curve,48,.00115,6,false),steel(0x777d7b,.58));wire.name='Open wall-anchored tying wire';group.add(wire);
-  const twist=new THREE.Group();twist.name='tie-wire-twist';twist.visible=false;twist.position.set(0,0,frontZ-middle.z);group.add(twist);
+  const twist=new THREE.Group();twist.name='tie-wire-twist';twist.visible=false;twist.position.set(centreX-middle.x,0,frontZ-middle.z);group.add(twist);
   for(const phase of [0,Math.PI]){const points=Array.from({length:25},(_,i)=>{const t=i/24,a=phase+t*Math.PI*5;return new THREE.Vector3(Math.cos(a)*.0022,-t*.018,Math.sin(a)*.0022);});const strand=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points),24,.00065,5,false),steel(0x6c7270,.5));strand.name='Twisted tying-wire strand';twist.add(strand);}
   return group;
+}
+
+/** Tighten the bow while keeping endpoints at their individual masonry depths. */
+export function setRebarDepth(group:THREE.Group,depth:number):void{
+  if(group.scale.z===depth)return;
+  const wire=group.getObjectByName('Open wall-anchored tying wire') as THREE.Mesh<THREE.TubeGeometry>,curve=wire.geometry.parameters.path as THREE.CatmullRomCurve3;
+  const left=group.userData.leftHole as number[],right=group.userData.rightHole as number[];
+  curve.points[0].z=(left[2]-group.position.z)/depth;
+  curve.points[curve.points.length-1].z=(right[2]-group.position.z)/depth;
+  curve.updateArcLengths();
+  const updated=new THREE.TubeGeometry(curve,48,.00115,6,false);
+  // Reuse the existing GPU buffers throughout the short tightening animation.
+  for(const name of ['position','normal']){const attribute=wire.geometry.getAttribute(name) as THREE.BufferAttribute;attribute.copyArray(updated.getAttribute(name).array);attribute.needsUpdate=true;}
+  wire.geometry.computeBoundingSphere();updated.dispose();group.scale.z=depth;
 }
