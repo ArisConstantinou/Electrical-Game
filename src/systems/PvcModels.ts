@@ -3,6 +3,9 @@ import { PvcBend, PVC } from './PvcBend';
 import type { PvcPreset } from './PvcPresets';
 import { batchStaticShadows } from '../world/StaticShadowBatch';
 export const pvcMaterial=new THREE.MeshStandardMaterial({color:0xe1e2d8,roughness:.57});
+// R reveals the working/installed tube. Inventory must still write depth so
+// the interaction outline stays at its edge instead of filling the bundle.
+export const pvcStockMaterial=pvcMaterial.clone();
 const STOCK_CENTER=new THREE.Vector3(3.46,.02,1.15);
 const STOCK_LEAN=.095;
 const STOCK_DIRECTION=new THREE.Vector3(Math.sin(STOCK_LEAN),Math.cos(STOCK_LEAN),0);
@@ -78,23 +81,23 @@ export class PvcStock extends THREE.Group{
     super();this.name='PVC workshop · 20 × 3 m';this.userData.studioEntityId='pvc:workshop';
     const original=new THREE.Group();original.name='PVC bundle 1 · 20 × 3 m';original.userData.pvcBundleIndex=0;this.bundleRoots.push(original);this.add(original);
     const pipeG=new THREE.CylinderGeometry(.01,.01,3,10,1,true),endG=new THREE.RingGeometry(.008,.01,10);
-    const pickOnlyPvc=pvcMaterial.clone();pickOnlyPvc.visible=false;
+    const pickOnlyPvc=pvcStockMaterial.clone();pickOnlyPvc.visible=false;
     for(let i=0;i<PVC.count;i++){
       const group=new THREE.Group();group.userData.pvcStock=i;original.add(group);this.pipes.push(group);
-      part(group,pipeG,pvcMaterial,'3 m PVC length',[0,1.5,0]);
-      for(const y of [0,3]){const end=part(group,endG,pvcMaterial,'Open pipe end',[0,y,0]);end.rotation.x=Math.PI/2;}
+      part(group,pipeG,pvcStockMaterial,'3 m PVC length',[0,1.5,0]);
+      for(const y of [0,3]){const end=part(group,endG,pvcStockMaterial,'Open pipe end',[0,y,0]);end.rotation.x=Math.PI/2;}
       const mark=part(group,new THREE.CylinderGeometry(.0103,.0103,.005,10,1,true),new THREE.MeshStandardMaterial({color:0x15191b,roughness:.85}),'Permanent marker ring');mark.visible=false;this.marks.push(mark);
       // The three rigid pieces move together when the bundle opens. Preserve
       // their visible meshes and picking while drawing one shadow per pipe.
       batchStaticShadows(group,group.children);
       for(const mesh of group.children)if(mesh instanceof THREE.Mesh && (mesh.name==='3 m PVC length'||mesh.name==='Open pipe end'))mesh.material=pickOnlyPvc;
     }
-    this.stockBarrels=new THREE.InstancedMesh(pipeG,pvcMaterial,PVC.count);
+    this.stockBarrels=new THREE.InstancedMesh(pipeG,pvcStockMaterial,PVC.count);
     this.stockBarrels.name='Visible first bundle PVC tubes';
     this.stockBarrels.receiveShadow=true;
     this.stockBarrels.frustumCulled=false;
     original.add(this.stockBarrels);
-    this.stockEnds=new THREE.InstancedMesh(endG,pvcMaterial,PVC.count*2);
+    this.stockEnds=new THREE.InstancedMesh(endG,pvcStockMaterial,PVC.count*2);
     this.stockEnds.name='Visible first bundle open PVC ends';
     this.stockEnds.frustumCulled=false;
     original.add(this.stockEnds);
@@ -108,8 +111,8 @@ export class PvcStock extends THREE.Group{
     const dummy=new THREE.Object3D();
     for(let bundle=1;bundle<PVC_BUNDLE_COUNT;bundle++){
       const root=new THREE.Group();root.name=`PVC bundle ${bundle+1} · 20 × 3 m`;root.userData.pvcBundleIndex=bundle;root.position.set(STOCK_CENTER.x,STOCK_CENTER.y,RESERVE_BUNDLE_Z[bundle-1]);root.rotation.z=-STOCK_LEAN;this.add(root);this.bundleRoots.push(root);
-      const barrels=new THREE.InstancedMesh(pipeG,pvcMaterial,PVC.count);barrels.name='Individual 3 m hollow PVC tubes';barrels.castShadow=barrels.receiveShadow=true;root.add(barrels);
-      const ends=new THREE.InstancedMesh(endG,pvcMaterial,PVC.count*2);ends.name='Open PVC tube ends';root.add(ends);
+      const barrels=new THREE.InstancedMesh(pipeG,pvcStockMaterial,PVC.count);barrels.name='Individual 3 m hollow PVC tubes';barrels.castShadow=barrels.receiveShadow=true;root.add(barrels);
+      const ends=new THREE.InstancedMesh(endG,pvcStockMaterial,PVC.count*2);ends.name='Open PVC tube ends';root.add(ends);
       for(let i=0;i<PVC.count;i++){
         const offset=STOCK_BUNDLE_OFFSETS[i];dummy.position.set(offset.x,1.5,offset.y);dummy.rotation.set(0,0,0);dummy.updateMatrix();barrels.setMatrixAt(i,dummy.matrix);
         for(let end=0;end<2;end++){dummy.position.set(offset.x,end*3,offset.y);dummy.rotation.set(Math.PI/2,0,0);dummy.updateMatrix();ends.setMatrixAt(i*2+end,dummy.matrix);}
@@ -125,7 +128,7 @@ export class PvcStock extends THREE.Group{
       const material=new THREE.MeshBasicMaterial({color:0xffd43b,side:THREE.BackSide,depthTest:true,depthWrite:false,transparent:true,opacity:.94,toneMapped:false});
       const shell=new THREE.InstancedMesh(outlineGeometry,material,PVC.count);
       shell.name=`PVC bundle ${index+1} interaction highlight`;shell.renderOrder=20;shell.raycast=()=>{};shell.frustumCulled=false;
-      shell.instanceMatrix.copy(index===0?this.stockBarrels.instanceMatrix:this.reserveMeshes[index-1].pipes.instanceMatrix);
+      shell.instanceMatrix.array.set((index===0?this.stockBarrels.instanceMatrix:this.reserveMeshes[index-1].pipes.instanceMatrix).array);
       this.bundleRoots[index].add(shell);this.interactionHighlights.push(shell);
     }
     this.bundleHighlight=new THREE.Box3Helper(this.bundleBox,0xffda35);this.bundleHighlight.name='Selected PVC bundle highlight';this.bundleHighlight.visible=false;this.bundleHighlight.raycast=()=>{};this.add(this.bundleHighlight);
@@ -206,7 +209,7 @@ export class PvcStock extends THREE.Group{
       }
       bundle.pipes.instanceMatrix.needsUpdate=bundle.ends.instanceMatrix.needsUpdate=true;
       bundle.pipes.computeBoundingBox();bundle.pipes.computeBoundingSphere();bundle.ends.computeBoundingSphere();
-      this.interactionHighlights[index].instanceMatrix.copy(bundle.pipes.instanceMatrix);this.interactionHighlights[index].instanceMatrix.needsUpdate=true;
+      this.interactionHighlights[index].instanceMatrix.array.set(bundle.pipes.instanceMatrix.array);this.interactionHighlights[index].instanceMatrix.needsUpdate=true;
       return;
     }
     this.spread=progress;
@@ -224,7 +227,9 @@ export class PvcStock extends THREE.Group{
       }
     }
     this.stockBarrels.instanceMatrix.needsUpdate=this.stockEnds.instanceMatrix.needsUpdate=true;
-    this.interactionHighlights[0].instanceMatrix.copy(this.stockBarrels.instanceMatrix);this.interactionHighlights[0].instanceMatrix.needsUpdate=true;
+    // Node-renderer instance bindings retain this typed array. BufferAttribute
+    // .copy() replaces it and leaves the GPU drawing the old standing outline.
+    this.interactionHighlights[0].instanceMatrix.array.set(this.stockBarrels.instanceMatrix.array);this.interactionHighlights[0].instanceMatrix.needsUpdate=true;
     this.stockBarrels.computeBoundingBox();this.stockBarrels.computeBoundingSphere();this.stockEnds.computeBoundingSphere();
     this.ruler.visible=progress===1;
     this.presetMarks.visible=progress===1;
