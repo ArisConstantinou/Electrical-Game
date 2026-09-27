@@ -42,10 +42,10 @@ try {
     const assertReceiptClearOfStance = async phase => {
       if (layout.name !== 'landscape') return;
       const receipt = await page.locator('#mixing-receipt').boundingBox();
-      const stand = await page.locator('#mobile-stand').boundingBox();
-      const crouch = await page.locator('#mobile-crouch').boundingBox();
+      const movement = await page.locator('#joystick').boundingBox();
+      const action = await page.locator('#look-joystick').boundingBox();
       const overlaps = (a, b) => a && b && a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
-      assert(!overlaps(receipt, stand) && !overlaps(receipt, crouch), `${phase}: mixing receipt must not cover mobile stance controls`);
+      assert(!overlaps(receipt, movement) && !overlaps(receipt, action), `${phase}: mixing receipt must not cover the mobile movement/stance or aim/jump pads`);
     };
     await assertReceiptClearOfStance('empty bucket');
     const target = await page.evaluate(() => window.__wireTheHouse.mixing.aimedObject()?.kind);

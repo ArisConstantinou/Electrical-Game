@@ -1,7 +1,17 @@
 # Preparation bay, ready wheelbarrow and drum mixer
 
-Preview: <http://127.0.0.1:5364/Electrical-Game/>. Work is isolated on
-`codex/mortar-mixing-fixes`; protected main checkout and public deployment are unchanged.
+Preview: <http://127.0.0.1:5365/Electrical-Game/>. Reuse the project's single
+listener; isolated candidates are tested through browser request routing.
+
+## 2026-09-27 transport-wheel correction
+
+- The concrete mixer's transport axle runs across Z, underneath the motor-side upright at X = 0.40 m. Both tyres, rim lips and hub caps share that axis. The two tripod legs meet its ends; the former assembly incorrectly ran along the front-foot / motor span in X.
+- Tyre diameter remains 33.2 cm, width 6 cm and track 60 cm. The wheelbarrow keeps its existing X axle. Drum, motor, wear materials and mixing logic remain unchanged.
+- The sand pile is 50 cm farther forward, leaving the newly oriented tyres on bare floor. Its shape and 600 kg starting stock remain unchanged. The mansion mixer position is retained to keep the rear doorway clear.
+- `tests/mixer-transport-ui.mjs` checks the actual game in WebGL/WebGPU at 1440×900, 390×844 and 844×390: tyre/axle orientation, hub and leg joins, floor/sand clearance, doorway footprint, finite geometry, wheelbarrow orientation and independent drum start/stop.
+- `tests/sand-shoveling-ui.mjs` passes native scooping/pouring and finite stock conservation at desktop, portrait, landscape and tablet sizes. Landscape receipt clearance now checks the current movement/stance and aim/jump joysticks, replacing obsolete removed button selectors.
+- Before/after desktop WebGL samples use the same camera and 130 measured submitted frames after warmup. The mixer remains 64 meshes / 54,424 triangles; P95 measured 9.0 ms before and 6.4 ms after. These are brief frozen-scene PC samples, not an iPhone benchmark or proof of an FPS improvement. GPU time, heap and VRAM are not independently measured.
+- Runtime edits are in the named, editable procedural assemblies. Existing Blender/GLB files below are historical snapshots and were not regenerated for this runtime correction.
 
 ## Layout and models
 

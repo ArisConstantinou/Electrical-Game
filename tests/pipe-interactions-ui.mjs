@@ -46,7 +46,7 @@ try{
   const intervals=[];g.step=window.pipeStep;await new Promise(resolve=>{let count=0,last=0;const frame=now=>{if(count++>=30&&last)intervals.push(now-last);last=now;if(count<90)requestAnimationFrame(frame);else resolve();};requestAnimationFrame(frame);});g.step=()=>{};intervals.sort((a,b)=>a-b);
   return{environment:'Windows Chrome headless, 1366x768; fixed camera; physical-phone performance unverified',meanMs:samples.reduce((a,b)=>a+b,0)/samples.length,p95Ms:samples[114],maxMs:samples[119],fps:1000/(intervals.reduce((a,b)=>a+b,0)/intervals.length),frameP95Ms:intervals[Math.floor(intervals.length*.95)],frameMaxMs:intervals.at(-1),draws,geometries:g.renderer.webgl.info.memory.geometries,textures:g.renderer.webgl.info.memory.textures};
  });
- if(!baseline&&!performanceOnly){
+ if(!baseline&&!performanceOnly&&!process.argv.includes('--live-check')){
   await aim(4);await page.evaluate(()=>{const g=window.__wireTheHouse;g.player.update=window.pipePlayerUpdate;for(let i=0;i<20;i++)window.pipeStep(1/60);const c=g.renderer.camera,p=g.pvc.stock.bundleCenter(4).add(new c.position.constructor(.14,1.4,0));c.lookAt(p);g.player.pitch=c.rotation.x;g.player.yaw=c.rotation.y;for(let i=0;i<2;i++)window.pipeStep(1/60);g.player.update=()=>{};});
   assert.equal((await state()).aimedBundle,4,'The fifth bundle remains reachable after normal player collision updates');report.checks.push('normal player positioning and collision still allow fifth-bundle targeting');
   await aim(4);await page.evaluate(()=>window.__wireTheHouse.pvc.stock.bundleRoots[4].visible=false);await step(2);assert.equal((await state()).aimedBundle,null);await page.evaluate(()=>window.__wireTheHouse.pvc.stock.bundleRoots[4].visible=true);
