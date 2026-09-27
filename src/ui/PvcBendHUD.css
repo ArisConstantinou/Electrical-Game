@@ -1,0 +1,68 @@
+#pvc-bend-hud[hidden],#pvc-bend-hud [hidden]{display:none!important}
+#pvc-bend-hud{position:absolute;inset:0;z-index:24;pointer-events:none;color:#fff5d9;font:600 14px/1.25 system-ui,sans-serif;font-variant-numeric:tabular-nums;user-select:none;-webkit-user-select:none}
+#pvc-bend-hud svg{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#pvc-bend-hud small{font-size:12px;font-weight:700;letter-spacing:.06em;color:#d5cbb5}
+#pvc-bend-hud button{position:relative;display:flex;align-items:center;justify-content:center;gap:6px;min-width:52px;min-height:52px;padding:8px 12px;border:1px solid #9e9575;border-bottom-width:3px;border-radius:9px;background:#26322fed;color:#fff5d9;font:700 12px/1.2 system-ui,sans-serif;cursor:pointer;touch-action:none;pointer-events:auto;-webkit-tap-highlight-color:transparent}
+#pvc-bend-hud button:hover{border-color:#ffdf8b;background:#39463b}
+#pvc-bend-hud button:focus-visible{outline:3px solid #80d4ff;outline-offset:3px}
+#pvc-bend-hud button:active,#pvc-bend-hud button.is-held{background:#1b6d86;border-color:#80d4ff;transform:translateY(1px)}
+#pvc-bend-hud button:disabled{opacity:.4;cursor:default;transform:none}
+#pvc-bend-hud button[aria-pressed=true]{border-color:#ffda70;background:#555037}
+#pvc-bend-hud button.is-primary{background:#ad4e2a;border-color:#ffce67;color:#fff9e9}
+.pvc-bend-metrics{position:absolute;right:22px;top:35%;width:174px;padding:14px;border:1px solid #d8bf78;border-radius:14px;background:#182923eb;box-shadow:0 6px 22px #0005;pointer-events:auto}
+.pvc-angle-gauge{position:relative;height:118px}
+.pvc-angle-gauge>svg{position:absolute;inset:0;width:112px;height:112px;color:#ffce67}
+#pvc-bend-hud .pvc-gauge-track{stroke:#51634e;stroke-width:7}
+#pvc-bend-hud .pvc-gauge-fill{stroke-width:7;stroke-dasharray:0 90}
+#pvc-bend-hud .pvc-gauge-pipe{stroke:#8c9b80;stroke-width:3}
+.pvc-angle-gauge>div{position:absolute;left:44px;top:48px;display:flex;flex-direction:column;gap:3px}
+.pvc-angle-gauge output{font-size:26px;line-height:1;color:#ffdc7e}
+.pvc-angle-gauge span{font-size:12px;color:#d5cbb5}
+.pvc-radius{display:flex;gap:12px;align-items:center;padding-top:10px;border-top:1px solid #52604b}
+.pvc-radius>svg{width:30px;height:30px;color:#ffdc7e}
+.pvc-radius>div{display:flex;flex-direction:column;gap:3px}
+.pvc-radius output{font-size:20px}
+.pvc-bend-progress{height:4px;margin-top:13px;border-radius:3px;background:#4d5b45;overflow:hidden}
+.pvc-bend-progress i{display:block;height:100%;background:#ffce67}
+#pvc-bend-hud[data-ready=true] .pvc-gauge-fill{stroke:#b8e38c}
+#pvc-bend-hud[data-ready=true] .pvc-bend-progress i{background:#b8e38c}
+.pvc-quantity{margin-top:14px;padding-top:12px;border-top:1px solid #52604b}
+.pvc-quantity-title{display:flex;align-items:center;gap:7px;margin-bottom:8px}
+.pvc-quantity-title svg{width:22px;height:22px;color:#ffdc7e}
+.pvc-quantity-stepper{display:flex;gap:6px;align-items:center}
+#pvc-bend-hud .pvc-quantity-stepper button{min-width:44px;min-height:48px;padding:3px;font-size:25px}
+.pvc-quantity-stepper output{flex:1;text-align:center;font-size:28px;color:#ffdc7e}
+.pvc-quantity-presets{display:flex;gap:5px;margin-top:8px}
+#pvc-bend-hud .pvc-quantity-presets button{flex:1;min-width:0;min-height:44px;padding:6px 4px}
+.pvc-bend-dock{position:absolute;left:50%;bottom:104px;transform:translateX(-50%);width:max-content;max-width:calc(100% - 28px);padding:10px 12px;border:1px solid #a6986f;border-radius:13px;background:#172720ed;box-shadow:0 6px 22px #0005}
+.pvc-bend-position{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:9px;font-size:12px;letter-spacing:.02em}
+.pvc-bend-position>span{color:#e2c976}
+.pvc-bend-cells{display:flex;gap:3px}
+.pvc-bend-cells i{display:block;width:9px;height:9px;border-radius:2px;background:#566345;border:1px solid #8c967c}
+.pvc-bend-cells i.is-bent{background:#ffce67;border-color:#ffdc8a}
+.pvc-bend-cells i.is-active{background:#36a8ff;border-color:#b5e8ff;box-shadow:0 0 0 2px #36a8ff55}
+.pvc-bend-actions{display:flex;justify-content:center;gap:6px}
+.pvc-bend-actions button{flex-direction:column}
+.pvc-bend-actions svg{width:24px;height:24px}
+#pvc-bend-hud kbd{display:block;position:absolute;top:-7px;right:5px;min-width:20px;padding:2px 4px;border:1px solid #b4b09a;border-bottom-width:2px;border-radius:4px;background:#e7e2cf;color:#1f3029;font:800 12px/1.1 system-ui,sans-serif}
+.pvc-bend-notice{max-width:630px;margin:10px 0 0;color:#ffe3a1;font-size:14px;text-align:center}
+.pvc-bending-ui #desktop-key-guide-toggle,.pvc-bending-ui #site-pro-desktop-tools{display:none!important}
+@media(max-width:1000px) and (pointer:fine){.pvc-bend-actions button{padding:8px}.pvc-bend-metrics{right:12px;width:152px}}
+@media(pointer:coarse){
+ .pvc-bend-metrics{top:98px;right:12px;width:168px;padding:10px;border-radius:12px}
+ .pvc-angle-gauge{height:108px}.pvc-angle-gauge>svg{width:94px;height:94px}.pvc-angle-gauge>div{left:35px;top:43px;gap:3px}.pvc-angle-gauge output{font-size:22px}.pvc-angle-gauge span{font-size:12px}
+ .pvc-radius{gap:6px;padding-top:7px}.pvc-radius output{font-size:18px}.pvc-radius>svg{width:24px;height:24px}.pvc-bend-progress{margin-top:9px}
+ .pvc-bend-dock{bottom:calc(160px + env(safe-area-inset-bottom));padding:9px;width:calc(100% - 24px)}
+ .pvc-bend-position{flex-wrap:wrap;gap:5px 12px;min-height:40px;padding-right:48px}.pvc-bend-cells{width:100%;justify-content:center}
+ .pvc-bend-actions{flex-wrap:wrap;gap:6px}#pvc-bend-hud .pvc-bend-actions button{min-width:52px;min-height:54px;padding:7px;flex:1}
+ #pvc-bend-hud .pvc-bend-actions button span{display:none}#pvc-bend-hud .pvc-bend-actions button[data-bend-action=use],#pvc-bend-hud .pvc-bend-actions button[data-bend-action=confirm]{flex:2}
+ #pvc-bend-hud .pvc-bend-actions button[data-bend-action=use] span,#pvc-bend-hud .pvc-bend-actions button[data-bend-action=confirm] span{display:block;font-size:12px}
+ #pvc-bend-hud .pvc-bend-actions button[data-bend-action=pause]{position:absolute;top:7px;right:9px;min-width:44px;min-height:44px;width:44px;height:44px;padding:6px;flex:none}
+ #pvc-bend-hud kbd{display:none}.pvc-bend-notice{position:absolute;bottom:calc(100% + 8px);left:0;right:0;padding:8px;border-radius:8px;background:#172720f2;font-size:14px;line-height:1.3}
+ #pvc-bend-hud .pvc-quantity-stepper button{min-width:44px;min-height:48px}.pvc-quantity{margin-top:10px;padding-top:9px}.pvc-quantity-stepper{gap:3px}
+}
+@media(pointer:coarse) and (max-height:520px){
+ .pvc-bend-metrics{display:flex;justify-content:center;align-items:center;gap:12px;top:12px;left:150px;right:240px;width:auto;padding:8px 12px 14px}.pvc-angle-gauge{width:124px;height:100px;flex:none}.pvc-angle-gauge>svg{width:84px;height:84px}.pvc-angle-gauge>div{left:32px;top:35px}.pvc-angle-gauge output{font-size:20px}.pvc-radius{padding:0;border:0;min-width:90px}.pvc-radius output{font-size:18px}.pvc-bend-progress{position:absolute;bottom:6px;left:12px;right:12px;margin:0}
+ .pvc-bend-dock{top:auto;bottom:12px;width:calc(100% - 330px);max-width:520px;left:50%}
+ .pvc-bend-position{gap:5px}.pvc-bend-notice{max-width:520px}.pvc-quantity{width:156px;flex:none;margin:0;padding:0 0 0 10px;border-top:0;border-left:1px solid #52604b}.pvc-quantity-title{margin-bottom:5px}
+}

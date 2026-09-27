@@ -6,6 +6,8 @@ import type { BoxConduitEntry } from '../electrical/BoxGroup';
 import { buildToolModel } from '../player/ToolModels';
 import { workerHand,workerArm,poseWorkerArm,workerGripTarget,hideLegacyWorkerArm,type WorkerArm,type WorkerGripTarget } from '../player/WorkerArm';
 import { PvcBend,PVC,type PipeRecipe } from './PvcBend';
+import { PvcBendHighlight } from './PvcBendHighlight';
+import { PvcBendHUD } from '../ui/PvcBendHUD';
 import { PvcStock,PvcTube,part,pvcMaterial,pvcStockMaterial } from './PvcModels';
 import { springLeadPoint } from './PvcLead';
 import {DEFAULT_PVC_PRESETS,PVC_PRESET_KEY,readPvcPresets,type PvcPreset} from './PvcPresets';
@@ -27,6 +29,8 @@ export class PvcWorkshop {
   readonly stock=new PvcStock();
   readonly work=new THREE.Group();
   readonly pipe=new PvcTube(pvcMaterial.clone());
+  readonly bendHighlight=new PvcBendHighlight();
+  readonly bendHud:PvcBendHUD;
   readonly preparedRoot=new THREE.Group();
   private readonly targetGuideBounds=new THREE.Box3();
   private readonly targetGuide=new THREE.Box3Helper(this.targetGuideBounds,0xffa52f);
@@ -134,6 +138,7 @@ export class PvcWorkshop {
     body.rotation.z=0;part(this.marker,new THREE.ConeGeometry(.0035,.014,8),new THREE.MeshStandardMaterial({color:0x101212}),'Marker felt tip',[0,-.007,0]);
     this.cutRing=new THREE.Mesh(new THREE.TorusGeometry(.011,.0008,4,24),new THREE.MeshBasicMaterial({color:0xeaa34c}));this.previewRoot.add(this.cutRing);
     this.markRing=new THREE.Mesh(new THREE.TorusGeometry(.0103,.0015,4,24),new THREE.MeshBasicMaterial({color:0x13171a}));this.markRing.name='Actual black marker at spring centre';this.work.add(this.markRing);
+    this.pipe.add(this.bendHighlight);
     for(const side of [-1,1]){const hand=workerHand(side,'spring'),arm=workerArm(side,hand,v());this.arms.push(arm);game.renderer.scene.add(arm.group,hand);}
     this.controls=document.createElement('div');this.controls.id='pvc-touch-controls';this.controls.hidden=true;
     this.controls.innerHTML='<button data-pvc="back" aria-label="Προηγούμενη θέση χεριών">← ΧΕΡΙΑ</button><button data-pvc="forward" aria-label="Επόμενη θέση χεριών">ΧΕΡΙΑ →</button><button id="pvc-use">ΚΡΑΤΑ</button><button data-pvc="confirm">ΕΛΕΓΧΟΣ</button><button data-pvc="undo">ΑΝΑΙΡΕΣΗ</button><button data-pvc="save">PRESET</button><button data-pvc="transparent">ΔΙΑΦΑΝΕΙΑ</button><button data-pvc="qty-1" aria-label="Ετοίμασε μία σωλήνα">1</button><button data-pvc="qty-5" aria-label="Ετοίμασε πέντε σωλήνες">5</button><button data-pvc="qty-all" aria-label="Ετοίμασε όλες τις σωλήνες">ΟΛΕΣ</button><button data-pvc="pause">ΠΙΣΩ</button>';
@@ -149,6 +154,7 @@ export class PvcWorkshop {
     this.fitControls.querySelector('#pvc-entry-previous')!.addEventListener('click',()=>this.queue.push(()=>this.selectEntry(-1)));
     this.fitControls.querySelector('#pvc-entry-next')!.addEventListener('click',()=>this.queue.push(()=>this.selectEntry(1)));
     game.hud.shell.append(this.prompt,this.liveMeasure,this.markConfirm,this.zoomControl,this.drillControl,this.controls,this.fitControls);
+    this.bendHud=new PvcBendHUD(game.hud.shell,action=>this.queue.push(()=>action==='use'?this.use():this.command(action)),held=>this.toolbarHold=held);
     try{this.customPresets=readPvcPresets(localStorage);}catch{/* Storage can be unavailable in private/embedded contexts. */}
     this.stock.setPresets(this.presets);
     this.prompt.addEventListener('click',()=>this.queue.push(()=>this.interact()));
@@ -390,6 +396,7 @@ export class PvcWorkshop {
   private command(command:string):void{
     if(command==='save'){this.savePreset();return;}
     if(command==='transparent'){this.toggleTransparent();return;}
+    if(this.phase==='review'&&['qty-less','qty-more'].includes(command)){this.changeQuantity(command==='qty-more'?1:-1);return;}
     if(this.phase==='review'&&command.startsWith('qty-')){this.quantity=command==='qty-all'?this.rawCount:Math.min(this.rawCount,Number(command.slice(4)));return;}
     if(command==='pause'){this.pause();return;}
     if(command==='confirm'){this.interact();return;}
@@ -675,6 +682,7 @@ export class PvcWorkshop {
   }
   present():void{
     const active=this.blocksWork;
+    if(!active)this.bendHighlight.visible=false;
     this.work.visible=active&&this.phase!=='spreading';
     this.arms.forEach(a=>{a.group.visible=a.hand.visible=this.work.visible;});
     this.stock.markAt(this.bend.mark,this.markingProgress,this.activeBundle);
@@ -723,6 +731,7 @@ export class PvcWorkshop {
     // Work within arm reach; the original close-up was 78 cm beyond the eyes.
     const support=this.bend.at(this.bend.gripS-.16),working=this.bend.at(this.bend.gripS+.12);
     this.pipe.position.set(bending?-(support.x+working.x)/2:-mark.x,bending?.015+(support.y+working.y)/2:-.23-mark.y,bending?-.46:-.39);this.pipe.rotation.set(bending?Math.PI:0,0,0);
+    this.bendHighlight.update(this.bend,this.focused&&['spring','inserting','bending','review'].includes(this.phase),this.phase==='bending');
     if(this.phase==='spring'||this.phase==='inserting')this.pipe.position.x=THREE.MathUtils.lerp(-.08,-mark.x,this.insertion);
     if(this.phase==='carrying'){
       this.pipe.rotation.z=-1.2;const grip=this.bend.at(Math.min(this.bend.mark,.6));
@@ -787,7 +796,7 @@ export class PvcWorkshop {
       const tip=c.worldToLocal(world),localTangent=tangent.applyQuaternion(c.quaternion.clone().invert());
       this.cutter.quaternion.setFromUnitVectors(v(0,-1,0),localTangent);
       this.cutter.position.copy(tip).sub(v().fromArray(this.cutter.userData.tipPoint).applyQuaternion(this.cutter.quaternion));
-      right.copy(v().fromArray(this.cutter.userData.gripPoint).applyQuaternion(this.cutter.quaternion).add(this.cutter.position));left.copy(tip).add(v(-.015,world.y<.16?.08:-.13,0));
+      right.copy(v().fromArray(this.cutter.userData.gripPoint).applyQuaternion(this.cutter.quaternion).add(this.cutter.position));left.copy(tip).add(v(-.015,world.y < .16 ? .08 : -.13,0));
       rightQ.fromArray(this.cutter.userData.gripQuaternion??[0,0,0,1]).premultiply(this.cutter.quaternion);
       this.cutter.getObjectByName('cutter-moving-handle')!.rotation.z=.13-(this.phase==='cutting'?Math.sin(Math.min(1,this.elapsed/.45)*Math.PI)*.55:0);
     }else if(this.phase==='opening'){
@@ -829,10 +838,13 @@ export class PvcWorkshop {
     if(idleUi&&this.idleUiPresented)return;
     this.idleUiPresented=idleUi;
     const touchModifiers=this.touch&&['bending','review'].includes(this.phase);
-    this.controls.hidden=!show||(this.touch&&!touchModifiers);this.controls.dataset.phase=this.phase;
+    const bendUi=show&&['spring','inserting','bending','review','extracting'].includes(this.phase);
+    this.controls.hidden=bendUi||!show||(this.touch&&!touchModifiers);this.controls.dataset.phase=this.phase;
+    this.bendHud.update(show,this.phase,this.bend,this.quantity,this.rawCount,this.transparent,this.pressHeld,this.message);
+    this.game.hud.shell.classList.toggle('pvc-bending-ui',bendUi);
     this.game.hud.shell.classList.toggle('pvc-working',this.blocksWork);
     this.game.hud.shell.classList.toggle('pvc-focused',this.focused);
-    this.prompt.hidden=!this.game.started||(this.touch&&show)||(!show&&!near&&this.phase!=='carrying')||(this.phase==='carrying'&&!near&&!nearBox);
+    this.prompt.hidden=bendUi||!this.game.started||(this.touch&&show)||(!show&&!near&&this.phase!=='carrying')||(this.phase==='carrying'&&!near&&!nearBox);
     const tips:Partial<Record<Phase,string>>={
       marking:'Mouse: γωνία · E: σημάδεψε όλες τις σωλήνες · P: preset · Tab: επόμενο',
       spring:'LMB: βάλε το spring · R: διαφάνεια · ESC: πίσω',
@@ -887,7 +899,7 @@ export class PvcWorkshop {
       (this.fitControls.querySelector('#pvc-cut-confirm') as HTMLButtonElement).disabled=this.cutS<=this.cutFrom+.001;
     }
     this.zoomControl.setAttribute('aria-pressed',String(this.fitZoomed));this.zoomControl.dataset.zoom=String(this.fitZoomed);
-    this.liveMeasure.hidden=!show||!['marking','bending','review','fitting','cut'].includes(this.phase);
+    this.liveMeasure.hidden=bendUi||!show||!['marking','bending','review','fitting','cut'].includes(this.phase);
     if(!this.liveMeasure.hidden){
       const marking=this.phase==='marking',fit=Boolean(this.target);
       let point:THREE.Vector3;
@@ -921,5 +933,5 @@ export class PvcWorkshop {
       mobileAction.textContent='AIM';mobileDetail.textContent=this.game.input.actionHeld?'STOP':'JUMP';joystick.setAttribute('aria-label',`Drag to aim; tap to ${action==='AIM'?'use':action}; hold still to jump`);
     }
   }
-  get telemetry(){const fitError=this.fitErrorAt(this.phase==='fitting'?this.cutS:this.cutFrom);return{phase:this.phase,focused:this.focused,activeBundle:this.activeBundle,aimedBundle:this.game.started&&!this.focused?this.stockTarget()?.bundle??null:null,stockHighlights:this.stock.interactionHighlights.map(h=>(h.material as THREE.MeshBasicMaterial).color.getHex()===0x36a8ff?'blue':'yellow'),bundles:this.stock.bundleRemaining.map((remaining,index)=>({remaining,opened:this.stock.bundleOpened[index],spread:this.stock.bundleSpread[index],phase:this.bundlePhase(index)})),raw:this.rawCount,prepared:this.prepared.length,carrying:Boolean(this.carried),installed:this.installedCount,total:this.rawCount+this.prepared.filter(p=>p.originBundle===this.activeBundle).length+Number(this.carried?.originBundle===this.activeBundle)+this.installedByBundle[this.activeBundle],totalAll:this.stock.bundleRemaining.reduce((a,b)=>a+b,0)+this.prepared.length+Number(Boolean(this.carried))+this.installedCount,markCm:this.bend.mark*100,markingProgress:this.markingProgress,markingActive:this.markingActive,springInsertion:this.insertion,springCentreM:this.bend.mark,springLengthM:PVC.springLength,retrievalCableM:PVC.cableLength,grip:this.bend.grip,angle:this.bend.angle,radiusMm:this.bend.radius?this.bend.radius*1000:null,ready:this.bend.ready,angles:[...this.bend.angles],quantity:this.quantity,target:this.target?.definition.id??null,guideTarget:this.guideTarget?.definition.id??null,boxBottomCm:this.boxBottomHeight()===null?null:this.boxBottomHeight()!*100,cutCm:this.cutS*100,cutFromCm:this.cutFrom*100,cutHeightCm:(this.bend.topHeight-this.bend.at(this.phase==='fitting'?this.cutS:this.cutFrom).x)*100,entryHeightCm:this.entry()?.position.y===undefined?null:this.entry()!.position.y*100,entryPosition:this.entry()?.position.toArray()??null,entryIndex:this.entryIndex,entryCount:this.entries().length,cutSnapped:this.cutSnapped,fitErrorMm:fitError,fitReady:fitError>=-SHORT_PIPE_TOLERANCE_MM&&fitError<=BOX_ENTRY_ALLOWANCE_MM,boxEntryAllowanceMm:BOX_ENTRY_ALLOWANCE_MM,offcuts:this.offcuts.length,message:this.message,preview:this.pipe.visible,fasteners:{holes:this.fastenerHoles.length,pairs:this.fastenerPairs.length,drilled:this.fastenerHoles.filter(h=>h.drilled).length,index:this.fastenerIndex,progress:this.fastenerProgress,bitDiameterMm:12,aim:{...this.fastenerAim},positions:this.fastenerHoles.map(h=>({side:h.side,x:h.marker.position.x,y:h.y,z:h.marker.position.z})),rebars:this.fastenerPairs.map(p=>({visible:p.rebar.visible,position:p.rebar.position.toArray(),scale:p.rebar.scale.toArray(),left:p.rebar.userData.leftHole,right:p.rebar.userData.rightHole}))},arms:this.arms.map(a=>({side:a.side,reach:a.shoulder.distanceTo(a.wrist)}))};}
+  get telemetry(){const fitError=this.fitErrorAt(this.phase==='fitting'?this.cutS:this.cutFrom);return{phase:this.phase,focused:this.focused,activeBundle:this.activeBundle,aimedBundle:this.game.started&&!this.focused?this.stockTarget()?.bundle??null:null,stockHighlights:this.stock.interactionHighlights.map(h=>(h.material as THREE.MeshBasicMaterial).color.getHex()===0x36a8ff?'blue':'yellow'),bundles:this.stock.bundleRemaining.map((remaining,index)=>({remaining,opened:this.stock.bundleOpened[index],spread:this.stock.bundleSpread[index],phase:this.bundlePhase(index)})),raw:this.rawCount,prepared:this.prepared.length,carrying:Boolean(this.carried),installed:this.installedCount,total:this.rawCount+this.prepared.filter(p=>p.originBundle===this.activeBundle).length+Number(this.carried?.originBundle===this.activeBundle)+this.installedByBundle[this.activeBundle],totalAll:this.stock.bundleRemaining.reduce((a,b)=>a+b,0)+this.prepared.length+Number(Boolean(this.carried))+this.installedCount,markCm:this.bend.mark*100,markingProgress:this.markingProgress,markingActive:this.markingActive,springInsertion:this.insertion,springCentreM:this.bend.mark,springLengthM:PVC.springLength,retrievalCableM:PVC.cableLength,grip:this.bend.grip,angle:this.bend.angle,radiusMm:this.bend.radius?this.bend.radius*1000:null,ready:this.bend.ready,angles:[...this.bend.angles],quantity:this.quantity,target:this.target?.definition.id??null,guideTarget:this.guideTarget?.definition.id??null,boxBottomCm:this.boxBottomHeight()===null?null:this.boxBottomHeight()!*100,cutCm:this.cutS*100,cutFromCm:this.cutFrom*100,cutHeightCm:(this.bend.topHeight-this.bend.at(this.phase==='fitting'?this.cutS:this.cutFrom).x)*100,entryHeightCm:this.entry()?.position.y===undefined?null:this.entry()!.position.y*100,entryPosition:this.entry()?.position.toArray()??null,entryIndex:this.entryIndex,entryCount:this.entries().length,cutSnapped:this.cutSnapped,fitErrorMm:fitError,fitReady:fitError>=-SHORT_PIPE_TOLERANCE_MM&&fitError<=BOX_ENTRY_ALLOWANCE_MM,boxEntryAllowanceMm:BOX_ENTRY_ALLOWANCE_MM,offcuts:this.offcuts.length,message:this.message,preview:this.pipe.visible,bendHighlight:{visible:this.bendHighlight.visible,activeVisible:this.bendHighlight.active.visible,protectedRangeM:this.bendHighlight.userData.range??null,activeRangeM:this.bendHighlight.userData.activeRange??null},fasteners:{holes:this.fastenerHoles.length,pairs:this.fastenerPairs.length,drilled:this.fastenerHoles.filter(h=>h.drilled).length,index:this.fastenerIndex,progress:this.fastenerProgress,bitDiameterMm:12,aim:{...this.fastenerAim},positions:this.fastenerHoles.map(h=>({side:h.side,x:h.marker.position.x,y:h.y,z:h.marker.position.z})),rebars:this.fastenerPairs.map(p=>({visible:p.rebar.visible,position:p.rebar.position.toArray(),scale:p.rebar.scale.toArray(),left:p.rebar.userData.leftHole,right:p.rebar.userData.rightHole}))},arms:this.arms.map(a=>({side:a.side,reach:a.shoulder.distanceTo(a.wrist)}))};}
 }
