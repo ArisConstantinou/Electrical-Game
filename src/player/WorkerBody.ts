@@ -6,26 +6,21 @@ import type { FPSRig, RigTool } from './FPSRig';
 import type { WorkerGripTarget } from './WorkerArm';
 import referenceGrips from './referenceGrips.json';
 import {solveRigidGrasp,type GraspHistory} from './RigidGrasp';
+import { loadStartupAsset } from '../core/StartupAsset';
 
 const Y=new THREE.Vector3(0,1,0);
 async function loadWorkerModel(asset:string):Promise<THREE.Group>{
   const url=`${import.meta.env.BASE_URL}assets/worker/${asset}`;
-  for(let attempt=0;attempt<2;attempt++){
-    try{return (await new GLTFLoader().loadAsync(attempt===0?url:`${url}?retry=${Date.now()}`)).scene;}
-    catch(error){if(attempt===1)throw error;}
-  }
-  throw new Error(`Could not load ${asset}`);
+  return loadStartupAsset(url, asset === 'worker.glb' ? 'Worker model' : 'Apprentice model',
+    async request => (await new GLTFLoader().loadAsync(request)).scene);
 }
 async function loadWorkerMetadata():Promise<Record<string,{head:number[];tail:number[]}>>{
   const url=`${import.meta.env.BASE_URL}assets/worker/skeleton.json`;
-  for(let attempt=0;attempt<2;attempt++){
-    try{
-      const response=await fetch(attempt===0?url:`${url}?retry=${Date.now()}`);
+  return loadStartupAsset(url, 'Worker data', async request => {
+      const response=await fetch(request);
       if(!response.ok)throw new Error(`Worker skeleton HTTP ${response.status}`);
       return await response.json() as Record<string,{head:number[];tail:number[]}>;
-    }catch(error){if(attempt===1)throw error;}
-  }
-  throw new Error('Could not load worker skeleton');
+  });
 }
 /** Full anatomical sample. World-space skeleton owns the pose; camera aim remains independent. */
 export class WorkerBody extends THREE.Group {

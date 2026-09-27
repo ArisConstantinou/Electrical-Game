@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile,writeFile,mkdir} from 'node:fs/promises';
-const source=await readFile('public/perf/recorder.js','utf8');
+const source=await readFile('public/performance/recorder.js','utf8');
 const start=source.indexOf('function copyCapture('),end=source.indexOf('function installRuntime(',start);assert(start>=0&&end>start);
 const production=source.slice(start,end);
 function probe(body,snapshotMs,encodingMs){

@@ -13,23 +13,23 @@ const result={cases:[],errors:[]};
 await runManagedClient(session,180000,async()=>{
  const context=await session.browser.newContext({viewport:{width:1366,height:768},acceptDownloads:true});await blockPointerLock(context);await routeBuildingDist(context);
  const page=await context.newPage();page.on('pageerror',e=>result.errors.push(e.message));
- await page.goto('http://127.0.0.1:5365/Electrical-Game/perf/');await page.locator('#begin').click();
+ await page.goto('http://127.0.0.1:5365/Electrical-Game/?performance=1');await page.locator('#begin').click();
  await page.locator('#stop').click();
- const early=await page.evaluate(()=>window.performanceRecording.report);assert.equal(early.outcome,'stopped');assert.equal(early.tour.completed,false);assert(!early.loading.readyMs);
+ const early=await page.evaluate(()=>window.performanceRecording?.report);assert.equal(early.outcome,'stopped');assert.equal(early.tour.completed,false);assert(!early.loading.readyMs);
  assert(await page.locator('#download').isVisible());result.cases.push('stop-during-loading');
- await page.locator('#begin').click();await page.waitForFunction(()=>window.performanceRecording.tour,null,{timeout:120000});await page.waitForTimeout(4000);
+ await page.locator('#begin').click();await page.waitForFunction(()=>window.performanceRecording?.tour,null,{timeout:120000});await page.waitForTimeout(4000);
  await page.screenshot({path:path.join(out,'desktop-tour.png')});
  const child=page.frames().find(f=>f.parentFrame());await child.evaluate(()=>{const g=window.__wireTheHouse;cancelAnimationFrame(g.animationFrame);g.animationFrame=null;});
- await page.waitForFunction(()=>!window.performanceRecording.active,null,{timeout:20000});
- const stalled=await page.evaluate(()=>window.performanceRecording.report);assert.equal(stalled.outcome,'render-stalled');assert(stalled.longestPresentationGapMs>15000);assert.equal(stalled.worst1000ms.fps,0);
+ await page.waitForFunction(()=>!window.performanceRecording?.active,null,{timeout:20000});
+ const stalled=await page.evaluate(()=>window.performanceRecording?.report);assert.equal(stalled.outcome,'render-stalled');assert(stalled.longestPresentationGapMs>15000);assert.equal(stalled.worst1000ms.fps,0);
  assert(await child.evaluate(()=>window.__wireTheHouse.lifecyclePaused),'Reviewing results suspends scene work');
  assert(stalled.loading.firstContentfulPaintMs>0);result.cases.push('automatic-frozen-tail-stop-and-paint-timing');
  // Slow navigation on a new run must not reuse the previous ready runtime.
  await context.route('http://127.0.0.1:5365/Electrical-Game/',async route=>{await new Promise(resolve=>setTimeout(resolve,1000));await route.fallback();});
  await page.locator('#begin').click();await page.waitForTimeout(400);
- assert.equal(await page.evaluate(()=>window.performanceRecording.tour),null,'Old paused game is not attached during a delayed reload');
- await page.waitForFunction(()=>window.performanceRecording.tour,null,{timeout:120000});await page.waitForTimeout(1500);await page.locator('#stop').click();
- const fresh=await page.evaluate(()=>window.performanceRecording.report);assert.equal(fresh.events.filter(e=>e.type==='recording-started').length,1);
+ assert.equal(await page.evaluate(()=>window.performanceRecording?.tour),null,'Old paused game is not attached during a delayed reload');
+ await page.waitForFunction(()=>window.performanceRecording?.tour,null,{timeout:120000});await page.waitForTimeout(1500);await page.locator('#stop').click();
+ const fresh=await page.evaluate(()=>window.performanceRecording?.report);assert.equal(fresh.events.filter(e=>e.type==='recording-started').length,1);
  result.cases.push('delayed-fresh-navigation');
  await page.evaluate(()=>{Object.defineProperty(navigator,'canShare',{configurable:true,value:()=>true});Object.defineProperty(navigator,'share',{configurable:true,value:async data=>{window.__shareEvidence=await Promise.all(data.files.map(async f=>({name:f.name,type:f.type,size:f.size,text:f.type==='text/plain'?await f.text():null})));}});});
  await page.locator('#share').click();await page.waitForFunction(()=>window.__shareEvidence);
@@ -39,12 +39,12 @@ await runManagedClient(session,180000,async()=>{
  let downloads=0;page.on('download',()=>downloads++);await page.locator('#share').click();await page.waitForTimeout(200);assert.equal(downloads,0,'Cancel does not silently download');result.cases.push('share-cancellation');
  await page.evaluate(()=>Object.defineProperty(navigator,'canShare',{configurable:true,value:()=>false}));const downloading=page.waitForEvent('download');await page.locator('#share').click();const downloaded=await downloading;await downloaded.saveAs(path.join(out,'fallback.json'));assert.equal(JSON.parse(await readFile(path.join(out,'fallback.json'),'utf8')).schema,4);result.cases.push('share-download-fallback');
  const landscape=await session.browser.newContext({viewport:{width:844,height:390},isMobile:true,hasTouch:true});await routeBuildingDist(landscape);
- const lp=await landscape.newPage();await lp.goto('http://127.0.0.1:5365/Electrical-Game/perf/');await lp.locator('#begin').waitFor();
+ const lp=await landscape.newPage();await lp.goto('http://127.0.0.1:5365/Electrical-Game/?performance=1');await lp.locator('#begin').waitFor();
  assert.equal(await lp.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await lp.screenshot({path:path.join(out,'landscape-prompt.png')});
  // A genuinely expensive JPEG encode must stop subsequent capture attempts.
  await lp.evaluate(()=>{const native=HTMLCanvasElement.prototype.toDataURL;HTMLCanvasElement.prototype.toDataURL=function(...args){const until=performance.now()+40;while(performance.now()<until){}return native.apply(this,args);};});
- await lp.locator('#begin').tap();await lp.waitForFunction(()=>window.performanceRecording.tour,null,{timeout:120000});await lp.waitForTimeout(9000);await lp.locator('#stop').tap();
- const capped=await lp.evaluate(()=>window.performanceRecording.report);await writeFile(path.join(out,'capture-budget.json'),JSON.stringify(capped,null,2));assert.equal(capped.device.backend,'WebGPU');assert(capped.events.some(e=>e.type==='capture-budget-exceeded'),JSON.stringify(capped.capture));assert(capped.capture.count<=1);assert(capped.capture.totalCpuMs>=40);assert(capped.samples.some(s=>s.previousCaptureCpuMs>=40));result.cases.push('asynchronous-webgpu-capture-budget');
+ await lp.locator('#begin').tap();await lp.waitForFunction(()=>window.performanceRecording?.tour,null,{timeout:120000});await lp.waitForTimeout(9000);await lp.locator('#stop').tap();
+ const capped=await lp.evaluate(()=>window.performanceRecording?.report);await writeFile(path.join(out,'capture-budget.json'),JSON.stringify(capped,null,2));assert.equal(capped.device.backend,'WebGPU');assert(capped.events.some(e=>e.type==='capture-budget-exceeded'),JSON.stringify(capped.capture));assert(capped.capture.count<=1);assert(capped.capture.totalCpuMs>=40);assert(capped.samples.some(s=>s.previousCaptureCpuMs>=40));result.cases.push('asynchronous-webgpu-capture-budget');
  await landscape.close();
  assert.deepEqual(result.errors,[]);result.passed=true;await context.close();
 });

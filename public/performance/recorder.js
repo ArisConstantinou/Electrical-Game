@@ -5,9 +5,9 @@ import {observeMainThread} from './observers.js?v=diagnostics-4.0.2';
 import {createFunctionalChecks} from './functional.js?v=diagnostics-4.0.2';
 import {reportText} from './report-text.js?v=diagnostics-4.0.2';
 const $=id=>document.getElementById(id),frame=$('game'),panel=$('panel');
-const gameURL=new URL('../',location.href);
+const gameURL=new URL('../',import.meta.url);
 for(const key of ['renderer','level','v'])if(new URL(location.href).searchParams.has(key))gameURL.searchParams.set(key,new URL(location.href).searchParams.get(key));
-let active=false,game=null,report=null,timer=null,startedAt=0,run=0,tour=null;
+let active=false,game=null,report=null,timer=null,startedAt=0,run=0,tour=null,savingReport=Promise.resolve();
 let phase='loading',functional=null,functionalAt=0,functionalHiddenAt=0,resourceSamples=[],tasks=[],observer=null,support={},overhead={tourCpuMs:0,recorderCpuMs:0,monitorCpuMs:0},panelUpdatedAt=-Infinity;
 let samples=[],events=[],errors=[],diagnostics=[],checkpoints=[],captures=[],hudSamples=[],segments=[],loading={},settings={};
 let disposers=[],pendingCPU=0,last=0,first=0,activeStep=null,visibleMs=0,visibleAt=0,presentations=0,longestGap=0,stallAt=0;
@@ -191,7 +191,7 @@ function finish(outcome='stopped'){
  // Measurement is finished; stop scene work while the evidence is reviewed.
  game?.suspendLifecycle();
  if(!game){frame.removeAttribute('src');frame.hidden=true;}
- renderReport(report);persist(report).catch(error=>{$('capture-status').textContent+=' Η μόνιμη αποθήκευση δεν επιτράπηκε· χρησιμοποίησε Λήψη αναφοράς.';});
+ renderReport(report);savingReport=persist(report).catch(error=>{$('capture-status').textContent+=' Η μόνιμη αποθήκευση δεν επιτράπηκε· χρησιμοποίησε Λήψη αναφοράς.';});
 }
 function renderReport(value){
  panel.classList.remove('compact');panel.classList.add('completed');$('stop').hidden=true;$('begin').hidden=false;$('begin').textContent='ΝΕΟ BENCHMARK';$('results').hidden=false;for(const id of ['download','share','copy'])$(id).hidden=false;
@@ -214,7 +214,7 @@ async function database(){return new Promise((resolve,reject)=>{const request=in
 async function persist(value){const db=await database();try{await new Promise((resolve,reject)=>{const tx=db.transaction('reports','readwrite');tx.objectStore('reports').put(value,'last');tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});}finally{db.close();}}
 function reportFile(){return new File([JSON.stringify(report,null,2)],`electrical-game-benchmark-${report.createdAt.replace(/[:.]/g,'-')}.json`,{type:'application/json'});}
 function download(){if(!report)return;const file=reportFile(),url=URL.createObjectURL(file),link=document.createElement('a');link.href=url;link.download=file.name;link.click();setTimeout(()=>URL.revokeObjectURL(url),30000);}
-$('begin').onclick=start;$('stop').onclick=()=>finish('stopped');$('close').onclick=()=>{if(active)finish('stopped');location.assign(gameURL.href);};$('download').onclick=download;
+$('begin').onclick=start;$('stop').onclick=()=>finish('stopped');$('close').onclick=async()=>{if(active)finish('stopped');$('close').disabled=true;let deadline;try{await Promise.race([savingReport,new Promise(resolve=>{deadline=setTimeout(resolve,2000);})]);}finally{clearTimeout(deadline);location.assign(gameURL.href);}};$('download').onclick=download;
 $('share').onclick=async()=>{
  if(!report)return;
  const file=reportFile(),textFile=new File([JSON.stringify(report,null,2)],file.name.replace('.json','.txt'),{type:'text/plain'});

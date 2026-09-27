@@ -2,7 +2,7 @@
 
 The recorder now inspects every authored room in the default mansion, rather than a main room on each floor. It runs two measurement passes, followed by separate controlled functional checks. It preserves the game's renderer, resolution, geometry, materials, graphics settings, movement speed, collisions and stair profiles. No server, telemetry upload or paid service is added.
 
-The benchmark is served directly at `/Electrical-Game/perf/`. The previous `/review/performance/` directory and redirect are removed. The parent stays at `/perf/` when a new measurement reloads only its game iframe.
+Open **PERFORMANCE TEST** beside **LEVEL EDITOR** in the main menu. The test stays on `/Electrical-Game/?performance=1`; the separate `/perf/` document is removed. Renderer/version parameters are preserved for the game iframe. Loading starts only after START BENCHMARK. MAIN MENU remains available during loading, the route, stopped/completed results and restored reports. Returning stops recording, restores runtime hooks and leaves the test. New measurements reload only the child game; saved reports restore without a game renderer. Saved/editor layouts do not pretend to complete the fixed mansion route.
 
 ## Coverage
 
@@ -58,7 +58,7 @@ Copy Numbers produces a bounded text summary with the recorded device/build, bot
 - `tests/benchmark-faults.mjs`: real 180 ms CPU blocking, runtime exception, failed image request, incomplete route, and supported/unsupported measurement paths.
 - `tests/benchmark-controls.mjs`: existing stop/loading, no-frame-tail, delayed restart, share/cancel/download and capture-budget regressions.
 - `tests/benchmark-capture-total.mjs`: runs the actual production capture function with a controlled CPU clock. The previous per-portion rule misses 20+20 ms; the new aggregate rule stops further images. Real browser readback made the attempted sub-budget UI fixture unreliable in two runs, so it is retained as diagnostic evidence, not a passing test. Real browser capture stopping remains covered by `benchmark-controls.mjs`.
-- `tests/benchmark-address.mjs`: direct `/perf/` entry and start/stop/new-run stay on the same parent page, game-root/query preservation, and absence of requests to the removed directory.
+- `tests/benchmark-address.mjs`: main-menu Performance Test entry and start/stop/new-run stay on the same parent page, game-root/query preservation, and absence of requests to the removed directory.
 - `tests/benchmark-public-smoke.mjs`: actual served prompt, version, HUD visibility, route manifest, bounded report and pause while reviewing, without candidate interception.
 - `tests/benchmark-copy.mjs`: denied/missing clipboard access, readable selected fallback, retry failure, matching small TXT, success, native Chrome clipboard readback and report restoration without another tour. Physical iPhone acceptance remains separate.
 - `tests/benchmark-report-text.mjs`: original recorded device/version, per-pass comparison, overhead and diagnosis retained while large raw histories and image payloads are excluded; bounded output and older report compatibility.

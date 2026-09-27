@@ -56,6 +56,10 @@
 #start-screen #start-button[data-ready='true'] #start-button-label { font-size: clamp(32px, 4vw, 40px); }
 #start-screen #start-button[data-ready='true'] #start-button-label { animation: start-ready-reveal .35s ease-out both; }
 #start-screen #start-button[data-ready='true'] .start-loading-indicator { display: none; }
+#start-screen #start-button[data-failed='true'] .start-loading-indicator { display: none; }
+#start-screen #start-button[data-failed='true'] { font-size: clamp(18px, 5vw, 28px); letter-spacing: .06em; }
+#start-screen .start-load-error { order: 2; margin: 10px 0 0; color: #753329; font: 700 14px/1.4 Bahnschrift, Arial, sans-serif; }
+#start-screen .start-load-error[hidden] { display: none; }
 #start-screen #start-button[data-preparing='true']::after { content: ''; position: absolute; left: 0; bottom: 0; width: var(--load-progress); height: 4px; border-radius: 0 3px 3px 3px; background: #b68b12; }
 #start-screen #start-button .start-loading-indicator { position: absolute; right: 13px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; justify-content: flex-end; gap: 6px; min-width: 70px; }
 #start-screen #start-button .start-loading-icons { position: relative; display: block; flex: none; width: 25px; height: 25px; background: transparent; }
@@ -92,7 +96,9 @@
 #start-screen .apprentice-count button svg { width: 20px; height: 20px; }
 #start-screen .apprentice-count output { min-width: 0; color: #31574c; font: 900 12px/1.2 Bahnschrift, Arial, sans-serif; }
 
-#start-screen .start-level-actions { display: grid; grid-template-columns: 1fr; gap: 9px; }
+#start-screen .start-level-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+#start-screen #start-level-editor,
+#start-screen #start-performance-test { padding: 7px 8px; justify-content: center; font-size: 14px; letter-spacing: .02em; }
 #start-screen .start-level-actions button,
 #start-screen .start-utilities button { display: flex; align-items: center; justify-content: flex-start; gap: 9px; width: 100%; min-height: 50px; padding: 7px 18px; border: 1px solid #81988c; border-radius: 6px; background: #f5f2e7; box-shadow: none; color: #1b3834; font: 800 16px/1.1 Bahnschrift, Arial, sans-serif; letter-spacing: .07em; text-align: left; cursor: pointer; }
 #start-screen .start-level-actions button:hover:not(:disabled),
@@ -161,7 +167,8 @@
   #start-screen .apprentice-count output { font-size: 12px; }
   #start-screen .start-level-actions { grid-template-columns: 1fr 1fr; gap: 6px; }
   #start-screen .start-level-actions button { justify-content: center; min-height: 48px; padding: 4px; font-size: 12px; letter-spacing: .02em; }
-  #start-screen #start-level-editor { grid-column: 1 / -1; }
+  #start-screen #start-level-editor,
+  #start-screen #start-performance-test { grid-column: auto; font-size: 12px; gap: 5px; padding: 4px; }
   #start-screen .start-projects { flex: none; margin-top: 10px; padding-top: 9px; }
   #start-screen .start-project-list { flex: none; height: 148px; min-height: 0; max-height: 148px; }
   #start-screen .start-tools-card { grid-column: 1; }

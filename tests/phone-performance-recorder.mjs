@@ -26,7 +26,7 @@ await runManagedClient(session,720000,async()=>{
  await page.waitForFunction(()=>!document.querySelector('#begin').disabled,null,{timeout:120000});
  await page.screenshot({path:path.join(out,'portrait-before.png')});
  await context.unroute('**/review/performance/**');
- await page.goto('http://127.0.0.1:5365/Electrical-Game/perf/?renderer=webgl');
+ await page.goto('http://127.0.0.1:5365/Electrical-Game/?performance=1&renderer=webgl');
  assert.equal(await page.locator('#begin').textContent(),'START BENCHMARK');
  assert.equal(await page.locator('#game').getAttribute('src'),null,'Game loads only after the benchmark gesture');
  await page.screenshot({path:path.join(out,'portrait-after-prompt.png')});
@@ -79,7 +79,7 @@ await runManagedClient(session,720000,async()=>{
  await context.close();
  const landscape=await session.browser.newContext({viewport:{width:844,height:390},isMobile:true,hasTouch:true});await blockPointerLock(landscape);await routeBuildingDist(landscape);
  const landscapePage=await landscape.newPage();landscapePage.on('pageerror',e=>result.errors.push(e.message));
- await landscapePage.goto('http://127.0.0.1:5365/Electrical-Game/perf/');await landscapePage.locator('#begin').tap();
+ await landscapePage.goto('http://127.0.0.1:5365/Electrical-Game/?performance=1');await landscapePage.locator('#begin').tap();
  await landscapePage.waitForFunction(()=>window.performanceRecording.tour,null,{timeout:120000});await landscapePage.screenshot({path:path.join(out,'landscape-tour.png')});
  const lf=landscapePage.frames().find(f=>f.parentFrame());
  await lf.evaluate(()=>{window.__blockedPlayerUpdate=window.__wireTheHouse.player.update;window.__wireTheHouse.player.update=()=>{};});

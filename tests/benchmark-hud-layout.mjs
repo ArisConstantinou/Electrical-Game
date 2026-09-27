@@ -13,7 +13,7 @@ const results=[];
 await runManagedClient(session,180000,async()=>{
  for(const viewport of [{width:430,height:745},{width:320,height:740},{width:844,height:390},{width:1366,height:768}]){
   const context=await session.browser.newContext({viewport,isMobile:viewport.width<1000,hasTouch:viewport.width<1000,deviceScaleFactor:1});await blockPointerLock(context);await routeBuildingDist(context);
-  const page=await context.newPage();await page.goto('http://127.0.0.1:5365/Electrical-Game/perf/');await page.locator('#begin').click();await page.waitForFunction(()=>window.performanceRecording.tour,null,{timeout:120000});await page.waitForTimeout(1200);
+  const page=await context.newPage();await page.goto('http://127.0.0.1:5365/Electrical-Game/?performance=1');await page.locator('#begin').click();await page.waitForFunction(()=>window.performanceRecording?.tour,null,{timeout:120000});await page.waitForTimeout(1200);
   const child=page.frames().find(f=>f.parentFrame());
   const hud=await child.evaluate(()=>['fps-counter','mobile-top-rail','mobile-tool-slider'].map(id=>{const e=document.getElementById(id),r=e?.getBoundingClientRect();return {id,visible:!!r&&r.width>0&&r.height>0&&getComputedStyle(e).visibility!=='hidden',rect:r?.toJSON()};}));
   const panel=await page.locator('#panel').boundingBox();

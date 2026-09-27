@@ -8,7 +8,7 @@ const origin = 'http://127.0.0.1:5365/Electrical-Game/';
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const results = [];
 try {
-  for (const failLimit of [1, 2]) {
+  for (const failLimit of [1, 3]) {
     const context = await browser.newContext({
       viewport: { width: 430, height: 932 }, isMobile: true, hasTouch: true, deviceScaleFactor: 3,
     });
@@ -43,7 +43,7 @@ try {
     assert.equal(state.progress, failLimit === 1 ? 'READY' : 'LOAD FAILED');
     assert.deepEqual(pageErrors, []);
     results.push({ failedLoads, state });
-    if (failLimit === 2) {
+    if (failLimit === 3) {
       await Promise.all([page.waitForEvent('load'), page.locator('#start-button').click()]);
       assert.equal(await page.locator('#start-screen').isVisible(), true, 'Retry must not start an unprepared game');
     }

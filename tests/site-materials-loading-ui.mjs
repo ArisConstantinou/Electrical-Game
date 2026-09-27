@@ -24,7 +24,7 @@ try{
  assert(report.running.started&&report.running.raf!==null);assert.equal(report.running.error,'');assert.deepEqual(report.errors,[]);assert(!report.console.some(s=>s.includes('Site preparation failed')));
  await page.screenshot({path:`${out}/running.png`});await context.close();
  const failedContext=await browser.newContext({viewport:{width:430,height:932},isMobile:true,hasTouch:true});await blockPointerLock(failedContext);await serveTaskBuild(failedContext,base);
- await failedContext.route('**/assets/site-materials/concrete-wall-009-albedo-1k.jpg',route=>route.fulfill({status:404,body:'Missing test image'}));
+ await failedContext.route('**/assets/site-materials/concrete-wall-009-albedo-1k.jpg*',route=>route.fulfill({status:404,body:'Missing test image'}));
  const failedPage=await failedContext.newPage();await failedPage.goto(base);
  await failedPage.waitForFunction(()=>document.querySelector('#start-load-percent')?.value==='LOAD FAILED',undefined,{timeout:120000});
  report.failedAsset=await failedPage.evaluate(()=>({ready:!!window.__wireTheHouse?.isReadyForStart,label:document.querySelector('#start-button-label')?.textContent,disabled:document.querySelector('#start-button')?.disabled}));

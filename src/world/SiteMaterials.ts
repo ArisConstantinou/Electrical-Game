@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { loadStartupAsset } from '../core/StartupAsset';
 
 type Surface = 'floor' | 'concrete' | 'plaster' | 'clay';
 
@@ -28,9 +29,12 @@ function photographedTexture(surface: Surface, repeatX: number, repeatY: number,
   let sourceImage = materialTextures.get(sourceKey);
   if (!sourceImage) {
     const url=`${import.meta.env.BASE_URL}assets/site-materials/${filename}`;
-    let resolveImage!:(error:Error|null)=>void;
-    loadingImages.push(new Promise(resolve=>{resolveImage=resolve;}));
-    sourceImage = textureLoader.load(url,()=>resolveImage(null),undefined,()=>resolveImage(new Error(`Construction texture failed to load: ${filename}`)));
+    // Keep one Source shared by all UV-repeat clones across retry attempts.
+    sourceImage = new THREE.Texture();
+    const sharedTexture = sourceImage;
+    loadingImages.push(loadStartupAsset(url, 'Building material image', request => textureLoader.loadAsync(request))
+      .then(loaded => { sharedTexture.image = loaded.image; sharedTexture.needsUpdate = true; return null; },
+        error => error instanceof Error ? error : new Error(String(error))));
     if (kind === 'albedo') sourceImage.colorSpace = THREE.SRGBColorSpace;
     materialTextures.set(sourceKey, sourceImage);
   }

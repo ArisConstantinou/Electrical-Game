@@ -13,7 +13,7 @@ await runManagedClient(session,180000,async()=>{
  const context=await session.browser.newContext({viewport:{width:430,height:745},hasTouch:true,isMobile:true,deviceScaleFactor:3});await blockPointerLock(context);await routeBuildingDist(context);
  const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('http://127.0.0.1:5365/Electrical-Game/?renderer='+ (process.env.QA_BACKEND??'webgpu'));await page.waitForFunction(()=>window.__wireTheHouse?.isReadyForStart,null,{timeout:120000});await page.locator('#start-button').click();
  await page.evaluate(async()=>{
-  const {createFunctionalChecks}=await import('./perf/functional.js');const g=window.__wireTheHouse;g.player.camera.position.set(0,1.65,2);g.input.resetTransientInput();
+  const {createFunctionalChecks}=await import('./performance/functional.js');const g=window.__wireTheHouse;g.player.camera.position.set(0,1.65,2);g.input.resetTransientInput();
   const original=g.step;window.__checks=null;
   const controller=createFunctionalChecks(g,checks=>{window.__checks=checks;g.step=original;g.suspendLifecycle();});
   g.step=function(...args){controller.update(args[0]);try{return original.apply(this,args);}finally{controller.afterStep();}};

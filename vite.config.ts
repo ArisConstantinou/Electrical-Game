@@ -7,26 +7,16 @@ import path from 'node:path';
 // Public folder index documents are directory routes on Pages. Vite's SPA
 // fallback otherwise turns these same URLs into the game's index document.
 const benchmarkDocuments = (): Plugin => ({
-  name: 'wire-house-benchmark-documents',
+  name: 'wire-house-retired-benchmark-route',
   configureServer(server) {
     server.middlewares.use((request, response, next) => {
-      const url = new URL(request.url ?? '/', 'http://127.0.0.1');
-      if (request.method !== 'GET' && request.method !== 'HEAD') return next();
-      // The retired benchmark URL must not fall through to the game SPA.
-      if (url.pathname === '/Electrical-Game/review/performance' || url.pathname.startsWith('/Electrical-Game/review/performance/')) {
+      const pathname = new URL(request.url ?? '/', 'http://127.0.0.1').pathname;
+      if (/^\/Electrical-Game\/(?:perf|review\/performance)(?:\/|$)/.test(pathname)) {
         response.statusCode = 404;
         response.setHeader('Content-Type', 'text/plain; charset=utf-8');
-        response.end(request.method === 'HEAD' ? '' : 'Benchmark address removed. Use /Electrical-Game/perf/.');
+        response.end(request.method === 'HEAD' ? '' : 'Open Performance Test from the main menu.');
         return;
       }
-      const directories = ['/Electrical-Game/perf/'];
-      if (directories.some(directory => url.pathname === directory.slice(0, -1))) {
-        response.statusCode = 302;
-        response.setHeader('Location', `${url.pathname}/${url.search}`);
-        response.end();
-        return;
-      }
-      if (directories.includes(url.pathname)) request.url = `${url.pathname}index.html${url.search}`;
       next();
     });
   },

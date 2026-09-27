@@ -13,13 +13,13 @@ const result={cases:[],errors:[],physicalPhone:false};
 await runManagedClient(session,180000,async()=>{
  const context=await session.browser.newContext({viewport:{width:430,height:745},isMobile:true,hasTouch:true,acceptDownloads:true});await blockPointerLock(context);await routeBuildingDist(context);
  const page=await context.newPage();page.on('pageerror',e=>result.errors.push(e.message));
- await page.goto(process.env.QA_COPY_URL??'http://127.0.0.1:5365/Electrical-Game/perf/');
+ await page.goto(process.env.QA_COPY_URL??'http://127.0.0.1:5365/Electrical-Game/?performance=1');
  if(process.env.QA_COPY_REPORT){
   const saved=JSON.parse(await readFile(process.env.QA_COPY_REPORT,'utf8'));
   await page.evaluate(value=>new Promise((resolve,reject)=>{const request=indexedDB.open('electrical-game-benchmark',1);request.onsuccess=()=>{const db=request.result,tx=db.transaction('reports','readwrite');tx.objectStore('reports').put(value,'last');tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>reject(tx.error);};request.onerror=()=>reject(request.error);}),saved);
-  await page.reload();await page.waitForFunction(()=>window.performanceRecording.report);result.cases.push('existing-report-imported-into-owned-test-context');
- }else{await page.locator('#begin').tap();await page.waitForFunction(()=>window.performanceRecording.tour,null,{timeout:120000});await page.waitForTimeout(1000);await page.locator('#stop').tap();}
- const original=await page.evaluate(()=>window.performanceRecording.report);
+  await page.reload();await page.waitForFunction(()=>window.performanceRecording?.report);result.cases.push('existing-report-imported-into-owned-test-context');
+ }else{await page.locator('#begin').tap();await page.waitForFunction(()=>window.performanceRecording?.tour,null,{timeout:120000});await page.waitForTimeout(1000);await page.locator('#stop').tap();}
+ const original=await page.evaluate(()=>window.performanceRecording?.report);
  await page.evaluate(()=>{window.__nativeClipboard=navigator.clipboard;Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{throw new DOMException('Denied','NotAllowedError');}}});});
  await page.locator('#copy').tap();await page.waitForTimeout(200);await page.screenshot({path:path.join(out,'copy-denied.png')});
  assert(await page.locator('#copy-text').isVisible(),'Denied clipboard must expose a selectable text fallback');
@@ -33,7 +33,7 @@ await runManagedClient(session,180000,async()=>{
  await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:undefined}));await page.locator('#copy').tap();assert(await page.locator('#copy-text').isVisible());result.cases.push('missing-clipboard-api');
  await page.locator('#copy-close').tap();await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.__copiedText=text;}}}));await page.locator('#copy').tap();await page.waitForFunction(()=>window.__copiedText);assert.equal(await page.evaluate(()=>window.__copiedText),text);assert((await page.locator('#status').textContent()).includes('αντιγράφηκαν'));assert.equal(await page.locator('#copy-sheet').isVisible(),false);result.cases.push('clipboard-success');
  await context.grantPermissions(['clipboard-read','clipboard-write']);await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:window.__nativeClipboard}));await page.locator('#copy').tap();assert.equal((await page.evaluate(()=>navigator.clipboard.readText())).replaceAll('\r\n','\n'),text,'Windows native clipboard may normalize line endings');result.cases.push('native-chrome-clipboard-readback');
- await page.reload();await page.waitForFunction(()=>window.performanceRecording.report);assert.equal(await page.locator('#game').getAttribute('src'),null);assert.equal(await page.evaluate(()=>window.performanceRecording.report.createdAt),original.createdAt);result.cases.push('saved-report-restored-without-rerun');
+ await page.reload();await page.waitForFunction(()=>window.performanceRecording?.report);assert.equal(await page.locator('#game').getAttribute('src'),null);assert.equal(await page.evaluate(()=>window.performanceRecording?.report.createdAt),original.createdAt);result.cases.push('saved-report-restored-without-rerun');
  await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:undefined}));await page.locator('#copy').tap();assert(await page.locator('#copy-sheet').isVisible());await page.locator('#copy-close').tap();await page.locator('#begin').tap();assert.equal(await page.locator('#copy-sheet').isVisible(),false);await page.locator('#stop').tap();result.cases.push('new-run-clears-copy-sheet');
  assert.deepEqual(result.errors,[]);result.passed=true;result.characters=text.length;await context.close();
 });
