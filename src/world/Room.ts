@@ -175,9 +175,16 @@ export class Room extends THREE.Group {
     this.addConstructionJoints();
     this.addRearWall();
     fitColumns(this);
+    const passageJambs: THREE.Box3[] = [];
+    this.updateWorldMatrix(true, true);
+    this.traverse(object => {
+      if (object.name === 'Exposed concrete passage jamb')
+        passageJambs.push(new THREE.Box3().setFromObject(object));
+    });
     this.mansionWing = this.mansionPreview ? new MansionGroundWing(
       this.exterior.getObjectByName('Olive tree outside unfinished opening') ?? null,
       this.exterior.getObjectByName('Offset adjacent residential block') ?? null,
+      passageJambs,
     ) : null;
     if (this.mansionWing) {
       this.add(this.mansionWing);

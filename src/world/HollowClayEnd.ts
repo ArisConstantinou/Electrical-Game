@@ -121,12 +121,14 @@ function makeEnd(variant: number, torn = false): THREE.BufferGeometry {
 export const hollowClayEndShapes = [makeEnd(0), makeEnd(1), makeEnd(2)];
 export const brokenClayEndShapes = [makeEnd(0, true), makeEnd(1, true), makeEnd(2, true)];
 
-export function hollowClayWallEnds(length: number, rows: number, course: number, gap: number, alongX: boolean, wallName: string): THREE.Group {
+export function hollowClayWallEnds(length: number, rows: number, course: number, gap: number, alongX: boolean, wallName: string,
+  coveredEnds: readonly number[] = []): THREE.Group {
   const group = new THREE.Group();
   group.name = 'Four-chamber exposed hollow clay block ends';
   const seed = [...wallName].reduce((value, char) => Math.imul(value ^ char.charCodeAt(0), 16777619), 2166136261) >>> 0;
   const batches: { row: number; end: number }[][] = [[], [], []];
   for (let row = 0; row < rows; row++) for (let end = 0; end < 2; end++) {
+    if (coveredEnds.includes(end)) continue;
     const pick = ((Math.imul(row + 1, 2654435761) ^ Math.imul(end + 1, 2246822519) ^ seed) >>> 0) % 7;
     batches[pick < 3 ? 0 : pick < 6 ? 1 : 2].push({ row, end });
   }
