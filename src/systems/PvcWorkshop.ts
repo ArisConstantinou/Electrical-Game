@@ -82,6 +82,8 @@ export class PvcWorkshop {
   private canvasHold=false;
   private markingActive=false;
   private fitZoomed=false;
+  private supportS:number|null=null;
+  private cutterRetreat=0;
   private fastenerAim={x:-.72,y:.72};
   private fastenerHoles:FastenerHole[]=[];
   private fastenerPairs:FastenerPair[]=[];
@@ -154,6 +156,7 @@ export class PvcWorkshop {
     this.fitControls.querySelector('#pvc-entry-previous')!.addEventListener('click',()=>this.queue.push(()=>this.selectEntry(-1)));
     this.fitControls.querySelector('#pvc-entry-next')!.addEventListener('click',()=>this.queue.push(()=>this.selectEntry(1)));
     game.hud.shell.append(this.prompt,this.liveMeasure,this.markConfirm,this.zoomControl,this.drillControl,this.controls,this.fitControls);
+    const handArrows=document.createElement('span');handArrows.className='pvc-hand-arrows';handArrows.setAttribute('aria-hidden','true');handArrows.innerHTML='<span>↑</span><span>↓</span>';game.hud.shell.querySelector('#joystick-thumb')!.append(handArrows);
     this.bendHud=new PvcBendHUD(game.hud.shell,action=>this.queue.push(()=>action==='use'?this.use():this.command(action)),held=>this.toolbarHold=held);
     try{this.customPresets=readPvcPresets(localStorage);}catch{/* Storage can be unavailable in private/embedded contexts. */}
     this.stock.setPresets(this.presets);
@@ -242,7 +245,7 @@ export class PvcWorkshop {
     if(this.phase==='carrying'&&tool==='cutter'){this.interact();return false;}
     this.message=this.instruction('Άφησε τη σωλήνα στη μάτσα ή πάτησε ESC για παύση.','Άφησε τη σωλήνα στη μάτσα ή πάτησε ΠΙΣΩ για παύση.');return false;
   }
-  private transition(phase:Phase):void{this.phase=phase;this.elapsed=0;this.message='';this.shapeKey='';if(phase!=='marking')this.markingActive=false;}
+  private transition(phase:Phase):void{this.phase=phase;this.elapsed=0;this.message='';this.shapeKey='';if(phase!=='marking')this.markingActive=false;if(!['fitting','cutting','cut'].includes(phase)){this.supportS=null;this.cutterRetreat=0;}}
   private stockPoint(x:number,y:number,z:number):THREE.Vector3{return this.stock.markingPoint(this.activeBundle,x,y,z);}
   private selectBundle(index:number):void{
     if(index===this.activeBundle)return;
@@ -379,6 +382,20 @@ export class PvcWorkshop {
     // tapped AIM toggle and supplies duration-based bending.
     this.pressHeld=this.focused&&(this.toolbarHold||this.canvasHold||this.touch&&this.game.input.actionHeld);
     if(this.focused){
+      if(['fitting','cutting','cut'].includes(this.phase)){
+        // Up raises the support toward the free end; down follows the pipe
+        // through its radius. This focused action never moves the player.
+        const input=this.game.input,move=this.touch?input.mobileMove.y:Number(input.pressed('KeyS'))-Number(input.pressed('KeyW'));
+        const old=this.supportS??this.initialSupportS(),next=THREE.MathUtils.clamp(old+move*.24*dt,this.cutFrom+.025,this.bend.mark+.04);
+        // During a cut the loaded support stops before the blade. During
+        // adjustment the shears pull aside so the hand can pass either side.
+        this.supportS=this.phase==='cutting'&&Math.abs(this.supportPlaneGap(next))<.115?old:next;
+        const gap=Math.abs(this.supportPlaneGap(this.supportS)),approaching=gap<Math.abs(this.supportPlaneGap(old))-.00001;
+        const retreat=this.phase!=='cutting'&&(gap<.105||approaching&&gap<.145)?1:0;
+        this.cutterRetreat=THREE.MathUtils.damp(this.cutterRetreat,retreat,25,dt);
+        if(retreat===0&&this.cutterRetreat<.004)this.cutterRetreat=0;
+        if(this.cutterReady&&this.message==='Μετακίνησε το αριστερό χέρι πιο μακριά από τον κόφτη.')this.message='';
+      }
       const c=this.game.renderer.camera,t=1-Math.exp(-8*dt);c.position.lerp(this.cameraDestination,t);c.quaternion.slerp(this.targetRotation,t);
       this.game.player.yaw=c.rotation.y;this.game.player.pitch=c.rotation.x;this.game.player.velocity.set(0,0,0);
       const direction=Number(this.game.input.pressed('KeyD'))-Number(this.game.input.pressed('KeyA'));
@@ -449,6 +466,18 @@ export class PvcWorkshop {
     if(this.phase==='cut'&&cut>this.cutFrom+.001)this.transition('fitting');
     this.cutS=cut;this.cutSnapped=true;this.setFitCamera();this.message='ΠΡΟΣΩΠΟ · ελεύθερη μετακίνηση για άλλο ύψος.';
   }
+  private supportPlaneGap(s:number,cutS=this.cutS):number{
+    const hand=this.bend.at(s),cut=this.bend.at(cutS);
+    return (hand.x-cut.x)*Math.cos(cut.angle)+(hand.y-cut.y)*Math.sin(cut.angle);
+  }
+  private initialSupportS():number{
+    const max=this.bend.mark+.04;let s=Math.max(this.cutFrom+.025,this.bend.mark-PVC.springLength/2-.025);
+    while(s<max&&this.supportPlaneGap(s)<.125)s=Math.min(max,s+.005);
+    return s;
+  }
+  private get cutterReady():boolean{
+    return Math.abs(this.supportPlaneGap(this.supportS??this.initialSupportS()))>=.105&&this.cutterRetreat===0;
+  }
   private use():void{
     if(!this.focused)return;
     if(this.phase==='fastener-marking'){this.markFastenerHole();return;}
@@ -460,6 +489,7 @@ export class PvcWorkshop {
     if(this.touch&&this.phase==='bending'&&this.bend.ready){this.transition('review');return;}
     if(this.phase==='fitting'){
       if(this.cutS<=this.cutFrom+.001){this.message='Μετακίνησε το cutter στο σημείο που θέλεις να κόψεις.';return;}
+      if(!this.cutterReady){this.message='Μετακίνησε το αριστερό χέρι πιο μακριά από τον κόφτη.';return;}
       this.transition('cutting');this.game.audio.play('cutter');
     }
   }
@@ -713,7 +743,11 @@ export class PvcWorkshop {
   }
   anatomicalGrips():WorkerGripTarget[]{
     const clearFirstPerson=['carrying','fitting','cutting','cut','installing'].includes(this.phase)||this.phase.startsWith('fastener-');
-    return this.arms.map(arm=>({...workerGripTarget(arm,this.work.visible&&this.phase!=='fastener-marking'&&(this.phase!=='carrying'||arm.side>0)),section:(this.phase.startsWith('fastener-')?(arm.side<0?[.005,.005]:[.011,.011]):[.01,.01]) as [number,number],shape:'round' as const,contactLocked:true,surfaceContact:true,firstPersonClearance:clearFirstPerson?.42:undefined}));
+    const cutting=this.cutter.visible&&this.work.visible;
+    return this.arms.map(arm=>{
+      const cutter=cutting&&arm.side>0;
+      return {...workerGripTarget(arm,this.work.visible&&this.phase!=='fastener-marking'&&(this.phase!=='carrying'||arm.side>0)),section:(cutter?[.020,.014]:this.phase.startsWith('fastener-')?(arm.side<0?[.005,.005]:[.011,.011]):[.01,.01]) as [number,number],shape:cutter?'box' as const:'round' as const,contactLocked:true,surfaceContact:true,cutter:cutter?this.cutter:undefined,thumbWrap:this.phase==='carrying',firstPersonClearance:this.phase==='carrying'?.28:cutting?.20:clearFirstPerson?.42:undefined};
+    });
   }
   useAnatomicalBody():void{
     // Legacy arm geometry is only a transform driver, never a visible fallback.
@@ -735,9 +769,15 @@ export class PvcWorkshop {
     this.pipe.position.set(bending?-(support.x+working.x)/2:-mark.x,bending?.015+(support.y+working.y)/2:-.23-mark.y,bending?-.46:-.39);this.pipe.rotation.set(bending?Math.PI:0,0,0);
     this.bendHighlight.update(this.bend,this.focused&&['spring','inserting','bending','review'].includes(this.phase),this.phase==='bending');
     if(this.phase==='spring'||this.phase==='inserting')this.pipe.position.x=THREE.MathUtils.lerp(-.08,-mark.x,this.insertion);
+    // A carried pipe is held on a straight section, clear of the elbow and
+    // open end. Use this same material point for the tube and anatomical grip.
+    let carryGrip:ReturnType<PvcBend['at']>|null=null;
     if(this.phase==='carrying'){
-      this.pipe.rotation.z=-1.2;const grip=this.bend.at(Math.min(this.bend.mark,.6));
-      this.pipe.position.copy(v(.19,-.28,-.43).sub(v(grip.x,grip.y).applyQuaternion(this.pipe.quaternion)));
+      const before=this.bend.mark-PVC.springLength/2,after=this.bend.mark+PVC.springLength/2;
+      const s=PVC.length-Math.max(after,this.cutFrom)>=.18?Math.max(after,this.cutFrom)+.09:before-.09;
+      carryGrip=this.bend.at(Math.min(PVC.length-.09,s));
+      this.pipe.rotation.z=-1.2;
+      this.pipe.position.copy(v(.12,-.10,-.36).sub(v(carryGrip.x,carryGrip.y).applyQuaternion(this.pipe.quaternion)));
     }
     this.spring.visible=this.cable.visible=bending;
     this.markRing.visible=bending;
@@ -772,6 +812,10 @@ export class PvcWorkshop {
     this.heldRebar.visible=['fastener-insert-ready','fastener-inserting'].includes(this.phase);
     this.rebarPliers.visible=['fastener-insert-ready','fastener-inserting','fastener-tighten-ready','fastener-tightening'].includes(this.phase);
     const left=v(-.21,-.20,-.43),right=v(.20,-.21,-.43),leftQ=new THREE.Quaternion(),rightQ=new THREE.Quaternion();
+    if(carryGrip){
+      right.copy(v(carryGrip.x,carryGrip.y).applyQuaternion(this.pipe.quaternion).add(this.pipe.position));
+      rightQ.setFromUnitVectors(v(0,1,0),v(Math.cos(carryGrip.angle),Math.sin(carryGrip.angle),0).applyQuaternion(this.pipe.quaternion));
+    }
     if(bending){
       // Both hands bracket the active spring section while feeding the pipe.
       // Downward pressure stays between the two physical contacts.
@@ -793,18 +837,28 @@ export class PvcWorkshop {
       const root=new THREE.Object3D();this.orientAtBox(root,this.phase==='installing'?.07*(1-this.elapsed/.6):.07);
       this.pipe.position.copy(c.worldToLocal(root.position.clone()));this.pipe.quaternion.copy(c.quaternion.clone().invert().multiply(root.quaternion));
       const cut=this.bend.at(this.cutS),world=v(cut.x,cut.y,0).applyQuaternion(root.quaternion).add(root.position);
-      const tangent=v(Math.cos(cut.angle),Math.sin(cut.angle),0).applyQuaternion(root.quaternion);
-      this.cutRing.position.copy(world);this.cutRing.quaternion.setFromUnitVectors(v(0,0,1),tangent);this.cutRing.visible=this.phase==='fitting';
-      const tip=c.worldToLocal(world.clone()),localTangent=tangent.applyQuaternion(c.quaternion.clone().invert());
-      this.cutter.quaternion.setFromUnitVectors(v(0,-1,0),localTangent);
-      this.cutter.position.copy(tip).sub(v().fromArray(this.cutter.userData.tipPoint).applyQuaternion(this.cutter.quaternion));
-      right.copy(v().fromArray(this.cutter.userData.gripPoint).applyQuaternion(this.cutter.quaternion).add(this.cutter.position));left.copy(tip).add(v(-.015,world.y < .16 ? .08 : -.13,0));
-      rightQ.fromArray(this.cutter.userData.gripQuaternion??[0,0,0,1]).premultiply(this.cutter.quaternion);
-      this.cutter.getObjectByName('cutter-moving-handle')!.rotation.z=.13-(this.phase==='cutting'?Math.sin(Math.min(1,this.elapsed/.45)*Math.PI)*.55:0);
+      this.cutRing.position.copy(world);this.cutRing.quaternion.setFromUnitVectors(v(0,0,1),v(0,1,0));this.cutRing.visible=this.phase==='fitting';
+      // The blade lies in model XY. Its normal follows the pipe's local
+      // tangent, so a vertical installed run is cut with horizontal shears.
+      const before=this.bend.at(Math.max(0,this.cutS-.001)),after=this.bend.at(this.cutS+.001);
+      const normal=v(before.x-after.x,before.y-after.y,0).normalize().applyQuaternion(root.quaternion);
+      const tip=c.worldToLocal(world.clone()),q=c.quaternion.clone().invert().multiply(new THREE.Quaternion().setFromUnitVectors(v(0,0,1),normal));
+      this.cutter.quaternion.copy(q);this.cutter.position.copy(tip).sub(v().fromArray(this.cutter.userData.tipPoint).applyQuaternion(q));
+      this.cutter.position.add(v(.23,0,.025).multiplyScalar(this.cutterRetreat));
+      // Keep the support hand low on the retained run, just before its bend.
+      // The lower fingers straddle the start of the radius as the shears close.
+      const lower=this.bend.at(this.supportS??this.initialSupportS());
+      left.copy(c.worldToLocal(v(lower.x,lower.y,0).applyQuaternion(root.quaternion).add(root.position)));
+      const supportAxis=v(-Math.cos(lower.angle),-Math.sin(lower.angle),0).applyQuaternion(root.quaternion);
+      leftQ.copy(c.quaternion).invert().multiply(new THREE.Quaternion().setFromUnitVectors(v(0,1,0),supportAxis));
+      rightQ.copy(q).multiply(new THREE.Quaternion().fromArray(this.cutter.userData.gripQuaternion??[0,0,0,1]));
+      this.cutter.getObjectByName('cutter-moving-handle')!.rotation.z=.13-(this.phase==='cutting'?Math.sin(Math.min(1,this.elapsed/.45)*Math.PI)*.33:0);
+      this.work.updateMatrixWorld(true);
+      right.copy(c.worldToLocal(this.cutter.getObjectByName('Moving red moulded handle')!.getWorldPosition(v()).add(this.cutter.getObjectByName('Fixed red moulded handle')!.getWorldPosition(v())).multiplyScalar(.5)));
     }else if(this.phase==='opening'){
       this.cutter.position.set(.02,-.15+Math.sin(this.elapsed*6)*.04,-.41);this.cutter.quaternion.identity();
       right.copy(v().fromArray(this.cutter.userData.gripPoint).add(this.cutter.position));rightQ.fromArray(this.cutter.userData.gripQuaternion);
-      this.cutter.getObjectByName('cutter-moving-handle')!.rotation.z=.13-Math.max(0,Math.sin(this.elapsed*9))*.5;
+      this.cutter.getObjectByName('cutter-moving-handle')!.rotation.z=.13-Math.max(0,Math.sin(this.elapsed*9))*.33;
     }else if(securing){
       const holes=this.fastenerHoles,pairs=this.fastenerPairs;
       if(this.phase==='fastener-drilling'&&holes.length){
@@ -846,14 +900,20 @@ export class PvcWorkshop {
     this.game.hud.shell.classList.toggle('pvc-bending-ui',bendUi);
     this.game.hud.shell.classList.toggle('pvc-working',this.blocksWork);
     this.game.hud.shell.classList.toggle('pvc-focused',this.focused);
+    const handControl=this.touch&&show&&['fitting','cutting','cut'].includes(this.phase),moveStick=this.game.hud.shell.querySelector<HTMLElement>('#joystick')!;
+    if(moveStick.classList.contains('pvc-hand-control')!==handControl){
+      if(handControl)moveStick.dataset.pvcMoveLabel=moveStick.getAttribute('aria-label')??'Movement joystick';
+      moveStick.classList.toggle('pvc-hand-control',handControl);moveStick.setAttribute('aria-label',handControl?'Αριστερό χέρι: πάνω ή κάτω στη σωλήνα':moveStick.dataset.pvcMoveLabel??'Movement joystick');
+      if(!handControl)delete moveStick.dataset.pvcMoveLabel;
+    }
     this.prompt.hidden=bendUi||!this.game.started||(this.touch&&show)||(!show&&!near&&this.phase!=='carrying')||(this.phase==='carrying'&&!near&&!nearBox);
     const tips:Partial<Record<Phase,string>>={
       marking:'Mouse: γωνία · E: σημάδεψε όλες τις σωλήνες · P: preset · Tab: επόμενο',
       spring:'LMB: βάλε το spring · R: διαφάνεια · ESC: πίσω',
       bending:'A / D: χέρι · LMB: λύγισε εδώ · 8 θέσεις για 90° · Z: διόρθωση · E: έλεγχος · R: διαφάνεια',
       review:'Ροδέλα ή − / +: ποσότητα · E: παραγωγή · R: διαφάνεια',
-      fitting:'Mouse πάνω/κάτω: ύψος κοπής · LMB: κόψε · V: πρόσωπο · [ / ]: είσοδος · R: διαφάνεια',
-      cut:'Mouse πάνω/κάτω: νέα κοπή · E: εφάρμοσε · V: πρόσωπο · [ / ]: είσοδος · ESC: πίσω',
+      fitting:'Mouse πάνω/κάτω: ύψος κοπής · W/S: αριστερό χέρι · LMB: κόψε · V: πρόσωπο · [ / ]: είσοδος · R: διαφάνεια',
+      cut:'Mouse πάνω/κάτω: νέα κοπή · W/S: αριστερό χέρι · E: εφάρμοσε · V: πρόσωπο · [ / ]: είσοδος · ESC: πίσω',
       'pipe-install-ready':'USE: πέρασε τη σωλήνα μέσα από τα ανοικτά rebar και εφάρμοσέ τη στο κουτί',
       opening:'Κοπή πλαστικών δεσιμάτων',spreading:'Ευθυγράμμιση σωλήνων',
       inserting:'Εισαγωγή spring στο σημάδι',extracting:'Τράβηγμα spring από το καλώδιο',

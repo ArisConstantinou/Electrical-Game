@@ -219,7 +219,7 @@ export class MobileControls {
       const doubleTap=Boolean(last&&now-last.time<=300&&Math.hypot(event.clientX-last.x,event.clientY-last.y)<=24);
       this.lastMoveTap=null;
       this.moveTap={x:event.clientX,y:event.clientY,time:now,travel:0,eligible:!doubleTap};
-      if(doubleTap)window.dispatchEvent(new CustomEvent('wirehouse:work-height'));
+      if(doubleTap&&!joystick?.classList.contains('pvc-hand-control'))window.dispatchEvent(new CustomEvent('wirehouse:work-height'));
       if (joystick) {
         if (this.movementStickMode === 'floating') {
           const width = joystick.getBoundingClientRect().width;
