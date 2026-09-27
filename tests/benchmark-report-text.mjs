@@ -1,0 +1,9 @@
+import assert from 'node:assert/strict';
+import {reportText} from '../public/perf/report-text.js';
+const stats={fps:50.8,minInstantFPS:2.7,p95Ms:37,maxMs:371};
+const saved={recorderVersion:'4.0.1',createdAt:'2026-09-27',device:{userAgent:'saved physical phone',backend:'WebGPU',canvas:{width:752,height:1303}},buildScripts:['original-build.js'],tour:{reached:414,total:414},coverage:{verifiedRooms:24,expectedRooms:24,missing:[]},byArea:{stairs:stats},visitComparison:[{label:'stairs',passes:[{pass:1,frames:stats,cpu:{p95Ms:17}},{pass:2,frames:{...stats,p95Ms:34}}],p95ChangeMs:-3}],overhead:{captureCpuMs:40},capture:{totalCpuMs:40},captures:[{dataURL:'data:image/jpeg;base64,'+'a'.repeat(2000000)}],samples:Array(50000).fill({frameMs:20,secretRawHistory:true}),hud:{samples:Array(50000).fill({fps:50})},findings:[{title:'CPU-heavy',evidence:{frameMs:371,cpuMs:279,unexpected:{dataURL:'data:image/jpeg;base64,aaaa'}}}],finalState:{renderer:{queuedFrames:1}},errors:[]};
+const text=reportText(saved,'50.8 FPS');
+assert(text.includes('saved physical phone'));assert(text.includes('4.0.1'));assert(text.includes('original-build.js'));assert(text.includes('1: 50.8 FPS'));assert(text.includes('2: 50.8 FPS'));assert(text.includes('ΔP95 -3 ms'));assert(text.includes('captureCpuMs'));assert(text.includes('queuedFrames'));assert(!text.includes('data:image/'));assert(!text.includes('secretRawHistory'));assert(text.length<5000);
+assert.doesNotThrow(()=>reportText({schema:3}));
+const huge=reportText({...saved,findings:Array.from({length:100},()=>({title:'x'.repeat(10000),evidence:Array(100).fill('y'.repeat(3000))}))});assert(huge.length<96000);assert(huge.includes('έφτασε το όριο'));
+console.log(JSON.stringify({passed:true,characters:text.length,rawSampleCount:saved.samples.length,maximumTextCharacters:huge.length}));

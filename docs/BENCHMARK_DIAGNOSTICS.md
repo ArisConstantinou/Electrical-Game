@@ -18,7 +18,7 @@ Two passes take longer than the previous short tour. The interface shows phase a
 
 ## Diagnostics
 
-Report schema 4 includes recorder version `4.0.1`, room identifiers, pass, camera pose, frame intervals, P95/P99, counts over 50/100/250 ms and over the nominal 60 FPS budget. CPU game-step and CPU render-submission measurements are distinct; neither is an isolated GPU timing. The full raw intervals and rolling no-frame windows remain available.
+Report schema 4 includes recorder version `4.0.2`, room identifiers, pass, camera pose, frame intervals, P95/P99, counts over 50/100/250 ms and over the nominal 60 FPS budget. CPU game-step and CPU render-submission measurements are distinct; neither is an isolated GPU timing. The full raw intervals and rolling no-frame windows remain available.
 
 Findings distinguish observed exceptions, resource-load errors, graphics loss, no-frame stalls and route failures from correlated CPU-heavy, long-task or capture-overhead indications. Unexplained frame delays remain unresolved, rather than being assigned to the GPU. Relevant nearby renderer lifecycle telemetry, resource timing and thumbnails accompany slow-frame evidence. Findings are bounded, while raw sample data retains the rest.
 
@@ -46,6 +46,8 @@ The report labels measured tour, recorder-bookkeeping, monitoring and capture CP
 
 Reports and screenshots remain local to the device until the user chooses share/download/copy. The entire benchmark module graph has a version query, so the new recorder cannot silently import an older cached tour. Schema 3 reports still render with a message that the additional diagnostics require a new run.
 
+Copy Numbers produces a bounded text summary with the recorded device/build, both room visits, overhead, capabilities, loading, slow frames and diagnosis. It omits raw frame histories and embedded pictures; the full JSON remains available. If clipboard access is denied or unavailable, a modal exposes selected read-only text for manual copy, a retry triggered by another user tap, and a small TXT download. Reloading on the same origin restores the previous report; no new tour is needed to use the fallback. This does not upload results automatically.
+
 ## Verification
 
 - `tests/benchmark-hud-layout.mjs`: the protected benchmark failed because its panel overlapped both `fps-counter` and `mobile-top-rail` at 430×745. The candidate passes portrait 430×745 and 320×740, landscape 844×390 and desktop 1366×768. Before/after screenshots are retained in `output/benchmark-hud-before/` and `output/benchmark-hud-layout/`.
@@ -58,6 +60,8 @@ Reports and screenshots remain local to the device until the user chooses share/
 - `tests/benchmark-capture-total.mjs`: runs the actual production capture function with a controlled CPU clock. The previous per-portion rule misses 20+20 ms; the new aggregate rule stops further images. Real browser readback made the attempted sub-budget UI fixture unreliable in two runs, so it is retained as diagnostic evidence, not a passing test. Real browser capture stopping remains covered by `benchmark-controls.mjs`.
 - `tests/benchmark-address.mjs`: direct `/perf/` entry and start/stop/new-run stay on the same parent page, game-root/query preservation, and absence of requests to the removed directory.
 - `tests/benchmark-public-smoke.mjs`: actual served prompt, version, HUD visibility, route manifest, bounded report and pause while reviewing, without candidate interception.
+- `tests/benchmark-copy.mjs`: denied/missing clipboard access, readable selected fallback, retry failure, matching small TXT, success, native Chrome clipboard readback and report restoration without another tour. Physical iPhone acceptance remains separate.
+- `tests/benchmark-report-text.mjs`: original recorded device/version, per-pass comparison, overhead and diagnosis retained while large raw histories and image payloads are excluded; bounded output and older report compatibility.
 - `tests/benchmark-full-tour.mjs`: a complete real-time two-pass run with room coverage, measured per-room samples and all functional checks; no time scaling or generated FPS data. `QA_LIVE=1` skips candidate interception for final listener verification; `QA_BENCH_URL` selects the published benchmark.
 
 All browser tests use the existing managed browser lifecycle and close only owned processes. Candidate checks use the protected sole 5365 URL with test-local production-build interception; actual listener and published checks are separate receipts. Local results use Windows Chrome on the development PC, including mobile viewport emulation, and do not establish iPhone performance.

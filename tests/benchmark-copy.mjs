@@ -1,0 +1,40 @@
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import os from 'node:os';
+import {pathToFileURL} from 'node:url';
+import {mkdir,readFile,writeFile} from 'node:fs/promises';
+import {chromium} from 'playwright';
+import {blockPointerLock} from './browser-safety.mjs';
+import {routeBuildingDist} from './building-qa-utils.mjs';
+const {launchManagedBrowser,runManagedClient}=await import(pathToFileURL(path.join(process.env.CODEX_HOME??path.join(os.homedir(),'.codex'),'skills/develop-web-game/scripts/browser_lifecycle.mjs')));
+const out=path.resolve(process.env.QA_COPY_OUTPUT??'output/benchmark-copy');await mkdir(out,{recursive:true});
+const session=await launchManagedBrowser(chromium,{channel:'chrome',headless:true,screenshotDir:out});
+const result={cases:[],errors:[],physicalPhone:false};
+await runManagedClient(session,180000,async()=>{
+ const context=await session.browser.newContext({viewport:{width:430,height:745},isMobile:true,hasTouch:true,acceptDownloads:true});await blockPointerLock(context);await routeBuildingDist(context);
+ const page=await context.newPage();page.on('pageerror',e=>result.errors.push(e.message));
+ await page.goto(process.env.QA_COPY_URL??'http://127.0.0.1:5365/Electrical-Game/perf/');
+ if(process.env.QA_COPY_REPORT){
+  const saved=JSON.parse(await readFile(process.env.QA_COPY_REPORT,'utf8'));
+  await page.evaluate(value=>new Promise((resolve,reject)=>{const request=indexedDB.open('electrical-game-benchmark',1);request.onsuccess=()=>{const db=request.result,tx=db.transaction('reports','readwrite');tx.objectStore('reports').put(value,'last');tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>reject(tx.error);};request.onerror=()=>reject(request.error);}),saved);
+  await page.reload();await page.waitForFunction(()=>window.performanceRecording.report);result.cases.push('existing-report-imported-into-owned-test-context');
+ }else{await page.locator('#begin').tap();await page.waitForFunction(()=>window.performanceRecording.tour,null,{timeout:120000});await page.waitForTimeout(1000);await page.locator('#stop').tap();}
+ const original=await page.evaluate(()=>window.performanceRecording.report);
+ await page.evaluate(()=>{window.__nativeClipboard=navigator.clipboard;Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{throw new DOMException('Denied','NotAllowedError');}}});});
+ await page.locator('#copy').tap();await page.waitForTimeout(200);await page.screenshot({path:path.join(out,'copy-denied.png')});
+ assert(await page.locator('#copy-text').isVisible(),'Denied clipboard must expose a selectable text fallback');
+ const text=await page.locator('#copy-text').inputValue();assert(text.includes(original.device.userAgent));assert(text.includes('Πρώτο / δεύτερο πέρασμα'));assert(text.includes('Επιβάρυνση καταγραφέα'));assert(text.length<100000);assert(!text.includes('data:image/'));assert(text.includes('Διάγνωση:'));
+ const selection=await page.locator('#copy-text').evaluate(e=>({start:e.selectionStart,end:e.selectionEnd,readOnly:e.readOnly,font:getComputedStyle(e).fontSize}));assert.equal(selection.start,0);assert.equal(selection.end,text.length);assert(selection.readOnly);assert(parseFloat(selection.font)>=16);
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);result.cases.push('denied-clipboard-selected-readable-fallback');
+ await page.evaluate(()=>{document.execCommand=()=>false;});await page.locator('#copy-retry').tap();assert((await page.locator('#copy-help').textContent()).includes('παρατεταμένα'));assert.equal(await page.locator('#copy-text').inputValue(),text);result.cases.push('retry-failure-retains-manual-text');
+ for(const viewport of [{width:320,height:740},{width:844,height:390},{width:1366,height:768}]){await page.setViewportSize(viewport);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);const box=await page.locator('#copy-sheet').boundingBox();assert(box.width<=viewport.width);assert(box.height<=viewport.height);await page.screenshot({path:path.join(out,`fallback-${viewport.width}.png`)});}await page.setViewportSize({width:430,height:745});result.cases.push('fallback-four-viewports');
+ const downloading=page.waitForEvent('download');await page.locator('#copy-download').tap();const downloaded=await downloading;await downloaded.saveAs(path.join(out,'summary.txt'));assert((await downloaded.failure())===null);assert.equal(await readFile(path.join(out,'summary.txt'),'utf8'),text);result.cases.push('small-text-download');
+ await page.locator('#copy-close').tap();assert.equal(await page.evaluate(()=>document.activeElement.id),'copy');
+ await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:undefined}));await page.locator('#copy').tap();assert(await page.locator('#copy-text').isVisible());result.cases.push('missing-clipboard-api');
+ await page.locator('#copy-close').tap();await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.__copiedText=text;}}}));await page.locator('#copy').tap();await page.waitForFunction(()=>window.__copiedText);assert.equal(await page.evaluate(()=>window.__copiedText),text);assert((await page.locator('#status').textContent()).includes('αντιγράφηκαν'));assert.equal(await page.locator('#copy-sheet').isVisible(),false);result.cases.push('clipboard-success');
+ await context.grantPermissions(['clipboard-read','clipboard-write']);await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:window.__nativeClipboard}));await page.locator('#copy').tap();assert.equal((await page.evaluate(()=>navigator.clipboard.readText())).replaceAll('\r\n','\n'),text,'Windows native clipboard may normalize line endings');result.cases.push('native-chrome-clipboard-readback');
+ await page.reload();await page.waitForFunction(()=>window.performanceRecording.report);assert.equal(await page.locator('#game').getAttribute('src'),null);assert.equal(await page.evaluate(()=>window.performanceRecording.report.createdAt),original.createdAt);result.cases.push('saved-report-restored-without-rerun');
+ await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:undefined}));await page.locator('#copy').tap();assert(await page.locator('#copy-sheet').isVisible());await page.locator('#copy-close').tap();await page.locator('#begin').tap();assert.equal(await page.locator('#copy-sheet').isVisible(),false);await page.locator('#stop').tap();result.cases.push('new-run-clears-copy-sheet');
+ assert.deepEqual(result.errors,[]);result.passed=true;result.characters=text.length;await context.close();
+});
+await writeFile(path.join(out,'report.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));

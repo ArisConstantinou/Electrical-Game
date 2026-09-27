@@ -1,6 +1,6 @@
-import {number,stats} from './metrics.js?v=diagnostics-4.0.1';
-import {inspectionManifest} from './tour.js?v=diagnostics-4.0.1';
-export const RECORDER_VERSION='4.0.1';
+import {number,stats} from './metrics.js?v=diagnostics-4.0.2';
+import {inspectionManifest} from './tour.js?v=diagnostics-4.0.2';
+export const RECORDER_VERSION='4.0.2';
 export function appendResourceSnapshot(rows,sample,limit=1024){
  if(rows.length>=limit){if(sample.kind==='periodic')return false;const index=rows.findIndex(s=>s.kind==='periodic');if(index<0)return false;rows.splice(index,1);}
  rows.push(sample);return true;

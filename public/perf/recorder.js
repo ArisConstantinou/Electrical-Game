@@ -1,8 +1,9 @@
-import {number,stats,worstWindow} from './metrics.js?v=diagnostics-4.0.1';
-import {createTour} from './tour.js?v=diagnostics-4.0.1';
-import {RECORDER_VERSION,coverage,compareVisits,diagnose,supportFor,appendResourceSnapshot} from './diagnostics.js?v=diagnostics-4.0.1';
-import {observeMainThread} from './observers.js?v=diagnostics-4.0.1';
-import {createFunctionalChecks} from './functional.js?v=diagnostics-4.0.1';
+import {number,stats,worstWindow} from './metrics.js?v=diagnostics-4.0.2';
+import {createTour} from './tour.js?v=diagnostics-4.0.2';
+import {RECORDER_VERSION,coverage,compareVisits,diagnose,supportFor,appendResourceSnapshot} from './diagnostics.js?v=diagnostics-4.0.2';
+import {observeMainThread} from './observers.js?v=diagnostics-4.0.2';
+import {createFunctionalChecks} from './functional.js?v=diagnostics-4.0.2';
+import {reportText} from './report-text.js?v=diagnostics-4.0.2';
 const $=id=>document.getElementById(id),frame=$('game'),panel=$('panel');
 const gameURL=new URL('../',location.href);
 for(const key of ['renderer','level','v'])if(new URL(location.href).searchParams.has(key))gameURL.searchParams.set(key,new URL(location.href).searchParams.get(key));
@@ -162,6 +163,7 @@ function monitor(){
  }catch(error){errors.push(String(error));finish('load-failed');}
 }
 function start(){
+ if($('copy-sheet').open)$('copy-sheet').close();
  if(active)return;run++;active=true;game=null;report=null;tour=null;startedAt=performance.now();
  samples=[];events=[];errors=[];diagnostics=[];checkpoints=[];captures=[];hudSamples=[];segments=[];loading={};settings={};
  phase='loading';functional=null;functionalAt=0;functionalHiddenAt=0;resourceSamples=[];tasks=[];observer=null;support=supportFor(window);overhead={tourCpuMs:0,recorderCpuMs:0,monitorCpuMs:0};panelUpdatedAt=-Infinity;
@@ -220,7 +222,25 @@ $('share').onclick=async()=>{
  if(navigator.canShare?.({files})){try{await navigator.share({files,title:'Electrical-Game benchmark'});$('status').textContent='Η κοινοποίηση παραδόθηκε στον browser.';return;}catch(error){if(error.name==='AbortError')return;}}
  $('status').textContent='Η κοινοποίηση αρχείων δεν υποστηρίζεται εδώ. Γίνεται λήψη της πλήρους αναφοράς με τις εικόνες.';download();
 };
-$('copy').onclick=async()=>{if(!report)return;try{await navigator.clipboard.writeText(`${navigator.userAgent}\n${report.device.backend??'μη διαθέσιμο'} · ${report.device.canvas?.width??'?'}×${report.device.canvas?.height??'?'}\nΈκδοση: ${report.buildScripts.join(', ')}\n${$('summary').textContent}\nΔιαδρομή: ${report.outcome} · ${report.tour.reached}/${report.tour.total}\n${Object.entries(report.byArea).map(([name,s])=>`${name}: ${s.fps} FPS, ελάχιστο ${s.minInstantFPS}, P95 ${s.p95Ms}ms, max ${s.maxMs}ms`).join('\n')}\nΑργότερα καρέ: ${JSON.stringify(report.slowestFrames)}\nΕυρήματα: ${JSON.stringify(report.findings)}\nΚάλυψη: ${JSON.stringify(report.coverage)}\nΛειτουργικοί έλεγχοι: ${JSON.stringify(report.functional)}\nΔιάγνωση: ${JSON.stringify(report.finalState)}\nΣφάλματα: ${JSON.stringify(report.errors)}`);$('status').textContent='Οι αριθμοί και η διάγνωση αντιγράφηκαν.';}catch{$('status').textContent='Η αντιγραφή δεν επιτράπηκε. Χρησιμοποίησε Λήψη αναφοράς.';}};
+function selectCopyText(){const text=$('copy-text');text.focus();text.select();text.setSelectionRange(0,text.value.length);text.scrollTop=0;}
+$('copy').onclick=async()=>{
+ if(!report)return;const value=reportText(report,$('summary').textContent);
+ try{await navigator.clipboard.writeText(value);$('status').textContent='Οι αριθμοί και η διάγνωση αντιγράφηκαν.';}
+ catch{
+  $('copy-text').value=value;$('copy-help').textContent='Ο browser δεν επέτρεψε αυτόματη αντιγραφή. Το κείμενο είναι επιλεγμένο: πάτησε παρατεταμένα και διάλεξε Αντιγραφή ή κατέβασε το μικρό TXT.';
+  $('copy-sheet').showModal();selectCopyText();
+ }
+};
+$('copy-retry').onclick=()=>{
+ selectCopyText();let copied=false;try{copied=document.execCommand('copy');}catch{}
+ $('copy-help').textContent=copied?'Οι αριθμοί και η διάγνωση αντιγράφηκαν.':'Πάτησε παρατεταμένα στο επιλεγμένο κείμενο και διάλεξε Αντιγραφή ή χρησιμοποίησε Λήψη TXT.';
+};
+$('copy-download').onclick=()=>{
+ const url=URL.createObjectURL(new Blob([$('copy-text').value],{type:'text/plain;charset=utf-8'})),link=document.createElement('a');
+ link.href=url;link.download=`electrical-game-summary-${report.createdAt.replace(/[:.]/g,'-')}.txt`;link.click();setTimeout(()=>URL.revokeObjectURL(url),30000);
+};
+$('copy-close').onclick=()=>$('copy-sheet').close();
+$('copy-sheet').addEventListener('close',()=>{if(!active)$('copy').focus();});
 // Inspectable acceptance hooks; no generated performance measurements.
 window.performanceRecording={start,finish,get report(){return report;},get active(){return active;},get phase(){return phase;},get tour(){return tour?{index:tour.index,total:tour.total,current:tour.current}:null;}};
 window.render_game_to_text=()=>JSON.stringify({mode:active?'benchmark':report?'results':'prompt',phase,functionalChecks:functional?.checks.map(c=>({id:c.id,status:c.status}))??[],status:$('status').textContent,loading,tour:window.performanceRecording.tour,frames:samples.length,coordinates:'Game world metres: x east, y up, z north; the tour uses normal movement and collision.',game:game?JSON.parse(frame.contentWindow.render_game_to_text()):null});

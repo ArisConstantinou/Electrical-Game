@@ -1,5 +1,13 @@
 Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web game named WIRE THE HOUSE, based on real Cyprus residential first-fix practices, editable in Web Game Studio, playable on desktop/mobile, deployed to arisconstantinou/Electrical-Game via GitHub Pages, and ending at FIRST FIX COMPLETE without cable pulling.
 
+## 2026-09-27 · Mobile report and copy fallback
+
+- Physical phone report supplied manually: menu 3.1 s, READY 11.5 s, average 50.8 FPS, minimum 2.7 FPS, P95 37 ms, P99 46 ms, maximum interval 371 ms, longest no-frame gap 1.6 s. All 24 rooms were inspected in both passes and all six functional checks passed. Floor travel averages 46–48 FPS with 200–294 ms spikes; courtyard averages 44.9 FPS. Stable 60 FPS remains unmet. CPU/capture correlations are evidence, not proof of all stall causes. This different tour is not a controlled comparison with the older benchmark.
+- User reported Copy Numbers failing. Protected base `ab0710f`, isolated `codex/benchmark-diagnostics`, sole integration listener PID 42244 on 5365; primary dirty files untouched.
+- Full physical report was later supplied: recorder 4.0.1, published game asset `index-CJjVaaMC.js`, iPhone Chrome/WebGPU, 752×1303 canvas. All 53 intervals above 100 ms occur in pass 1; pass 2 maximum is 76 ms, yet its average is 50.3 FPS versus 51.5 in pass 1. Courtyard inspection worsens 53.5 -> 37.1 FPS. One capture cost 34 ms and was disabled; it cannot explain later drops. Both pass endpoints retain 1,467 geometries/89 textures, with heap unavailable. The 1.645 s no-frame gap occurs just before a 38.685 s background transition; the nearby renderer has no graphics loss or error and no queued frame. This is not proof of a GPU crash or overheating.
+- Clipboard-denial regression fails before: no selectable fallback. Version 4.0.2 adds a modal with selected read-only text, explicit retry and small TXT download. Native clipboard success keeps the single-click flow. Summary includes original report device/version, both visits, capabilities and recorder/capture overhead, with no raw sample history or embedded images. Full JSON and local storage remain intact; old saved reports can be copied without another tour.
+- Verification and deployment receipts: `output/benchmark-copy-before/`, `output/benchmark-copy/`, `output/benchmark-copy-release.json`. Browser viewport checks are Windows Chrome, not physical iPhone proof. No graphics, gameplay, dependency or port changes.
+
 ## 2026-09-27 · Canonical benchmark address
 
 - User clarified the issue as the `/perf/` redirect and explicitly requested removal of `/review/performance/`. Scope is direct address delivery, not graphics lifecycle or benchmark behavior changes.
