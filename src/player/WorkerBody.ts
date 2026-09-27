@@ -658,7 +658,9 @@ export class WorkerBody extends THREE.Group {
       const radial=pipeAxis.clone().addScaledVector(long,-pipeAxis.dot(long)).normalize();
       q=this.handOrientation(side,radial,long);
       const neutralFore=q.clone().multiply(frame.foreToHand.clone().invert());
-      q.premultiply(new THREE.Quaternion().setFromUnitVectors(Y.clone().applyQuaternion(neutralFore),long));
+      // Shears need the physical knuckle row along their lever. Reusing the
+      // imported pipe rest frame rotates that row away from the moving handle.
+      if(!grip.cutter)q.premultiply(new THREE.Quaternion().setFromUnitVectors(Y.clone().applyQuaternion(neutralFore),long));
       const back=long.clone().multiplyScalar(-sign).cross(pipeAxis).normalize(),across=pipeAxis.clone().cross(back);
       wrist.copy(grip.center).addScaledVector(across,-sign*grip.section[0]*.6).addScaledVector(back,-grip.section[1]-.012).sub(frame.knuckle.clone().applyQuaternion(q));
       const axis=wrist.clone().sub(shoulder),distance=axis.length();axis.normalize();
@@ -677,7 +679,8 @@ export class WorkerBody extends THREE.Group {
     this.gripErrors[side]=this.point('hand.'+side).distanceTo(wrist);
     const back=long.clone().multiplyScalar(-sign).cross(pipeAxis).normalize(),across=pipeAxis.clone().cross(back);
     const rotation=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(across,pipeAxis,back));
-    this.wrapGrip(side,grip.center,rotation,grip.section,false,working,'round',undefined,undefined,true);
+    if(grip.cutter)this.wrapCutterGrip(side,grip.cutter);
+    else this.wrapGrip(side,grip.center,rotation,grip.section,false,working,'round',undefined,undefined,true);
     const actualFore=this.point('hand.'+side).sub(this.point('forearm.'+side)).normalize();
     const neutralFore=Y.clone().applyQuaternion(q.clone().multiply(frame.foreToHand.clone().invert()));
     this.fingerFit[(hammer?'hammerWrist':'pipeWrist')+side]={bendDegrees:THREE.MathUtils.radToDeg(actualFore.angleTo(neutralFore))};
@@ -944,6 +947,22 @@ export class WorkerBody extends THREE.Group {
     this.fitThumb(side,tip,spray||contactCylinder?{center,axis,radius:section[0]}:undefined,contactCylinder);
     const thumbEnd=this.bone('thumb.03.'+side),end=this.point('thumb.03.'+side).add(Y.clone().applyQuaternion(thumbEnd.getWorldQuaternion(new THREE.Quaternion())).multiplyScalar(this.lengths.get('thumb.03.'+side)!));
     this.fingerFit['thumbContact'+side]={center:center.toArray(),axis:axis.toArray(),across:across.toArray(),back:back.toArray(),tip:end.toArray(),section};
+  }
+  private wrapCutterGrip(side:string,cutter:THREE.Group):void {
+    // Fingers squeeze the moving lever while the thumb braces the fixed one.
+    // Both contacts come from the actual render geometry, including its hinge.
+    const contact=(name:string)=>{
+      const rod=cutter.getObjectByName(name) as THREE.Mesh<THREE.CylinderGeometry>,center=rod.getWorldPosition(new THREE.Vector3());
+      return {center,axis:Y.clone().applyQuaternion(rod.getWorldQuaternion(new THREE.Quaternion())),radius:rod.geometry.parameters.radiusTop,half:rod.geometry.parameters.height/2};
+    };
+    const moving=contact('Moving red moulded handle'),fixed=contact('Fixed red moulded handle');
+    const rotation=cutter.getObjectByName('Moving red moulded handle')!.getWorldQuaternion(new THREE.Quaternion());
+    for(const digit of ['index','middle','ring','little']){
+      this.closeFinger(digit,side,moving.center,rotation,[moving.radius,moving.radius],'round');
+    }
+    const thumb=this.point('thumb.03.'+side),offset=thumb.sub(fixed.center),along=THREE.MathUtils.clamp(offset.dot(fixed.axis),-fixed.half+.008,fixed.half-.008);
+    offset.addScaledVector(fixed.axis,-offset.dot(fixed.axis)).normalize();
+    this.fitThumb(side,fixed.center.clone().addScaledVector(fixed.axis,along).addScaledVector(offset,fixed.radius+.010),fixed,true);
   }
   private pinchBox(side:string,center:THREE.Vector3,rotation:THREE.Quaternion):void {
     const sign=side==='R'?1:-1;

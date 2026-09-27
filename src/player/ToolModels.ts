@@ -329,7 +329,8 @@ function cutter(): THREE.Group {
   // The hand spans the two levers, instead of perching on the end of one.
   const grip=vector([.125,-.067,.005]).applyQuaternion(assembly.quaternion).add(assembly.position);
   const axis=vector([-.8,.6,0]).applyQuaternion(assembly.quaternion);
-  return gripFrame(metadata(group,grip.toArray() as [number,number,number],[-.001,.014,-.059]),axis.toArray() as [number,number,number]);
+  const cradle=vector([-.036,.008,0]).applyQuaternion(assembly.quaternion).add(assembly.position);
+  return gripFrame(metadata(group,grip.toArray() as [number,number,number],cradle.toArray() as [number,number,number]),axis.toArray() as [number,number,number]);
 }
 
 function hose(): THREE.Group {
