@@ -889,6 +889,7 @@ export class Game {
       body: this.fpsRig.debugPose(),
       anatomicalWorker:this.workerBody.telemetry,
       modelInspector:this.modelInspector.telemetry,
+      levelEditor:this.levelEditor.navigationState,
       frontBodyView:this.frontBodyView,
       view: { mode: this.modelInspector.active?'model-inspector':this.frontBodyView?'front-body':'continuous-shared', viewQuaternion: this.renderer.renderCamera.quaternion.toArray(), workQuaternion: this.renderer.camera.quaternion.toArray() },
       workPosition: this.player.workPosition,

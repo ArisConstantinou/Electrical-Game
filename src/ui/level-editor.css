@@ -1,7 +1,7 @@
 #start-level-editor{width:100%;min-height:52px;border:1px solid #e4aa70;border-radius:4px;background:#1b2729e8;color:#f9ead3;font:800 19px/1 'Barlow Condensed',sans-serif;letter-spacing:.12em;cursor:pointer}
 #start-level-editor:disabled{opacity:.55;cursor:wait}
 #start-level-editor:focus-visible{outline:3px solid #ffd481;outline-offset:3px}
-#game-shell.level-editor-open > :not(#game-stage):not(#level-editor){visibility:hidden!important;pointer-events:none!important}
+#game-shell.level-editor-open > :not(#game-stage):not(#level-editor):not(#level-exit-dialog){visibility:hidden!important;pointer-events:none!important}
 #level-editor[hidden]{display:none!important}
 #level-editor{position:absolute;inset:0;z-index:20;pointer-events:none;color:#f5ead7;font:14px/1.3 system-ui,sans-serif}
 #level-editor header,#level-editor .level-editor__bar,#level-editor aside,#level-editor .level-editor__inspector{pointer-events:auto;background:rgba(20,29,30,.96);border:1px solid #8c8573;box-shadow:0 8px 28px #0008}
@@ -462,4 +462,47 @@
 }
 #game-shell #level-editor[data-nav-mode=bottom].dock-collapsed #level-dock-toggle span{
   top:17px;transform:translateX(-50%) rotate(225deg);
+}
+
+/* Main-menu return remains visible independently of the editor's hidden header. */
+#game-shell #level-editor #level-close {
+  position:absolute;z-index:21;top:max(12px,env(safe-area-inset-top));right:max(12px,env(safe-area-inset-right));
+  display:inline-flex;align-items:center;justify-content:center;gap:9px;min-width:110px;min-height:48px;
+  padding:10px 14px;border:1px solid #71857a;border-radius:8px;background:#f0ebd9f5;color:#203c35;
+  box-shadow:0 4px 0 #384e43,0 10px 24px #0005;font:900 14px/1 Bahnschrift,Arial,sans-serif;letter-spacing:.07em;
+  pointer-events:auto;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;
+}
+#game-shell #level-editor #level-close:hover,#game-shell #level-editor #level-close:focus-visible {background:#ffda28;border-color:#a8841d;outline:2px solid #ffe161;outline-offset:3px}
+#level-exit-dialog {
+  box-sizing:border-box;width:min(510px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;
+  margin:auto;padding:28px;border:1px solid #71857a;border-radius:12px;background:linear-gradient(155deg,#f0ebd9,#ded4ba);
+  box-shadow:0 7px 0 #384e43,0 24px 60px #0008;color:#203c35;font:16px/1.45 Bahnschrift,Arial,sans-serif;
+  pointer-events:auto;overscroll-behavior:contain;
+}
+#level-exit-dialog::backdrop {background:#0e1a13b8}
+.level-exit__heading {display:flex;align-items:center;gap:11px;color:#31574b;font-size:12px;font-weight:900;letter-spacing:.1em}
+.level-exit__icon {display:grid;place-items:center;flex:none;width:42px;height:42px;border:1px solid #ad8d25;border-radius:9px;background:#ffda28;color:#203c35}
+.level-exit__icon svg {width:26px;height:26px}
+#level-exit-dialog h2 {margin:20px 0 10px;font-size:28px;line-height:1.12;font-weight:900;letter-spacing:-.02em}
+#level-exit-description {margin:0 0 20px;color:#405c51}
+#level-exit-dialog label {display:block;margin:0 0 7px;font-size:12px;font-weight:900;letter-spacing:.1em}
+#level-exit-name {box-sizing:border-box;width:100%;min-height:46px;padding:10px 12px;border:1px solid #81988c;border-radius:6px;background:#fffdf2;color:#203c35;font:16px/1.2 Bahnschrift,Arial,sans-serif}
+.level-exit__actions {display:grid;gap:11px;margin-top:22px}
+#level-exit-dialog button {min-height:48px;padding:12px 14px;border:1px solid #81988c;border-radius:6px;background:#fffdf2;color:#203c35;font:800 16px/1.25 Bahnschrift,Arial,sans-serif;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+#level-exit-dialog #level-exit-save {border:1px solid #b29223;background:#ffda28;box-shadow:0 4px 0 #ae8a19}
+#level-exit-dialog #level-exit-discard {background:#e7ecdf}
+#level-exit-dialog #level-exit-cancel {background:transparent;border-color:transparent;color:#405c51}
+#level-exit-dialog button:hover:not(:disabled) {background:#fff5c4}
+#level-exit-dialog button:focus-visible,#level-exit-name:focus-visible {outline:2px solid #315b4c;outline-offset:3px}
+#level-exit-dialog button:disabled,#level-exit-name:disabled {opacity:.6;cursor:wait}
+#level-exit-error {padding:10px 12px;border-left:3px solid #a14124;background:#f8dfcc;color:#71351f;font-size:14px}
+@media(max-width:520px) {#level-exit-dialog {padding:22px}#level-exit-dialog h2 {font-size:25px}}
+@media(max-height:500px) {
+  #level-exit-dialog {width:min(650px,calc(100vw - 32px));padding:16px 22px}
+  #level-exit-dialog h2 {margin:10px 0 6px;font-size:24px}
+  #level-exit-description {margin-bottom:10px;font-size:14px}
+  .level-exit__heading {font-size:12px}.level-exit__icon {width:32px;height:32px}
+  .level-exit__actions {grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}
+  #level-exit-dialog #level-exit-cancel {grid-column:1/-1;min-height:44px;padding:8px}
+  #level-exit-dialog button {font-size:14px}
 }

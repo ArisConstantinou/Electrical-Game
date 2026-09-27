@@ -99,6 +99,11 @@ const validCurvedShape = (value: unknown): value is CurvedWallShape => {
 /** Direct editing of mansion wall assemblies. A wall's visual and collision footprint share one transform. */
 export class LevelEditor {
   readonly panel = document.createElement('section');
+  private readonly exitDialog = document.createElement('dialog');
+  private savedSignature: string | null = null;
+  private saving = false;
+  private lastSaveError = '';
+  private exitControls: { orbit: boolean; topOrbit: boolean; gizmo: boolean } | null = null;
   readonly camera = new THREE.PerspectiveCamera(55, 1, .05, 180);
   readonly topCamera = new THREE.OrthographicCamera(-8, 8, 16, -16, .05, 180);
   readonly orbit: OrbitControls;
@@ -225,7 +230,7 @@ export class LevelEditor {
     this.panel.hidden = true;
     this.panel.setAttribute('role', 'dialog');
     this.panel.setAttribute('aria-label', 'Level Editor');
-    this.panel.innerHTML = `<header><div><small>WIRE THE HOUSE · LIVE SITE</small><h2>LEVEL EDITOR</h2></div><div class="level-editor__header-actions"><button id="level-settings" type="button" aria-label="Editor navigation settings">⚙</button><button id="level-close" type="button" aria-label="Close level editor">✕</button></div></header>
+    this.panel.innerHTML = `<header><div><small>WIRE THE HOUSE · LIVE SITE</small><h2>LEVEL EDITOR</h2></div><div class="level-editor__header-actions"><button id="level-settings" type="button" aria-label="Editor navigation settings">⚙</button></div></header><button id="level-close" type="button" aria-label="Επιστροφή στο main menu" title="Επιστροφή στο main menu">✕</button>
       <div id="level-settings-panel" hidden><label for="level-nav-mode">EDITOR NAVIGATION</label><select id="level-nav-mode"><option value="bottom">Bottom navigation</option><option value="wheel">Wheel navigation</option></select></div>
       <button id="level-view-trigger" type="button" aria-expanded="false" aria-controls="level-view-panel">▤ VIEW · ALL</button><div id="level-view-panel" hidden><div class="level-view__modes"><button type="button" data-level-view="3d">◈ ANGLE</button><button type="button" data-level-view="2d">▤ TOP</button></div><label for="level-floor">VISIBLE FLOOR</label><select id="level-floor"><option value="-1">All floors · 3D only</option><option value="6">B2 · services and stores</option><option value="5">B1 · garage and workshop</option><option value="0">G-0 · ground</option><option value="1">L1 · first</option><option value="2">L2 · second</option><option value="3">L3 · third</option><option value="4">L4 · fourth</option></select><small>Only the selected level is drawn. Drag empty space to pan in top view; pinch to zoom.</small><button id="level-view-close" type="button">⌄ CLOSE VIEW</button></div>
       <div class="level-editor__bar"><button id="level-translate" type="button">MOVE</button><button id="level-rotate" type="button">ROTATE</button><button id="level-scale" type="button">SCALE</button><label><input id="level-snap" type="checkbox" checked> SNAP</label><select id="level-grid" aria-label="Snap spacing"><option value="0.1">10 cm</option><option value="0.25" selected>25 cm</option><option value="0.5">50 cm</option><option value="1">1 m</option></select><button id="level-save" type="button">SAVE</button><button id="level-export" type="button">EXPORT</button></div>
@@ -238,6 +243,16 @@ export class LevelEditor {
     this.haloElement = this.el('#level-halo');
     this.decorateControls();
     game.hud.shell.append(this.panel);
+    this.exitDialog.id = 'level-exit-dialog';
+    this.exitDialog.setAttribute('aria-labelledby', 'level-exit-title');
+    this.exitDialog.setAttribute('aria-describedby', 'level-exit-description');
+    this.exitDialog.innerHTML = `<div class="level-exit__heading"><span class="level-exit__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3h13l3 3v15H4zM7 3v7h10V3M7 21v-7h10v7"/></svg></span><span>WIRE THE HOUSE · LEVEL EDITOR</span></div>
+      <h2 id="level-exit-title">Πριν επιστρέψεις στο μενού</h2>
+      <p id="level-exit-description">Έχεις μη αποθηκευμένες αλλαγές. Θέλεις να τις αποθηκεύσεις πριν φύγεις;</p>
+      <label for="level-exit-name">ΟΝΟΜΑ LEVEL</label><input id="level-exit-name" type="text" maxlength="48" autocomplete="off">
+      <p id="level-exit-error" role="alert" hidden></p>
+      <div class="level-exit__actions"><button id="level-exit-save" type="button">Αποθήκευση και επιστροφή</button><button id="level-exit-discard" type="button">Επιστροφή χωρίς αποθήκευση</button><button id="level-exit-cancel" type="button" autofocus>Ακύρωση · Συνέχεια επεξεργασίας</button></div>`;
+    game.hud.shell.append(this.exitDialog);
     this.bind();
     this.setToolMode('translate');
     this.setCameraMode('orbit');
@@ -331,6 +346,7 @@ export class LevelEditor {
       button.classList.add('level-editor__icon-button');
       button.insertAdjacentHTML('afterbegin', icon(name));
     });
+    this.el('#level-close').insertAdjacentHTML('beforeend', '<span>ΜΕΝΟΥ</span>');
     this.panel.querySelector('header h2')?.insertAdjacentHTML('afterend', '<span class="level-editor__scene"><span></span>MANSION · CONSTRUCTION</span>');
     this.panel.querySelector('aside>label')?.insertAdjacentHTML('beforeend', '<small id="level-count"></small>');
     this.el('#level-search').insertAdjacentHTML('afterend', '<select id="level-filter" aria-label="Filter site elements"><option value="all">All structures and assets</option><option value="brick-wall">Brick walls</option><option value="concrete-wall">Concrete walls</option><option value="floor">Floor slabs</option><option value="stair">Stairs</option><option value="asset">Site assets</option></select>');
@@ -366,7 +382,12 @@ export class LevelEditor {
   }
   private status(message: string): void { this.el('#level-status').textContent = message; this.el('#level-save-status').textContent = message; }
   private bind(): void {
-    this.el('#level-close').addEventListener('click', () => this.close());
+    this.el('#level-close').addEventListener('click', () => this.requestMainMenu());
+    this.exitDialog.querySelector('#level-exit-cancel')!.addEventListener('click', () => this.cancelMainMenu());
+    this.exitDialog.querySelector('#level-exit-discard')!.addEventListener('click', () => this.returnToMainMenu());
+    this.exitDialog.querySelector('#level-exit-save')!.addEventListener('click', () => void this.saveAndReturnToMainMenu());
+    this.exitDialog.addEventListener('cancel', event => { event.preventDefault(); this.cancelMainMenu(); });
+    this.exitDialog.addEventListener('close', () => { if (!this.exitDialog.open) this.restoreExitControls(); });
     this.el('#level-view-trigger').addEventListener('click', () => {
       const panel = this.el('#level-view-panel');
       panel.hidden = !panel.hidden;
@@ -384,7 +405,7 @@ export class LevelEditor {
     this.el('#level-redo').addEventListener('click', () => this.moveHistory(1));
     this.el('#level-settings').addEventListener('click', () => { this.el('#level-settings-panel').hidden = !this.el('#level-settings-panel').hidden; });
     this.el('#level-scene-settings').addEventListener('click', () => this.el('#level-settings').click());
-    this.el('#level-scene-exit').addEventListener('click', () => this.close());
+    this.el('#level-scene-exit').addEventListener('click', () => this.requestMainMenu());
     this.el<HTMLSelectElement>('#level-nav-mode').addEventListener('change', event => this.setNavMode((event.target as HTMLSelectElement).value === 'wheel' ? 'wheel' : 'bottom'));
     this.panel.querySelectorAll<HTMLButtonElement>('[data-editor-tab]').forEach(button => button.addEventListener('click', () => {
       const tab = button.dataset.editorTab as typeof this.tab;
@@ -622,7 +643,12 @@ export class LevelEditor {
     });
     addEventListener('keydown', event => {
       if (!this.active) return;
-      if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); this.close(); }
+      if (this.exitDialog.open) {
+        event.stopImmediatePropagation();
+        if (event.key === 'Escape') { event.preventDefault(); this.cancelMainMenu(); }
+        return;
+      }
+      if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); this.requestMainMenu(); return; }
       if (event.target instanceof Element && event.target.closest('input,select,textarea,[contenteditable="true"]')) {
         event.stopImmediatePropagation();
         return;
@@ -1360,12 +1386,90 @@ export class LevelEditor {
     this.updateStartMarkerVisibility();
     this.resize();
     this.refreshList();
+    this.savedSignature ??= this.editSignature();
     this.status('Edit structures live. SAVE writes browser and local project; EXPORT downloads JSON.');
+  }
+
+  private editSignature(document = this.document(), name = this.el<HTMLInputElement>('#level-slot-name').value): string {
+    return JSON.stringify({ ...document, name: name.trim().slice(0, 48) || 'My Level' });
+  }
+
+  get navigationState(): { active: boolean; exitPromptOpen: boolean; saving: boolean } {
+    return { active: this.active, exitPromptOpen: this.exitDialog.open, saving: this.saving };
+  }
+
+  private restoreExitControls(): void {
+    if (this.active && this.exitControls) {
+      this.orbit.enabled = this.exitControls.orbit;
+      this.topOrbit.enabled = this.exitControls.topOrbit;
+      this.gizmo.enabled = this.exitControls.gizmo;
+    }
+    this.exitControls = null;
+  }
+
+  private requestMainMenu(): void {
+    if (!this.active || this.exitDialog.open || this.saving) return;
+    if (!(this.template === 'blank' && !this.currentSlotId) && this.editSignature() === this.savedSignature) {
+      this.returnToMainMenu();
+      return;
+    }
+    const name = this.exitDialog.querySelector<HTMLInputElement>('#level-exit-name')!;
+    name.value = this.el<HTMLInputElement>('#level-slot-name').value;
+    this.exitDialog.querySelector<HTMLElement>('#level-exit-description')!.textContent = this.template === 'blank' && !this.currentSlotId
+      ? 'Αυτό το level δεν έχει αποθηκευτεί ακόμα. Θέλεις να το αποθηκεύσεις πριν επιστρέψεις στο μενού;'
+      : 'Έχεις μη αποθηκευμένες αλλαγές. Θέλεις να τις αποθηκεύσεις πριν επιστρέψεις στο μενού;';
+    this.exitDialog.querySelector<HTMLElement>('#level-exit-error')!.hidden = true;
+    this.exitControls = { orbit: this.orbit.enabled, topOrbit: this.topOrbit.enabled, gizmo: this.gizmo.enabled };
+    this.orbit.enabled = this.topOrbit.enabled = this.gizmo.enabled = false;
+    this.exitDialog.showModal();
+  }
+
+  private cancelMainMenu(): void {
+    if (this.saving) return;
+    this.exitDialog.close();
+    this.restoreExitControls();
+    this.el('#level-close').focus();
+  }
+
+  private returnToMainMenu(): void {
+    if (this.saving) return;
+    const url = new URL(location.href);
+    url.searchParams.delete('editor');
+    url.searchParams.delete('template');
+    // Reload the persisted level, or Basic for a new unsaved site. Discarded
+    // live geometry must never leak into the main menu's next Play action.
+    if (this.currentSlotId) url.searchParams.set('level', this.currentSlotId);
+    else url.searchParams.delete('level');
+    this.game.input.resetTransientInput();
+    location.assign(url.href);
+  }
+
+  private async saveAndReturnToMainMenu(): Promise<void> {
+    if (this.saving) return;
+    const name = this.exitDialog.querySelector<HTMLInputElement>('#level-exit-name')!.value;
+    this.el<HTMLInputElement>('#level-slot-name').value = name;
+    this.exitDialog.querySelector<HTMLElement>('#level-exit-error')!.hidden = true;
+    const button = this.exitDialog.querySelector<HTMLButtonElement>('#level-exit-save')!;
+    button.textContent = 'Αποθήκευση…';
+    this.exitDialog.setAttribute('aria-busy', 'true');
+    this.exitDialog.querySelectorAll<HTMLButtonElement | HTMLInputElement>('button,input').forEach(control => { control.disabled = true; });
+    const saved = await this.save();
+    this.exitDialog.removeAttribute('aria-busy');
+    this.exitDialog.querySelectorAll<HTMLButtonElement | HTMLInputElement>('button,input').forEach(control => { control.disabled = false; });
+    button.textContent = 'Αποθήκευση και επιστροφή';
+    if (saved) this.returnToMainMenu();
+    else {
+      const error = this.exitDialog.querySelector<HTMLElement>('#level-exit-error')!;
+      error.textContent = this.lastSaveError;
+      error.hidden = false;
+      button.focus();
+    }
   }
 
   close(): void {
     if (!this.active) return;
     this.active = false;
+    if (this.exitDialog.open) this.exitDialog.close();
     this.editorTouches.clear();
     this.pinchZoom = null;
     this.panel.hidden = true;
@@ -2149,7 +2253,10 @@ export class LevelEditor {
       apprenticeStarts: Array.from({ length: 5 }, (_, offset) => this.apprenticeStarts.get(offset + 1)!.toArray() as [number, number, number]),
       apprenticeStartYaws: Array.from({ length: 5 }, (_, offset) => this.apprenticeStartYaws.get(offset + 1)!) };
   }
-  private async save(asCopy = false): Promise<void> {
+  private async save(asCopy = false): Promise<boolean> {
+    if (this.saving) return false;
+    this.saving = true;
+    this.lastSaveError = '';
     const document: LevelDocument = { ...this.document(), name: this.el<HTMLInputElement>('#level-slot-name').value.trim().slice(0, 48) || 'My Level' };
     const name = document.name!;
     const id = asCopy || !this.currentSlotId ? crypto.randomUUID() : this.currentSlotId;
@@ -2166,14 +2273,24 @@ export class LevelEditor {
       const current = globalThis.document.querySelector('#start-level-current');
       if (current) current.textContent = `SAVED · ${name}`;
       window.dispatchEvent(new Event('wirehouse:level-saved'));
-    } catch (error) { this.status(`Save failed: ${String(error)}`); return; }
+      this.savedSignature = this.editSignature(document, name);
+    } catch (error) {
+      this.lastSaveError = 'Η αποθήκευση απέτυχε. Οι αλλαγές σου παραμένουν στον editor. Έλεγξε τον διαθέσιμο χώρο του browser ή εξήγαγε το level ως JSON.';
+      this.status(`Save failed: ${String(error)}`);
+      this.saving = false;
+      return false;
+    }
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
     try {
-      const response = await fetch(`/__wire-house-mansion-level?slot=${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(document) });
+      const response = await fetch(`/__wire-house-mansion-level?slot=${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(document), signal: controller.signal });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       this.status(`${name} saved separately. Basic stays unchanged.`);
     } catch {
       this.status(`${name} saved in this browser. EXPORT downloads portable JSON; project-file save requires the local preview.`);
-    }
+    } finally { clearTimeout(timeout); }
+    this.saving = false;
+    return true;
   }
   private export(): void {
     const file = new Blob([`${JSON.stringify(this.document(), null, 2)}\n`], { type: 'application/json' });
@@ -2206,6 +2323,7 @@ export class LevelEditor {
       this.historySelections = [[]];
       this.historyIndex = 0;
       this.updateHistoryButtons();
+      this.savedSignature = this.editSignature();
       return true;
     } catch (error) { console.warn('Saved level could not be restored', error); return false; }
   }

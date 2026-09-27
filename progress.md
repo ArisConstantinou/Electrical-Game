@@ -1,5 +1,13 @@
 Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web game named WIRE THE HOUSE, based on real Cyprus residential first-fix practices, editable in Web Game Studio, playable on desktop/mobile, deployed to arisconstantinou/Electrical-Game via GitHub Pages, and ending at FIRST FIX COMPLETE without cable pulling.
 
+## 2026-09-27 · Editor return to main menu
+
+- User requested an attractive top-right X/back button, a main-menu-themed save/discard/cancel prompt for unsaved work, and authorized proceeding. Isolated changes on `codex/editor-menu-return` in the existing free `stairs-fps-20260927` worktree, from clean `bf4e7fb`. The primary dirty checkout and the sole 5365 integration listener remain protected.
+- Baseline runtime reproduced the hidden header/X and an unguarded Scene → Exit action. The new X/MENU button sits outside that header, remains available with collapsed tools, and shares its guard with Scene → Exit and Escape.
+- Compare persistent document/name snapshots on exit, not history indices or a per-frame dirty poll. New unsaved blank sites prompt; pristine Basic and Undo back to the saved state exit directly. Save failures retain the editor and show an inline error. A reload removes editor startup parameters and reloads the saved level (or Basic) so discarded live geometry cannot leak into Play.
+- Native modal matches the existing cream/green/yellow menu, names the level before saving, confines focus and editor shortcuts, and restores the original camera/gizmo enablement on cancellation. A queued native close event cannot restore controls into a newly reopened modal. Saves block duplicate actions; optional local project persistence is bounded to five seconds after browser persistence succeeds.
+- Build, actual develop-web-game client screenshot/state, storage failure, save/restore, discard, name changes, Undo, keyboard guards, camera drag after cancellation, in-flight save, and portrait/landscape touch-target checks pass. Twenty same-scene prompt requests had P95 4.9 ms/max 6.4 ms synchronous work and unchanged 1,833 geometries (PC only; GPU/compositor timing excluded). The existing desktop/mobile orbit/history/copy/paste/delete regression also passes. Candidate and subsequent release QA artifacts are retained under `output/` with managed-browser cleanup reports. Details: `docs/EDITOR_MENU_RETURN.md`.
+
 ## 2026-09-27 · Automatic device benchmark
 
 - User supplied real iPhone data (47.9 FPS, maximum interval 378 ms, CPU maximum 356 ms, no graphics loss) and requested one-tap automatic startup/loading measurement, whole-scene tour, no countdown, captured problem moments and sharing. Approved the scoped local-report/sharing design, then explicitly requested commit and push.
