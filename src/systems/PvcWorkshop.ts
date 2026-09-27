@@ -441,7 +441,7 @@ export class PvcWorkshop {
   }
   private use():void{
     if(!this.focused)return;
-    if(this.phase==='fastener-marking'){this.markFastenerHole();return;}
+    if(this.phase==='fastener-marking'){if(this.touch)this.markFastenerHole();else this.startFastenerDrilling();return;}
     if(this.phase==='fastener-insert-ready'){this.fastenerIndex=0;this.fastenerProgress=0;this.transition('fastener-inserting');return;}
     if(this.phase==='pipe-install-ready'){if(!this.installClear()){this.message='Η σωλήνα δεν περνά ελεύθερα στο κανάλι. Διόρθωσε πρώτα το άνοιγμα.';return;}this.transition('installing');return;}
     if(this.phase==='fastener-tighten-ready'){this.fastenerIndex=0;this.fastenerProgress=0;this.transition('fastener-tightening');return;}
@@ -618,7 +618,8 @@ export class PvcWorkshop {
     const hole:FastenerHole={side:cursor.side,y:cursor.point.y,marker:this.markerAt(cursor.point,cursor.side),drilled:false,paired:false};this.fastenerHoles.push(hole);
     const mate=otherSide.find(h=>!h.paired);
     if(mate){hole.paired=mate.paired=true;const left=hole.side<0?hole:mate,right=hole.side>0?hole:mate,area=this.fastenerArea()!;const rebar=buildRebarHug(left.marker.position,right.marker.position,area.z+.085);rebar.visible=false;this.securingRoot.add(rebar);this.fastenerPairs.push({left,right,rebar});this.fastenerAim.y=THREE.MathUtils.clamp(this.fastenerAim.y-.34,0,1);}
-    this.fastenerAim.x=cursor.side<0?.72:-.72;this.message=`${this.fastenerHoles.length} οπές σημειωμένες${this.fastenerPairs.length?' · πάτησε το εικονίδιο τρυπανιού όταν τελειώσεις':''}.`;
+    const drillingReady=this.fastenerPairs.length>0&&this.fastenerPairs.length*2===this.fastenerHoles.length;
+    this.fastenerAim.x=cursor.side<0?.72:-.72;this.message=`${this.fastenerHoles.length} οπές σημειωμένες${drillingReady?this.instruction(' · LMB: τρύπησε όταν τελειώσεις',' · πάτησε το εικονίδιο τρυπανιού όταν τελειώσεις'):''}.`;
   }
   private startFastenerDrilling():void{
     if(this.phase!=='fastener-marking'||this.fastenerPairs.length<1||this.fastenerPairs.length*2!==this.fastenerHoles.length)return;
@@ -854,7 +855,7 @@ export class PvcWorkshop {
       opening:'Κοπή πλαστικών δεσιμάτων',spreading:'Ευθυγράμμιση σωλήνων',
       inserting:'Εισαγωγή spring στο σημάδι',extracting:'Τράβηγμα spring από το καλώδιο',
       cutting:'Κοπή PVC',installing:'Εισαγωγή στο κουτί',
-      'fastener-marking':'Μετακίνησε ελεύθερα τον στόχο πάνω στο τούβλο · USE: σημάδεψε οπή · ελάχιστο ένα αντικριστό ζεύγος',
+      'fastener-marking':'Mouse: στόχος · E: σημάδεψε οπή · LMB: τρύπησε · ελάχιστο ένα αντικριστό ζεύγος',
       'fastener-drilling':'Τρύπημα 12 mm · οι σημειωμένες οπές ανοίγουν μία-μία',
       'fastener-insert-ready':'USE: πέρασε τα σύρματα ένα-ένα στις οπές, ανοικτά για τη σωλήνα',
       'fastener-inserting':'Εισαγωγή ανοικτών συρμάτων · ένα ζεύγος τη φορά',
