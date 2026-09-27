@@ -4,6 +4,27 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, readdir, rename, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
+// Public folder index documents are directory routes on Pages. Vite's SPA
+// fallback otherwise turns these same URLs into the game's index document.
+const benchmarkDocuments = (): Plugin => ({
+  name: 'wire-house-benchmark-documents',
+  configureServer(server) {
+    server.middlewares.use((request, response, next) => {
+      const url = new URL(request.url ?? '/', 'http://127.0.0.1');
+      if (request.method !== 'GET' && request.method !== 'HEAD') return next();
+      const directories = ['/Electrical-Game/perf/', '/Electrical-Game/review/performance/'];
+      if (directories.some(directory => url.pathname === directory.slice(0, -1))) {
+        response.statusCode = 302;
+        response.setHeader('Location', `${url.pathname}/${url.search}`);
+        response.end();
+        return;
+      }
+      if (directories.includes(url.pathname)) request.url = `${url.pathname}index.html${url.search}`;
+      next();
+    });
+  },
+});
+
 const studioOverrides = (): Plugin => ({
   name: 'wire-house-studio-overrides',
   configureServer(server) {
@@ -122,7 +143,7 @@ export default defineConfig({
   // QA retains complete before/after builds under output. Only the real app
   // entry participates in development dependency discovery.
   optimizeDeps: { entries: ['index.html'] },
-  plugins: [studioOverrides(), levelEditorDocument()],
+  plugins: [benchmarkDocuments(), studioOverrides(), levelEditorDocument()],
   server: { host: '127.0.0.1', port: 5365, strictPort: true },
   preview: { host: '127.0.0.1', port: 5365, strictPort: true },
   build: { target: 'es2022', sourcemap: false },

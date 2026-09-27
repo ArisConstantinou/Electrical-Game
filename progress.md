@@ -8,6 +8,7 @@ Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web gam
 - Build and metric checks pass. The real-time portrait WebGL tour completes all 112 checkpoints and ten areas, with 23,445 measured intervals, 18 useful images and no browser errors. The injected-stall run exposes 1 FPS instantaneous and the actual HUD minimum of 3.4 FPS; these are diagnostic acceptance results, not ordinary-performance claims. Native screenshot copies were visually inspected.
 - Persistence/export/fresh capture, freeze/resume, missing-frame tails, WebGPU landscape blocked-route reporting, loading cancellation, delayed reload protection, FCP timing, result suspension and native-share/cancellation/download fallback pass. The actual develop-web-game client reaches the automatic tour with inspected screenshot/state and no error artifact. All owned browser sessions close cleanly.
 - This benchmark does not establish constant 60 FPS or physical iPhone correctness by itself. Publication verification and device-level follow-up remain pending at this checkpoint. Details: docs/AUTOMATIC_BENCHMARK.md.
+- Live integration testing found that Vite's public-directory URLs fall back to the game index while Pages serves those directories correctly. Added narrowly scoped development URL mapping for `/perf/` and `/review/performance/`, with slash/query preservation, before publication. The server remains on 5365.
 
 ## 2026-09-27 · Stair-view frame deadline correction
 
