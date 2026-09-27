@@ -29,7 +29,7 @@ try {
   report.errors.push(entry);
  });
  await page.goto(url.href);
- report.servedModule=await page.locator('script[type="module"]').getAttribute('src');
+ report.servedModule=await page.locator('script[type="module"][src]:not([src*="@vite"])').first().getAttribute('src');
  await page.waitForFunction(()=>window.__wireTheHouse?.isReadyForStart,null,{timeout:120000});
  await page.locator('#start-button').click();
  await page.waitForFunction(()=>window.__wireTheHouse.started);
