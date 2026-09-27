@@ -19,6 +19,7 @@ export class ElectricalBox extends THREE.Group {
   readonly width: number;
   readonly height: number;
   readonly depth: number;
+  readonly bottomConduitEntries: THREE.Vector3[];
 
   constructor(readonly kind: BoxKind, stableId: string) {
     super();
@@ -34,6 +35,8 @@ export class ElectricalBox extends THREE.Group {
     const rimDepth = 0.006;
     const bodyDepth = this.depth - rimDepth;
     const entryXs = this.kind === '2G' ? [-this.width * .25, this.width * .25] : [0];
+    const bottomEntryXs = [-this.width * .25, this.width * .25];
+    this.bottomConduitEntries = bottomEntryXs.map(x => new THREE.Vector3(x, -this.height / 2, -bodyDepth / 2 - rimDepth));
     const backShape = new THREE.Shape();
     const backHalfWidth = this.width / 2 - wall, backHalfHeight = this.height / 2 - wall;
     backShape.moveTo(-backHalfWidth, -backHalfHeight);
@@ -63,9 +66,27 @@ export class ElectricalBox extends THREE.Group {
     left.position.set(-this.width / 2 + wall / 2, 0, -bodyDepth / 2 - rimDepth);
     right.position.set(this.width / 2 - wall / 2, 0, -bodyDepth / 2 - rimDepth);
     const top = mesh(topGeometry, innerPlastic);
-    const bottom = mesh(topGeometry, innerPlastic);
+    // Actual 21.5 mm openings through the lower casing wall, centred in depth.
+    // Rear cable knockouts remain separate from these conduit entrances.
+    const bottomShape = new THREE.Shape();
+    const bottomHalfWidth = this.width / 2 - wall;
+    bottomShape.moveTo(-bottomHalfWidth, -bodyDepth / 2);
+    bottomShape.lineTo(bottomHalfWidth, -bodyDepth / 2);
+    bottomShape.lineTo(bottomHalfWidth, bodyDepth / 2);
+    bottomShape.lineTo(-bottomHalfWidth, bodyDepth / 2);
+    bottomShape.closePath();
+    for (const x of bottomEntryXs) {
+      const opening = new THREE.Path();
+      opening.absarc(x, 0, .01075, 0, Math.PI * 2, true);
+      bottomShape.holes.push(opening);
+    }
+    const bottomGeometry = new THREE.ExtrudeGeometry(bottomShape, { depth: wall, bevelEnabled: false, curveSegments: 16 });
+    bottomGeometry.rotateX(Math.PI / 2);
+    const bottom = mesh(bottomGeometry, innerPlastic);
+    bottom.name = 'Lower casing wall with two open 20 mm conduit entrances';
+    bottom.userData.conduitEntryCount = 2;
     top.position.set(0, this.height / 2 - wall / 2, -bodyDepth / 2 - rimDepth);
-    bottom.position.set(0, -this.height / 2 + wall / 2, -bodyDepth / 2 - rimDepth);
+    bottom.position.set(0, -this.height / 2 + wall, -bodyDepth / 2 - rimDepth);
     this.add(left, right, top, bottom);
 
     const horizontalRim = new RoundedBoxGeometry(this.width + rim * 2, rim, rimDepth, 2, .001);

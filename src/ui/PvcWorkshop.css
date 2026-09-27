@@ -4,6 +4,14 @@
 #pvc-mark-confirm{position:absolute;z-index:24;right:12%;top:45%;min-height:44px;padding:9px 13px;border:1px solid #ffce67;border-radius:5px;background:#c4582f;color:#fffaf0;box-shadow:0 4px 18px #0007;font:800 14px/1.25 system-ui,sans-serif;letter-spacing:.02em;cursor:pointer}
 #pvc-mark-confirm svg{display:none}
 #pvc-fit-zoom{display:none}
+#pvc-fit-controls[hidden]{display:none!important}
+#pvc-fit-controls{position:absolute;z-index:24;left:50%;top:86px;transform:translateX(-50%);display:flex;gap:6px;max-width:calc(100% - 20px);padding:6px;border:1px solid #67766b;border-radius:9px;background:#14241fe8;box-shadow:0 4px 18px #0007}
+#pvc-fit-controls button{min-width:48px;min-height:48px;padding:8px 12px;border:2px solid #cbb782;border-radius:6px;background:#1c3830;color:#fff8e8;font:700 14px/1.2 system-ui,sans-serif;white-space:nowrap;cursor:pointer;touch-action:manipulation}
+#pvc-fit-controls button:disabled{opacity:.45;cursor:default}
+#pvc-fit-controls button[aria-pressed="true"]{background:#a4532d;border-color:#ffd27d}
+#pvc-fit-controls #pvc-cut-confirm{background:#b84f27;border-color:#ffd27d}
+@media(pointer:coarse){#pvc-fit-controls{top:76px;gap:4px;padding:5px}#pvc-fit-controls button{padding:8px;font-size:12px}}
+@media(pointer:coarse) and (max-height:520px){#pvc-fit-controls{top:12px}}
 #pvc-drill-holes{position:absolute;z-index:24;left:150px;bottom:142px;width:52px;height:52px;padding:9px;border:2px solid #ffd27d;border-radius:12px;background:#a83e27;color:#fff;box-shadow:0 4px 18px #0007;cursor:pointer}
 #pvc-drill-holes svg{display:block;width:30px;height:30px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 #pvc-touch-controls{display:none}

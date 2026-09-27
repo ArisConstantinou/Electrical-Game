@@ -4,6 +4,12 @@ import { INSTALLATION_RULES, type BoxKind } from '../data/installationRules';
 import { ElectricalBox } from './Box';
 import { boxAssemblyBounds, horizontalBoxLayout, type BoxModuleLayout } from './BoxAssembly';
 
+export interface BoxConduitEntry {
+  boxIndex: number;
+  side: 'left' | 'right';
+  position: THREE.Vector3;
+}
+
 export class BoxGroup extends THREE.Group {
   readonly boxes: ElectricalBox[] = [];
   readonly groupWidth: number;
@@ -51,6 +57,21 @@ export class BoxGroup extends THREE.Group {
   get depthError(): number { return this.position.z-(Number(this.userData.finishDepth) || 0); }
   get isLevel(): boolean { return Math.abs(this.tiltDegrees) <= INSTALLATION_RULES.leveling.tiltToleranceDegrees; }
   get isFlush(): boolean { return Math.abs(this.depthError) <= INSTALLATION_RULES.leveling.depthToleranceMetres; }
+
+  getBottomConduitEntries(): BoxConduitEntry[] {
+    this.updateWorldMatrix(true, true);
+    const entries: BoxConduitEntry[] = [];
+    this.boxes.forEach((box, boxIndex) => {
+      const down = new THREE.Vector3(0, -1, 0).transformDirection(box.matrixWorld);
+      if (!box.visible || down.y > -.7) return;
+      box.bottomConduitEntries.forEach((point, index) => entries.push({
+        boxIndex, side: index === 0 ? 'left' : 'right', position: box.localToWorld(point.clone()),
+      }));
+    });
+    // A stacked assembly is entered through its exposed lowest row.
+    const bottom = Math.min(...entries.map(entry => entry.position.y));
+    return entries.filter(entry => entry.position.y <= bottom + .005).sort((a, b) => a.position.x - b.position.x);
+  }
 
   private buildLevelBar(stableId: string): THREE.Group {
     const bar = new THREE.Group();
