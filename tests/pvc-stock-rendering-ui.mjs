@@ -9,7 +9,7 @@ import { serveTaskBuild } from './serve-task-build.mjs';
 const {launchManagedBrowser,runManagedClient}=await import(pathToFileURL(path.join(process.env.CODEX_HOME??path.join(os.homedir(),'.codex'),'skills/develop-web-game/scripts/browser_lifecycle.mjs')));
 
 const baseline=process.argv.includes('--baseline');
-const url='http://127.0.0.1:5365/Electrical-Game/'+(process.argv.includes('--webgl')?'?renderer=webgl':'');
+const url=process.env.GAME_URL??'http://127.0.0.1:5365/Electrical-Game/'+(process.argv.includes('--webgl')?'?renderer=webgl':'');
 const out=process.env.PVC_RENDER_OUT??`output/pvc-stock-rendering/${baseline?'before':'after'}`;
 await mkdir(out,{recursive:true});
 const report={baseline,errors:[],failures:[],cases:[],physicalPhone:false};
