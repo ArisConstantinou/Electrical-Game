@@ -7,7 +7,7 @@ import {routeBuildingDist} from './building-qa-utils.mjs';
 
 const baseline=process.argv.includes('--baseline');
 const url=process.env.DRILL_QA_URL??'http://127.0.0.1:5365/Electrical-Game/';
-const out=process.env.DRILL_QA_OUTPUT??`output/left-click-drill/${baseline?'before':'after'}`;
+const out=process.env.DRILL_QA_OUTPUT??`output/direct-drill/${baseline?'before':'after'}`;
 await mkdir(out,{recursive:true});
 const report={url,baseline,errors:[],checks:[],performance:[],physicalPhone:false};
 const server=await chromium.launchServer({channel:'chrome',headless:true});
@@ -30,35 +30,47 @@ try{
   const mark=touch?async()=>{await page.locator('#look-joystick').tap();await step();}:key;
   const click=async()=>{await page.mouse.down();await step();await page.mouse.up();await step();};
   const snap=async name=>{await page.evaluate(async()=>{const r=window.__wireTheHouse.renderer;await r.waitForFrame();r.render();await r.waitForFrame();});await page.screenshot({path:`${out}/${touch?'touch':'desktop'}-${name}.png`});};
-  await page.evaluate(()=>{const g=window.__wireTheHouse,p=g.mission.points[0],c=g.renderer.camera,pos=p.boxGroup.getWorldPosition(c.position.clone()),bottom=pos.y-p.boxGroup.groupHeight/2;dispatchEvent(new CustomEvent('wirehouse:select-tool',{detail:'drill'}));c.position.set(pos.x,.72,pos.z+.90);c.lookAt(pos.x,(bottom+.08)/2,pos.z-.03);g.player.pitch=c.rotation.x;g.player.yaw=c.rotation.y;c.updateMatrixWorld(true);});
-  await step();assert(await page.evaluate(()=>window.__wireTheHouse.pvc.fastenerPrepAvailable));await mark();await step(70);assert.equal((await state()).phase,'fastener-marking');
-  await page.mouse.move(viewport.width/2,viewport.height/2);await step();
-  await page.evaluate(()=>{window.__wireTheHouse.pvc.fastenerAim={x:-.72,y:.72};});
-  if(!touch&&!baseline){
-   await click();assert.equal((await state()).fasteners.holes,0,'LMB must not mark a new hole or start before a complete pair');
-   await mark();await click();assert.equal((await state()).fasteners.holes,1);assert.equal((await state()).phase,'fastener-marking','Unpaired holes cannot drill');
-  }else await mark();
-  await page.evaluate(()=>window.__wireTheHouse.player.lookHandler(44,18));await mark();
-  await page.evaluate(()=>window.__wireTheHouse.player.lookHandler(-52,-10));await mark();
-  await page.evaluate(()=>window.__wireTheHouse.player.lookHandler(35,22));await mark();
-  report.marked=await state();assert.equal(report.marked.fasteners.holes,4,JSON.stringify(report.marked));assert.equal(report.marked.fasteners.pairs,2);
-  await snap('marked');
-  const profile=await page.evaluate(async()=>{const g=window.__wireTheHouse,samples=[];for(let i=0;i<120;i++){const t=performance.now();window.drillStep(1/60,0,false);samples.push(performance.now()-t);}const frames=[];for(let i=0;i<45;i++){const t=performance.now();await g.renderer.waitForFrame();g.renderer.render();await g.renderer.waitForFrame();frames.push(performance.now()-t);}samples.sort((a,b)=>a-b);frames.sort((a,b)=>a-b);return{simulationMeanMs:samples.reduce((a,b)=>a+b)/samples.length,p95Ms:samples[114],maxMs:samples[119],renderWaitP95Ms:frames[42],renderWaitMaxMs:frames[44],calls:g.renderer.webgl.info.render.calls,triangles:g.renderer.webgl.info.render.triangles};});
-  report.performance.push({touch,viewport,...profile});
-  const removed=await page.evaluate(()=>window.__wireTheHouse.room.brickWall.volume.removedNodeCount);
-  if(touch){await page.locator('#pvc-drill-holes').tap();await step();}
-  else await click();
-  report.afterClick=await state();await snap('click');
-  assert.equal((await state()).phase,'fastener-drilling','Left mouse click must start drilling without Escape or clicking the toolbar');
-  assert.equal((await state()).fasteners.holes,4,'Drilling must retain every chosen hole');
-  if(!touch){await page.mouse.down();await step(240);await page.mouse.up();await step();}else await step(240);
-  assert.equal((await state()).phase,'fastener-insert-ready');assert.equal((await state()).fasteners.drilled,4);
-  assert(await page.evaluate(before=>window.__wireTheHouse.room.brickWall.volume.removedNodeCount>before,removed));
-  await snap('drilled');await mark();await step(145);assert.equal((await state()).phase,'sealed');
-  assert.equal(await page.evaluate(()=>window.__wireTheHouse.mission.points[0].userData.pvcFasteners.sequence),'marked-drilled-open-wire');
-  assert.equal((await state()).focused,false);assert((await state()).fasteners.rebars.every(r=>r.visible));
-  report.checks.push(touch?'Touch: four marks -> toolbar drill -> four real holes -> persistent open wire':'Desktop: reject zero/odd marks -> E adds four marks -> LMB drills -> held click cannot repeat -> E inserts wire');
-  await context.close();
+  {
+   let ePresses=0;await page.exposeFunction('recordDrillE',()=>ePresses++);await page.evaluate(()=>addEventListener('keydown',e=>{if(e.code==='KeyE')window.recordDrillE();}));
+   await page.mouse.move(viewport.width/2,viewport.height/2);
+   const holes=await page.evaluate(()=>{const g=window.__wireTheHouse,p=g.mission.points[0],c=g.renderer.camera,pos=p.boxGroup.getWorldPosition(c.position.clone()),volume=g.room.brickWall.volume,max=Math.max(.13,pos.y-p.boxGroup.groupHeight/2-.065),min=.09,span=max-min;dispatchEvent(new CustomEvent('wirehouse:select-tool',{detail:'drill'}));c.position.set(pos.x,.72,pos.z+.90);return[[-.065,.85],[.05,.75],[-.08,.2],[.038,.25]].map(([x,y])=>{const hit=volume.raycast({x:pos.x+x,y:min+span*y,z:volume.frontZ+.1},{x:0,y:0,z:-1},1);if(!hit)throw new Error('Fixture must aim at real brick');return[hit.point.x,hit.point.y,hit.point.z];});});
+   const aim=async point=>{await page.evaluate(point=>{const g=window.__wireTheHouse,c=g.renderer.camera;c.lookAt(...point);g.player.pitch=c.rotation.x;g.player.yaw=c.rotation.y;c.updateMatrixWorld(true);},point);await step();};
+   await aim(holes[0]);await snap('aim-before');
+   const removed=await page.evaluate(()=>window.__wireTheHouse.room.brickWall.volume.removedNodeCount);
+   const performanceSamples=await page.evaluate(()=>{const samples=[];for(let i=0;i<120;i++){const t=performance.now();window.drillStep(1/60,0,false);samples.push(performance.now()-t);}samples.sort((a,b)=>a-b);return{meanMs:samples.reduce((a,b)=>a+b)/samples.length,p95Ms:samples[114],maxMs:samples[119]};});report.performance.push({touch,viewport,...performanceSamples});
+   await aim(holes[0]);report.aimHits=[await page.evaluate(()=>{const g=window.__wireTheHouse,c=g.renderer.camera;return g.room.brickWall.volume.raycast(c.getWorldPosition(c.position.clone()),c.getWorldDirection(c.position.clone()),1.8)?.point;})];await (touch?mark:click)();report.firstClick=await state();await snap('first-click');
+   assert.equal(report.firstClick.phase,'fastener-drilling','The first left click must drill directly, without E or prior circles');
+   assert.equal(report.firstClick.fasteners.holes,1);assert.equal(ePresses,0);
+   assert(await page.evaluate(()=>{const p=window.__wireTheHouse.pvc;return !p.securingCursor.visible&&p.fastenerHoles.every(h=>h.marker.children.every(m=>!m.visible));}),'No red aiming/marking circles before the real hole');
+   await step(55);assert.equal((await state()).fasteners.drilled,1);assert.equal((await state()).phase,'fastener-marking');
+   assert(await page.evaluate(before=>window.__wireTheHouse.room.brickWall.volume.removedNodeCount>before,removed),'First click must remove actual masonry');
+   await (touch?mark:click)();await step(55);assert.equal((await state()).fasteners.holes,1,'An already drilled unpaired hole must not duplicate');
+   for(const invalid of [[(holes[0][0]+holes[1][0])/2,holes[0][1],holes[0][2]],[holes[0][0]-.15,holes[0][1],holes[0][2]],holes[2]]){
+    await aim(invalid);await (touch?mark:click)();await step(55);assert.equal((await state()).fasteners.holes,1,'Pipe gap, outside chase and another unpaired same-side hole must be rejected');
+   }
+   if(touch){
+    const pad=await page.locator('#look-joystick').boundingBox(),x=pad.x+pad.width/2,y=pad.y+pad.height/2;
+    const before=await page.evaluate(()=>window.__wireTheHouse.player.yaw),cdp=await context.newCDPSession(page);
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x+28,y:y-12}]});await step(20);
+    assert(Math.abs(await page.evaluate(()=>window.__wireTheHouse.player.yaw)-before)>.01,'Right joystick drag must still turn the actual camera while drilling');
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await step();await cdp.detach();
+    assert.equal((await state()).fasteners.holes,1,'Dragging must aim without drilling');
+   }
+   for(let i=1;i<holes.length;i++){
+    await aim(holes[i]);report.aimHits.push(await page.evaluate(()=>{const g=window.__wireTheHouse,c=g.renderer.camera;return g.room.brickWall.volume.raycast(c.getWorldPosition(c.position.clone()),c.getWorldDirection(c.position.clone()),1.8)?.point;}));if(touch){await mark();await step(60);}else{await page.mouse.down();await step(60);await page.mouse.up();await step();}
+    report.directStep={i,state:await state()};assert.equal(report.directStep.state.fasteners.drilled,i+1,JSON.stringify(report.directStep));
+    assert.equal((await state()).phase,i%2?'fastener-insert-ready':'fastener-marking');
+   }
+   const drilled=(await state()).fasteners;assert.equal(drilled.holes,4);assert.equal(drilled.pairs,2);
+   report.aimHits.forEach((point,i)=>{assert(point);assert(Math.abs(drilled.positions[i].x-point.x)<.001,'Hole X must match the actual surface under the crosshair');assert(Math.abs(drilled.positions[i].y-point.y)<.001,'Hole Y must match the actual surface under the crosshair');assert(Math.abs(drilled.positions[i].z-point.z)<.001,'Hole must contact real masonry instead of an empty reference plane');});
+   assert.equal(await page.locator('#pvc-drill-holes').isVisible(),false,'Desktop must not require the drill toolbar');
+   await snap('four-drilled');await (touch?mark:click)();await step(145);assert.equal((await state()).phase,'sealed');assert.equal(ePresses,0);
+   assert((await state()).fasteners.rebars.every(r=>r.visible));assert.equal(await page.evaluate(()=>window.__wireTheHouse.mission.points[0].userData.pvcFasteners.sequence),'marked-drilled-open-wire');
+   report.checks.push(`${touch?'Mobile right joystick centre':'Desktop LMB'}: first LMB drills at crosshair with no E/circles; duplicate rejected; four independent click/hold holes form two pairs; primary action threads wire`);
+   await context.close();continue;
+  }
+
  }
  assert.equal(report.errors.length,0,report.errors.join('\n'));
 }finally{

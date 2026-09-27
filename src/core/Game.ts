@@ -45,7 +45,7 @@ import { BoxAssemblyBuilder, horizontalBoxLayout, type BoxAttachmentZone } from 
 
 const TOOL_HINTS: Record<RigTool, string> = {
   measure: 'TAPE MEASURE · aim to measure from the floor · M to mark',
-  drill: 'DRILL · hold at a pencil mark to prepare the fixing hole',
+  drill: 'DRILL · aim at the work point · left click to drill',
   driver: 'DRIVER · hold on the laser bracket to fasten it',
   laser: 'LASER · place on a drilled fixing, then secure with the driver',
   spray: 'SPRAY CAN · mark the chase route',
@@ -803,7 +803,7 @@ export class Game {
       'no-solid':'AIM AT BRICK','too-close':'STEP BACK SLIGHTLY','out-of-reach':'MOVE INTO REACH',
     };
     const useStatus=this.selectedTool==='measure'?'AIM TO MEASURE'
-      :this.selectedTool==='drill'?(this.pvc.fastenerPrepAvailable?'USE · PVC FIXINGS':this.laserLevel.working?'DRILLING':'HOLD TO DRILL')
+      :this.selectedTool==='drill'?(this.pvc.fastenerPrepAvailable?'DRILL · PVC FIXINGS':this.laserLevel.working?'DRILLING':'HOLD TO DRILL')
       :this.selectedTool==='driver'?(this.laserLevel.working?'FASTENING':'HOLD TO FASTEN')
       :this.selectedTool==='laser'?(this.laserLevel.telemetry.mounted?'TAP TO PICK UP':'TAP TO MOUNT')
       :this.selectedTool==='hammer'?(this.hammerSpeed===0?'SPEED 0 · PAUSED':hammerStatus[this.fpsRig.contactStatus])
@@ -1268,7 +1268,7 @@ export class Game {
     // one hammer strike rather than turning a held pointer into auto-repeat.
     if (changed && tool === 'hammer' && this.input.actionHeld) this.input.actionRequested = true;
     if (tool === 'spring' || tool === 'cutter') this.conduit.selectTool(tool as PvcTool);
-    const touchHint=tool==='fitting'?'ΚΟΥΤΙΑ · άγγιξε ΣΥΝΑΡΜΟΛΟΓΗΣΗ':tool==='measure'?'ΜΕΤΡΗΣΗ · στόχευσε τον τοίχο και άγγιξε ΣΗΜΑΔΙ':tool==='trowel'?'ΜΙΣΤΡΙ · κράτα και άφησε στην πράσινη περιοχή':TOOL_HINTS[tool];
+    const touchHint=tool==='drill'?'ΤΡΥΠΑΝΙ · στόχευσε και πάτησε το κέντρο του δεξιού joystick':tool==='fitting'?'ΚΟΥΤΙΑ · άγγιξε ΣΥΝΑΡΜΟΛΟΓΗΣΗ':tool==='measure'?'ΜΕΤΡΗΣΗ · στόχευσε τον τοίχο και άγγιξε ΣΗΜΑΔΙ':tool==='trowel'?'ΜΙΣΤΡΙ · κράτα και άφησε στην πράσινη περιοχή':TOOL_HINTS[tool];
     this.hud.notify(matchMedia('(pointer:coarse)').matches?touchHint:TOOL_HINTS[tool], true, 1200);
   }
 
