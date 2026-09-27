@@ -38,15 +38,23 @@ export class MansionGroundWing extends THREE.Group {
   readonly courtyard: MansionCourtyard;
   readonly surroundings: MansionSurroundings;
 
-  constructor(oliveSource: THREE.Object3D | null, neighbourSource: THREE.Object3D | null) {
+  constructor(oliveSource: THREE.Object3D | null, neighbourSource: THREE.Object3D | null,
+    private readonly passageJambs: readonly THREE.Box3[] = []) {
     super();
     this.name = 'Mansion ground circulation construction slice';
     this.userData.studioEntityId = 'world:mansion-ground-wing';
     this.slab('Rough supported passage slab', 2.7, 4.1, 0, 5.65);
     this.slab('Ground foyer slab', 10.35, 5.0, 3.825, 10.1, true);
     this.slab('Shaded north circulation return', 10.35, 2.9, 3.825, 14.05);
-    this.wall('Passage west fired-clay partition', -1.35, 3.62, -1.35, 7.65);
-    this.wall('Passage east fired-clay partition', 1.35, 3.62, 1.35, 7.65);
+    // The passage masonry starts at the actual fitted concrete face. Its old
+    // 3.62 m start ran through the jamb and exposed a second clay edge.
+    for (const side of [-1, 1]) {
+      const jamb = this.passageJambs.find(box => Math.sign(box.min.x + box.max.x) === side);
+      // The inside clay face follows the clear opening, rather than putting
+      // half the block beyond the jamb where a false cut face stays exposed.
+      const x = jamb ? (side < 0 ? jamb.max.x : jamb.min.x) + side * CONSTRUCTION_DEFAULTS.brickDepth / 2 : side * 1.35;
+      this.wall(`Passage ${side < 0 ? 'west' : 'east'} fired-clay partition`, x, jamb?.max.z ?? 3.62, x, 7.65, 0, 3, jamb ? [0] : []);
+    }
     this.wall('Foyer west fired-clay partition', -1.35, 7.65, -1.35, 15.5);
     this.wall('Foyer north fired-clay perimeter', -1.35, 15.5, 9, 15.5);
     // The 2.4 m opening is a true route into the open courtyard. Structural
@@ -327,16 +335,20 @@ export class MansionGroundWing extends THREE.Group {
       const index=this.obstacles.findIndex(item=>item.id===id);if(index>=0)this.obstacles.splice(index,1);
     }
     const names:string[]=[];
-    const infill=(name:string,x0:number,z0:number,x1:number,z1:number,base=0,height=3)=>{
-      names.push(name);this.wall(name,x0,z0,x1,z1,base,height);
+    const infill=(name:string,x0:number,z0:number,x1:number,z1:number,base=0,height=3,coveredEnds:readonly number[]=[])=>{
+      names.push(name);this.wall(name,x0,z0,x1,z1,base,height,coveredEnds);
     };
     infill('Original room right practice masonry',3.91,-3.6,3.91,3.6);
     infill('Original room west wall before window',-3.91,-3.6,-3.91,1.05);
     infill('Original room west wall after window',-3.91,2.95,-3.91,3.6);
     infill('Original room window clay sill',-3.91,1.05,-3.91,2.95,0,1.01);
     infill('Original room window clay head',-3.91,1.05,-3.91,2.95,2.48,.52);
-    infill('Original room rear west infill',-3.8,3.68,-1.35,3.68);
-    infill('Original room rear east infill',1.35,3.68,3.8,3.68);
+    const westJamb=this.passageJambs.find(box=>box.max.x<0);
+    const eastJamb=this.passageJambs.find(box=>box.min.x>0);
+    // End both clay and mortar at the outer jamb face, keeping the same wall
+    // IDs and deriving fracture/picking/collision from the shortened wall.
+    infill('Original room rear west infill',-3.8,3.68,westJamb?.min.x??-1.35,3.68,0,3,westJamb?[1]:[]);
+    infill('Original room rear east infill',eastJamb?.max.x??1.35,3.68,3.8,3.68,0,3,eastJamb?[0]:[]);
     infill('Original room rear lintel infill',-1.35,3.68,1.35,3.68,2.638,.362);
     return names.map(name=>this.editableWalls.get(name)!);
   }
@@ -919,7 +931,8 @@ export class MansionGroundWing extends THREE.Group {
     }
   }
 
-  private wall(name: string, x0: number, z0: number, x1: number, z1: number, baseY = 0, height = 3): void {
+  private wall(name: string, x0: number, z0: number, x1: number, z1: number, baseY = 0, height = 3,
+    coveredEnds: readonly number[] = []): void {
     const alongX = Math.abs(x1 - x0) > Math.abs(z1 - z0);
     const length = Math.hypot(x1 - x0, z1 - z0);
     const centreX = (x0 + x1) / 2, centreZ = (z0 + z1) / 2;
@@ -997,7 +1010,7 @@ export class MansionGroundWing extends THREE.Group {
       editable.add(bricks);
       batchMeshes[index] = bricks;
     }
-    editable.add(hollowClayWallEnds(length, rows, course, gap, alongX, name));
+    editable.add(hollowClayWallEnds(length, rows, course, gap, alongX, name, coveredEnds));
     const obstacle: PlayerObstacle = { id: name, minX: Math.min(x0, x1) - .12, maxX: Math.max(x0, x1) + .12,
       minZ: Math.min(z0, z1) - .12, maxZ: Math.max(z0, z1) + .12,
       minFloorY: baseY, maxFloorY: baseY + height };

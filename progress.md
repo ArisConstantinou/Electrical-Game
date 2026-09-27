@@ -1,5 +1,15 @@
 Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web game named WIRE THE HOUSE, based on real Cyprus residential first-fix practices, editable in Web Game Studio, playable on desktop/mobile, deployed to arisconstantinou/Electrical-Game via GitHub Pages, and ending at FIRST FIX COMPLETE without cable pulling.
 
+## 2026-09-27 · Original passage concrete and masonry contacts
+
+- User approved the repair after a screenshot diagnosis. Protected base `d88cc85`, isolated branch `codex/wall-concrete-joints` in the existing managed `pipe-e-prompts` checkout. The dirty primary checkout, saved user levels and sole port-5365 listener are preserved.
+- Before regression fails on the actual live game and previous Pages production: rear clay/mortar overlaps each concrete jamb by 260 mm, passage partitions by 125 mm. Runtime captures are under ignored `output/wall-concrete-joints/before` and `before-production`.
+- Derive contacts from the fitted original concrete jamb bounds. Rear infills end at the outer concrete faces; passage partitions start at the rear faces and align their inner faces with the clear opening. Concrete thickness and 10 cm clay thickness remain the approved sizes. Closed contacts omit decorative hollow end caps. The existing authored wall builder supplies the matching fracture, picking and collision bounds and preserves wall IDs.
+- New `test:wall-joints` passes both sides, zero overlap/contact alignment, omission of closed cut ends, real edge chasing and damage restoration, and desktop/mobile viewport captures. TypeScript/Vite build passes. Existing `construction-depth` passes all seven geometry/editor/collision/save checks. `building-contract` passes 143 wall contacts, UV scale checks, six native hammer workflows and exact damage save/restore.
+- The historical building-contract camera used scaled local clearance and also failed unchanged baseline with `too-close`. Its fixture now sets 95 cm in world metres, inside the existing physical tool range; gameplay constraints remain intact. The original failure receipt is retained under ignored output.
+- Comparable serial PC Chrome headless 1118x1223 production samples: mean simulation 1.9425 -> 1.9767 ms, P95 simulation 3.2 -> 3.4 ms, frame P95 8.4 -> 8.3 ms, frame max 8.4 -> 8.4 ms. This view exposes additional background construction after fixing the join: 205 -> 227 draw calls, 2,862,519 -> 2,953,671 triangles, textures stay 80. Physical-phone performance is unverified.
+- Final integration, preserved PVC prompts/highlights, skill-client smoke, push and deployment receipts will be recorded under ignored `output/wall-concrete-joints/release.json`. Task-attributable usage/credits are unavailable; no agents or dependency installs were used.
+
 ## 2026-09-27 · Concrete mixer transport-wheel direction
 
 - Requested correction uses the user's actual game screenshot and orange mixer reference. Protected base: `889ef055c11dc90b1a0c0eb41e785e90d3429f51`; isolated worktree `stairs-fps-20260927`, branch `codex/mixer-wheel-axis`. Primary dirty checkout preserved; sole live integration listener remains on strict port 5365.

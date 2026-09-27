@@ -59,8 +59,11 @@ try{
  for(const name of ['Original room right practice masonry','Original room west wall before window','Original room rear east infill','L2 west wing room entrance north pier','L1 east wing north return','B1 unfinished workshop partition south']){
   const before=await page.evaluate(name=>{
    const g=window.__wireTheHouse,wall=g.room.mansionWing.masonryDemolition.get(name),cam=g.player.camera;
-   const center=cam.position.clone().set(0,1.65,0),eye=center.clone();if(wall.alongX)eye.z=-1;else eye.x=name==='Original room right practice masonry'?-1:1;
-   wall.group.updateWorldMatrix(true,true);cam.position.copy(wall.group.localToWorld(eye));cam.lookAt(wall.group.localToWorld(center));g.player.yaw=cam.rotation.y;g.player.pitch=cam.rotation.x;
+   const center=cam.position.clone().set(0,1.65,0),normal=center.clone().set(wall.alongX?0:name==='Original room right practice masonry'?-1:1,0,wall.alongX?-1:0);
+   // Wall depth is scaled to 10 cm; use a world-metre camera clearance so
+   // the physical chisel does not start inside its minimum work distance.
+   wall.group.updateWorldMatrix(true,true);const target=wall.group.localToWorld(center);
+   cam.position.copy(target).add(normal.transformDirection(wall.group.matrixWorld).multiplyScalar(.95));cam.lookAt(target);g.player.yaw=cam.rotation.y;g.player.pitch=cam.rotation.x;
    g.hammerMode='chase';g.lastHammerMasonryAim=null;g.failedHammerMasonry=null;g.player.wallWorkEnabled=false;
    return wall.removedClayNodes;
   },name);
