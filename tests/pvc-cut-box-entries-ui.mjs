@@ -89,16 +89,19 @@ try{
   check('right entry actually moves the pipe',right.entryPosition[0]-left[0]>.03,{left,right:right.entryPosition});
   await click('#pvc-entry-previous');check('left entry can be selected again',Math.abs((await state()).entryPosition[0]-left[0])<1e-8,await state());
   await snap('flush-left');await cut();assert.equal((await state()).phase,'cut');
-  // Real marking / drilling / open-wire installation / tightening sequence.
+  // Fit first, then drill and thread wires while the same pipe remains fitted.
+  // Explicitly staged wires still support the independent wire-first sequence.
   await key('KeyE');
   if(staged){assert.equal((await state()).phase,'pipe-install-ready');row.marked=await state();}
   else{
+   await step(50);
    assert.equal((await state()).phase,'fastener-marking',JSON.stringify(await state()));
+   assert(await page.evaluate(()=>Boolean(window.__wireTheHouse.mission.points[1].conduit)),'Pipe stays fitted while marking');
    await key('KeyE');await key('KeyE');assert.equal((await state()).fasteners.pairs,1);
    row.marked=await state();await click('#pvc-drill-holes');await step(150);assert.equal((await state()).phase,'fastener-insert-ready');
-   await key('KeyE');await step(95);assert.equal((await state()).phase,'pipe-install-ready');
+   await key('KeyE');await step(95);assert.equal((await state()).phase,'fastener-tighten-ready');
   }
-  await key('KeyE');await step(50);assert.equal((await state()).phase,'fastener-tighten-ready');
+  if(staged){await key('KeyE');await step(50);}assert.equal((await state()).phase,'fastener-tighten-ready');
   const installed=await page.evaluate(()=>{const g=window.__wireTheHouse,p=g.mission.points[1],V=g.renderer.camera.position.constructor,world=p.conduit.getWorldPosition(new V()),entry=g.pvc.telemetry.entryPosition;return{position:world.toArray(),entry,recipe:p.conduit.userData.pvcRecipe};});
   check('installed conduit retains the selected entry',Math.abs(installed.position[0]-left[0])<1e-8&&Math.abs(installed.position[2]-left[2])<1e-8,installed);
   check('fasteners straddle the selected pipe',row.marked.fasteners.positions[0].x<left[0]&&row.marked.fasteners.positions[1].x>left[0],row.marked.fasteners.positions);
