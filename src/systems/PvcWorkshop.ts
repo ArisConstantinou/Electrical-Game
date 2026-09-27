@@ -525,6 +525,8 @@ export class PvcWorkshop {
         }
         this.fastenerIndex=0;this.fastenerProgress=0;this.transition('pipe-install-ready');this.setFastenerCamera();this.message='Τα ανοικτά σύρματα είναι έτοιμα. USE: εφάρμοσε τη σωλήνα.';return;
       }
+      const area=this.fastenerArea();
+      if(!area||Math.min(area.outerLeft,area.outerRight)<area.innerX){this.message='Δεν χωρά ζεύγος στερέωσης γύρω από αυτή την είσοδο μέσα στο κανάλι. Επίλεξε άλλη κάτω είσοδο με τα βέλη.';return;}
       // Prepare the wall first. The cut conduit stays in the player's stock
       // until the holes are drilled and open tying wires are anchored.
       this.fastenerHoles=[];this.fastenerPairs=[];this.fastenerIndex=0;this.fastenerProgress=0;this.fastenerAim={x:-.72,y:.72};
@@ -626,7 +628,8 @@ export class PvcWorkshop {
     const area=this.fastenerArea()!,entry=this.carried?this.entry():null;
     // Tightening scales depth to 10%. The closed bow must meet the pipe's
     // outer face while both masonry anchors retain their original positions.
-    const frontZ=entry?area.z+(entry.position.z+PVC.diameter/2+.00115-area.z)/.1-.038:area.z+.085;
+    const anchorZ=(left.z+right.z)/2;
+    const frontZ=entry?anchorZ+(entry.position.z+PVC.diameter/2+.00115-anchorZ)/.1-.038:area.z+.085;
     return buildRebarHug(left,right,frontZ,entry?.position.x);
   }
   private markFastenerHole():void{
@@ -784,7 +787,7 @@ export class PvcWorkshop {
       const tip=c.worldToLocal(world),localTangent=tangent.applyQuaternion(c.quaternion.clone().invert());
       this.cutter.quaternion.setFromUnitVectors(v(0,-1,0),localTangent);
       this.cutter.position.copy(tip).sub(v().fromArray(this.cutter.userData.tipPoint).applyQuaternion(this.cutter.quaternion));
-      right.copy(v().fromArray(this.cutter.userData.gripPoint).applyQuaternion(this.cutter.quaternion).add(this.cutter.position));left.copy(tip).add(v(-.015,-.13,0));
+      right.copy(v().fromArray(this.cutter.userData.gripPoint).applyQuaternion(this.cutter.quaternion).add(this.cutter.position));left.copy(tip).add(v(-.015,world.y<.16?.08:-.13,0));
       rightQ.fromArray(this.cutter.userData.gripQuaternion??[0,0,0,1]).premultiply(this.cutter.quaternion);
       this.cutter.getObjectByName('cutter-moving-handle')!.rotation.z=.13-(this.phase==='cutting'?Math.sin(Math.min(1,this.elapsed/.45)*Math.PI)*.55:0);
     }else if(this.phase==='opening'){

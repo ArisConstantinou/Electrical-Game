@@ -8,14 +8,14 @@ const baseline=process.argv.includes('--baseline'),live=process.argv.includes('-
 const out=process.env.PVC_CUT_OUT??`output/pvc-cut-box-entries/${baseline?'before':live?'live':'after'}`;
 const url='http://127.0.0.1:5365/Electrical-Game/';
 await mkdir(out,{recursive:true});
-const report={baseline,live,url,environment:'Windows Chrome headless; touch cases are emulation, not a physical phone',errors:[],cases:[]};
+const report={baseline,live,url,sourceRef:process.env.PVC_SOURCE_REF??null,environment:'Windows Chrome headless; Core Ultra 9 285K / RTX 5080 and Intel Graphics host; touch cases are emulation, not a physical phone',errors:[],cases:[]};
 const browser=await chromium.launch({channel:'chrome',headless:true});
 try{
  for(const viewport of [{width:1095,height:1139},{width:390,height:844},{width:844,height:390}]){
   if(baseline&&viewport.width!==1095)continue;
   const mobile=viewport.width!==1095,name=!mobile?'desktop':viewport.width<500?'portrait':'landscape';
   const context=await browser.newContext({viewport,isMobile:mobile,hasTouch:mobile});
-  await blockPointerLock(context);if(!baseline&&!live)await serveTaskBuild(context,url);
+  await blockPointerLock(context);if(!live&&process.env.TASK_BUILD_ROOT)await serveTaskBuild(context,url);
   const page=await context.newPage();page.on('pageerror',e=>report.errors.push(e.message));
   await page.goto(url);await page.locator('#apprentice-count').selectOption('0');
   await page.locator('#start-button').click({timeout:120000});
@@ -60,6 +60,9 @@ try{
   assert.equal((await state()).phase,'fitting');await cut();assert.equal((await state()).offcuts,2);
   await key('KeyE');assert.equal((await state()).phase,'cut','A deliberately short pipe may be cut but cannot be installed');
   check('short free cuts are retained instead of undone',/κοντή/.test((await state()).message),await state());
+  await page.evaluate(()=>{const g=window.__wireTheHouse,p=g.pvc;g.player.lookHandler(0,(p.bend.mark+.2-.004-p.cutS)/.0006);});await step(70);
+  check('lowest curved cut keeps both hands above the floor',await page.evaluate(()=>window.__wireTheHouse.pvc.arms.every(a=>a.wrist.y>=.015)),await state());
+  await cut();check('complete low cut through the upright curve',(await state()).phase==='cut'&&(await state()).cutHeightCm<3,await state());await snap('lowest-cut');
   // Restore an uncut stock pipe for the independent flush / install scenario.
   await page.evaluate(()=>{const p=window.__wireTheHouse.pvc;p.cutFrom=0;p.carried.cutFrom=0;p.carried.mesh.update(p.bend);p.phase='fitting';});await step(2);
   await page.evaluate(()=>{const g=window.__wireTheHouse;g.player.lookHandler(0,(.02-g.pvc.cutS)/.0006);});await step(70);
@@ -103,6 +106,9 @@ function innerWidthFor(viewport){return viewport.width;}
 async function measure(page){return page.evaluate(async()=>{
  const g=window.__wireTheHouse,samples=[];for(let i=0;i<30;i++)window.cutTick(1/60,0,true);
  for(let i=0;i<120;i++){const t=performance.now();window.cutTick(1/60,0,true);samples.push(performance.now()-t);}samples.sort((a,b)=>a-b);
- const frames=[];await new Promise(resolve=>{let i=0,last;const tick=t=>{if(last!==undefined&&i>=10)frames.push(t-last);last=t;if(++i<70)requestAnimationFrame(tick);else resolve();};requestAnimationFrame(tick);});frames.sort((a,b)=>a-b);
- const info=g.renderer.webgl.info;return{phase:g.pvc.phase,meanMs:samples.reduce((a,b)=>a+b,0)/samples.length,p95Ms:samples[114],maxMs:samples.at(-1),frameP95Ms:frames[Math.floor(frames.length*.95)],frameMaxMs:frames.at(-1),geometries:info.memory.geometries,textures:info.memory.textures,calls:info.render.calls,triangles:info.render.triangles};
+ const times=[],draw=g.renderer.drawScene.bind(g.renderer);g.renderer.drawScene=function(scene){if(scene===this.scene)times.push(performance.now());return draw(scene);};
+ g.step=(dt,waterDt,present,bodyDt)=>window.cutTick(dt,0,present,bodyDt);
+ try{await new Promise(resolve=>{const start=performance.now(),tick=()=>{if(performance.now()-start<2200)requestAnimationFrame(tick);else resolve();};requestAnimationFrame(tick);});}finally{g.step=()=>{};g.renderer.drawScene=draw;}
+ const frames=times.slice(9).map((t,i)=>t-times[i+8]).sort((a,b)=>a-b);
+ const info=g.renderer.webgl.info;return{phase:g.pvc.phase,backend:g.renderer.webgl.backend.isWebGPUBackend?'WebGPU':g.renderer.webgl.backend.isWebGLBackend?'WebGL':'unknown',meanMs:samples.reduce((a,b)=>a+b,0)/samples.length,p95Ms:samples[114],maxMs:samples.at(-1),renderedFrames:times.length,frameP95Ms:frames[Math.floor(frames.length*.95)],frameMaxMs:frames.at(-1),stallsOver50Ms:frames.filter(t=>t>50).length,geometries:info.memory.geometries,textures:info.memory.textures,calls:info.render.calls,triangles:info.render.triangles};
 });}
