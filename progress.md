@@ -1,5 +1,15 @@
 Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web game named WIRE THE HOUSE, based on real Cyprus residential first-fix practices, editable in Web Game Studio, playable on desktop/mobile, deployed to arisconstantinou/Electrical-Game via GitHub Pages, and ending at FIRST FIX COMPLETE without cable pulling.
 
+## 2026-09-27 · Concrete mixer transport-wheel direction
+
+- Requested correction uses the user's actual game screenshot and orange mixer reference. Protected base: `889ef055c11dc90b1a0c0eb41e785e90d3429f51`; isolated worktree `stairs-fps-20260927`, branch `codex/mixer-wheel-axis`. Primary dirty checkout preserved; sole live integration listener remains on strict port 5365.
+- Reproduced the old X-oriented assembly in the production build, captured before editing, and recorded failing tyre/axle orientation checks. Corrected the complete assembly to Z beneath the motor-side upright: tyres, hubs, axle and both tripod legs. Wheelbarrow orientation, mixer dimensions, drum operation and materials are retained.
+- The corrected front tyre initially penetrated the existing sand surface by about 9.7 cm. Moving the whole conserved pile forward 50 cm gives both tyres their original 4 mm floor clearance while retaining the mixer location and rear doorway clearance. Sand shape and starting 600 kg stock are unchanged.
+- Build/typecheck/diff checks pass. `mixer-transport-ui` passes 10 checks in WebGL and WebGPU across desktop, portrait and landscape. The mixer remains 64 meshes / 54,424 triangles. Comparable frozen-scene PC WebGL P95: 9.0 ms before, 6.4 ms after; this is not physical-phone evidence or an FPS-improvement claim.
+- Actual develop-web-game client completed; its gameplay state and final screenshot were inspected, with no game errors and no owned browser processes left running. Native `sand-shoveling-ui` passes desktop, portrait, landscape and tablet: repeated 2.24 kg scoops, visible held load, bucket delivery, cut/stock conservation and mobile control clearance. Its stale removed stance-button selectors now reference the current joystick pads.
+- Delivery: fast-forward the verified integration checkout, check the real listener, then push the approved changes to main and verify Pages CI plus the actual public WebGPU game. Release receipt is stored under ignored `output/mixer-transport-release.json`. Historical Blender/GLB snapshots were not regenerated; the edited runtime source remains the named procedural assembly.
+- Usage checkpoint: Codex account weekly use measured at 10%; task-attributable use and credits are unavailable. No paid model/asset service, dependency installation or extra agent was used.
+
 ## 2026-09-27 · Wall and column depth
 
 - Approved specification: bare brick 10 cm, future plaster 2.5 cm on each face, finished wall 15 cm, centred concrete column 15 cm. Current raw columns project 2.5 cm on BOTH faces; no visible plaster added. Larger sizes remain available in the editor.

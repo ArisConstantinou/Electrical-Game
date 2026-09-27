@@ -57,8 +57,9 @@ function copies(parent:THREE.Object3D,name:string,geo:THREE.BufferGeometry,mat:T
   const m=new THREE.InstancedMesh(geo,mat,transforms.length);m.name=name;m.userData.studioEntityId=`equipment:${parent.name}:${name}`;
   transforms.forEach((t,i)=>m.setMatrixAt(i,t));m.castShadow=true;m.receiveShadow=true;parent.add(m);
 }
-function wheel(parent:THREE.Object3D,name:string,r:number,width:number,at:V,tread:boolean):void {
-  const g=group(name);g.position.set(...at);parent.add(g);g.rotation.z=Math.PI/2;
+function wheel(parent:THREE.Object3D,name:string,r:number,width:number,at:V,tread:boolean,axis:'x'|'z'='x'):void {
+  const g=group(name);g.position.set(...at);parent.add(g);
+  if(axis==='z')g.rotation.x=Math.PI/2;else g.rotation.z=Math.PI/2;
   const rubber=paint(0x202322,.86,0),rim=paint(0xaeb4b2,.3,.8),black=paint(0x353936,.5,.6);
   const profile=[[r*.55,-width*.38],[r*.71,-width*.52],[r*.88,-width*.48],[r*.98,-width*.30],[r,0],[r*.98,width*.30],[r*.88,width*.48],[r*.71,width*.52],[r*.55,width*.38],[r*.55,-width*.38]];
   lathe(g,`${name}-rubber-carcass`,profile,rubber);
@@ -172,13 +173,15 @@ export function createConcreteMixer():THREE.Group {
   bar(frame,'orange-telescopic-post',[-.41,.40,-.22],[-.41,1.09,-.22],.024,orange,true);
   mesh(frame,'front-ground-foot',new THREE.BoxGeometry(.19,.012,.12),dark,[-.41,.014,-.22]);
   bar(frame,'rear-upright',[.40,.44,-.22],[.40,1.09,-.22],.027,orange,true);
-  bar(frame,'axle-crossmember',[.10,.172,.36],[.66,.172,.36],.016,dark);
-  for(const x of [.10,.66])bar(frame,`rear-tripod-leg-${x}`,[.40,.47,-.22],[x,.172,.36],.027,dark,true);
+  // The transport axle crosses the motor-side upright, perpendicular to the
+  // front-foot / motor frame span. Keep the hubs and tripod on that same axle.
+  bar(frame,'axle-crossmember',[.40,.172,-.50],[.40,.172,.06],.016,dark);
+  for(const [id,z] of [[.10,-.50],[.66,.06]])bar(frame,`rear-tripod-leg-${id}`,[.40,.47,-.22],[.40,.172,z],.027,dark,true);
   bar(frame,'lower-orange-crossmember',[-.41,.44,-.22],[.40,.44,-.22],.025,orange,true);
   bar(frame,'front-diagonal-gusset',[-.41,.62,-.22],[-.22,.44,-.22],.013,orange,true);
   bar(frame,'rear-diagonal-gusset',[.40,.65,-.22],[.21,.44,-.22],.013,orange,true);
-  wheel(frame,'left-transport-wheel',.166,.060,[.08,.17,.36],false);
-  wheel(frame,'right-transport-wheel',.166,.060,[.68,.17,.36],false);
+  wheel(frame,'left-transport-wheel',.166,.060,[.40,.17,-.52],false,'z');
+  wheel(frame,'right-transport-wheel',.166,.060,[.40,.17,.08],false,'z');
   for(const s of [-1,1])bar(frame,`external-trunnion-${s}`,[s*.35,1.065,-.22],[s*.49,1.065,-.22],.029,steel);
   for(const x of [-.41,.40])mesh(frame,`bearing-support-${x}`,new RoundedBoxGeometry(.09,.125,.10,2,.009),orange,[x,1.04,-.22]);
   // Drum and cradle pivot together around the horizontal trunnions.
