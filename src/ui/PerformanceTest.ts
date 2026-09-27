@@ -10,7 +10,19 @@ export async function openPerformanceTest(root: HTMLElement): Promise<void> {
   begin.disabled = true;
   close.onclick = () => location.assign(import.meta.env.BASE_URL);
   const recorderUrl = `${import.meta.env.BASE_URL}performance/recorder.js`;
-  try { await import(/* @vite-ignore */ recorderUrl); begin.disabled = false; }
+  try {
+    // Native module loading keeps public JS external in both Vite and Pages.
+    // Vite rewrites dynamic import variables with ?import, which rejects public files.
+    await new Promise<void>((resolve, reject) => {
+      const script = document.createElement('script');
+      script.type = 'module';
+      script.src = recorderUrl;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error('Performance recorder unavailable'));
+      root.append(script);
+    });
+    begin.disabled = false;
+  }
   catch (error) {
     console.error('Performance test could not load', error);
     root.querySelector('#status')!.textContent = 'Performance test could not load. Return to the main menu and try again.';
