@@ -27,12 +27,16 @@ export function fitColumns(root: THREE.Object3D, walls: readonly THREE.Group[] =
     const oldBounds = new THREE.Box3().setFromObject(mesh),oldSize = oldBounds.getSize(new THREE.Vector3());
     const centre = oldBounds.getCenter(new THREE.Vector3());
     const matches = new Map<'x'|'z', { distance: number; centre: number }>();
+    // Some room supports retain the old, wider shell's centre (up to 22.5 cm
+    // from the current 10 cm masonry). Fit those to the nearest wall as well.
+    // Opening jambs/reveals use the tighter range to retain their clear span.
+    const wallReach = /\b(column|support|supporting)\b/i.test(mesh.name) ? .25 : .18;
     for (const wall of walls) {
       if (oldBounds.max.y <= wall.position.y + .01 ||
           oldBounds.min.y >= wall.position.y + (wall.userData.height ?? 3) - .01) continue;
       const normal = wall.userData.alongX ? 'z' : 'x', along = normal === 'z' ? 'x' : 'z';
       const distance = Math.abs(centre[normal] - wall.position[normal]);
-      if (distance > .18 || Math.abs(centre[along] - wall.position[along]) > wall.userData.length / 2 + .18) continue;
+      if (distance > wallReach || Math.abs(centre[along] - wall.position[along]) > wall.userData.length / 2 + .18) continue;
       if (!matches.has(normal) || matches.get(normal)!.distance > distance) matches.set(normal, { distance, centre: wall.position[normal] });
     }
     const axes: ('x'|'z')[] = mesh.userData.constructionColumnAxes ?? (matches.size ? [...matches.keys()] : ['z']);
