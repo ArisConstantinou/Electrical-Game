@@ -7,8 +7,8 @@ import {blockPointerLock} from './browser-safety.mjs';
 
 const baseline=process.argv.includes('--baseline'),live=process.argv.includes('--live');
 const out=process.env.BEND_QA_OUTPUT??`output/bending-indicators/${baseline?'before':live?'live':'after'}`;
-const url='http://127.0.0.1:5365/Electrical-Game/';await mkdir(out,{recursive:true});
-const report={baseline,live,errors:[],checks:[],viewports:[],performance:[],physicalPhone:false};
+const url=process.env.BEND_QA_URL??'http://127.0.0.1:5365/Electrical-Game/';await mkdir(out,{recursive:true});
+const report={url,baseline,live,errors:[],checks:[],viewports:[],performance:[],physicalPhone:false};
 // Only this test browser sees the candidate's compiled code. Unchanged public
 // assets use the existing, identified listener; no second server/port is used.
 async function candidate(context){
