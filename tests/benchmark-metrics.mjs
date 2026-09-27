@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {stats,worstWindow} from '../public/review/performance/metrics.js';
+const slow=stats([16,16,378,16]);
+assert.equal(slow.minInstantFPS,2.6,'378 ms must explicitly expose the approximately 3 FPS instant');
+assert.equal(slow.maxMs,378);
+const stalled={start:0,end:4000,times:[16,32,48,64,80,96,112,128,144,160]};
+assert.equal(worstWindow([stalled],1000).fps,0,'No-frame tail counts as zero FPS');
+assert.equal(worstWindow([{start:0,end:1000,times:Array.from({length:60},(_,i)=>(i+1)*1000/60)}],1000).fps,60);
+assert.equal(worstWindow([{start:0,end:400,times:[16]},{start:3000,end:3300,times:[3016]}],500),null,'Hidden time cannot form a measured window');
+console.log('Benchmark instantaneous, rolling, stalled-tail and lifecycle-window metrics passed');

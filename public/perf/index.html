@@ -2,7 +2,11 @@
 <html lang="el">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="refresh" content="0;url=../review/performance/">
+<script>
+const destination=new URL('../review/performance/',location.href);
+destination.search=location.search;
+location.replace(destination.href);
+</script>
 <title>Electrical-Game · Έλεγχος απόδοσης</title>
 <p><a href="../review/performance/">Άνοιγμα ελέγχου απόδοσης</a></p>
 </html>

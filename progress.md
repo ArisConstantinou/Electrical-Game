@@ -1,5 +1,14 @@
 Original prompt: Create a clean Vite/TypeScript/Three.js 3D first-person web game named WIRE THE HOUSE, based on real Cyprus residential first-fix practices, editable in Web Game Studio, playable on desktop/mobile, deployed to arisconstantinou/Electrical-Game via GitHub Pages, and ending at FIRST FIX COMPLETE without cable pulling.
 
+## 2026-09-27 · Automatic device benchmark
+
+- User supplied real iPhone data (47.9 FPS, maximum interval 378 ms, CPU maximum 356 ms, no graphics loss) and requested one-tap automatic startup/loading measurement, whole-scene tour, no countdown, captured problem moments and sharing. Approved the scoped local-report/sharing design, then explicitly requested commit and push.
+- Added a deferred-loading prompt, a normal-controller route, actual HUD and minimum/rolling FPS, bounded event thumbnails, local persistence and export/share. Protected the dirty primary checkout and the sole 5365 integration listener.
+- Route feasibility passes all 112 checkpoints, including L4/B2 and the ground-floor return. Initial exterior guesses collided with real courtyard/garage walls; the final route follows the garage doorway and existing foyer passage. No collision or gameplay geometry was changed.
+- Build and metric checks pass. The real-time portrait WebGL tour completes all 112 checkpoints and ten areas, with 23,445 measured intervals, 18 useful images and no browser errors. The injected-stall run exposes 1 FPS instantaneous and the actual HUD minimum of 3.4 FPS; these are diagnostic acceptance results, not ordinary-performance claims. Native screenshot copies were visually inspected.
+- Persistence/export/fresh capture, freeze/resume, missing-frame tails, WebGPU landscape blocked-route reporting, loading cancellation, delayed reload protection, FCP timing, result suspension and native-share/cancellation/download fallback pass. The actual develop-web-game client reaches the automatic tour with inspected screenshot/state and no error artifact. All owned browser sessions close cleanly.
+- This benchmark does not establish constant 60 FPS or physical iPhone correctness by itself. Publication verification and device-level follow-up remain pending at this checkpoint. Details: docs/AUTOMATIC_BENCHMARK.md.
+
 ## 2026-09-27 · Stair-view frame deadline correction
 
 - Isolated from public `619380c` on `codex/stairs-fps-20260927`; primary dirty work and the sole 5365 listener are protected. Candidate tests intercept the existing origin's requests rather than replacing the shared preview.

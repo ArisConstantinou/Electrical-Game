@@ -1,114 +1,179 @@
+import {number,stats,worstWindow} from './metrics.js';
+import {createTour} from './tour.js';
 const $=id=>document.getElementById(id),frame=$('game'),panel=$('panel');
 const gameURL=new URL('../../',location.href);
-// The same route and existing device settings are used; no quality overrides.
 for(const key of ['renderer','level'])if(new URL(location.href).searchParams.has(key))gameURL.searchParams.set(key,new URL(location.href).searchParams.get(key));
-frame.src=gameURL.href;
-let active=false,game=null,report=null,timer=null,originalStep,originalDraw,wrappedStep,wrappedDraw,pendingCPU=0,last=0,first=0;
-let samples=[],events=[],errors=[],disposers=[],startedAt=0,activeStep=null;
-let diagnostics=[],heartbeat=0,heartbeatAt=0,heartbeatRequest=0,visibleMs=0,visibleAt=0,presentations=0,stallAt=0,longestGap=0;
-const number=value=>Math.round(value*10)/10;
-const stats=values=>{
- if(!values.length)return null;
- const sorted=[...values].sort((a,b)=>a-b),mean=values.reduce((a,b)=>a+b,0)/values.length;
- return {count:values.length,meanMs:number(mean),fps:number(1000/mean),p95Ms:number(sorted[Math.min(sorted.length-1,Math.ceil(sorted.length*.95)-1)]),maxMs:number(sorted.at(-1)),over50ms:values.filter(v=>v>50).length};
-};
+let active=false,game=null,report=null,timer=null,startedAt=0,run=0,tour=null;
+let samples=[],events=[],errors=[],diagnostics=[],checkpoints=[],captures=[],hudSamples=[],segments=[],loading={},settings={};
+let disposers=[],pendingCPU=0,last=0,first=0,activeStep=null,visibleMs=0,visibleAt=0,presentations=0,longestGap=0,stallAt=0;
+let heartbeat=0,heartbeatAt=0,heartbeatRequest=0,currentSegment=null,currentDocument=null,previousDocument=null,bootAttempted=false;
+let lastCaptureAt=-Infinity,captureRequest=null,captureBytes=0,captureCost=0,captureNextMs=0,captureFailure='',hudFPS=null,restoreRuntime=()=>{},hiddenAt=0,loadingHiddenMs=0;
+const elapsed=()=>performance.now()-startedAt;
+const eligible=()=>!!game?.started&&!document.hidden&&!frame.contentDocument?.hidden&&!game.lifecyclePaused;
+function accountTime(){const now=performance.now();if(visibleAt)visibleMs+=now-visibleAt;visibleAt=first&&eligible()?now:0;}
+function closeSegment(){if(currentSegment){currentSegment.end=elapsed();currentSegment=null;}}
+function note(type,detail=''){
+ events.push({atMs:number(elapsed()),type,detail});
+ if(['hidden','visible','freeze','resume'].includes(type)){accountTime();closeSegment();last=0;pendingCPU=0;visibleAt=0;stallAt=0;}
+}
+function listen(target,type,handler){target.addEventListener(type,handler);disposers.push(()=>target.removeEventListener(type,handler));}
 function area(){
+ if(!game)return 'Φόρτωση';
  const p=game.player,y=p.camera.position.y-p.eyeHeight,x=p.camera.position.x,z=p.camera.position.z;
  if(y< -5)return 'B2';if(y< -1)return 'B1';if(y>1)return `L${Math.min(4,Math.max(1,Math.round(y/3.3)))}`;
  if(x>9&&z>6&&z<16)return 'Αυλή';if(z>5&&x<9)return 'Φουαγιέ / σκάλα';if(Math.abs(x)<4&&Math.abs(z)<4)return 'Αρχικό δωμάτιο';return 'Εξωτερικός χώρος';
 }
-function note(type,detail=''){
- events.push({atMs:number(performance.now()-startedAt),type,detail});
- if(['hidden','visible','freeze','resume'].includes(type)){accountTime();last=0;pendingCPU=0;visibleAt=0;stallAt=0;}
-}
-const eligible=()=>game.started&&!document.hidden&&!frame.contentDocument.hidden&&!game.lifecyclePaused;
-function accountTime(){const now=performance.now();if(visibleAt)visibleMs+=now-visibleAt;visibleAt=first&&eligible()?now:0;}
 function snapshot(){
  accountTime();const now=performance.now(),gap=last&&eligible()?now-last:0;longestGap=Math.max(longestGap,gap);
- const state={atMs:number(now-startedAt),area:area(),gapMs:number(gap),childAnimationFrames:heartbeat,childAnimationGapMs:heartbeatAt?number(now-heartbeatAt):null,parentVisibility:document.visibilityState,gameVisibility:frame.contentDocument.visibilityState,game:{started:game.started,ready:game.isReadyForStart,paused:game.lifecyclePaused,animationFrame:game.animationFrame,waterPreparing:!!game.waterProTask,generation:game.lifecycleGeneration},renderer:{pending:game.renderer.framePending,error:game.renderer.renderError,...game.renderer.lifecycleTelemetry}};
- if(diagnostics.length<240)diagnostics.push(state);
- if(gap>2000&&!stallAt){stallAt=last;note('rendering-stalled',state);}
+ const state={atMs:number(elapsed()),area:area(),gapMs:number(gap),childAnimationFrames:heartbeat,childAnimationGapMs:heartbeatAt?number(now-heartbeatAt):null,parentVisibility:document.visibilityState,gameVisibility:frame.contentDocument?.visibilityState,game:game?{started:game.started,ready:game.isReadyForStart,paused:game.lifecyclePaused,animationFrame:game.animationFrame,waterPreparing:!!game.waterProTask,generation:game.lifecycleGeneration}:null,renderer:game?{pending:game.renderer.framePending,error:game.renderer.renderError,...game.renderer.lifecycleTelemetry}:null};
+ if(diagnostics.length<1800)diagnostics.push(state);
+ if(gap>2000&&!stallAt){stallAt=last;note('rendering-stalled',state);captureRequest={reason:'Χωρίς νέα καρέ',frameMs:gap};}
  if(gap<=2000&&stallAt){note('rendering-recovered',{gapMs:number(now-stallAt)});stallAt=0;}
  return state;
 }
-function finish(){
- if(!active)return;
- const finalState=snapshot();
- active=false;clearInterval(timer);timer=null;
- frame.contentWindow.cancelAnimationFrame(heartbeatRequest);
- if(game.step===wrappedStep)game.step=originalStep;
- if(game.renderer.drawScene===wrappedDraw)game.renderer.drawScene=originalDraw;
- for(const dispose of disposers)dispose();disposers=[];
- const renderer=game.renderer,canvas=renderer.webgl.domElement,backend=renderer.webgl.backend;
- const byArea=Object.fromEntries([...new Set(samples.map(s=>s.area))].map(name=>[name,stats(samples.filter(s=>s.area===name).map(s=>s.frameMs))]));
- report={schema:2,createdAt:new Date().toISOString(),gameURL:gameURL.href,buildScripts:[...frame.contentDocument.querySelectorAll('script[src]')].map(s=>s.src),device:{userAgent:navigator.userAgent,viewport:{width:innerWidth,height:innerHeight},devicePixelRatio,canvas:{width:canvas.width,height:canvas.height},backend:backend.isWebGLBackend?'WebGL2':'WebGPU'},durationMs:number(performance.now()-startedAt),visiblePlayingMs:number(visibleMs),effectiveFPS:visibleMs?number(presentations*1000/visibleMs):null,longestPresentationGapMs:number(longestGap),finalState,diagnostics,method:'Successful scene submissions, not isolated GPU completion. Interval statistics describe received frames only. Effective FPS includes time without new submissions while visible and playing, including a frozen tail. Paused/background time is excluded. One independent child animation heartbeat and one diagnostic snapshot per second.',frames:stats(samples.map(s=>s.frameMs)),cpu:stats(samples.map(s=>s.cpuMs)),byArea,errors:[...errors,...renderer.renderError?[renderer.renderError]:[]],events,samples};
- panel.classList.remove('compact');panel.classList.add('completed');$('stop').hidden=true;$('begin').hidden=false;$('begin').textContent='Νέα καταγραφή';$('results').hidden=false;$('download').hidden=!samples.length;$('copy').hidden=!samples.length;
- $('status').textContent=finalState.gapMs>2000?'Το παιχνίδι σταμάτησε να δίνει νέα καρέ. Η διάγνωση αποθηκεύτηκε.':samples.length?'Η καταγραφή ολοκληρώθηκε.':'Δεν καταγράφηκαν εικόνες παιχνιδιού. Πάτησε START και ξαναδοκίμασε.';
- report.slowestFrames=[...samples].sort((a,b)=>b.frameMs-a.frameMs).slice(0,5);
- const s=report.frames;$('summary').textContent=s?`${report.effectiveFPS} FPS συνολικά · ${s.count} διαστήματα καρέ\nΚαρέ που ελήφθησαν: ${s.fps} FPS\nP95: ${s.p95Ms} ms · μέγιστο: ${s.maxMs} ms\n${s.over50ms} καρέ πάνω από 50 ms\nCPU παιχνιδιού: P95 ${report.cpu.p95Ms} ms · μέγιστο ${report.cpu.maxMs} ms\nΜεγαλύτερο διάστημα χωρίς νέο καρέ: ${number(longestGap/1000)} s`:'Χωρίς δείγματα.';
- $('rows').replaceChildren();for(const [name,s]of Object.entries(byArea)){const row=document.createElement('tr');for(const text of [name,s.fps,`${s.p95Ms} / ${s.maxMs} ms`]){const cell=document.createElement('td');cell.textContent=text;row.append(cell);}$('rows').append(row);}
+// Bounded event-driven thumbnails; no continuous video encoder or readback loop.
+// Drawing and JPEG encoding costs remain visible in raw metrics and are labelled.
+function capture(reason,frameMs=0,sample=null){
+ if(!active||!game||captureFailure||elapsed()-lastCaptureAt<3000)return;
+ const before=performance.now();lastCaptureAt=elapsed();
+ try{
+  const source=game.renderer.webgl.domElement,canvas=document.createElement('canvas');
+  canvas.width=Math.min(320,source.width);canvas.height=Math.round(source.height*canvas.width/source.width);
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(source,0,0,canvas.width,canvas.height);
+  const pixels=ctx.getImageData(0,0,canvas.width,canvas.height).data;
+  let lit=0;for(let i=0;i<pixels.length;i+=64)if(pixels[i]+pixels[i+1]+pixels[i+2]>24)lit++;
+  if(!lit){note('capture-unavailable','Ο browser επέστρεψε κενή εικόνα. Οι μετρήσεις συνεχίζονται.');captureFailure='Ο browser δεν επέτρεψε χρήσιμη λήψη του καμβά.';return;}
+  const dataURL=canvas.toDataURL('image/jpeg',.65),cost=performance.now()-before;
+  const item={atMs:number(elapsed()),reason,frameMs:number(frameMs),area:area(),checkpoint:tour?.current?.label,position:game.player.camera.position.toArray().map(number),yaw:number(game.player.yaw),pitch:number(game.player.pitch),width:canvas.width,height:canvas.height,captureCpuMs:number(cost),dataURL};
+  // Keep the strongest events plus route views, bounded to 18 thumbnails / 3 MB.
+  if(captures.length>=18){const weakest=captures.reduce((best,c,i)=>c.frameMs<captures[best].frameMs?i:best,0);if(frameMs<=captures[weakest].frameMs)return;captureBytes-=captures[weakest].dataURL.length;captures.splice(weakest,1);}
+  if(captureBytes+dataURL.length>3*1024*1024){note('capture-limit','Οι εικόνες έφτασαν το όριο αποθήκευσης.');return;}
+  captureBytes+=dataURL.length;captures.push(item);
+ }catch(error){captureFailure=String(error);note('capture-unavailable',captureFailure);}
+ finally{const cost=performance.now()-before;captureCost+=cost;captureNextMs+=cost;if(sample)sample.captureCpuMs=number(cost);}
 }
-function start(){
- if(!game||active)return;
- active=true;report=null;samples=[];events=[];errors=[];pendingCPU=0;last=0;first=0;startedAt=performance.now();
- diagnostics=[];heartbeat=0;heartbeatAt=0;visibleMs=0;visibleAt=0;presentations=0;stallAt=0;longestGap=0;
- panel.classList.add('compact');$('stop').hidden=false;$('results').hidden=true;
- originalStep=game.step;originalDraw=game.renderer.drawScene;
- wrappedStep=function(...args){
+function installRuntime(g){
+ game=g;const originalStep=g.step,originalDraw=g.renderer.drawScene,originalFps=g.hud.updateFps;
+ const wrappedFps=function(value){hudFPS=number(value);hudSamples.push({atMs:number(elapsed()),fps:number(value),area:area(),checkpoint:tour?.current?.label});return originalFps.call(this,value);};
+ const wrappedStep=function(...args){
+  if(active&&eligible())tour?.update(args[0]);
   const current={begin:performance.now(),previousCPU:pendingCPU,drawn:false,sample:null};activeStep=current;
-  try{return originalStep.apply(this,args);}finally{
-   const elapsed=performance.now()-current.begin;
-   if(current.drawn){if(current.sample)current.sample.cpuMs=number(current.previousCPU+elapsed);pendingCPU=0;}
-   else pendingCPU+=elapsed;
-   activeStep=null;
-  }
+  try{return originalStep.apply(this,args);}finally{const spent=performance.now()-current.begin;if(current.drawn){if(current.sample)current.sample.cpuMs=number(current.previousCPU+spent);pendingCPU=0;}else pendingCPU+=spent;activeStep=null;}
  };
- wrappedDraw=function(...args){
-  const began=performance.now(),cpuBeforeDraw=pendingCPU,shadowRequested=!!game.room.sun?.shadow.needsUpdate;
+ const wrappedDraw=function(...args){
+  const began=performance.now(),cpuBefore=pendingCPU,shadowRequested=!!g.room.sun?.shadow.needsUpdate;
   const result=originalDraw.apply(this,args);
-  {
-   const now=performance.now();if(active&&game.started&&!document.hidden&&!frame.contentDocument.hidden){
-    if(!first){first=now;visibleAt=now;note('first-game-frame');}presentations++;
-    if(last)longestGap=Math.max(longestGap,now-last);
-    if(last&&samples.length<30000){const p=game.player.camera.position,info=game.renderer.webgl.info,sample={atMs:number(now-startedAt),frameMs:number(now-last),cpuMs:number(cpuBeforeDraw+now-began),area:area(),position:[number(p.x),number(p.y),number(p.z)],tool:game.selectedTool,drawCalls:info.render.calls,triangles:info.render.triangles,geometries:info.memory.geometries,textures:info.memory.textures,shadowRequested};samples.push(sample);if(activeStep)activeStep.sample=sample;}
-    last=now;
-   }
-   if(activeStep)activeStep.drawn=true;
-   pendingCPU=0;
+  if(active&&eligible()){
+   const now=performance.now(),at=elapsed();
+   if(!first){first=now;visibleAt=now;loading.firstGameFrameMs=number(at);note('first-game-frame');}
+   if(!currentSegment){currentSegment={start:at,end:at,times:[]};segments.push(currentSegment);}
+   currentSegment.times.push(at);currentSegment.end=at;presentations++;
+   if(last)longestGap=Math.max(longestGap,now-last);
+   let sample=null;
+   if(last){const p=g.player.camera.position,info=g.renderer.webgl.info;sample={atMs:number(at),frameMs:number(now-last),cpuMs:number(cpuBefore+now-began),instantFPS:number(1000/(now-last)),hudFPS,area:area(),checkpoint:tour?.current?.label,position:[number(p.x),number(p.y),number(p.z)],yaw:number(g.player.yaw),pitch:number(g.player.pitch),tool:g.selectedTool,drawCalls:info.render.calls,triangles:info.render.triangles,geometries:info.memory.geometries,textures:info.memory.textures,shadowRequested,previousCaptureCpuMs:number(captureNextMs)};captureNextMs=0;samples.push(sample);if(activeStep)activeStep.sample=sample;}
+   last=now;
+   if(sample?.frameMs>=100)capture('Καθυστέρηση καρέ',sample.frameMs,sample);
+   else if(captureRequest){capture(captureRequest.reason,captureRequest.frameMs,sample);captureRequest=null;}
+   if(samples.length>=60000)queueMicrotask(()=>finish('capacity-limit'));
   }
-  return result;
+  if(activeStep)activeStep.drawn=true;pendingCPU=0;return result;
  };
- game.step=wrappedStep;game.renderer.drawScene=wrappedDraw;
- const listen=(target,type,handler)=>{target.addEventListener(type,handler);disposers.push(()=>target.removeEventListener(type,handler));};
- listen(document,'visibilitychange',()=>note(document.hidden?'hidden':'visible'));
- listen(frame.contentDocument,'visibilitychange',()=>note(frame.contentDocument.hidden?'hidden':'visible'));
- for(const type of ['freeze','resume'])listen(frame.contentDocument,type,()=>note(type));
- listen(frame.contentWindow,'error',event=>{errors.push(String(event.message));note('error',String(event.message));});
- listen(frame.contentWindow,'unhandledrejection',event=>{errors.push(String(event.reason));note('unhandledrejection',String(event.reason));});
- for(const type of ['webglcontextlost','webglcontextrestored'])listen(game.renderer.webgl.domElement,type,()=>note(type));
- listen(frame.contentWindow,'wirehouse:graphics-lost',()=>note('graphics-lost'));
+ g.step=wrappedStep;g.renderer.drawScene=wrappedDraw;g.hud.updateFps=wrappedFps;
+ restoreRuntime=()=>{if(g.step===wrappedStep)g.step=originalStep;if(g.renderer.drawScene===wrappedDraw)g.renderer.drawScene=originalDraw;if(g.hud.updateFps===wrappedFps)g.hud.updateFps=originalFps;};
  const beat=()=>{if(!active)return;heartbeat++;heartbeatAt=performance.now();heartbeatRequest=frame.contentWindow.requestAnimationFrame(beat);};
  heartbeatRequest=frame.contentWindow.requestAnimationFrame(beat);
- note('recording-started');
- timer=setInterval(()=>{
-  const state=snapshot();
-  if(!first)$('status').textContent='Πάτησε START στο παιχνίδι';
-  else{const seconds=Math.max(0,120-Math.floor((performance.now()-first)/1000));$('status').textContent=state.gapMs>2000?`Πάγωμα · ${Math.floor(state.gapMs/1000)}s χωρίς καρέ`:game.lifecyclePaused?'Το παιχνίδι είναι σε παύση':`Καταγραφή · ${seconds}s`;
-   if(seconds===0||samples.length>=30000)finish();}
- },1000);
- $('status').textContent=game.started?'Καταγραφή · 120s':'Πάτησε START στο παιχνίδι';
+ settings={apprentices:frame.contentDocument.querySelector('#apprentice-count')?.value,tool:g.selectedTool};
+ tour=createTour(g,checkpoint=>{
+  checkpoints.push({atMs:number(elapsed()),...checkpoint});
+  if(checkpoint.kind==='view')captureRequest={reason:checkpoint.label,frameMs:0};
+ },()=>queueMicrotask(()=>finish('completed')),failure=>{note('tour-blocked',failure);queueMicrotask(()=>finish('blocked'));});
+ listen(g.renderer.webgl.domElement,'webglcontextlost',()=>{note('webglcontextlost');captureRequest={reason:'Απώλεια γραφικών',frameMs:0};});
+ listen(g.renderer.webgl.domElement,'webglcontextrestored',()=>note('webglcontextrestored'));
+ listen(frame.contentWindow,'wirehouse:graphics-lost',()=>note('graphics-lost'));
+ note('game-ready');loading.readyMs=number(elapsed());
+ if(!g.room.mansionWing||gameURL.searchParams.has('level')){note('unsupported-route','Η σταθερή διαδρομή απαιτεί το αρχικό mansion.');finish('unsupported-route');return;}
+ loading.startRequestedMs=number(elapsed());frame.contentDocument.querySelector('#start-button').click();
 }
-$('begin').onclick=start;$('stop').onclick=finish;
-$('close').onclick=()=>location.assign(gameURL.href);
-$('download').onclick=async()=>{
+function monitor(){
+ if(!active)return;
+ try{
+  const doc=frame.contentDocument;
+  if(!doc||doc===previousDocument)return; // A slow reload must not attach the preceding game's runtime.
+  if(doc&&doc!==currentDocument&&doc.URL!=='about:blank'){
+   currentDocument=doc;
+   listen(doc,'visibilitychange',()=>note(doc.hidden?'hidden':'visible'));
+   for(const type of ['freeze','resume'])listen(doc,type,()=>note(type));
+   listen(frame.contentWindow,'error',event=>{const message=String(event.message||event.target?.src||'Resource load failed');errors.push(message);note('error',message);captureRequest={reason:'Σφάλμα',frameMs:0};});
+   listen(frame.contentWindow,'unhandledrejection',event=>{errors.push(String(event.reason));note('unhandledrejection',String(event.reason));});
+  }
+  if(!loading.menuVisibleMs&&doc?.querySelector('#start-screen')){loading.menuVisibleMs=number(elapsed());note('menu-visible');}
+  const progress=doc?.querySelector('#start-load-percent')?.value;
+  if(progress&&progress!==loading.progress?.at(-1)?.value)(loading.progress??=[]).push({atMs:number(elapsed()),value:progress});
+  if(!game){
+   $('status').textContent=`Φόρτωση παιχνιδιού${progress?' · '+progress:''}`;
+   if(progress==='LOAD FAILED'){finish('load-failed');return;}
+   const g=frame.contentWindow.__wireTheHouse;
+   if(g?.isReadyForStart&&!bootAttempted){bootAttempted=true;installRuntime(g);}
+   if(elapsed()-loadingHiddenMs>180000&&!document.hidden)finish('load-timeout');
+   return;
+  }
+  const gap=last&&eligible()?performance.now()-last:0;
+  $('status').textContent=gap>2000?`Πάγωμα · ${Math.floor(gap/1000)}s χωρίς καρέ`:game.lifecyclePaused||document.hidden?'Σε παύση · η διαδρομή θα συνεχιστεί':`${tour.current?.label??'Ολοκλήρωση'} · ${Math.round(tour.index/tour.total*100)}%`;
+  $('route-progress').value=tour.index/tour.total;
+  if(gap>15000){capture('Χωρίς νέα καρέ',gap);finish('render-stalled');}
+ }catch(error){errors.push(String(error));finish('load-failed');}
+}
+function start(){
+ if(active)return;run++;active=true;game=null;report=null;tour=null;startedAt=performance.now();
+ samples=[];events=[];errors=[];diagnostics=[];checkpoints=[];captures=[];hudSamples=[];segments=[];loading={};settings={};
+ pendingCPU=0;last=0;first=0;visibleMs=0;visibleAt=0;presentations=0;longestGap=0;stallAt=0;heartbeat=0;heartbeatAt=0;currentSegment=null;currentDocument=null;bootAttempted=false;
+ captureBytes=0;captureCost=0;captureNextMs=0;lastCaptureAt=-Infinity;captureRequest=null;captureFailure='';hudFPS=null;restoreRuntime=()=>{};hiddenAt=0;loadingHiddenMs=0;
+ panel.classList.remove('completed');panel.classList.add('compact');frame.hidden=false;frame.style.pointerEvents='none';
+ $('stop').hidden=false;$('results').hidden=true;$('route-progress').hidden=false;$('status').textContent='Φόρτωση παιχνιδιού…';
+ listen(document,'visibilitychange',()=>{if(document.hidden)hiddenAt=performance.now();else if(hiddenAt){loadingHiddenMs+=performance.now()-hiddenAt;hiddenAt=0;}note(document.hidden?'hidden':'visible');});
+ listen(frame,'load',()=>{if(!active)return;loading.documentLoadedMs=number(elapsed());note('document-loaded');monitor();});
+ note('recording-started');previousDocument=frame.contentDocument;frame.src=gameURL.href;
+ let diagnosticsAt=0;
+ timer=setInterval(()=>{monitor();if(active&&elapsed()-diagnosticsAt>=1000){snapshot();diagnosticsAt=elapsed();}},100);
+}
+function finish(outcome='stopped'){
+ if(!active)return;
+ const finalState=snapshot();closeSegment();active=false;clearInterval(timer);timer=null;tour?.stop();frame.style.pointerEvents='auto';
+ if(game)frame.contentWindow.cancelAnimationFrame(heartbeatRequest);restoreRuntime();for(const dispose of disposers)dispose();disposers=[];
+ const renderer=game?.renderer,canvas=renderer?.webgl.domElement,backend=renderer?.webgl.backend;
+ let navigation=null,resources=[];
+ try{const perf=frame.contentWindow.performance;navigation=perf.getEntriesByType('navigation')[0]?.toJSON()??null;resources=perf.getEntriesByType('resource').map(e=>({name:e.name,durationMs:number(e.duration),transferSize:e.transferSize,encodedBodySize:e.encodedBodySize})).sort((a,b)=>b.durationMs-a.durationMs).slice(0,20);const fcp=perf.getEntriesByName('first-contentful-paint')[0];if(fcp)loading.firstContentfulPaintMs=number(perf.timeOrigin-performance.timeOrigin-startedAt+fcp.startTime);}catch{}
+ const byArea=Object.fromEntries([...new Set(samples.map(s=>s.area))].map(name=>[name,stats(samples.filter(s=>s.area===name).map(s=>s.frameMs))]));
+ report={schema:3,createdAt:new Date().toISOString(),outcome,gameURL:gameURL.href,buildScripts:[...frame.contentDocument?.querySelectorAll('script[src]')??[]].map(s=>s.src),device:{userAgent:navigator.userAgent,viewport:{width:innerWidth,height:innerHeight},devicePixelRatio,canvas:canvas?{width:canvas.width,height:canvas.height}:null,backend:backend?(backend.isWebGLBackend?'WebGL2':'WebGPU'):null},settings,loading:{...loading,hiddenMs:number(loadingHiddenMs),navigation,slowestResources:resources},durationMs:number(elapsed()),visiblePlayingMs:number(visibleMs),effectiveFPS:visibleMs?number(presentations*1000/visibleMs):null,longestPresentationGapMs:number(longestGap),worst500ms:worstWindow(segments,500),worst1000ms:worstWindow(segments,1000),hud:{minFPS:hudSamples.length?Math.min(...hudSamples.map(s=>s.fps)):null,samples:hudSamples},tour:{completed:outcome==='completed',reached:tour?.index??0,total:tour?.total??0,checkpoints},finalState,diagnostics,method:'Successful scene submissions, not isolated GPU completion. Raw intervals include labelled thumbnail overhead. Fixed 500/1000ms windows include no-frame tails. Background and paused segments are excluded. HUD FPS values use the actual game counter. Automatic tour uses normal player physics and collisions. Loading starts before iframe navigation; timings include this visit’s cache state.',frames:stats(samples.map(s=>s.frameMs)),cpu:stats(samples.map(s=>s.cpuMs)),byArea,errors:[...errors,...renderer?.renderError?[renderer.renderError]:[]],events,samples,slowestFrames:[...samples].sort((a,b)=>b.frameMs-a.frameMs).slice(0,20),slowFrames:samples.filter(s=>s.frameMs>=100),captures,capture:{count:captures.length,encodedBytes:captureBytes,totalCpuMs:number(captureCost),unavailable:captureFailure,limits:{width:320,images:18,bytes:3*1024*1024,minimumGapMs:3000}}};
+ // Measurement is finished; stop scene work while the evidence is reviewed.
+ game?.suspendLifecycle();
+ if(!game){frame.removeAttribute('src');frame.hidden=true;}
+ renderReport(report);persist(report).catch(error=>{$('capture-status').textContent+=' Η μόνιμη αποθήκευση δεν επιτράπηκε· χρησιμοποίησε Λήψη αναφοράς.';});
+}
+function renderReport(value){
+ panel.classList.remove('compact');panel.classList.add('completed');$('stop').hidden=true;$('begin').hidden=false;$('begin').textContent='ΝΕΟ BENCHMARK';$('results').hidden=false;for(const id of ['download','share','copy'])$(id).hidden=false;
+ const messages={completed:'Η αυτόματη διαδρομή ολοκληρώθηκε.',stopped:'Το benchmark διακόπηκε. Αποθηκεύτηκαν όσα μετρήθηκαν.',blocked:'Η διαδρομή εμποδίστηκε. Η θέση και οι συγκρούσεις καταγράφηκαν.','load-failed':'Η φόρτωση απέτυχε. Αποθηκεύτηκε η διάγνωση.','load-timeout':'Η φόρτωση δεν ολοκληρώθηκε. Αποθηκεύτηκε η διάγνωση.','render-stalled':'Το παιχνίδι σταμάτησε να δίνει νέα καρέ.','capacity-limit':'Συμπληρώθηκε το όριο δειγμάτων. Η διαδρομή είναι ημιτελής.','unsupported-route':'Η αυτόματη διαδρομή υποστηρίζει το αρχικό mansion.'};
+ $('status').textContent=messages[value.outcome]??value.outcome;
+ const s=value.frames,load=value.loading;
+ $('summary').textContent=`Μενού: ${load.menuVisibleMs==null?'μη διαθέσιμο':number(load.menuVisibleMs/1000)+' s'} · READY: ${load.readyMs==null?'μη διαθέσιμο':number(load.readyMs/1000)+' s'}\nΠρώτο καρέ παιχνιδιού: ${load.firstGameFrameMs==null?'μη διαθέσιμο':number(load.firstGameFrameMs/1000)+' s'}\n`+(s?`${value.effectiveFPS} FPS συνολικά · ${s.count} διαστήματα καρέ\nΕλάχιστα στιγμιαία: ${s.minInstantFPS} FPS · HUD: ${value.hud.minFPS??'μη διαθέσιμο'} FPS\nΧειρότερο 1 s: ${value.worst1000ms?.fps??'μη διαθέσιμο'} FPS\nP95: ${s.p95Ms} ms · μέγιστο: ${s.maxMs} ms\n${s.over50ms} καρέ πάνω από 50 ms\nCPU παιχνιδιού: P95 ${value.cpu.p95Ms} ms · μέγιστο ${value.cpu.maxMs} ms\nΜεγαλύτερο διάστημα χωρίς νέο καρέ: ${number(value.longestPresentationGapMs/1000)} s`:'Χωρίς καρέ παιχνιδιού. Η φόρτωση και τα σφάλματα καταγράφηκαν.');
+ $('rows').replaceChildren();for(const [name,s] of Object.entries(value.byArea)){const row=document.createElement('tr');for(const text of [name,`${s.fps} / ${s.minInstantFPS}`,`${s.p95Ms} / ${s.maxMs} ms`]){const cell=document.createElement('td');cell.textContent=text;row.append(cell);}$('rows').append(row);}
+ $('capture-status').textContent=value.capture.unavailable?`Λήψη εικόνων μη διαθέσιμη: ${value.capture.unavailable}`:`${value.captures.length} εικόνες · μετρημένο κόστος λήψεων ${value.capture.totalCpuMs} ms συνολικά.`;
+ $('captures').replaceChildren();for(const c of value.captures){const figure=document.createElement('figure'),img=document.createElement('img'),caption=document.createElement('figcaption');img.src=c.dataURL;img.alt=`${c.reason} · ${c.area}`;caption.textContent=`${c.area} · ${number(c.atMs/1000)} s · ${c.frameMs?c.frameMs+' ms':c.reason}`;figure.append(img,caption);$('captures').append(figure);}
+}
+async function database(){return new Promise((resolve,reject)=>{const request=indexedDB.open('electrical-game-benchmark',1);request.onupgradeneeded=()=>request.result.createObjectStore('reports');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});}
+async function persist(value){const db=await database();try{await new Promise((resolve,reject)=>{const tx=db.transaction('reports','readwrite');tx.objectStore('reports').put(value,'last');tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});}finally{db.close();}}
+function reportFile(){return new File([JSON.stringify(report,null,2)],`electrical-game-benchmark-${report.createdAt.replace(/[:.]/g,'-')}.json`,{type:'application/json'});}
+function download(){if(!report)return;const file=reportFile(),url=URL.createObjectURL(file),link=document.createElement('a');link.href=url;link.download=file.name;link.click();setTimeout(()=>URL.revokeObjectURL(url),30000);}
+$('begin').onclick=start;$('stop').onclick=()=>finish('stopped');$('close').onclick=()=>{if(active)finish('stopped');location.assign(gameURL.href);};$('download').onclick=download;
+$('share').onclick=async()=>{
  if(!report)return;
- const file=new File([JSON.stringify(report,null,2)],`electrical-game-performance-${Date.now()}.json`,{type:'application/json'});
- if(navigator.canShare?.({files:[file]})){try{await navigator.share({files:[file],title:'Electrical-Game performance'});return;}catch(error){if(error.name==='AbortError')return;}}
- const url=URL.createObjectURL(file),link=document.createElement('a');link.href=url;link.download=file.name;link.click();setTimeout(()=>URL.revokeObjectURL(url),30000);
+ const file=reportFile(),textFile=new File([JSON.stringify(report,null,2)],file.name.replace('.json','.txt'),{type:'text/plain'});
+ const files=[textFile,...report.captures.map((c,i)=>{const bytes=Uint8Array.from(atob(c.dataURL.split(',')[1]),v=>v.charCodeAt(0));return new File([bytes],`benchmark-${i+1}-${Math.round(c.atMs)}ms.jpg`,{type:'image/jpeg'});})];
+ if(navigator.canShare?.({files})){try{await navigator.share({files,title:'Electrical-Game benchmark'});$('status').textContent='Η κοινοποίηση παραδόθηκε στον browser.';return;}catch(error){if(error.name==='AbortError')return;}}
+ $('status').textContent='Η κοινοποίηση αρχείων δεν υποστηρίζεται εδώ. Γίνεται λήψη της πλήρους αναφοράς με τις εικόνες.';download();
 };
-$('copy').onclick=async()=>{if(!report?.frames)return;try{await navigator.clipboard.writeText(`${navigator.userAgent}\n${report.device.backend} · ${report.device.canvas.width}×${report.device.canvas.height}\nΈκδοση: ${report.buildScripts.join(', ')}\n${$('summary').textContent}\n${Object.entries(report.byArea).map(([name,s])=>`${name}: ${s.fps} FPS, P95 ${s.p95Ms}ms, max ${s.maxMs}ms`).join('\n')}\nΑργότερα καρέ: ${JSON.stringify(report.slowestFrames)}\nΔιάγνωση: ${JSON.stringify(report.finalState)}\nΣφάλματα: ${JSON.stringify(report.errors)}`);$('status').textContent='Οι αριθμοί και η διάγνωση αντιγράφηκαν.';}catch{$('status').textContent='Η αντιγραφή δεν επιτράπηκε. Χρησιμοποίησε την αποθήκευση αναφοράς.';}};
-const wait=setInterval(()=>{
- try{const g=frame.contentWindow.__wireTheHouse;if(!g?.isReadyForStart)return;game=g;clearInterval(wait);$('begin').disabled=false;$('status').textContent='Έτοιμο για καταγραφή.';}catch{$('status').textContent='Δεν μπορούμε να διαβάσουμε το παιχνίδι. Άνοιξε αυτή τη σελίδα από τον ίδιο ιστότοπο.';clearInterval(wait);}
-},500);
-// Read-only access for the local acceptance check; no generated performance data.
-window.performanceRecording={start,finish,get report(){return report;},get active(){return active;}};
+$('copy').onclick=async()=>{if(!report)return;try{await navigator.clipboard.writeText(`${navigator.userAgent}\n${report.device.backend??'μη διαθέσιμο'} · ${report.device.canvas?.width??'?'}×${report.device.canvas?.height??'?'}\nΈκδοση: ${report.buildScripts.join(', ')}\n${$('summary').textContent}\nΔιαδρομή: ${report.outcome} · ${report.tour.reached}/${report.tour.total}\n${Object.entries(report.byArea).map(([name,s])=>`${name}: ${s.fps} FPS, ελάχιστο ${s.minInstantFPS}, P95 ${s.p95Ms}ms, max ${s.maxMs}ms`).join('\n')}\nΑργότερα καρέ: ${JSON.stringify(report.slowestFrames)}\nΔιάγνωση: ${JSON.stringify(report.finalState)}\nΣφάλματα: ${JSON.stringify(report.errors)}`);$('status').textContent='Οι αριθμοί και η διάγνωση αντιγράφηκαν.';}catch{$('status').textContent='Η αντιγραφή δεν επιτράπηκε. Χρησιμοποίησε Λήψη αναφοράς.';}};
+// Inspectable acceptance hooks; no generated performance measurements.
+window.performanceRecording={start,finish,get report(){return report;},get active(){return active;},get tour(){return tour?{index:tour.index,total:tour.total,current:tour.current}:null;}};
+window.render_game_to_text=()=>JSON.stringify({mode:active?'benchmark':report?'results':'prompt',status:$('status').textContent,loading,tour:window.performanceRecording.tour,frames:samples.length,coordinates:'Game world metres: x east, y up, z north; the tour uses normal movement and collision.',game:game?JSON.parse(frame.contentWindow.render_game_to_text()):null});
+database().then(db=>{const request=db.transaction('reports').objectStore('reports').get('last');request.onsuccess=()=>{if(request.result&&!active&&!report&&run===0){report=request.result;renderReport(report);$('status').textContent='Η προηγούμενη αναφορά διατηρήθηκε στη συσκευή. Πάτησε ΝΕΟ BENCHMARK για νέα μέτρηση.';}db.close();};request.onerror=()=>db.close();}).catch(()=>{});
