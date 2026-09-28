@@ -57,23 +57,31 @@ receipts are retained only in ignored private
 Runtime hand IK/wire deformation are TypeScript, not baked GLB gameplay or
 Unreal import verification. The tool is a procedural reference interpretation.
 
-## Protected base and next action
+## Approved promotion (2026-09-28)
 
-Shared runtime remains `C:/Users/arz0r/.codex/worktrees/jump-controls-release/Electrical-Game`,
-commit `0d9f432`, PID 42244, `http://127.0.0.1:5365/Electrical-Game/`.
-The final start-worker-preview verification confirmed the same checkout;
-it was clean. The primary dirty checkout was not edited.
+The user approved the reviewed candidate. Focused implementation commit
+`0d27d44` was merged with the approved hammer and M18 releases into
+`bb79278`, fast-forwarded into the sole shared checkout, and pushed to
+`origin/main` without force. The existing listener kept port 5365:
+`http://127.0.0.1:5365/Electrical-Game/`. The primary dirty checkout was
+not edited.
 
-No candidate commit, push or live promotion occurred. AGENTS.md section 12
-requires approval for promotion, and the visual review preference requires
-approval before a major visual commit/push. Present the retained captures and
-ask whether to integrate and publish this concrete candidate. After approval:
-verify latest shared source, preserve newer approved changes and any dirty
-files, make the focused commit, integrate into the same listener, rerun actual
-served acceptance, then push/deploy only the agreed release and verify it.
-Never start a second Electrical-Game listener or change port 5365.
+The combined build passed model dimensions, unequal-depth wire anchors,
+three-layout rebar tying, three-layout wire-first installation, full 20-pipe
+workflow and M18 drilling/driver contact. The same scenarios passed on the
+actual live Vite checkout. One live wire-first hand-reach assertion failed on
+its first run and passed on the repeat; no reproducible defect was found.
+The live rebar test recorded 16.8 ms p95 frames in all three emulated layouts
+with no frame over 50 ms. GPU draw calls were unavailable. No physical
+iPhone/Safari test was performed.
 
-Recovery copies of the two source files before each approved base update are
-under ignored `output/rebar-pliers-wire/integration/` and
-`output/rebar-pliers-wire/integration-direct/`. Final uncommitted candidate
-source is in this managed worktree. Do not archive it while approval is pending.
+[Pages deployment run #174](https://github.com/ArisConstantinou/Electrical-Game/actions/runs/36379994245)
+succeeded for `bb79278`. The public HTML and bundle returned HTTP 200 and
+contained both new tool models; an actual public Chrome load started the game
+without page errors and exposed the 250 mm nippers and 1.6 mm held wire.
+The public URL is `https://arisconstantinou.github.io/Electrical-Game/`.
+
+Recovery copies from earlier base integration remain under ignored
+`output/rebar-pliers-wire/integration/` and
+`output/rebar-pliers-wire/integration-direct/`. The GLB exports and source
+remain editable; keep the managed candidate worktree for future revisions.
