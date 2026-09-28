@@ -74,6 +74,10 @@ export class PvcWorkshop {
   cutErrorMm=0;
   private entryIndex=0;
   private cutSnapped=false;
+  private cutHeightBlocked=false;
+  private cutHeightHold=0;
+  private cutHeightHoldElapsed=0;
+  private cutHeightPointer:number|null=null;
   private target:InstallationPoint|null=null;
   private carried:StockPipe|null=null;
   private elapsed=0;
@@ -153,11 +157,25 @@ export class PvcWorkshop {
     this.zoomControl=document.createElement('button');this.zoomControl.id='pvc-fit-zoom';this.zoomControl.setAttribute('aria-label','Μεγέθυνση κάμερας κοπής');this.zoomControl.innerHTML='<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="14" cy="14" r="8"/><path d="m20 20 8 8M10 14h8"/><path class="zoom-plus" d="M14 10v8"/></svg>';this.zoomControl.hidden=true;
     this.drillControl=document.createElement('button');this.drillControl.id='pvc-drill-holes';this.drillControl.setAttribute('aria-label','Τρύπησε διαδοχικά τις σημειωμένες οπές με τρυπάνι 12 χιλιοστών');this.drillControl.innerHTML='<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 7h15v10H3zM18 10h7M25 9v4M6 17v10h9v-4l-3-6M5 27"/><path d="M25 11h5"/></svg>';this.drillControl.hidden=true;
     this.fitControls=document.createElement('div');this.fitControls.id='pvc-fit-controls';this.fitControls.hidden=true;
-    this.fitControls.innerHTML='<button id="pvc-entry-previous" aria-label="Προηγούμενη κάτω είσοδος">←</button><button id="pvc-cut-flush" aria-label="Κοπή πρόσωπο με το κάτω χείλος του κουτιού">ΠΡΟΣΩΠΟ</button><button id="pvc-cut-confirm" aria-label="Κόψε πλήρως τη σωλήνα στο επιλεγμένο ύψος">ΚΟΨΕ</button><button id="pvc-entry-next" aria-label="Επόμενη κάτω είσοδος">→</button>';
+    this.fitControls.innerHTML='<button id="pvc-entry-previous" aria-label="Προηγούμενη κάτω είσοδος">←</button><button id="pvc-cut-flush" aria-label="Κοπή πρόσωπο με το κάτω χείλος του κουτιού">ΠΡΟΣΩΠΟ</button><button id="pvc-cut-confirm" aria-label="Κόψε πλήρως τη σωλήνα στο επιλεγμένο ύψος">ΚΟΨΕ</button><button id="pvc-entry-next" aria-label="Επόμενη κάτω είσοδος">→</button><div class="pvc-cut-height-row" role="group" aria-label="Ύψος κόφτη"><button id="pvc-cut-height-up" aria-label="Ανέβασε τον κόφτη">▲</button><output id="pvc-cut-height-status">ΥΨΟΣ ΚΟΠΗΣ</output><button id="pvc-cut-height-down" aria-label="Κατέβασε τον κόφτη">▼</button></div>';
     this.fitControls.querySelector('#pvc-cut-confirm')!.addEventListener('click',()=>this.queue.push(()=>this.use()));
     this.fitControls.querySelector('#pvc-cut-flush')!.addEventListener('click',()=>this.queue.push(()=>this.snapCutFlush()));
     this.fitControls.querySelector('#pvc-entry-previous')!.addEventListener('click',()=>this.queue.push(()=>this.selectEntry(-1)));
     this.fitControls.querySelector('#pvc-entry-next')!.addEventListener('click',()=>this.queue.push(()=>this.selectEntry(1)));
+    for(const button of this.fitControls.querySelectorAll<HTMLButtonElement>('#pvc-cut-height-up,#pvc-cut-height-down')){
+      const direction=button.id==='pvc-cut-height-up'?-1:1;
+      button.addEventListener('pointerdown',event=>{
+        event.preventDefault();event.stopPropagation();
+        this.cutHeightHold=direction;this.cutHeightHoldElapsed=0;this.cutHeightPointer=event.pointerId;
+        try{button.setPointerCapture(event.pointerId);}catch{/* Synthetic pointers may not support capture. */}
+        this.queue.push(()=>this.setCut(this.cutS+direction*.005));
+      });
+      for(const kind of ['pointerup','pointercancel','lostpointercapture'] as const)button.addEventListener(kind,event=>{
+        if((event as PointerEvent).pointerId!==this.cutHeightPointer)return;
+        this.cutHeightHold=0;this.cutHeightPointer=null;
+      });
+      button.addEventListener('click',event=>{if(event.detail===0)this.queue.push(()=>this.setCut(this.cutS+direction*.005));});
+    }
     game.hud.shell.append(this.prompt,this.liveMeasure,this.markConfirm,this.zoomControl,this.drillControl,this.controls,this.fitControls);
     const handArrows=document.createElement('span');handArrows.className='pvc-hand-arrows';handArrows.setAttribute('aria-hidden','true');handArrows.innerHTML='<span>↑</span><span>↓</span>';game.hud.shell.querySelector('#joystick-thumb')!.append(handArrows);
     this.bendHud=new PvcBendHUD(game.hud.shell,action=>this.queue.push(()=>action==='use'?this.use():this.command(action)),held=>this.toolbarHold=held);
@@ -179,6 +197,10 @@ export class PvcWorkshop {
     game.hud.shell.addEventListener('wheel',e=>{
       if(!this.focused)return;e.preventDefault();e.stopImmediatePropagation();
       if(this.phase==='review')this.queue.push(()=>this.changeQuantity(e.deltaY<0?1:-1));
+      if(['fitting','cut'].includes(this.phase)&&!e.ctrlKey){
+        const pixels=e.deltaY*(e.deltaMode===WheelEvent.DOM_DELTA_LINE?16:e.deltaMode===WheelEvent.DOM_DELTA_PAGE?innerHeight:1);
+        if(Number.isFinite(pixels)&&pixels!==0)this.setCut(this.cutS+THREE.MathUtils.clamp(pixels*(e.shiftKey ? .00003 : .00015),-.03,.03));
+      }
     },{capture:true,passive:false});
     let touchY:number|null=null;
     game.renderer.webgl.domElement.addEventListener('pointerdown',e=>{
@@ -195,6 +217,9 @@ export class PvcWorkshop {
       }
       if(!this.focused)return;
       if(e.code==='Escape'){this.queue.push(()=>this.pause());return;}
+      if(['fitting','cut'].includes(this.phase)&&(e.code==='ArrowUp'||e.code==='ArrowDown')){
+        e.preventDefault();this.queue.push(()=>this.setCut(this.cutS+(e.code==='ArrowUp'?-1:1)*(e.shiftKey ? .001 : .01)));return;
+      }
       if(e.repeat)return;
       if(['fitting','cut'].includes(this.phase)){
         if(e.code==='KeyV'){e.preventDefault();this.queue.push(()=>this.snapCutFlush());}
@@ -245,7 +270,7 @@ export class PvcWorkshop {
     if(this.phase==='carrying'&&tool==='cutter'){this.interact();return false;}
     this.message=this.instruction('Άφησε τη σωλήνα στη μάτσα ή πάτησε ESC για παύση.','Άφησε τη σωλήνα στη μάτσα ή πάτησε ΠΙΣΩ για παύση.');return false;
   }
-  private transition(phase:Phase):void{this.phase=phase;this.elapsed=0;this.message='';this.shapeKey='';if(phase!=='marking')this.markingActive=false;if(!['fitting','cutting','cut'].includes(phase)){this.supportS=null;this.cutterRetreat=0;}}
+  private transition(phase:Phase):void{this.phase=phase;this.elapsed=0;this.message='';this.shapeKey='';if(phase!=='marking')this.markingActive=false;if(!['fitting','cut'].includes(phase)){this.cutHeightHold=0;this.cutHeightPointer=null;this.cutHeightBlocked=false;}if(!['fitting','cutting','cut'].includes(phase)){this.supportS=null;this.cutterRetreat=0;}}
   private stockPoint(x:number,y:number,z:number):THREE.Vector3{return this.stock.markingPoint(this.activeBundle,x,y,z);}
   private selectBundle(index:number):void{
     if(index===this.activeBundle)return;
@@ -381,6 +406,10 @@ export class PvcWorkshop {
     // tapped AIM toggle and supplies duration-based bending.
     this.pressHeld=this.focused&&(this.toolbarHold||this.canvasHold||this.touch&&this.game.input.actionHeld);
     if(this.focused){
+      if(this.cutHeightHold&&['fitting','cut'].includes(this.phase)){
+        this.cutHeightHoldElapsed+=dt;
+        if(this.cutHeightHoldElapsed>.18)this.setCut(this.cutS+this.cutHeightHold*.42*Math.min(dt,.05));
+      }
       if(['fitting','cutting','cut'].includes(this.phase)){
         // Up raises the support toward the free end; down follows the pipe
         // through its radius. This focused action never moves the player.
@@ -393,6 +422,7 @@ export class PvcWorkshop {
         const retreat=this.phase!=='cutting'&&(gap<.105||approaching&&gap<.145)?1:0;
         this.cutterRetreat=THREE.MathUtils.damp(this.cutterRetreat,retreat,25,dt);
         if(retreat===0&&this.cutterRetreat<.004)this.cutterRetreat=0;
+        if(gap>=.13&&Math.abs(next-old)>.0001)this.cutHeightBlocked=false;
         if(this.cutterReady&&this.message==='Μετακίνησε το αριστερό χέρι πιο μακριά από τον κόφτη.')this.message='';
       }
       const c=this.game.renderer.camera,t=1-Math.exp(-8*dt);if(this.phase.startsWith('fastener-'))this.game.player.updateLook(dt);else{c.position.lerp(this.cameraDestination,t);c.quaternion.slerp(this.targetRotation,t);}
@@ -437,12 +467,17 @@ export class PvcWorkshop {
     const support=this.supportS??this.initialSupportS(),before=this.supportPlaneGap(support),after=this.supportPlaneGap(support,next);
     // The only occupied band is the independently positioned support hand.
     // Stop before its blade plane; moving W/S can free either side again.
+    let blocked=false;
     if(Math.abs(before)>=.105&&(Math.abs(after)<.105||before*after<=0)){
       let low=0,high=1;for(let i=0;i<24;i++){const t=(low+high)/2,gap=this.supportPlaneGap(support,THREE.MathUtils.lerp(this.cutS,next,t));if(Math.abs(gap)<.105||before*gap<=0)high=t;else low=t;}
-      next=THREE.MathUtils.lerp(this.cutS,next,low);
+      next=THREE.MathUtils.lerp(this.cutS,next,low);blocked=true;
     }
+    this.cutHeightBlocked=blocked;
+    if(Math.abs(next-this.cutS)<1e-8){if(blocked)this.message=this.instruction('Ο κόφτης σταμάτησε στο χέρι · W/S: μετακίνησέ το.','Ο κόφτης σταμάτησε στο χέρι · αριστερό stick: μετακίνησέ το.');return;}
     if(this.phase==='cut'&&next>this.cutFrom+.001)this.transition('fitting');
-    this.cutS=next;this.cutSnapped=false;this.message='';this.setFitCamera();
+    this.cutS=next;this.cutSnapped=false;this.cutHeightBlocked=blocked;
+    this.message=blocked?this.instruction('Ο κόφτης σταμάτησε στο χέρι · W/S: μετακίνησέ το.','Ο κόφτης σταμάτησε στο χέρι · αριστερό stick: μετακίνησέ το.'):'';
+    this.setFitCamera();
   }
   private cutLimit():number{
     // The whole upright piece, including the curve, can be trimmed after
@@ -469,7 +504,7 @@ export class PvcWorkshop {
     const cut=this.flushCut();
     if(cut===null){this.message='Η κομμένη σωλήνα δεν φτάνει στο κάτω χείλος του κουτιού.';return;}
     if(this.phase==='cut'&&cut>this.cutFrom+.001)this.transition('fitting');
-    this.cutS=cut;this.cutSnapped=true;this.setFitCamera();this.message='ΠΡΟΣΩΠΟ · ελεύθερη μετακίνηση για άλλο ύψος.';
+    this.cutS=cut;this.cutSnapped=true;this.cutHeightBlocked=false;this.setFitCamera();this.message='ΠΡΟΣΩΠΟ · ελεύθερη μετακίνηση για άλλο ύψος.';
   }
   private supportPlaneGap(s:number,cutS=this.cutS):number{
     const hand=this.bend.at(s),cut=this.bend.at(cutS);
@@ -554,7 +589,7 @@ export class PvcWorkshop {
       this.cutS=this.cutFrom;this.cutSnapped=false;
       this.fitZoomed=false;this.transition('fitting');this.snapCutFlush();this.setFocus();return;
     }
-    if(this.phase==='fitting'){this.message=this.instruction('Mouse πάνω/κάτω για μήκος, αριστερό click για πραγματική κοπή.','Σύρε πάνω/κάτω για μήκος και κράτα ΚΟΨΕ για πραγματική κοπή.');return;}
+    if(this.phase==='fitting'){this.message=this.instruction('Ροδέλα, ↑↓ ή κουμπιά για ύψος· αριστερό click για πραγματική κοπή.','Πάτησε ή κράτα ▲▼ για ύψος και κράτα ΚΟΨΕ για πραγματική κοπή.');return;}
     if(this.phase==='cut'){
       const error=this.fitError();
       // Free cutting is independent of seating. The lower casing lip is the
@@ -935,8 +970,8 @@ export class PvcWorkshop {
       spring:'LMB: βάλε το spring · R: διαφάνεια · ESC: πίσω',
       bending:'A / D: χέρι · LMB: λύγισε εδώ · 8 θέσεις για 90° · Z: διόρθωση · E: έλεγχος · R: διαφάνεια',
       review:'Ροδέλα ή − / +: ποσότητα · E: παραγωγή · R: διαφάνεια',
-      fitting:'Mouse πάνω/κάτω: ύψος κοπής · W/S: αριστερό χέρι · LMB: κόψε · V: πρόσωπο · [ / ]: είσοδος · R: διαφάνεια',
-      cut:'Mouse πάνω/κάτω: νέα κοπή · W/S: αριστερό χέρι · E: εφάρμοσε · V: πρόσωπο · [ / ]: είσοδος · ESC: πίσω',
+      fitting:'Ροδέλα / ↑↓ / κουμπιά: ύψος κοπής · W/S: αριστερό χέρι · LMB: κόψε · V: πρόσωπο · [ / ]: είσοδος',
+      cut:'Ροδέλα / ↑↓ / κουμπιά: νέα κοπή · W/S: αριστερό χέρι · E: εφάρμοσε · V: πρόσωπο · ESC: πίσω',
       'pipe-install-ready':'USE: πέρασε τη σωλήνα μέσα από τα ανοικτά rebar και εφάρμοσέ τη στο κουτί',
       opening:'Κοπή πλαστικών δεσιμάτων',spreading:'Ευθυγράμμιση σωλήνων',
       inserting:'Εισαγωγή spring στο σημάδι',extracting:'Τράβηγμα spring από το καλώδιο',
@@ -953,7 +988,7 @@ export class PvcWorkshop {
       spring:'Tap AIM για εισαγωγή spring',
       bending:'8 ΘΕΣΕΙΣ ΧΕΡΙΩΝ · Tap AIM: έναρξη / διακοπή λυγίσματος · Tap AIM στις 90°: έλεγχος',
       review:'Διάλεξε 1, 5 ή ΟΛΕΣ · μετά ΕΤΟΙΜΑΣΕ ΚΑΙ ΚΡΑΤΑ',
-      fitting:'Σύρε πάνω/κάτω για ύψος · ΠΡΟΣΩΠΟ: snap · Tap AIM: κόψε',cut:'Σύρε για νέα κοπή · USE: εφαρμογή ή ΠΙΣΩ','pipe-install-ready':'Tap AIM · ΕΦΑΡΜΟΣΕ ΣΩΛΗΝΑ',
+      fitting:'Πάτησε ή κράτα ▲▼ για ύψος · ΠΡΟΣΩΠΟ: snap · Tap AIM: κόψε',cut:'▲▼: νέα κοπή · USE: εφαρμογή ή ΠΙΣΩ','pipe-install-ready':'Tap AIM · ΕΦΑΡΜΟΣΕ ΣΩΛΗΝΑ',
       'fastener-marking':'Δεξί joystick: στόχευση · πάτησε το κέντρο για οπή στο τούβλο',
       'fastener-drilling':'Τρύπημα 12 mm · μία οπή τη φορά','fastener-insert-ready':'Tap AIM · ΠΕΡΑΣΕ ΣΥΡΜΑ','fastener-inserting':'Πέρασμα ανοικτού σύρματος','fastener-tighten-ready':'Tap AIM · ΣΤΡΙΨΕ ΜΕ ΠΕΝΣΑ','fastener-tightening':'Στρίψιμο ένα-ένα',
     });
@@ -982,6 +1017,10 @@ export class PvcWorkshop {
       const flush=this.fitControls.querySelector('#pvc-cut-flush') as HTMLButtonElement;
       flush.disabled=this.flushCut()===null;flush.setAttribute('aria-pressed',String(this.cutSnapped));
       (this.fitControls.querySelector('#pvc-cut-confirm') as HTMLButtonElement).disabled=this.cutS<=this.cutFrom+.001;
+      const status=this.fitControls.querySelector<HTMLOutputElement>('#pvc-cut-height-status')!;
+      const handBlocked=this.cutHeightBlocked;
+      status.dataset.blocked=String(handBlocked);
+      status.textContent=handBlocked?`ΧΕΡΙ · ${this.touch?'ΑΡΙΣΤΕΡΟ STICK':'W/S'}`:`ΥΨΟΣ ${(100*(this.bend.topHeight-this.bend.at(this.cutS).x)).toFixed(1)} cm`;
     }
     this.zoomControl.setAttribute('aria-pressed',String(this.fitZoomed));this.zoomControl.dataset.zoom=String(this.fitZoomed);
     this.liveMeasure.hidden=bendUi||!show||!['marking','bending','review','fitting','cut'].includes(this.phase);

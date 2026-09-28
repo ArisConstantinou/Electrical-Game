@@ -5,8 +5,12 @@
 #pvc-mark-confirm svg{display:none}
 #pvc-fit-zoom{display:none}
 #pvc-fit-controls[hidden]{display:none!important}
-#pvc-fit-controls{position:absolute;z-index:24;left:50%;top:86px;transform:translateX(-50%);display:flex;gap:6px;max-width:calc(100% - 20px);padding:6px;border:1px solid #67766b;border-radius:9px;background:#14241fe8;box-shadow:0 4px 18px #0007}
+#pvc-fit-controls{position:absolute;z-index:24;left:50%;top:86px;transform:translateX(-50%);display:grid;grid-template-columns:48px max-content max-content 48px;align-items:center;gap:6px;max-width:calc(100% - 20px);padding:6px;border:1px solid #67766b;border-radius:9px;background:#14241fe8;box-shadow:0 4px 18px #0007}
 #pvc-fit-controls button{min-width:48px;min-height:48px;padding:8px 12px;border:2px solid #cbb782;border-radius:6px;background:#1c3830;color:#fff8e8;font:700 14px/1.2 system-ui,sans-serif;white-space:nowrap;cursor:pointer;touch-action:manipulation}
+#pvc-fit-controls .pvc-cut-height-row{grid-column:1/-1;display:grid;grid-template-columns:48px minmax(0,1fr) 48px;gap:6px;align-items:center}
+#pvc-fit-controls .pvc-cut-height-row button{padding:6px;font-size:20px;touch-action:none}
+#pvc-cut-height-status{display:flex;align-items:center;justify-content:center;min-height:48px;padding:3px 5px;border:1px solid #8ca99a;border-radius:5px;background:#243c33;color:#f5f4d9;font:700 14px/1.2 system-ui,sans-serif;text-align:center;font-variant-numeric:tabular-nums}
+#pvc-cut-height-status[data-blocked="true"]{border-color:#ffcf69;background:#563c21;color:#ffe6a1}
 #pvc-fit-controls button:disabled{opacity:.45;cursor:default}
 #pvc-fit-controls button[aria-pressed="true"]{background:#a4532d;border-color:#ffd27d}
 #pvc-fit-controls #pvc-cut-confirm{background:#b84f27;border-color:#ffd27d}
