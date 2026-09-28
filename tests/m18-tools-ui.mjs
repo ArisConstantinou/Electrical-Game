@@ -5,6 +5,7 @@ import {blockPointerLock} from './browser-safety.mjs';
 import {routeBuildingDist} from './building-qa-utils.mjs';
 
 const baseline=process.argv.includes('--baseline');
+const live=process.env.M18_LIVE==='1';
 const out=process.env.M18_OUT??`output/m18-tools/${baseline?'before-fps':'after-fps'}`;
 await mkdir(out,{recursive:true});
 const report={baseline,errors:[],cases:[],physicalMobile:false};
@@ -13,7 +14,7 @@ try{
  for(const mobile of [false,true]){
   const viewport=mobile?{width:390,height:844}:{width:1366,height:768};
   const context=await browser.newContext({viewport,isMobile:mobile,hasTouch:mobile});await blockPointerLock(context);
-  if(!baseline)await routeBuildingDist(context);
+  if(!baseline&&!live)await routeBuildingDist(context);
   const page=await context.newPage();page.on('pageerror',e=>report.errors.push(e.message));
   await page.goto('http://127.0.0.1:5365/Electrical-Game/');await page.locator('#apprentice-count').selectOption('0');
   await page.locator('#start-button').click({timeout:120000});

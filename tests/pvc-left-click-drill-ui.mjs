@@ -6,6 +6,7 @@ import {blockPointerLock} from './browser-safety.mjs';
 import {routeBuildingDist} from './building-qa-utils.mjs';
 
 const baseline=process.argv.includes('--baseline');
+const live=process.env.M18_LIVE==='1';
 const url=process.env.DRILL_QA_URL??'http://127.0.0.1:5365/Electrical-Game/';
 const out=process.env.DRILL_QA_OUTPUT??`output/direct-drill/${baseline?'before':'after'}`;
 await mkdir(out,{recursive:true});
@@ -20,7 +21,7 @@ try{
  for(const touch of baseline?[false]:[false,true]){
   const viewport=touch?{width:390,height:844}:{width:1366,height:768};
   const context=await browser.newContext({viewport,hasTouch:touch,isMobile:touch});
-  await blockPointerLock(context);if(!baseline)await routeBuildingDist(context);
+  await blockPointerLock(context);if(!baseline&&!live)await routeBuildingDist(context);
   const page=await context.newPage();page.on('pageerror',e=>report.errors.push(e.message));
   await page.goto(url);await page.locator('#apprentice-count').selectOption('0');await page.locator('#start-button').click({timeout:120000});
   await page.evaluate(async()=>{const g=window.__wireTheHouse;await g.workerBody.ready;window.drillStep=g.step.bind(g);g.step=()=>{};g.mixing.finished=true;g.mixing.setActive(false);});

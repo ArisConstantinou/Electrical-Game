@@ -5,11 +5,12 @@ import {blockPointerLock} from './browser-safety.mjs';
 import {routeBuildingDist} from './building-qa-utils.mjs';
 
 const out='output/m18-tools/work';await mkdir(out,{recursive:true});
+const live=process.env.M18_LIVE==='1';
 const report={fixture:'Stationary camera faces actual concrete. Native inputs create the pencil mark, drill, mount and tighten the laser; no targets or progress are injected.',cases:[],errors:[],physicalMobile:false};
 const browser=await chromium.launch({channel:'chrome',headless:true});
 try{
  for(const mobile of [false,true]){
-  const context=await browser.newContext({viewport:mobile?{width:390,height:844}:{width:1366,height:768},hasTouch:mobile,isMobile:mobile});await blockPointerLock(context);await routeBuildingDist(context);
+  const context=await browser.newContext({viewport:mobile?{width:390,height:844}:{width:1366,height:768},hasTouch:mobile,isMobile:mobile});await blockPointerLock(context);if(!live)await routeBuildingDist(context);
   const page=await context.newPage();page.on('pageerror',e=>report.errors.push(e.message));
   await page.goto('http://127.0.0.1:5365/Electrical-Game/');await page.locator('#apprentice-count').selectOption('0');await page.locator('#start-button').click({timeout:120000});
   await page.evaluate(()=>{const g=window.__wireTheHouse,c=g.renderer.camera;window.workStep=g.step.bind(g);g.step=()=>{};g.mixing.finished=true;g.mixing.setActive(false);g.player.update=()=>{c.rotation.set(g.player.pitch,g.player.yaw,0);};});
