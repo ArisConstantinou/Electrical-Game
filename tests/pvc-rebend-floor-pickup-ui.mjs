@@ -56,9 +56,20 @@ try{
       assert.equal((await state()).dropped,1);
       if(mobile)await page.locator('#pvc-drop-pipe').tap();else await page.locator('#pvc-drop-pipe').click();
       await tick(180);const empty=await state();assert.equal(empty.carrying,false);assert.equal(empty.dropped,2);assert.equal(empty.totalAll,100);
-      const aimDropped=async(id,capture=true)=>{await page.evaluate(id=>{const g=window.__wireTheHouse,p=g.pvc,c=g.renderer.camera,m=p.dropped.find(item=>item.mesh.uuid===id).mesh,position=m.geometry.getAttribute('position'),V=c.position.constructor,a=80*m.sides,b=a+m.sides/2;
-        const target=m.localToWorld(new V((position.getX(a)+position.getX(b))/2,(position.getY(a)+position.getY(b))/2,(position.getZ(a)+position.getZ(b))/2));
-        c.position.copy(target).add(new V(0,.9,.05));const direction=target.clone().sub(c.position).normalize();g.player.pitch=Math.asin(direction.y);g.player.yaw=Math.atan2(-direction.x,-direction.z);c.rotation.set(g.player.pitch,g.player.yaw,0);c.updateMatrixWorld(true);},id);await tick(3);if(capture)await snap('floor-target');const detail=await page.evaluate(id=>{const g=window.__wireTheHouse,p=g.pvc,c=g.renderer.camera,m=p.dropped.find(item=>item.mesh.uuid===id).mesh,position=m.geometry.getAttribute('position'),V=c.position.constructor,a=80*m.sides,b=a+m.sides/2,target=m.localToWorld(new V((position.getX(a)+position.getX(b))/2,(position.getY(a)+position.getY(b))/2,(position.getZ(a)+position.getZ(b))/2)),projected=target.clone().project(c);return{phase:p.phase,carried:p.carried?.mesh.uuid,aimed:p.floorTarget()?.mesh.uuid,stock:Boolean(p.stockTarget()),projected:projected.toArray(),camera:c.position.toArray(),pitch:g.player.pitch,yaw:g.player.yaw,dropped:p.dropped.map(pipe=>({uuid:pipe.mesh.uuid,position:pipe.mesh.position.toArray()})),expected:id};},id);assert.equal(detail.aimed,id,`The chosen dropped pipe must be targetable: ${JSON.stringify(detail)}`);};
+      const aimDropped=async(id,capture=true)=>{
+        let detail;
+        for(const section of [80,20,40,60,100,120,140,0,160]){
+          await page.evaluate(({id,section})=>{const g=window.__wireTheHouse,p=g.pvc,c=g.renderer.camera,m=p.dropped.find(item=>item.mesh.uuid===id).mesh,position=m.geometry.getAttribute('position'),V=c.position.constructor,a=section*m.sides,b=a+m.sides/2;
+            const target=m.localToWorld(new V((position.getX(a)+position.getX(b))/2,(position.getY(a)+position.getY(b))/2,(position.getZ(a)+position.getZ(b))/2));
+            c.position.copy(target).add(new V(0,.9,.05));const direction=target.clone().sub(c.position).normalize();g.player.pitch=Math.asin(direction.y);g.player.yaw=Math.atan2(-direction.x,-direction.z);c.rotation.set(g.player.pitch,g.player.yaw,0);c.updateMatrixWorld(true);
+          },{id,section});
+          await tick(3);
+          detail=await page.evaluate(({id,section})=>{const g=window.__wireTheHouse,p=g.pvc;return{phase:p.phase,aimed:p.floorTarget()?.mesh.uuid,expected:id,section,camera:g.renderer.camera.position.toArray()};},{id,section});
+          if(detail.aimed===id)break;
+        }
+        assert.equal(detail.aimed,id,`The chosen dropped pipe must have an exposed target: ${JSON.stringify(detail)}`);
+        if(capture)await snap('floor-target');
+      };
       await aimDropped(ids.oldPipe);
       if(mobile){await page.locator('#pvc-prompt').tap();await tick(3);}else await key('KeyE');
       const picked=await state();assert.equal(picked.phase,'carrying');assert.equal(picked.dropped,1);assert.equal(picked.totalAll,100);
@@ -75,12 +86,15 @@ try{
           while(p.dropped.length<10){const mesh=new Tube(p.pipe.material);mesh.update(p.bend);p.rawCount--;
             p.dropPipe({recipe:p.bend.recipe(),mesh,cutFrom:0,bundle:p.activeBundle,originBundle:p.activeBundle});}
         });await tick(180);
-        const floor=await page.evaluate(()=>{const p=window.__wireTheHouse.pvc;return{total:p.telemetry.totalAll,uuids:p.dropped.map(item=>item.mesh.uuid),highlights:p.dropped.map(item=>({visible:item.highlight?.visible,color:item.highlight?.material.color.getHex()})),bounds:p.dropped.map(item=>{item.mesh.updateMatrixWorld(true);const box=item.mesh.geometry.boundingBox.clone().applyMatrix4(item.mesh.matrixWorld);return[box.min.x,box.max.x,box.min.z,box.max.z];})};});
+        const floor=await page.evaluate(()=>{const p=window.__wireTheHouse.pvc;return{total:p.telemetry.totalAll,uuids:p.dropped.map(item=>item.mesh.uuid),centres:p.dropped.map(item=>[item.mesh.position.x,item.mesh.position.z]),highlights:p.dropped.map(item=>({visible:item.highlight?.visible,color:item.highlight?.material.color.getHex()})),bounds:p.dropped.map(item=>{item.mesh.updateMatrixWorld(true);const box=item.mesh.geometry.boundingBox.clone().applyMatrix4(item.mesh.matrixWorld);return[box.min.x,box.max.x,box.min.z,box.max.z];})};});
         assert.equal(floor.total,100);assert.equal(floor.uuids.length,10);assert.equal(new Set(floor.uuids).size,10);
         assert(floor.highlights.every(item=>item.visible&&[0xffd43b,0x36a8ff].includes(item.color)),'All ten floor pipes need visible outlines');
         assert(floor.bounds.every(([x0,x1,z0,z1])=>x0>=-3.8&&x1<=3.8&&z0>=-3.6&&z1<=3.6),'Dropped pipe geometry must stay within the room');
-        await page.evaluate(()=>{const g=window.__wireTheHouse,c=g.renderer.camera,V=c.position.constructor,target=new V(1.8,.07,1.2);
-          c.position.set(-.5,1.72,2.75);const direction=target.sub(c.position).normalize();g.player.pitch=Math.asin(direction.y);g.player.yaw=Math.atan2(-direction.x,-direction.z);c.rotation.set(g.player.pitch,g.player.yaw,0);c.updateMatrixWorld(true);});
+        assert(floor.centres.every(([x,z],i)=>floor.centres.slice(i+1).every(([otherX,otherZ])=>Math.hypot(x-otherX,z-otherZ)>.29)),'Ten pipes must not settle on identical floor positions');
+        const centre={x:(Math.min(...floor.bounds.map(box=>box[0]))+Math.max(...floor.bounds.map(box=>box[1])))/2,
+          z:(Math.min(...floor.bounds.map(box=>box[2]))+Math.max(...floor.bounds.map(box=>box[3])))/2};
+        await page.evaluate(({x,z})=>{const g=window.__wireTheHouse,c=g.renderer.camera,V=c.position.constructor,target=new V(x,.07,z);
+          c.position.set(Math.max(-3.2,x-1.7),1.65,Math.min(3.2,z+2.4));const direction=target.sub(c.position).normalize();g.player.pitch=Math.asin(direction.y);g.player.yaw=Math.atan2(-direction.x,-direction.z);c.rotation.set(g.player.pitch,g.player.yaw,0);c.updateMatrixWorld(true);},centre);
         await tick(3);await snap('ten-floor-pipes');
         await aimDropped(floor.uuids[0],false);
         const queryCost=await page.evaluate(()=>{const p=window.__wireTheHouse.pvc;
@@ -98,10 +112,13 @@ try{
           await page.evaluate(()=>window.__wireTheHouse.step=()=>{});
           frameRate={without,withTen};
         }
-        for(const id of floor.uuids){await aimDropped(id,false);await key('KeyE');assert.equal(await page.evaluate(()=>window.__wireTheHouse.pvc.carried?.mesh.uuid),id,`E must take ${id}`);
-          await page.locator('#pvc-drop-pipe').click();await tick(4);assert.equal((await state()).dropped,10);}
+        for(const [index,id] of floor.uuids.entries()){await aimDropped(id,false);await key('KeyE');assert.equal(await page.evaluate(()=>window.__wireTheHouse.pvc.carried?.mesh.uuid),id,`E must take ${id}`);
+          // Move the recovered pipe to the stock in this fixture so it cannot
+          // obscure a remaining target; dropping by the user control is tested above.
+          await page.evaluate(()=>{const p=window.__wireTheHouse.pvc,pipe=p.carried;p.prepared.push(pipe);p.preparedRoot.add(pipe.mesh);p.carried=null;p.transition('batch');p.arrangePrepared();});
+          await tick(3);assert.equal((await state()).dropped,9-index);}
         assert.equal((await state()).totalAll,100);
-        tenFloor={count:floor.uuids.length,individuallyPicked:floor.uuids.length,outlined:floor.highlights.length,insideRoom:true,queryCost,frameRate};
+        tenFloor={count:floor.uuids.length,individuallyPicked:floor.uuids.length,outlined:floor.highlights.length,insideRoom:true,separateLandingPositions:true,queryCost,frameRate};
       }
       if(mobile){
         await page.evaluate(()=>{const g=window.__wireTheHouse,p=g.pvc;p.target=g.mission.points[1];p.transition('cut');p.setFocus();});

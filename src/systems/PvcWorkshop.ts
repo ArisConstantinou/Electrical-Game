@@ -392,14 +392,26 @@ export class PvcWorkshop {
     const forward=v(-Math.sin(this.game.player.yaw),0,-Math.cos(this.game.player.yaw));
     const right=v(-forward.z,0,forward.x),lane=this.dropSequence++;
     const flat=new THREE.Quaternion().setFromAxisAngle(v(1,0,0),Math.PI/2);
-    const centre=camera.getWorldPosition(v())
-      .addScaledVector(forward,.65+Math.floor(lane/5)*.38)
-      .addScaledVector(right,(lane%5-2)*.38);
+    const eye=camera.getWorldPosition(v());
     // Keep the whole settled tube inside the room, including its bent end.
     const flatBounds=mesh.geometry.boundingBox!.clone();
     flatBounds.translate(flatBounds.getCenter(v()).negate());
     flatBounds.applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(flat));
     const xLimit=GAME_CONFIG.room.width/2-.16,zLimit=GAME_CONFIG.room.depth/2-.16;
+    // Search nearby landing lanes in front and behind the player. Clamping
+    // a fixed lane against a wall can put several pipes in the exact same spot.
+    const centre=v();let placed=false;
+    for(let row=0;row<12&&!placed;row++)for(const facing of [1,-1]){
+      for(const column of [0,-1,1,-2,2]){
+        const candidate=eye.clone().addScaledVector(forward,facing*(.65+row*.38)).addScaledVector(right,column*.38);
+        candidate.x=THREE.MathUtils.clamp(candidate.x,-xLimit-flatBounds.min.x,xLimit-flatBounds.max.x);
+        candidate.z=THREE.MathUtils.clamp(candidate.z,-zLimit-flatBounds.min.z,zLimit-flatBounds.max.z);
+        if(this.dropped.some(other=>Math.hypot(candidate.x-other.mesh.position.x,candidate.z-other.mesh.position.z)<.32))continue;
+        centre.copy(candidate);placed=true;break;
+      }
+      if(placed)break;
+    }
+    if(!placed)centre.copy(eye).addScaledVector(right,(lane%9-4)*.24);
     centre.x=THREE.MathUtils.clamp(centre.x,-xLimit-flatBounds.min.x,xLimit-flatBounds.max.x);
     centre.z=THREE.MathUtils.clamp(centre.z,-zLimit-flatBounds.min.z,zLimit-flatBounds.max.z);
     centre.y=Math.max(.48,(PVC.length-pipe.cutFrom)*.45);
