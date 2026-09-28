@@ -43,7 +43,10 @@ try{
       const projected=p.cutRing.position.clone().project(g.renderer.camera);
       const line=guide?.getBoundingClientRect();
       const expected={x:rect.left+(projected.x+1)*rect.width/2,y:rect.top+(1-projected.y)*rect.height/2};
-      return{phase:p.phase,error:p.telemetry.fitErrorMm,cutCm:p.telemetry.cutHeightCm,
+      const measure=document.querySelector('#pvc-live-measure')?.getBoundingClientRect();
+      const overlaps=(a,b)=>a&&b&&a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;
+      const measureControlsOverlap=measure&&['#joystick','#look-joystick'].some(selector=>overlaps(measure,document.querySelector(selector)?.getBoundingClientRect()));
+      return{phase:p.phase,error:p.telemetry.fitErrorMm,cutCm:p.telemetry.cutHeightCm,measureControlsOverlap,
         status:document.querySelector('#pvc-cut-height-status')?.textContent??'',
         guideVisible:!!guide&&!guide.hidden,guideCenter:line?{x:line.left+line.width/2,y:line.top+line.height/2}:null,expected,
         width:line?.width??0,height:line?.height??0,guideRect:line?{left:line.left,top:line.top,right:line.right,bottom:line.bottom}:null,
@@ -67,6 +70,7 @@ try{
       assert(Math.abs(moved.guideCenter.y-start.guideCenter.y)>5,`${name}: line did not move on screen`);
       assert.match(moved.status,/ΜΑΚΡΙΑ/);
       assert.match(moved.status,/↓/);
+       if(mobile)assert(!moved.measureControlsOverlap,`${name}: cut measurement covers a touch control`);
     }
     const proximity=[];
     if(name==='portrait'&&!baseline){

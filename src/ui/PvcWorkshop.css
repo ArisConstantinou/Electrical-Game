@@ -1,4 +1,4 @@
-#pvc-prompt[hidden],#pvc-live-measure[hidden],#pvc-cut-guide[hidden],#pvc-mark-confirm[hidden],#pvc-fit-zoom[hidden],#pvc-drill-holes[hidden],#pvc-touch-controls[hidden],#pvc-touch-controls [hidden]{display:none!important}
+#pvc-prompt[hidden],#pvc-live-measure[hidden],#pvc-cut-guide[hidden],#pvc-mark-confirm[hidden],#pvc-fit-zoom[hidden],#pvc-drill-holes[hidden],#pvc-pipe-actions[hidden],#pvc-touch-controls[hidden],#pvc-touch-controls [hidden]{display:none!important}
 #pvc-live-measure{position:absolute;z-index:23;padding:5px 8px;border:1px solid #ffce67;border-radius:4px;background:#14241fd9;color:#ffdc91;font:600 16px/1.4 system-ui,sans-serif;font-variant-numeric:tabular-nums;white-space:pre;pointer-events:none}
 #pvc-cut-guide{position:absolute;z-index:22;height:4px;border:1px solid #17221d;border-radius:3px;background:#ffe54b;box-shadow:0 0 0 1px #fff5a3,0 0 8px 2px #ffe54b99;pointer-events:none;transform-origin:center}
 #pvc-cut-guide::before,#pvc-cut-guide::after{content:"";position:absolute;top:50%;width:3px;height:13px;border-radius:2px;background:#ffe54b;box-shadow:0 0 0 1px #17221d,0 0 6px #ffe54b;transform:translateY(-50%)}
@@ -21,8 +21,14 @@
 #pvc-fit-controls button:disabled{opacity:.45;cursor:default}
 #pvc-fit-controls button[aria-pressed="true"]{background:#a4532d;border-color:#ffd27d}
 #pvc-fit-controls #pvc-cut-confirm{background:#b84f27;border-color:#ffd27d}
+#pvc-pipe-actions{position:absolute;z-index:24;left:50%;top:216px;transform:translateX(-50%);display:flex;gap:8px;max-width:calc(100% - 20px)}
+#pvc-pipe-actions[data-mode="carrying"]{top:86px}
+#pvc-pipe-actions button{min-height:48px;padding:9px 13px;border:2px solid #ffd27d;border-radius:8px;background:#a94a27;color:#fffaf0;box-shadow:0 5px 18px #0008;font:800 14px/1.2 system-ui,sans-serif;white-space:nowrap;cursor:pointer;touch-action:manipulation}
+#pvc-pipe-actions #pvc-drop-pipe{background:#234039;border-color:#a5d3bc}
+#pvc-pipe-actions button:disabled{opacity:.52;cursor:default}
 @media(pointer:coarse){#pvc-fit-controls{top:76px;gap:4px;padding:5px}#pvc-fit-controls button{padding:8px;font-size:12px}}
 @media(pointer:coarse) and (max-height:520px){#pvc-fit-controls{top:12px}}
+@media(pointer:coarse) and (max-height:520px){#pvc-pipe-actions{top:140px}#pvc-pipe-actions[data-mode="carrying"]{top:24px}}
 #pvc-drill-holes{position:absolute;z-index:24;left:150px;bottom:142px;width:52px;height:52px;padding:9px;border:2px solid #ffd27d;border-radius:12px;background:#a83e27;color:#fff;box-shadow:0 4px 18px #0007;cursor:pointer}
 #pvc-drill-holes svg{display:block;width:30px;height:30px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 #pvc-touch-controls{display:none}

@@ -19,6 +19,10 @@ export class PvcOffcuts {
     mesh.name='Falling hollow PVC offcut';
     this.pieces.push({mesh,velocity:new THREE.Vector3(.045,0,.14),rotation:mesh.quaternion.clone(),angle:0,spin:1.1,contact:false,settled:false,bounds:mesh.geometry.boundingBox!.clone()});
   }
+  take(mesh:THREE.Mesh):void{
+    const index=this.pieces.findIndex(piece=>piece.mesh===mesh);
+    if(index>=0)this.pieces.splice(index,1);
+  }
   update(seconds:number):void{
     if(seconds<=0||!Number.isFinite(seconds))return;
     for(const piece of this.pieces){
