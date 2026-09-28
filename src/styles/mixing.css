@@ -71,3 +71,4 @@
 }
 
 #pvc-prompt.pvc-world-action{bottom:auto;width:auto;min-height:44px;cursor:pointer;pointer-events:auto;text-shadow:none;touch-action:manipulation}
+@media(pointer:coarse){#pvc-prompt.pvc-world-action[data-phase="carrying"]{top:35%}}
