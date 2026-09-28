@@ -92,6 +92,7 @@ try{
         assert(floor.highlights.every(item=>item.visible&&[0xffd43b,0x36a8ff].includes(item.color)),'All ten floor pipes need visible outlines');
         assert(floor.bounds.every(([x0,x1,z0,z1])=>x0>=-3.8&&x1<=3.8&&z0>=-3.6&&z1<=3.6),'Dropped pipe geometry must stay within the room');
         if(!visualBaseline)assert(floor.centres.every(([x,z],i)=>floor.centres.slice(i+1).every(([otherX,otherZ])=>Math.hypot(x-otherX,z-otherZ)>.29)),'Ten pipes must not settle on identical floor positions');
+        if(!visualBaseline)assert(Math.max(...floor.centres.map(([x])=>x))-Math.min(...floor.centres.map(([x])=>x))>3.5,'Ten long pipes must spread laterally instead of overlapping in two rows');
         await page.evaluate(()=>{const g=window.__wireTheHouse,c=g.renderer.camera,V=c.position.constructor,target=new V(.8,.07,-2);
           c.position.set(.8,1.65,3);const direction=target.sub(c.position).normalize();g.player.pitch=Math.asin(direction.y);g.player.yaw=Math.atan2(-direction.x,-direction.z);c.rotation.set(g.player.pitch,g.player.yaw,0);c.updateMatrixWorld(true);});
         await tick(3);await snap('ten-floor-pipes');
