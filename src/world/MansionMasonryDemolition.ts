@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { PlayerObstacle } from '../player/EquipmentCollision';
 import { brokenClayEndShapes, hollowClayEndMaterial } from './HollowClayEnd';
-import { MasonryVolume, MaterialId, type MasonrySave, type MasonryRayHit } from './MasonryVolume';
+import { MasonryVolume, MaterialId, SERVICE_CHASE_DEPTH_M, type MasonrySave, type MasonryRayHit } from './MasonryVolume';
 import { damagedMasonryMaterial } from './BrickFaceMaterial';
 import { MansionBreakoutRubble } from './MansionBreakoutRubble';
 import type { MeshData } from './masonryMesher';
@@ -220,7 +220,7 @@ export class MansionMasonryDemolition {
     const joint = this.jointContact(entry, origin, direction, 2.4);
     const contact = joint?.contact ?? entry.volume.raycast(origin, direction, 2.4);
     if (!contact) { if (!this.broken.has(index)) this.disposeBrokenBrick(entry); return false; }
-    const maxDepthM = mode === 'chase' ? .105 : undefined;
+    const maxDepthM = mode === 'chase' ? SERVICE_CHASE_DEPTH_M : undefined;
     const result = entry.volume.impact({ point: contact.point, direction,
       chisel: 'flat', widthM: mode === 'chase' ? .045 : .075,
       energyJ: mode === 'chase' ? 6 : 18, maxDepthM });

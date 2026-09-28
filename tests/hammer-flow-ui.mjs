@@ -47,6 +47,7 @@ for(const mobile of [false,true])for(const scene of ['original','north'])for(con
     return {camera:c.position.toArray(),tip:tip.toArray(),entry:entry.toArray(),relativeTip:tip.clone().sub(entry).toArray(),relativeTool:tool.sub(entry).toArray(),orientation:h.getWorldQuaternion(c.quaternion.clone()).toArray(),
       tangent:tangent.toArray(),depth,desired:g.player.wallWorkDistance,target:g.player.workPosition.targetDistanceM,locked:g.player.workPosition.locked,held:g.input.actionHeld,yaw:g.player.yaw,pitch:g.player.pitch,side:g.hammerWorkStance.sideDegrees,
       status:g.fpsRig.contactStatus,reachable:g.fpsRig.reachable,inAir:g.fpsRig.chiselInAir,removed:wall?wall.removedClayNodes:g.room.brickWall.volume.removedNodeCount,
+      inwardPurchase:-new V(0,0,-1).applyQuaternion(h.getWorldQuaternion(c.quaternion.clone())).dot(plane.normal),
       pose:g.fpsRig.debugPose(),renderError:g.renderer.renderError,overflow:document.documentElement.scrollWidth>innerWidth};
   });
   await step(180);
@@ -94,6 +95,8 @@ for(const mobile of [false,true])for(const scene of ['original','north'])for(con
   if(!baseline){
     assert(idle.locked,`${name}: nearby hammer never snapped to wall`);assert(Math.abs(idle.depth-idle.target)<.003,`${name}: snap distance did not settle`);
     assert(Math.abs(idle.depth-idle.desired)<.025,`${name}: snapped to the old arbitrary distance`);
+    assert(idle.inwardPurchase>.70,`${name}: side-view chisel points along the facade instead of into the brick`);
+    assert(Math.abs(Math.abs(idle.side)-15)<.02,`${name}: view yaw changed the selected wall attack`);
     assert(start.held,`${name}: native USE did not hold percussion`);assert(stationary.removed>idle.removed,`${name}: stationary percussion did not remove actual clay`);
     assert(maxTipStep<=.0051&&maxToolStep<=.0051,`${name}: hammer reset between strikes`);assert(maxAngleStep<.001,`${name}: housing rotated on each new brick face`);
     assert(dist(start.camera,stationary.camera)<1e-8,`${name}: strikes repositioned player`);
@@ -101,6 +104,10 @@ for(const mobile of [false,true])for(const scene of ['original','north'])for(con
     const travel=moving.at(-1).camera.reduce((s,v,j)=>s+(v-stationary.camera[j])*stationary.tangent[j],0);
     assert(travel*travelSide>.15,`${name}: A/D or stick did not traverse the wall`);
     for(const s of moving){assert(Math.abs(s.depth-stationary.depth)<1e-8,`${name}: strafe changed standoff`);assert.equal(s.yaw,stationary.yaw);assert.equal(s.pitch,stationary.pitch);assert.equal(s.side,stationary.side);assert(!s.overflow);assert.equal(s.renderError,'');}
+    for(const s of [idle,start,stationary,...moving])for(const arm of s.pose.arms){
+      assert(Math.abs(dist(arm.shoulder,arm.elbow)-.31)<1e-5,`${name}: upper arm stretched`);
+      assert(Math.abs(dist(arm.elbow,arm.wrist)-.27)<1e-5,`${name}: forearm stretched`);
+    }
     for(let i=1;i<movingTrace.length;i++){
       const a=movingTrace[i-1],b=movingTrace[i];
       const tipTravel=b.tip.reduce((s,v,j)=>s+(v-a.tip[j])*stationary.tangent[j],0)*travelSide;

@@ -6,7 +6,7 @@ import { GAME_CONFIG } from '../data/gameConfig';
 import { laserBand, laserTint, laserEmission } from '../systems/LaserProjection';
 import type { InstallationDefinition } from '../data/installationRules';
 import type { InstallationPoint } from '../electrical/InstallationPoint';
-import { MasonryVolume, type MasonryFragment, type MasonryVolumeOptions } from './MasonryVolume';
+import { MasonryVolume, SERVICE_CHASE_DEPTH_M, type MasonryFragment, type MasonryVolumeOptions } from './MasonryVolume';
 import { brickFacePatch, brickFaceTone } from './BrickFacePatch';
 import { clayRibNormal, clayRibShade, siteClayImage, siteClayReady } from './BrickRibbing';
 
@@ -31,7 +31,7 @@ wallMaterial.name = 'Reference clay face with independent fractured masonry';
 const masonryColor = attribute<'vec3'>('color', 'vec3');
 const grain = fract(sin(dot(floor(positionWorld.xy.mul(1800)), vec2(127.1,311.7))).mul(43758.5453));
 const mottling = sin(positionWorld.x.mul(93).add(sin(positionWorld.y.mul(71)))).mul(sin(positionWorld.y.mul(127)));
-const rawMasonry = masonryColor.mul(grain.mul(.15).add(.90).add(mottling.mul(.045)));
+const rawMasonry = masonryColor.mul(grain.mul(.28).add(.82).add(mottling.mul(.075)));
 const brickLocalUv = attribute<'vec2'>('brickLocalUv', 'vec2');
 const edgeDistance = min(min(brickLocalUv.x, brickLocalUv.x.oneMinus()), min(brickLocalUv.y, brickLocalUv.y.oneMinus()));
 // A restrained darkening of the clay face at its real mortar boundary gives
@@ -41,8 +41,11 @@ const edgeShade = smoothstep(0, .075, edgeDistance).mul(.13).add(.87);
 const photographedClay = sampleTexture(brickImage, uv()).rgb.mul(masonryColor.r.div(.49))
   .mul(attribute<'vec3'>('brickTone', 'vec3'));
 const clayInterior = sampleTexture(siteClayImage, vec2(brickLocalUv.x, brickLocalUv.y.mul(.66).add(.32))).rgb;
-const fracturedClay = mix(rawMasonry, clayInterior,
-  smoothstep(.08, .2, masonryColor.r.sub(masonryColor.g)).mul(siteClayReady).mul(.42));
+// Preserve the volume's cavity occlusion when adding a little clay color.
+// A strong, unshaded factory-face sample made deep hollows read as flat orange
+// patches and carried the intact rib pattern onto newly fractured surfaces.
+const fracturedClay = mix(rawMasonry, clayInterior.mul(masonryColor.r.div(.44)),
+  smoothstep(.08, .2, masonryColor.r.sub(masonryColor.g)).mul(siteClayReady).mul(.12));
 const finishedClay = mix(photographedClay, clayInterior, siteClayReady.mul(.25)).mul(edgeShade).mul(clayRibShade);
 // Mortar squeezed out by hand follows the joints, with gaps and grit instead
 // of a constant-width graphic line. The underlying breakable field is intact.
@@ -63,8 +66,11 @@ const laidFace = mix(finishedClay, roughMortar, mortarMask.mul(.90).add(mortarSt
 // A face mask keeps real mortar joints, internal chambers and broken edges on
 // their own rough clay/mortar colors in both WebGPU and the WebGL backend.
 wallMaterial.colorNode = mix(mix(fracturedClay, laidFace, attribute<'float'>('brickFace', 'float').mul(brickImageReady)),laserTint,laserBand);
-wallMaterial.normalNode = normalMap(sampleTexture(clayRibNormal, brickLocalUv),
-  vec2(.75, .75).mul(attribute<'float'>('brickFace', 'float')));
+const fractureNormal=vec3(
+  sin(positionWorld.x.mul(1870).add(positionWorld.y.mul(1310))).mul(.055).add(.5),
+  sin(positionWorld.y.mul(1630).add(positionWorld.z.mul(1970))).mul(.055).add(.5),1);
+wallMaterial.normalNode = normalMap(mix(fractureNormal,sampleTexture(clayRibNormal,brickLocalUv).rgb,
+  attribute<'float'>('brickFace','float')),vec2(.75,.75));
 wallMaterial.emissiveNode=laserEmission;
 type MeshData = ReturnType<MasonryVolume['buildChunkMesh']>;
 
@@ -84,6 +90,7 @@ export class BrickWall extends THREE.Group {
   private workerError = '';
   chiselType: 'flat' | 'pointed' = 'flat';
   chiselEnergyJ = 4;
+  readonly chaseDepthM=SERVICE_CHASE_DEPTH_M;
   private widthM = .05;
   get chiselWidthM(): number { return this.widthM; }
   set chiselWidthM(value: number) { if(Number.isFinite(value)) this.widthM = THREE.MathUtils.clamp(value, .01, .05); }
@@ -265,7 +272,7 @@ export class BrickWall extends THREE.Group {
   }
   recessChaseAtAim(camera: THREE.Camera, _pointId: string): MasonryImpact | null {
     // Preserve the rear leaf while opening a physical box/conduit recess.
-    return this.strike(camera, .105);
+    return this.strike(camera, this.chaseDepthM);
   }
   private strike(camera: THREE.Camera, maxDepthM?: number): MasonryImpact | null {
     let contact = this.contactProvider?.(camera) ?? null;

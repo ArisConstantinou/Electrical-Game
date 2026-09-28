@@ -59,12 +59,12 @@ export class Room extends THREE.Group {
     this.name = 'Living room first-fix site';
     this.userData.studioEntityId = 'world:living-room';
     // Installation and mortar systems query this volume in world metres.
-    this.brickWall = new BrickWall(INSTALLATION_POINTS, { depth: CONSTRUCTION_DEFAULTS.brickDepth });
+    this.brickWall = new BrickWall(INSTALLATION_POINTS, { depth: CONSTRUCTION_DEFAULTS.brickDepth, hollowProfile:'horizontal-service-bay' });
     this.add(this.brickWall);
 
     // Preserve the former untouched masonry as a separate right-hand practice
     // surface while the main installation wall starts at the PVC phase.
-    this.intactPracticeWall = new BrickWall([], { depth: CONSTRUCTION_DEFAULTS.brickDepth });
+    this.intactPracticeWall = new BrickWall([], { depth: CONSTRUCTION_DEFAULTS.brickDepth, hollowProfile:'horizontal-service-bay' });
     this.intactPracticeWall.name = 'Untouched right-hand masonry practice wall';
     this.intactPracticeWall.setStudioEntityId('world:intact-practice-wall');
     this.intactPracticeWall.rotation.y = -Math.PI / 2;

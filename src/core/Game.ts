@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {m18ToolModelsReady} from '../player/M18ToolModels';
 import { Renderer } from './Renderer';
 import { Input } from './Input';
 import { AssetManager } from './AssetManager';
@@ -445,7 +446,7 @@ export class Game {
     let preparedStages = 0;
     const markPrepared = (): void => {
       if (startButton.dataset.preparing === 'false') return;
-      const percent = Math.round(++preparedStages / (9+viewStages) * 100);
+      const percent = Math.round(++preparedStages / (10+viewStages) * 100);
       startLoadPercent.value = `${percent}%`;
       startLoadPercent.setAttribute('aria-label', `Site preparation ${percent}%`);
       startScreen.style.setProperty('--load-progress', `${percent}%`);
@@ -456,6 +457,7 @@ export class Game {
       observePreparation(this.renderer.ready),
       observePreparation(this.workerBody.ready),
       observePreparation(this.fpsRig.hammerReady),
+      observePreparation(m18ToolModelsReady()),
       observePreparation(this.apprentice.ready),
       this.masonryBatch?.ready ?? Promise.resolve(),
     ]).then(async () => {
@@ -634,13 +636,22 @@ export class Game {
     const cuttingStep=(this.room.brickWall.chiselType==='flat'?this.room.brickWall.chiselWidthM:.01)*.36;
     this.player.wallToolTravelSpeedMps=this.selectedTool==='hammer'&&this.input.actionHeld
       ?Math.min(.6,cuttingStep*this.hammerSpeed/.24):null;
-    // Reserve rear-grip clearance along the sightline, then project that
-    // distance onto the facade. Multiplying two wall cosines underestimates
-    // clearance when the worker looks and chisels along the same wall side.
+    // Reserve actual head clearance around the rear grip. With the shaft
+    // facing the wall, an oblique view already puts the motor beside the
+    // head; adding the full frontal clearance there exceeds the arm reach.
     const hammerSpan=this.fpsRig.hammerGripToTipLengthM;
     const normal=plane?.normal??new THREE.Vector3(0,0,1),view=this.renderer.camera.getWorldDirection(new THREE.Vector3());
     const axis=wallWorkDirection(normal,this.hammerWorkStance.targetSideDegrees,this.hammerWorkStance.targetTiltDegrees);
-    this.player.wallWorkDistance=handWork?.46:Math.max(.46,(.32+hammerSpan*Math.max(.2,axis.dot(view)))*Math.max(.2,-view.dot(normal)));
+    const alignment=THREE.MathUtils.clamp(axis.dot(view),0,1);
+    const rearLateral=hammerSpan*Math.sqrt(1-alignment*alignment);
+    const headClearance=Math.max(.04,Math.sqrt(Math.max(0,.32*.32-rearLateral*rearLateral)));
+    const viewCos=Math.max(.2,-view.dot(normal));
+    const viewTan=Math.sqrt(Math.max(0,1-viewCos*viewCos))/viewCos;
+    // Keep the point under the reticle within a finite lateral arm workspace.
+    // At a strong side view, the same .46 m wall gap puts that point almost a
+    // metre down the facade even though the motor is clear beside the head.
+    const sideViewMinimum=Math.max(.30,Math.min(.46,.68/Math.max(1,viewTan)));
+    this.player.wallWorkDistance=handWork?.46:Math.max(sideViewMinimum,(headClearance+hammerSpan*alignment)*viewCos);
     // Looking around while building a gang must rotate only the view. Do not
     // auto-crouch or retarget the camera from the wall point under the cursor.
     this.player.handWorkTargetY=handWork&&this.selectedTool!=='fitting'?this.boxWorkAim()?.y??null:null;

@@ -37,16 +37,10 @@ export class HammerWorkStance {
     const focus = camera.position.clone().addScaledVector(view, distance);
     const workingAtWall = view.dot(normal) < -.15 && distance > 0 && standoff <= 1.45 && (plane||Math.abs(focus.x) <= 2.54 && focus.y >= 0 && focus.y <= 3);
     const hammerWork = enabled && workingAtWall && tool === 'hammer';
-    // Side adjustment is exact and symmetric about the worker's aim. The
-    // default shoulder angle lives in the selected setting, never a hidden bias.
-    // Keeping it fixed to
-    // the wall normal twisted the motor away from the body in oblique views.
-    const viewSide=THREE.MathUtils.radToDeg(Math.atan2(view.dot(wallWorkTangent(normal)),-view.dot(normal)));
-    // Open the wall-angle range continuously for glancing approaches. A
-    // crossing-only extension jumped 15 degrees at exactly 65 degrees of view.
-    // Normal poses through 55 degrees retain their established limit.
-    const sideLimit=Math.min(87,65+Math.max(0,Math.abs(viewSide)-55)*1.5);
-    const target = hammerWork ? THREE.MathUtils.clamp(requestedSide+viewSide,-sideLimit,sideLimit) : 0;
+    // The selected attack is measured from the facade normal. A side view
+    // changes the worker's shoulder presentation, never the shaft's purchase
+    // into the brick. Adding view yaw here made the bit graze along the wall.
+    const target = hammerWork ? THREE.MathUtils.clamp(requestedSide,-65,65) : 0;
     this.targetSideDegrees=target;
     this.sideDegrees = THREE.MathUtils.damp(this.sideDegrees, target, 10, Math.min(dt, .05));
     if (Math.abs(this.sideDegrees - target) < .01) this.sideDegrees = target;
