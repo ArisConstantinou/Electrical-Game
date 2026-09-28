@@ -1,0 +1,32 @@
+{
+  "units": "metres",
+  "engine": "Three.js 0.185.1",
+  "files": [
+    {
+      "file": "rebar-pliers-250mm.glb",
+      "bytes": 342892,
+      "sizeM": [
+        0.04699999839067459,
+        0.2500000074505806,
+        0.023000000044703484
+      ],
+      "meshes": 8,
+      "triangles": 3552,
+      "clips": [
+        "Jaw open close — complete forged halves"
+      ]
+    },
+    {
+      "file": "tie-wire-1.6mm-held.glb",
+      "bytes": 16008,
+      "sizeM": [
+        0.09489349648356438,
+        0.1800641193985939,
+        0.005593454756308347
+      ],
+      "meshes": 1,
+      "triangles": 576,
+      "clips": []
+    }
+  ]
+}

@@ -12,7 +12,8 @@ import { PvcBendHUD } from '../ui/PvcBendHUD';
 import { PvcStock,PvcTube,part,pvcMaterial,pvcStockMaterial } from './PvcModels';
 import { springLeadPoint } from './PvcLead';
 import {DEFAULT_PVC_PRESETS,PVC_PRESET_KEY,readPvcPresets,type PvcPreset} from './PvcPresets';
-import {buildHeldRebar,buildPvcDrill12,buildRebarHug,buildRebarPliers,setRebarDepth} from './PvcSecuringModels';
+import {buildHeldRebar,buildPvcDrill12,buildRebarHug,buildRebarPliers,setRebarPliersClosed,setTieWireProgress,setTieWireTarget} from './PvcSecuringModels';
+import {REBAR_TYING_ROLL} from './RebarTyingModels';
 import '../ui/PvcWorkshop.css';
 
 type Phase='sealed'|'opening'|'loose'|'spreading'|'marking'|'spring'|'inserting'|'bending'|'review'|'extracting'|'batch'|'carrying'|'fitting'|'cutting'|'cut'|'pipe-install-ready'|'installing'|'fastener-marking'|'fastener-drilling'|'fastener-insert-ready'|'fastener-inserting'|'fastener-tighten-ready'|'fastener-tightening';
@@ -270,7 +271,14 @@ export class PvcWorkshop {
     if(this.phase==='carrying'&&tool==='cutter'){this.interact();return false;}
     this.message=this.instruction('Άφησε τη σωλήνα στη μάτσα ή πάτησε ESC για παύση.','Άφησε τη σωλήνα στη μάτσα ή πάτησε ΠΙΣΩ για παύση.');return false;
   }
-  private transition(phase:Phase):void{this.phase=phase;this.elapsed=0;this.message='';this.shapeKey='';if(phase!=='marking')this.markingActive=false;if(!['fitting','cut'].includes(phase)){this.cutHeightHold=0;this.cutHeightPointer=null;this.cutHeightBlocked=false;}if(!['fitting','cutting','cut'].includes(phase)){this.supportS=null;this.cutterRetreat=0;}}
+  private transition(phase:Phase):void{this.phase=phase;this.elapsed=0;this.message='';this.shapeKey='';if(phase!=='marking')this.markingActive=false;if(!['fitting','cut'].includes(phase)){this.cutHeightHold=0;this.cutHeightPointer=null;this.cutHeightBlocked=false;}if(!['fitting','cutting','cut'].includes(phase)){this.supportS=null;this.cutterRetreat=0;}if(phase==='fastener-inserting'||phase==='fastener-tighten-ready')this.focusTyingWork();}
+  private focusTyingWork():void{
+    const pair=this.fastenerPairs[0];if(!pair)return;
+    const p=pair.rebar.getWorldPosition(v()),c=this.game.renderer.camera;
+    this.cameraDestination.set(p.x,Math.max(.34,p.y+.09),p.z+.40);this.cameraFocus.set(p.x,p.y+.055,p.z+.025);
+    c.position.copy(this.cameraDestination);c.lookAt(this.cameraFocus);c.updateMatrixWorld(true);
+    this.targetRotation.copy(c.quaternion);this.game.player.pitch=c.rotation.x;this.game.player.yaw=c.rotation.y;
+  }
   private stockPoint(x:number,y:number,z:number):THREE.Vector3{return this.stock.markingPoint(this.activeBundle,x,y,z);}
   private selectBundle(index:number):void{
     if(index===this.activeBundle)return;
@@ -677,10 +685,9 @@ export class PvcWorkshop {
       }
     }else if(this.phase==='fastener-tightening'){
       const duration=1.15,index=Math.min(this.fastenerPairs.length-1,Math.floor(this.elapsed/duration));this.fastenerIndex=index;this.fastenerProgress=THREE.MathUtils.clamp((this.elapsed-index*duration)/duration,0,1);
-      const jaw=this.rebarPliers.getObjectByName('rebar-plier-moving-jaw');if(jaw)jaw.rotation.z=-this.fastenerProgress*.30;
-      const pair=this.fastenerPairs[index],twist=pair.rebar.getObjectByName('tie-wire-twist');setRebarDepth(pair.rebar,1-THREE.MathUtils.smoothstep(this.fastenerProgress,0,1)*.90);if(twist){twist.visible=this.fastenerProgress>.55;twist.scale.y=THREE.MathUtils.smoothstep(this.fastenerProgress,.55,1);twist.rotation.y=this.fastenerProgress*Math.PI*3;}
-      for(let completed=0;completed<index;completed++)setRebarDepth(this.fastenerPairs[completed].rebar,.10);
-      if(this.elapsed>=this.fastenerPairs.length*duration){this.fastenerPairs.forEach(p=>setRebarDepth(p.rebar,.10));this.finishFasteners();}
+      for(let i=0;i<index;i++)setTieWireProgress(this.fastenerPairs[i].rebar,1);
+      setTieWireProgress(this.fastenerPairs[index].rebar,this.fastenerProgress);
+      if(this.elapsed>=this.fastenerPairs.length*duration)this.finishFasteners();
     }
   }
   private arrangePrepared():void{
@@ -715,11 +722,8 @@ export class PvcWorkshop {
   }
   private fastenerWire(left:THREE.Vector3,right:THREE.Vector3):THREE.Group{
     const area=this.fastenerArea()!,entry=this.carried?this.entry():null;
-    // Tightening scales depth to 10%. The closed bow must meet the pipe's
-    // outer face while both masonry anchors retain their original positions.
     const anchorZ=(left.z+right.z)/2;
-    const frontZ=entry?anchorZ+(entry.position.z+PVC.diameter/2+.00115-anchorZ)/.1-.038:area.z+.085;
-    return buildRebarHug(left,right,frontZ,entry?.position.x);
+    return buildRebarHug(left,right,Math.max(anchorZ+.07,(entry?.position.z??area.z)+.05),entry?.position.x??area.centreX,entry?entry.position.z+PVC.diameter/2+.0008:undefined);
   }
   private markFastenerHole():void{
     const cursor=this.fastenerCursorPoint();if(!cursor)return;
@@ -745,6 +749,7 @@ export class PvcWorkshop {
     this.fastenerDirectIndex=this.fastenerIndex=index;this.fastenerProgress=0;this.transition('fastener-drilling');this.message='Τρύπημα 12 mm στο σημείο στόχευσης.';
   }
   private finishFasteners():void{
+    this.fastenerPairs.forEach(pair=>setTieWireProgress(pair.rebar,1));
     if(!this.target)return;this.target.pipeStep='done';this.target.setStage('complete');this.target.userData.pvcFasteners={holeCount:this.fastenerHoles.length,pairCount:this.fastenerPairs.length,drillBitMm:12,sequence:this.target.conduit?.userData.fittedBeforeFasteners?'pipe-inserted-marked-drilled-wire-threaded-twisted':'marked-drilled-open-wire-pipe-inserted-twisted'};
     this.stagedFasteners.delete(this.target);this.installedCount++;if(this.carried){this.installedByBundle[this.carried.originBundle]++;this.carried.highlight?.geometry.dispose();(this.carried.highlight?.material as THREE.Material|undefined)?.dispose();this.carried.mesh.geometry.dispose();}this.carried=null;this.target=null;this.focused=false;this.transition('batch');this.game.audio.play('box');
   }
@@ -807,7 +812,9 @@ export class PvcWorkshop {
         const primary=arm.side>0,grip=workerGripTarget(arm,true);
         return {...grip,object:this.drill,section:(primary?[.019,.021]:[.013,.013]) as [number,number],shape:primary?'box' as const:'round' as const,contactLocked:true,surfaceContact:!primary,firstPersonClearance:.17,trigger:primary?this.drill.getObjectByName('Index finger trigger')?.getWorldPosition(v()):undefined};
       }
-      return {...workerGripTarget(arm,this.work.visible&&this.phase!=='fastener-marking'&&(this.phase!=='carrying'||arm.side>0)),section:(cutter?[.020,.014]:this.phase.startsWith('fastener-')?(arm.side<0?[.005,.005]:[.011,.011]):[.01,.01]) as [number,number],shape:cutter?'box' as const:'round' as const,contactLocked:true,surfaceContact:true,cutter:cutter?this.cutter:undefined,thumbWrap:this.phase==='carrying',firstPersonClearance:this.phase==='carrying'?.28:cutting?.20:clearFirstPerson?.42:undefined};
+      const pliers=this.rebarPliers.visible&&arm.side>0;
+      const releasedWire=arm.side<0&&['fastener-tighten-ready','fastener-tightening'].includes(this.phase);
+      return {...workerGripTarget(arm,this.work.visible&&!releasedWire&&this.phase!=='fastener-marking'&&(this.phase!=='carrying'||arm.side>0)),section:(cutter?[.020,.014]:pliers?this.rebarPliers.userData.gripSection:this.phase.startsWith('fastener-')?(arm.side<0?[.003,.003]:[.011,.011]):[.01,.01]) as [number,number],shape:cutter||pliers?'box' as const:'round' as const,contactLocked:true,surfaceContact:true,cutter:cutter?this.cutter:undefined,thumbWrap:this.phase==='carrying',firstPersonClearance:this.phase==='carrying'?.28:cutting?.20:this.rebarPliers.visible?.10:clearFirstPerson?.42:undefined};
     });
   }
   useAnatomicalBody():void{
@@ -929,11 +936,28 @@ export class PvcWorkshop {
         right.copy(v().fromArray(this.drill.userData.gripPoint).applyQuaternion(q).add(this.drill.position));rightQ.copy(q);
         left.copy(v().fromArray(this.drill.userData.secondaryGripPoint).applyQuaternion(q).add(this.drill.position));leftQ.copy(q).multiply(new THREE.Quaternion().setFromUnitVectors(v(0,1,0),v(1,0,0)));
       }else{
-        const pair=pairs[Math.min(this.fastenerIndex,Math.max(0,pairs.length-1))],world=pair?pair.left.marker.position.clone().add(pair.right.marker.position).multiplyScalar(.5):this.target!.boxGroup.getWorldPosition(v()).add(v(0,-.16,.12)),centre=c.worldToLocal(world);
-        this.heldRebar.position.copy(centre).add(v(-.16,-.03,.10));this.heldRebar.rotation.set(0,0,.08);left.copy(this.heldRebar.position).add(v(0,-.02,0));leftQ.identity();
-        this.rebarPliers.position.copy(centre).add(v(.10,-.01,.08));this.rebarPliers.rotation.set(0,0,-.18);right.copy(v().fromArray(this.rebarPliers.userData.gripPoint).applyQuaternion(this.rebarPliers.quaternion).add(this.rebarPliers.position));rightQ.copy(this.rebarPliers.quaternion);
+        const pair=pairs[Math.min(this.fastenerIndex,Math.max(0,pairs.length-1))],world=pair?pair.left.marker.position.clone().add(pair.right.marker.position).multiplyScalar(.5):this.target!.boxGroup.getWorldPosition(v()).add(v(0,-.16,.12)),centre=c.worldToLocal(world.clone());
+        this.heldRebar.position.copy(centre).add(v(-.11,-.015,.09));this.heldRebar.rotation.set(0,0,.08);left.copy(v().fromArray(this.heldRebar.userData.gripPoint).applyQuaternion(this.heldRebar.quaternion).add(this.heldRebar.position));leftQ.copy(this.heldRebar.quaternion);
+        const tying=['fastener-tighten-ready','fastener-tightening'].includes(this.phase),progress=this.phase==='fastener-tightening'?this.fastenerProgress:0;
+        setRebarPliersClosed(this.rebarPliers,tying?THREE.MathUtils.smoothstep(progress,0,.20):.3);
+        this.rebarPliers.quaternion.copy(c.quaternion).invert().multiply(new THREE.Quaternion().setFromAxisAngle(v(0,0,1),REBAR_TYING_ROLL)).multiply(new THREE.Quaternion().setFromAxisAngle(v(0,1,0),tying?THREE.MathUtils.smoothstep(progress,.20,.87)*Math.PI*5:0));
+        if(tying&&pair){
+          const entry=this.target?.conduit?this.entries()[this.target.conduit.userData.pvcRecipe?.entryIndex??this.entryIndex]:this.entry();
+          if(entry)this.fastenerPairs.forEach(p=>setTieWireTarget(p.rebar,entry.position.x,entry.position.z+PVC.diameter/2+.0008));
+          pair.rebar.updateMatrixWorld(true);
+          const contact=c.worldToLocal(pair.rebar.localToWorld(v().fromArray(pair.rebar.userData.toolContact)));
+          this.rebarPliers.position.copy(contact).sub(v().fromArray(this.rebarPliers.userData.tipPoint).applyQuaternion(this.rebarPliers.quaternion));
+          // Once threaded, release the wire with the free hand. The nippers
+          // tighten it one-handed; the free arm keeps its anatomical rest pose.
+        }else this.rebarPliers.position.copy(centre).add(v(.10,-.01,.08));
+        right.copy(v().fromArray(this.rebarPliers.userData.gripPoint).applyQuaternion(this.rebarPliers.quaternion).add(this.rebarPliers.position));rightQ.copy(this.rebarPliers.quaternion);
+        if(this.phase==='fastener-insert-ready'){
+          // Hold the next wire/tool within reach while the user remains free
+          // to aim and drill additional holes. Focus begins only on feeding.
+          this.heldRebar.position.set(-.10,-.14,-.32);this.heldRebar.quaternion.identity();left.copy(v().fromArray(this.heldRebar.userData.gripPoint).add(this.heldRebar.position));leftQ.identity();
+          this.rebarPliers.position.set(.08,-.17,-.32);right.copy(v().fromArray(this.rebarPliers.userData.gripPoint).applyQuaternion(this.rebarPliers.quaternion).add(this.rebarPliers.position));
+        }
         if(this.phase==='fastener-inserting'){const approach=1-THREE.MathUtils.smoothstep(this.fastenerProgress,0,1);this.heldRebar.position.z+=approach*.13;left.z+=approach*.13;}
-        if(this.phase==='fastener-tightening'){const approach=1-THREE.MathUtils.smoothstep(this.fastenerProgress,0,.35);this.rebarPliers.position.z+=approach*.10;right.z+=approach*.10;}
       }
     }
     this.work.updateMatrixWorld(true);
