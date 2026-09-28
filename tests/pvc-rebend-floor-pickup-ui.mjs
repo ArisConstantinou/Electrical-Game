@@ -6,6 +6,7 @@ import {serveTaskBuild} from './serve-task-build.mjs';
 
 const url='http://127.0.0.1:5365/Electrical-Game/';
 const live=process.argv.includes('--live');
+const visualBaseline=process.argv.includes('--visual-baseline');
 const out=process.env.PVC_REBEND_OUT??'output/pvc-rebend-floor-pickup/after';
 await mkdir(out,{recursive:true});
 const report={url,live,errors:[],cases:[]};
@@ -90,12 +91,11 @@ try{
         assert.equal(floor.total,100);assert.equal(floor.uuids.length,10);assert.equal(new Set(floor.uuids).size,10);
         assert(floor.highlights.every(item=>item.visible&&[0xffd43b,0x36a8ff].includes(item.color)),'All ten floor pipes need visible outlines');
         assert(floor.bounds.every(([x0,x1,z0,z1])=>x0>=-3.8&&x1<=3.8&&z0>=-3.6&&z1<=3.6),'Dropped pipe geometry must stay within the room');
-        assert(floor.centres.every(([x,z],i)=>floor.centres.slice(i+1).every(([otherX,otherZ])=>Math.hypot(x-otherX,z-otherZ)>.29)),'Ten pipes must not settle on identical floor positions');
-        const centre={x:(Math.min(...floor.bounds.map(box=>box[0]))+Math.max(...floor.bounds.map(box=>box[1])))/2,
-          z:(Math.min(...floor.bounds.map(box=>box[2]))+Math.max(...floor.bounds.map(box=>box[3])))/2};
-        await page.evaluate(({x,z})=>{const g=window.__wireTheHouse,c=g.renderer.camera,V=c.position.constructor,target=new V(x,.07,z);
-          c.position.set(Math.max(-3.2,x-1.7),1.65,Math.min(3.2,z+2.4));const direction=target.sub(c.position).normalize();g.player.pitch=Math.asin(direction.y);g.player.yaw=Math.atan2(-direction.x,-direction.z);c.rotation.set(g.player.pitch,g.player.yaw,0);c.updateMatrixWorld(true);},centre);
+        if(!visualBaseline)assert(floor.centres.every(([x,z],i)=>floor.centres.slice(i+1).every(([otherX,otherZ])=>Math.hypot(x-otherX,z-otherZ)>.29)),'Ten pipes must not settle on identical floor positions');
+        await page.evaluate(()=>{const g=window.__wireTheHouse,c=g.renderer.camera,V=c.position.constructor,target=new V(.8,.07,-2);
+          c.position.set(.8,1.65,3);const direction=target.sub(c.position).normalize();g.player.pitch=Math.asin(direction.y);g.player.yaw=Math.atan2(-direction.x,-direction.z);c.rotation.set(g.player.pitch,g.player.yaw,0);c.updateMatrixWorld(true);});
         await tick(3);await snap('ten-floor-pipes');
+        if(visualBaseline){report.cases.push({name,tenFloor:{count:floor.uuids.length,centres:floor.centres}});continue;}
         await aimDropped(floor.uuids[0],false);
         const queryCost=await page.evaluate(()=>{const p=window.__wireTheHouse.pvc;
           const measure=()=>{for(let i=0;i<20;i++)p.floorTarget();const start=performance.now();for(let i=0;i<200;i++)p.floorTarget();return (performance.now()-start)/200;};
