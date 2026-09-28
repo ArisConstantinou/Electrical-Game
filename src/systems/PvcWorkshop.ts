@@ -57,6 +57,7 @@ export class PvcWorkshop {
   transparent=false;
   readonly prompt:HTMLButtonElement;
   readonly liveMeasure:HTMLOutputElement;
+  readonly cutGuide:HTMLDivElement;
   bend=new PvcBend();
   phase:Phase='sealed';
   focused=false;
@@ -79,6 +80,7 @@ export class PvcWorkshop {
   private cutHeightHold=0;
   private cutHeightHoldElapsed=0;
   private cutHeightPointer:number|null=null;
+  private lastCutCue:{target:string;cutS:number;distanceMm:number;trend:'closer'|'further'|null}|null=null;
   private target:InstallationPoint|null=null;
   private carried:StockPipe|null=null;
   private elapsed=0;
@@ -154,6 +156,7 @@ export class PvcWorkshop {
     this.controls.innerHTML='<button data-pvc="back" aria-label="Προηγούμενη θέση χεριών">← ΧΕΡΙΑ</button><button data-pvc="forward" aria-label="Επόμενη θέση χεριών">ΧΕΡΙΑ →</button><button id="pvc-use">ΚΡΑΤΑ</button><button data-pvc="confirm">ΕΛΕΓΧΟΣ</button><button data-pvc="undo">ΑΝΑΙΡΕΣΗ</button><button data-pvc="save">PRESET</button><button data-pvc="transparent">ΔΙΑΦΑΝΕΙΑ</button><button data-pvc="qty-1" aria-label="Ετοίμασε μία σωλήνα">1</button><button data-pvc="qty-5" aria-label="Ετοίμασε πέντε σωλήνες">5</button><button data-pvc="qty-all" aria-label="Ετοίμασε όλες τις σωλήνες">ΟΛΕΣ</button><button data-pvc="pause">ΠΙΣΩ</button>';
     this.prompt=document.createElement('button');this.prompt.id='pvc-prompt';this.prompt.hidden=true;
     this.liveMeasure=document.createElement('output');this.liveMeasure.id='pvc-live-measure';this.liveMeasure.hidden=true;this.liveMeasure.setAttribute('aria-label','Ζωντανή μέτρηση σωλήνας');
+    this.cutGuide=document.createElement('div');this.cutGuide.id='pvc-cut-guide';this.cutGuide.hidden=true;this.cutGuide.setAttribute('aria-hidden','true');
     this.markConfirm=document.createElement('button');this.markConfirm.id='pvc-mark-confirm';this.markConfirm.setAttribute('aria-label','Σημάδεψε τις σωλήνες με τον μαρκαδόρο');this.markConfirm.innerHTML='<svg viewBox="0 0 32 32" aria-hidden="true"><path d="m8 24 3-8L23 4l5 5-12 12-8 3zM19 8l5 5M8 24l6-2-4-4-2 6z"/></svg>';this.markConfirm.hidden=true;
     this.zoomControl=document.createElement('button');this.zoomControl.id='pvc-fit-zoom';this.zoomControl.setAttribute('aria-label','Μεγέθυνση κάμερας κοπής');this.zoomControl.innerHTML='<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="14" cy="14" r="8"/><path d="m20 20 8 8M10 14h8"/><path class="zoom-plus" d="M14 10v8"/></svg>';this.zoomControl.hidden=true;
     this.drillControl=document.createElement('button');this.drillControl.id='pvc-drill-holes';this.drillControl.setAttribute('aria-label','Τρύπησε διαδοχικά τις σημειωμένες οπές με τρυπάνι 12 χιλιοστών');this.drillControl.innerHTML='<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 7h15v10H3zM18 10h7M25 9v4M6 17v10h9v-4l-3-6M5 27"/><path d="M25 11h5"/></svg>';this.drillControl.hidden=true;
@@ -177,7 +180,7 @@ export class PvcWorkshop {
       });
       button.addEventListener('click',event=>{if(event.detail===0)this.queue.push(()=>this.setCut(this.cutS+direction*.005));});
     }
-    game.hud.shell.append(this.prompt,this.liveMeasure,this.markConfirm,this.zoomControl,this.drillControl,this.controls,this.fitControls);
+    game.hud.shell.append(this.prompt,this.liveMeasure,this.cutGuide,this.markConfirm,this.zoomControl,this.drillControl,this.controls,this.fitControls);
     const handArrows=document.createElement('span');handArrows.className='pvc-hand-arrows';handArrows.setAttribute('aria-hidden','true');handArrows.innerHTML='<span>↑</span><span>↓</span>';game.hud.shell.querySelector('#joystick-thumb')!.append(handArrows);
     this.bendHud=new PvcBendHUD(game.hud.shell,action=>this.queue.push(()=>action==='use'?this.use():this.command(action)),held=>this.toolbarHold=held);
     try{this.customPresets=readPvcPresets(localStorage);}catch{/* Storage can be unavailable in private/embedded contexts. */}
@@ -271,7 +274,7 @@ export class PvcWorkshop {
     if(this.phase==='carrying'&&tool==='cutter'){this.interact();return false;}
     this.message=this.instruction('Άφησε τη σωλήνα στη μάτσα ή πάτησε ESC για παύση.','Άφησε τη σωλήνα στη μάτσα ή πάτησε ΠΙΣΩ για παύση.');return false;
   }
-  private transition(phase:Phase):void{this.phase=phase;this.elapsed=0;this.message='';this.shapeKey='';if(phase!=='marking')this.markingActive=false;if(!['fitting','cut'].includes(phase)){this.cutHeightHold=0;this.cutHeightPointer=null;this.cutHeightBlocked=false;}if(!['fitting','cutting','cut'].includes(phase)){this.supportS=null;this.cutterRetreat=0;}if(phase==='fastener-inserting'||phase==='fastener-tighten-ready')this.focusTyingWork();}
+  private transition(phase:Phase):void{this.phase=phase;this.elapsed=0;this.message='';this.shapeKey='';this.lastCutCue=null;if(phase!=='marking')this.markingActive=false;if(!['fitting','cut'].includes(phase)){this.cutHeightHold=0;this.cutHeightPointer=null;this.cutHeightBlocked=false;}if(!['fitting','cutting','cut'].includes(phase)){this.supportS=null;this.cutterRetreat=0;}if(phase==='fastener-inserting'||phase==='fastener-tighten-ready')this.focusTyingWork();}
   private focusTyingWork():void{
     const pair=this.fastenerPairs[0];if(!pair)return;
     const p=pair.rebar.getWorldPosition(v()),c=this.game.renderer.camera;
@@ -700,6 +703,21 @@ export class PvcWorkshop {
   private fitErrorAt(cut:number):number{
     const entry=this.entry();return entry?(this.bend.topHeight-this.bend.at(cut).x-entry.position.y)*1000:0;
   }
+  private cutProximity(errorMm:number):{label:string;arrow:string;band:string}{
+    const distanceMm=Math.abs(errorMm),target=`${this.target?.definition.id??''}:${this.entryIndex}`;
+    const previous=this.lastCutCue;
+    let trend=previous?.target===target?previous.trend:null;
+    if(!previous||previous.target!==target){this.lastCutCue={target,cutS:this.cutS,distanceMm,trend:null};}
+    else if(Math.abs(this.cutS-previous.cutS)>.00001){
+      const change=distanceMm-previous.distanceMm;
+      if(Math.abs(change)>=1)trend=change<0?'closer':'further';
+      this.lastCutCue={target,cutS:this.cutS,distanceMm,trend};
+    }
+    const band=distanceMm<=1.5?'aligned':distanceMm<=8?'almost':distanceMm<=35?'near':'far';
+    const label=band==='aligned'?'ΣΤΟ ΥΨΟΣ':band==='almost'?'ΣΧΕΔΟΝ':
+      trend==='further'?'ΠΙΟ ΜΑΚΡΙΑ':trend==='closer'?'ΠΙΟ ΚΟΝΤΑ':band==='near'?'ΚΟΝΤΑ':'ΜΑΚΡΙΑ';
+    return{label,arrow:errorMm>1.5?'↓':errorMm< -1.5?'↑':'',band};
+  }
   private fastenerArea():{centreX:number;innerX:number;outerLeft:number;outerRight:number;minY:number;maxY:number;z:number}|null{
     if(!this.target)return null;const p=this.target.boxGroup.getWorldPosition(v()),entry=this.carried?this.entry():null,bottom=entry?.position.y??p.y-this.target.boxGroup.groupHeight/2,centreX=entry?.position.x??p.x;
     // Free aiming is confined to the exposed brick inside the 200 mm chased
@@ -776,6 +794,7 @@ export class PvcWorkshop {
   }
   present():void{
     const active=this.blocksWork;
+    if(!active)this.cutGuide.hidden=true;
     if(!active)this.bendHighlight.visible=false;
     this.work.visible=active&&this.phase!=='spreading';
     this.arms.forEach(a=>{a.group.visible=a.hand.visible=this.work.visible;});
@@ -821,6 +840,27 @@ export class PvcWorkshop {
     // Legacy arm geometry is only a transform driver, never a visible fallback.
     // The current WorkerBody model, materials and animations remain untouched.
     this.arms.forEach(arm=>hideLegacyWorkerArm(arm,true));
+  }
+  private positionCutGuide(world:THREE.Vector3,normal:THREE.Vector3):void{
+    if(!this.focused||!['fitting','cutting','cut'].includes(this.phase)){this.cutGuide.hidden=true;return;}
+    const camera=this.game.renderer.camera;
+    const axis=v(1,0,0).applyQuaternion(camera.quaternion);
+    axis.addScaledVector(normal,-axis.dot(normal));
+    if(axis.lengthSq()<.01){axis.copy(v(0,1,0).applyQuaternion(camera.quaternion));axis.addScaledVector(normal,-axis.dot(normal));}
+    axis.normalize();
+    // The line lies in the real shear plane and uses the cutter's tip point.
+    const halfSpan=PVC.diameter*1.8;
+    const a=world.clone().addScaledVector(axis,-halfSpan).project(camera);
+    const b=world.clone().addScaledVector(axis,halfSpan).project(camera);
+    if(!Number.isFinite(a.x+b.x+a.y+b.y)||a.z< -1||a.z>1||b.z< -1||b.z>1){this.cutGuide.hidden=true;return;}
+    const hud=this.game.hud.shell,canvas=this.game.renderer.webgl.domElement.getBoundingClientRect(),shell=hud.getBoundingClientRect();
+    const x1=canvas.left-shell.left+(a.x+1)*canvas.width/2,y1=canvas.top-shell.top+(1-a.y)*canvas.height/2;
+    const x2=canvas.left-shell.left+(b.x+1)*canvas.width/2,y2=canvas.top-shell.top+(1-b.y)*canvas.height/2;
+    this.cutGuide.style.left=`${(x1+x2)/2+hud.scrollLeft}px`;this.cutGuide.style.top=`${(y1+y2)/2+hud.scrollTop}px`;
+    this.cutGuide.style.width=`${Math.hypot(x2-x1,y2-y1)}px`;
+    this.cutGuide.style.transform=`translate(-50%,-50%) rotate(${Math.atan2(y2-y1,x2-x1)}rad)`;
+    this.cutGuide.dataset.blocked=String(!this.cutterReady||this.cutHeightBlocked);
+    this.cutGuide.hidden=false;
   }
   private pose():void{
     const c=this.game.renderer.camera;c.updateMatrixWorld(true);
@@ -911,6 +951,7 @@ export class PvcWorkshop {
       const before=this.bend.at(Math.max(0,this.cutS-.001)),after=this.bend.at(this.cutS+.001);
       const normal=v(before.x-after.x,before.y-after.y,0).normalize().applyQuaternion(root.quaternion);
       this.cutRing.quaternion.setFromUnitVectors(v(0,0,1),normal);
+      this.positionCutGuide(world,normal);
       const tip=c.worldToLocal(world.clone()),q=c.quaternion.clone().invert().multiply(new THREE.Quaternion().setFromUnitVectors(v(0,0,1),normal));
       this.cutter.quaternion.copy(q);this.cutter.position.copy(tip).sub(v().fromArray(this.cutter.userData.tipPoint).applyQuaternion(q));
       this.cutter.position.add(v(.23,0,.025).multiplyScalar(this.cutterRetreat));
@@ -959,7 +1000,7 @@ export class PvcWorkshop {
         }
         if(this.phase==='fastener-inserting'){const approach=1-THREE.MathUtils.smoothstep(this.fastenerProgress,0,1);this.heldRebar.position.z+=approach*.13;left.z+=approach*.13;}
       }
-    }
+    }else this.cutGuide.hidden=true;
     this.work.updateMatrixWorld(true);
     const bodyRight=v(1,0,0).applyQuaternion(c.quaternion);
     for(const arm of this.arms){
@@ -1047,9 +1088,12 @@ export class PvcWorkshop {
       flush.disabled=this.flushCut()===null;flush.setAttribute('aria-pressed',String(this.cutSnapped));
       (this.fitControls.querySelector('#pvc-cut-confirm') as HTMLButtonElement).disabled=this.cutS<=this.cutFrom+.001;
       const status=this.fitControls.querySelector<HTMLOutputElement>('#pvc-cut-height-status')!;
-      const handBlocked=this.cutHeightBlocked;
+      const handBlocked=this.cutHeightBlocked||!this.cutterReady;
       status.dataset.blocked=String(handBlocked);
-      status.textContent=handBlocked?`ΧΕΡΙ · ${this.touch?'ΑΡΙΣΤΕΡΟ STICK':'W/S'}`:`ΥΨΟΣ ${(100*(this.bend.topHeight-this.bend.at(this.cutS).x)).toFixed(1)} cm`;
+      const error=this.fitErrorAt(this.cutS),cue=this.cutProximity(error),heightCm=(100*(this.bend.topHeight-this.bend.at(this.cutS).x)).toFixed(1);
+      status.dataset.proximity=cue.band;
+      status.textContent=handBlocked?`ΧΕΡΙ · ${this.touch?'ΑΡΙΣΤΕΡΟ STICK':'W/S'}`:`ΥΨΟΣ ${heightCm} cm\n${cue.label}${cue.arrow?' '+cue.arrow:''}`;
+      status.setAttribute('aria-label',handBlocked?'Μετακίνησε το αριστερό χέρι μακριά από τον κόφτη':`Ύψος κοπής ${heightCm} εκατοστά. ${cue.label}. ${Math.round(Math.abs(error))} χιλιοστά διαφορά. ${cue.arrow==='↓'?'Κατέβασε τον κόφτη.':cue.arrow==='↑'?'Ανέβασε τον κόφτη.':''}`);
     }
     this.zoomControl.setAttribute('aria-pressed',String(this.fitZoomed));this.zoomControl.dataset.zoom=String(this.fitZoomed);
     this.liveMeasure.hidden=bendUi||!show||!['marking','bending','review','fitting','cut'].includes(this.phase);
@@ -1064,9 +1108,21 @@ export class PvcWorkshop {
       this.liveMeasure.textContent=marking?`${(this.bend.mark*100).toFixed(1)} cm · από την αρχή`:
         fit?`Δάπεδο → κάτω κουτιού ${(this.boxBottomHeight()!*100).toFixed(1)} cm\nΎψος κοπής ${((this.bend.topHeight-this.bend.at(this.phase==='fitting'?this.cutS:this.cutFrom).x)*100).toFixed(1)} cm · ${Math.round(this.fitErrorAt(this.phase==='fitting'?this.cutS:this.cutFrom))} mm διαφορά\nΕίσοδος ${(this.entry()?.boxIndex??0)+1} · ${this.entry()?.side==='left'?'ΑΡΙΣΤΕΡΑ':'ΔΕΞΙΑ'}${this.cutSnapped?' · ΠΡΟΣΩΠΟ':''}`:
         `${this.bend.angle.toFixed(1)}° · R ${this.bend.radius?Math.round(this.bend.radius*1000)+' mm':'—'}${this.phase==='review'?'\nΠοσότητα × '+this.quantity:''}`;
-      const width=this.liveMeasure.offsetWidth,x=rect.left-shell.left+(point.x+1)*rect.width/2+12,y=rect.top-shell.top+(1-point.y)*rect.height/2;
-      this.liveMeasure.style.left=`${THREE.MathUtils.clamp(x,10,rect.width-width-10)}px`;
-      this.liveMeasure.style.top=`${THREE.MathUtils.clamp(y,70,rect.height-160)}px`;
+      const width=this.liveMeasure.offsetWidth,height=this.liveMeasure.offsetHeight;
+      const projectedX=rect.left-shell.left+(point.x+1)*rect.width/2+12,projectedY=rect.top-shell.top+(1-point.y)*rect.height/2;
+      let x=THREE.MathUtils.clamp(projectedX,10,rect.width-width-10);
+      let y=THREE.MathUtils.clamp(projectedY,70,rect.height-160);
+      if(!this.zoomControl.hidden&&y<rect.height*.55){
+        const zoom=this.zoomControl.getBoundingClientRect();
+        if(shell.left+x<zoom.right+8&&shell.left+x+width>zoom.left-8&&shell.top+y<zoom.bottom+8&&shell.top+y+height>zoom.top-8){
+          const left=zoom.left-shell.left-width-12,right=zoom.right-shell.left+12;
+          if(left>=10)x=left;
+          else if(right+width<=rect.width-10)x=right;
+          else y=THREE.MathUtils.clamp(zoom.bottom-shell.top+10,70,rect.height-height-20);
+        }
+      }
+      this.liveMeasure.style.left=`${x}px`;
+      this.liveMeasure.style.top=`${y}px`;
     }
     for(const button of this.controls.querySelectorAll<HTMLButtonElement>('[data-pvc]')){
       const action=button.dataset.pvc;
