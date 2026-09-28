@@ -49,7 +49,3 @@ try{
  }
  assert.deepEqual(report.errors,[]);report.passed=!baseline;
 }catch(error){report.failure=String(error.stack??error);throw error;}finally{await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));await browser.close();}
-
-
-
-\n

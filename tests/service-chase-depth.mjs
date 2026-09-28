@@ -37,5 +37,3 @@ try{
  }
  await writeFile(`${out}/report.json`,JSON.stringify({passed:true,cases:report},null,2));console.log(JSON.stringify({passed:true,cases:report}));
 }finally{await server.close();}
-
-\n
