@@ -30,6 +30,25 @@ try{
   for(let y=1;y<=wall.ny;y+=3)for(let x=1;x<=wall.nx;x+=3)for(const z of [1,wall.nz])assert.equal(wall.baseMaterial(x,y,z),vertical.baseMaterial(x,y,z),'Correcting the internal extrusion must preserve the front/back clay and mortar facade');
   report.checks.push('four horizontal bores; collision axes match; facade layout and outer shells unchanged');
 
+  const service=new MasonryVolume({seed:193187,depth:.10,hollowProfile:'horizontal-service-bay'});
+  const servicePitchY=service.height/23,servicePitchX=service.width/21;
+  const serviceRow=10,serviceY=serviceRow*servicePitchY,serviceX=-service.width/2+10*servicePitchX+servicePitchX*.65;
+  const serviceHeightPitch=(servicePitchY-.024)/2;
+  // Open the once-hidden chambers through a thin real material section, so
+  // raycast tests the same exposed solid boundaries that the renderer sees.
+  assert(service.carveBox({x:serviceX-.03,y:serviceY+.005,z:service.frontZ-.09},{x:serviceX-.015,y:serviceY+servicePitchY-.005,z:service.frontZ})>0);
+  for(let band=0;band<2;band++){
+    const y=serviceY+.012+(band+.5)*serviceHeightPitch;
+    assert.equal(service.sampleMaterial(serviceX,y,service.frontZ-.005),1,'Retain a real front clay shell');
+    assert.equal(service.sampleMaterial(serviceX,y,service.frontZ-.095),1,'Retain a real rear clay shell');
+    assert.equal(service.sampleMaterial(serviceX,y,service.frontZ-.05),0,'The deeper service bay must contain real air');
+    const along=Array.from({length:64},(_,i)=>service.sampleMaterial(-service.width/2+10*servicePitchX+.025+i*(servicePitchX-.05)/63,y,service.frontZ-.05));
+    assert(along.every(material=>material===0),'Each bore must run horizontally through its brick');
+    const hit=service.raycast({x:serviceX,y,z:service.frontZ-.05},{x:0,y:1,z:0},.08);
+    assert(hit&&hit.distance>0&&hit.distance<serviceHeightPitch*.5,'The horizontal web must be a physical collider');
+  }
+  report.checks.push('100 mm service leaf has two real lengthwise bores, a physical horizontal web and retained front/rear shells');
+
   // A saved narrow section cut opens both depth bays. This is a material edit,
   // not an overlay or a special mesher: restore exposes the same cavities used
   // by collision and by the actual worker input arrays.
@@ -65,7 +84,7 @@ try{
   }
   report.checks.push('section cut exposes real horizontal tunnels; worker material parity; eight mesh/collision ray matches');
 
-  for(const profile of ['horizontal-rounded','rounded-five','legacy-rectangular']){
+  for(const profile of ['horizontal-rounded','horizontal-service-bay','rounded-five','legacy-rectangular']){
     const original=new MasonryVolume({seed:8721,hollowProfile:profile});
     for(let blow=0;blow<8;blow++){
       const hit=original.raycast({x:.72+blow*.004,y:1.55,z:-2},{x:0,y:0,z:-1},.8);

@@ -3,6 +3,8 @@ import { MeshBuilder, meshVolume, clippedTetra, createRemovalClipper, CORNERS, T
 export interface Vec3 { x: number; y: number; z: number }
 export enum MaterialId { Air = 0, Clay = 1, Mortar = 2, Render = 3, Concrete = 4 }
 export const MATERIAL_NAMES = ['air', 'clay', 'mortar', 'render', 'concrete'] as const;
+/** Open the front hollow bay for services while retaining its rear backing. */
+export const SERVICE_CHASE_DEPTH_M = .075;
 export interface MasonryFragment {
   position: Vec3; size: Vec3; material: MaterialId; volume: number; detached: boolean;
   /** Exact removed-material triangles relative to position, including crushed chips and detached islands. */
@@ -15,7 +17,7 @@ export interface MasonryVolumeOptions {
   tileSize?: number; seed?: number; renderThickness?: number; material?: 'hollow-clay' | 'concrete';
   solidMaterial?: MaterialId;
   /** Explicit profile keeps older saved damage aligned with its original solids. */
-  hollowProfile?: 'horizontal-rounded' | 'rounded-five' | 'legacy-rectangular' | 'single-horizontal-four-bore';
+  hollowProfile?: 'horizontal-rounded' | 'horizontal-service-bay' | 'rounded-five' | 'legacy-rectangular' | 'single-horizontal-four-bore';
   maxConnectivityNodes?: number;
 }
 export interface MasonryImpactInput { point: Vec3; direction: Vec3; edge?: Vec3; energyJ?: number; chisel: 'pointed' | 'flat'; /** Flat cutting-edge width in metres, 10–50 mm. Pointed chisels ignore it. */ widthM?: number; seed?: number; /** Upward finishing stroke: preserve the locally established cavity backing. */ trim?: boolean; /** Keep the opposite face intact while cutting a service chase from either side. */ maxDepthM?: number }
@@ -174,16 +176,23 @@ export class MasonryVolume {
     const wallX = p.x + this.width / 2 - (row % 2 ? pitchX * .5 : 0);
     const localX = ((wallX % pitchX) + pitchX) % pitchX;
     if (localY < .006 || localY > pitchY - .006 || localX < .006 || localX > pitchX - .006) return MaterialId.Mortar;
-    const shell = .015;
-    if (d < shell || d > clayDepth - shell || localX < .018 || localX > pitchX - .018 || localY < .016 || localY > pitchY - .016) return MaterialId.Clay;
-    if(this.options.hollowProfile==='horizontal-rounded'){
+    const serviceBay=this.options.hollowProfile==='horizontal-service-bay';
+    const shell = serviceBay ? .010 : .015;
+    const sideShell=serviceBay ? .014 : .018;
+    const courseShell=serviceBay ? .012 : .016;
+    if (d < shell || d > clayDepth - shell || localX < sideShell || localX > pitchX - sideShell || localY < courseShell || localY > pitchY - courseShell) return MaterialId.Clay;
+    if(this.options.hollowProfile==='horizontal-rounded'||this.options.hollowProfile==='horizontal-service-bay'){
       // The extrusion axis follows the laid brick's horizontal length (X).
       // Two bores across its height and two through depth retain resolvable
       // horizontal webs; the outside shells and mortar courses stay unchanged.
-      const heightPitch=(pitchY-.032)/2,depthPitch=(clayDepth-shell*2)/2;
-      const boreY=((localY-.016)%heightPitch+heightPitch)%heightPitch-heightPitch*.5;
+      // The 100 mm work leaf needs a readable first chamber and retained
+      // 10 mm exterior shells. Keep the older double-depth profile named
+      // separately so restoring existing damage never changes its solids.
+      const bays=serviceBay?1:2;
+      const heightPitch=(pitchY-courseShell*2)/2,depthPitch=(clayDepth-shell*2)/bays;
+      const boreY=((localY-courseShell)%heightPitch+heightPitch)%heightPitch-heightPitch*.5;
       const boreZ=((d-shell)%depthPitch+depthPitch)%depthPitch-depthPitch*.5;
-      return(boreY/(heightPitch*.42))**2+(boreZ/(depthPitch*.5-.006))**2<1?MaterialId.Air:MaterialId.Clay;
+      return(boreY/(heightPitch*.42))**2+(boreZ/(depthPitch*.5-(serviceBay?.004:.006)))**2<1?MaterialId.Air:MaterialId.Clay;
     }
     // Saved vertical profiles keep their original X/Z cross-section and Y
     // extrusion, so restoring old damage cannot silently replace its solids.
@@ -270,7 +279,14 @@ export class MasonryVolume {
     if (z > 2 && z < this.nz - 1) {
       let open = 0;
       for (const offset of [[2, 0, 0], [-2, 0, 0], [0, 2, 0], [0, -2, 0], [0, 0, 2], [0, 0, -2]]) if (this.nodeAirExposed(x + offset[0], y + offset[1], z + offset[2])) open++;
-      variation *= .52 + open * .07;
+      // Bounded cavity occlusion follows the actual material depth and local
+      // opening. The broad ambient site light otherwise lit the back of a
+      // chamber almost as brightly as its broken lip.
+      const recess=Math.min(z-.5,this.nz+.5-z)*this.hz;
+      const depthShade=this.options.hollowProfile==='horizontal-service-bay'
+        ? 1-.82*clamp(recess/(this.depth*.5),0,1)
+        : 1;
+      variation *= (.52 + open * .07)*depthShade;
     }
     // Match the recessed, dusty grey mortar in the CC0 clay reference rather
     // than a bright grid that reads as tile grout under strong site daylight.
@@ -510,7 +526,10 @@ export class MasonryVolume {
     }
     if (input.maxDepthM !== undefined) {
       const depth = clamp(input.maxDepthM, this.hz * 2, this.depth - this.hz * 2);
-      if (contact.point.z >= this.frontZ - this.depth / 2) {
+      // The incoming shaft owns the work side. A deep exposed rib is still
+      // reached from the same facade; its position must not switch the depth
+      // guard to the opposite face and turn a chase into a through-hole.
+      if (direction.z <= 0) {
         trimFloorZ = Math.max(trimFloorZ ?? -Infinity, this.frontZ - depth);
         for (const job of this.pendingSupport) job.trimFloorZ = Math.max(job.trimFloorZ ?? -Infinity, trimFloorZ);
       } else {
@@ -547,6 +566,7 @@ export class MasonryVolume {
     // crushed core. Their material remains fully present until its strength fails.
     const grainSeed = hash(Math.floor(c.x / 5), Math.floor(c.y / 5), Math.floor(c.z / 5), this.seed);
     const grainAngle = (grainSeed % 6283) / 1000;
+    const serviceChase=input.maxDepthM!==undefined&&!input.trim;
     const canPryPlate = pry > .12 && width >= .025;
     const plateLength = .045 + pry * .055, plateWidth = .030 + width * .65;
     const stretch = input.chisel === 'flat' ? 1.55 : 1;
@@ -578,11 +598,17 @@ export class MasonryVolume {
         const lateral = delta.x * tangent.x + delta.y * tangent.y;
         const sideways = delta.x * -tangent.y + delta.y * tangent.x;
         plateRadius = Math.hypot((lateral - pry * .018) / plateLength, sideways / plateWidth);
-        plateEdge = 1 + .12 * Math.sin(Math.atan2(sideways, lateral) * 5 + grainAngle);
+        const materialEdge=serviceChase
+          ? .17*Math.sin(p.x*57+p.y*83+this.seed*.00001)+.10*Math.sin(p.x*113-p.y*47+grainAngle)
+          : 0;
+        plateEdge = 1 + .12 * Math.sin(Math.atan2(sideways, lateral) * 5 + grainAngle)+materialEdge;
         plate = plateRadius < plateEdge;
       }
       if (!plate && (along < -.045 || along > depthLimit)) continue;
-      const angular = Math.atan2(v, u), anisotropy = 1 + .18 * Math.sin(angular * 3 + (seed % 97)) + .12 * Math.cos(angular * 5 - (seed % 71));
+      // Repeated passes expose the same local weak faces. Redrawing a fresh
+      // circular lobe each blow averaged those faces into a smooth trench.
+      const stressSeed=serviceChase?grainSeed:seed;
+      const angular = Math.atan2(v, u), anisotropy = 1 + .18 * Math.sin(angular * 3 + (stressSeed % 97)) + .12 * Math.cos(angular * 5 - (stressSeed % 71));
       const effectiveRadius = radius * anisotropy;
       const core = radial < effectiveRadius;
       let corridor = false;
@@ -594,7 +620,7 @@ export class MasonryVolume {
       }
       const fissure = !core && corridor;
       const falloff = core ? Math.pow(Math.max(0, 1 - radial / effectiveRadius), .72) : (fissure ? .8 : .12) * Math.max(0, 1 - radial / crackRadius);
-      const materialScale = material === MaterialId.Render ? 1.4 : material === MaterialId.Concrete ? .26 : material === MaterialId.Mortar ? .72 : 1;
+      const materialScale = material === MaterialId.Render ? 1.4 : material === MaterialId.Concrete ? .26 : material === MaterialId.Mortar ? (serviceChase?1.08:.72) : 1;
       const backwardCoupling = along < -.008 ? .65 * Math.max(.1, 1 + along / .055) : 1;
       const address = this.chunkAddress(x, y, z), weakness = (this.chunks.get(address.key)?.damage[address.offset] ?? 0) / this.strength(x, y, z, material);
       // Grazing contact couples less crushing energy to intact clay, but a flat blade can

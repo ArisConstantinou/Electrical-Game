@@ -1,14 +1,14 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import {buildM18ToolModel} from './M18ToolModels';
 
 export type ReferenceToolKind='drill'|'driver'|'laser';
 
 /** Shared metre-scale handheld and installed reference tools; +Z faces the worker. */
 export function buildReferenceToolModel(kind:ReferenceToolKind):THREE.Group {
+  if(kind==='drill'||kind==='driver')return buildM18ToolModel(kind);
   const group=new THREE.Group();group.name=`Site ${kind}`;
   const black=new THREE.MeshStandardMaterial({color:0x202725,roughness:.83});
-  const paint=new THREE.MeshStandardMaterial({color:kind==='drill'?0xbf3429:kind==='driver'?0x287fa1:0x67a82d,roughness:.48});
   const steel=new THREE.MeshStandardMaterial({color:0xaab4b5,metalness:.60,roughness:.38});
   const part=(parent:THREE.Group,name:string,geometry:THREE.BufferGeometry,material:THREE.Material,x:number,y:number,z:number)=>{
     // Moulded shells and rubber guards need radiused edges at hand distance.
@@ -93,65 +93,6 @@ export function buildReferenceToolModel(kind:ReferenceToolKind):THREE.Group {
     part(group,'Fixing screw cross slot second edge',new THREE.BoxGeometry(.001,.005,.0005),black,0,0,.0137);
     group.userData.gripPoint=[.175,-.101,.059];group.userData.tipPoint=[turretX,0,turretZ+.018];group.userData.mountingPoint=[0,0,0];
     return group;
-  }
-  const drill=kind==='drill',bodyLength=drill?.135:.092;
-  part(group,'Rubber pistol grip',new THREE.BoxGeometry(.039,.089,.043),black,0,-.008,.011);
-  part(group,'Grip colour inlay',new RoundedBoxGeometry(.034,.068,.014,2,.005),paint,0,-.009,.032);
-  part(group,'Battery pack rubber base',new THREE.BoxGeometry(.077,.040,.084),black,0,-.070,.016);
-  part(group,'Battery latch',new THREE.BoxGeometry(.080,.018,.027),paint,0,-.059,.038);
-  // A tapered motor shell, narrow gearbox and swept grip shoulder replace
-  // the uniform red barrel. Anchor/bit datums stay in metre space.
-  const profile=[new THREE.Vector2(0,0),new THREE.Vector2(.027,0),new THREE.Vector2(.034,.008),new THREE.Vector2(.037,.028),new THREE.Vector2(.035,bodyLength*.64),new THREE.Vector2(.029,bodyLength-.015),new THREE.Vector2(.026,bodyLength),new THREE.Vector2(0,bodyLength)];
-  const body=part(group,drill?'Cordless drill motor housing':'Compact impact driver housing',new THREE.LatheGeometry(profile,24),paint,0,.064,-.011);body.rotation.x=-Math.PI/2;
-  part(group,'Rear motor bumper',new THREE.BoxGeometry(.059,.058,.014),black,0,.064,-.007);
-  const shoulder=part(group,'Contoured motor grip shoulder',new RoundedBoxGeometry(.042,.051,.067,2,.011),paint,0,.024,-.015);shoulder.rotation.x=-.15;
-  for(const side of [-1,1]){
-    for(let i=0;i<5;i++){const vent=part(group,'Recessed motor ventilation slot',new RoundedBoxGeometry(.003,.020,.0035,1,.001),black,side*.033,.063,-.029-i*.008);vent.rotation.x=-.22;}
-    for(let i=0;i<4;i++)part(group,'Grip rubber traction rib',new RoundedBoxGeometry(.002,.002,.028,1,.0008),black,side*.020,-.024+i*.009,.010);
-    for(const z of [-.023,-.070]){const screw=part(group,'Recessed motor screw',new THREE.CylinderGeometry(.002,.002,.0015,8),steel,side*.034,.048,z);screw.rotation.z=Math.PI/2;}
-  }
-  part(group,'Index finger trigger',new THREE.BoxGeometry(.022,.021,.013),black,0,.018,-.019);
-  part(group,'Forward reverse switch',new THREE.BoxGeometry(.047,.009,.013),black,0,.031,-.020);
-  const motor=new THREE.Group();motor.name='reference-motor';motor.position.set(0,.064,-.012-bodyLength);group.add(motor);
-  const collar=part(group,'Fixed torque selection collar',new THREE.CylinderGeometry(.027,.029,.023,32),black,0,.064,motor.position.z+.010);collar.rotation.x=Math.PI/2;
-  for(let i=0;i<16;i++){const a=i*Math.PI/8;const rib=part(group,'Torque collar grip rib',new THREE.BoxGeometry(.002,.003,.017),steel,Math.cos(a)*.028,.064+Math.sin(a)*.028,motor.position.z+.010);rib.rotation.z=a-Math.PI/2;}
-  const led=part(group,'Trigger work light lens',new RoundedBoxGeometry(.012,.005,.002,1,.001),new THREE.MeshStandardMaterial({color:0xe9e7d4,roughness:.24}),0,.032,-.043);led.rotation.x=-.2;
-  const chuck=part(motor,drill?'Keyless masonry drill chuck':'Quick release hex collet',new THREE.CylinderGeometry(drill?.019:.013,drill?.025:.019,drill?.043:.029,16),drill?black:steel,0,0,-.016);chuck.rotation.x=Math.PI/2;
-  const length=drill?.145:.070,tipZ=-.038-length;
-  const bit=part(motor,drill?'Long masonry drill bit':'Short hex screwdriver bit',new THREE.CylinderGeometry(drill?.003:.0035,drill?.003:.0035,length,drill?12:6),steel,0,0,-.038-length/2);bit.rotation.x=Math.PI/2;
-  if(drill){
-    for(const phase of [0,Math.PI]){
-      const points=Array.from({length:97},(_,i)=>{const t=i/96,a=phase+t*Math.PI*16;return new THREE.Vector3(Math.cos(a)*.0031,Math.sin(a)*.0031,-.050-t*.120);});
-      part(motor,'Continuous masonry bit helical cutting land',new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points),96,.00065,4,false),steel,0,0,0);
-    }
-    part(motor,'Carbide masonry cutting head',new THREE.BoxGeometry(.008,.0025,.005),steel,0,0,tipZ);
-  }else{
-    part(motor,'Phillips cross tip',new THREE.BoxGeometry(.0045,.0015,.006),steel,0,0,tipZ);
-    part(motor,'Phillips cross tip second edge',new THREE.BoxGeometry(.0015,.0045,.006),steel,0,0,tipZ);
-  }
-  group.userData.gripPoint=[0,-.005,.011];group.userData.tipPoint=[0,.064,motor.position.z+tipZ-(drill?.0025:.003)];
-  if(drill){
-    // Keep the proven grip, trigger and rotating masonry bit datums. The
-    // photographed shell is visual only, so an asset load failure leaves the
-    // working drill intact rather than removing the tool from gameplay.
-    new GLTFLoader().load(`${import.meta.env.BASE_URL}assets/tools/drill-01/Drill_01_1k.gltf`,asset=>{
-      const shell=asset.scene;
-      shell.name='Photographed cordless drill shell';
-      shell.rotation.y=-Math.PI/2;
-      shell.position.set(0,-.09,-.05);
-      shell.traverse(object=>{
-        if(object instanceof THREE.Mesh){
-          object.renderOrder=20;
-          object.castShadow=false;
-          object.receiveShadow=false;
-          object.frustumCulled=false;
-        }
-      });
-      group.children.filter(child=>child.userData.toolModelPart===true).forEach(child=>{child.visible=false;});
-      motor.getObjectByName('Keyless masonry drill chuck')!.visible=false;
-      group.add(shell);
-      group.userData.visualAsset='Poly Haven Drill 01 1K glTF CC0';
-    },undefined,error=>{console.warn('Drill shell unavailable; retaining functional drill model',error);});
   }
   return group;
 }
