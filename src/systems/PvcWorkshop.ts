@@ -402,8 +402,8 @@ export class PvcWorkshop {
     // a fixed lane against a wall can put several pipes in the exact same spot.
     const centre=v();let placed=false;
     for(let row=0;row<12&&!placed;row++)for(const facing of [1,-1]){
-      for(const column of [0,-1,1,-2,2]){
-        const candidate=eye.clone().addScaledVector(forward,facing*(.65+row*.38)).addScaledVector(right,column*.38);
+      for(const column of [0,-1,1,-2,2,-3,3,-4,4,-5,5]){
+        const candidate=eye.clone().addScaledVector(forward,facing*(.65+row*.38)).addScaledVector(right,column*.50);
         candidate.x=THREE.MathUtils.clamp(candidate.x,-xLimit-flatBounds.min.x,xLimit-flatBounds.max.x);
         candidate.z=THREE.MathUtils.clamp(candidate.z,-zLimit-flatBounds.min.z,zLimit-flatBounds.max.z);
         if(this.dropped.some(other=>Math.hypot(candidate.x-other.mesh.position.x,candidate.z-other.mesh.position.z)<.32))continue;
