@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { Game } from '../core/Game';
+import { GAME_CONFIG } from '../data/gameConfig';
 import type { RigTool } from '../player/FPSRig';
 import type { InstallationPoint } from '../electrical/InstallationPoint';
 import type { BoxConduitEntry } from '../electrical/BoxGroup';
@@ -38,6 +39,7 @@ export class PvcWorkshop {
   private readonly targetGuide=new THREE.Box3Helper(this.targetGuideBounds,0xffa52f);
   private guideTarget:InstallationPoint|null=null;
   readonly prepared:StockPipe[]=[];
+  readonly dropped:StockPipe[]=[];
   readonly cutter=buildToolModel('cutter');
   readonly marker=new THREE.Group();
   readonly spring=new THREE.InstancedMesh(new THREE.TorusGeometry(.0069,.0011,4,10),new THREE.MeshStandardMaterial({color:0x929ea4,metalness:.8,roughness:.25}),135);
@@ -48,6 +50,9 @@ export class PvcWorkshop {
   readonly zoomControl:HTMLButtonElement;
   readonly drillControl:HTMLButtonElement;
   readonly fitControls:HTMLElement;
+  readonly pipeActions:HTMLElement;
+  readonly newBendControl:HTMLButtonElement;
+  readonly dropPipeControl:HTMLButtonElement;
   readonly securingRoot=new THREE.Group();
   readonly securingCursor=new THREE.Group();
   readonly drill=buildPvcDrill12();
@@ -79,6 +84,7 @@ export class PvcWorkshop {
   private cutHeightHold=0;
   private cutHeightHoldElapsed=0;
   private cutHeightPointer:number|null=null;
+  private dropSequence=0;
   private target:InstallationPoint|null=null;
   private carried:StockPipe|null=null;
   private elapsed=0;
@@ -163,6 +169,11 @@ export class PvcWorkshop {
     this.fitControls.querySelector('#pvc-cut-flush')!.addEventListener('click',()=>this.queue.push(()=>this.snapCutFlush()));
     this.fitControls.querySelector('#pvc-entry-previous')!.addEventListener('click',()=>this.queue.push(()=>this.selectEntry(-1)));
     this.fitControls.querySelector('#pvc-entry-next')!.addEventListener('click',()=>this.queue.push(()=>this.selectEntry(1)));
+    this.newBendControl=document.createElement('button');this.newBendControl.id='pvc-new-bend';this.newBendControl.type='button';this.newBendControl.textContent='ΝΕΑ ΚΑΜΨΗ · N';this.newBendControl.setAttribute('aria-label','Άφησε την παλιά σωλήνα στο δάπεδο και ξεκίνα νέα κάμψη');this.newBendControl.hidden=true;
+    this.newBendControl.addEventListener('click',()=>this.queue.push(()=>this.startNewBend()));
+    this.dropPipeControl=document.createElement('button');this.dropPipeControl.id='pvc-drop-pipe';this.dropPipeControl.type='button';this.dropPipeControl.textContent='ΑΦΗΣΕ ΣΩΛΗΝΑ';this.dropPipeControl.setAttribute('aria-label','Άφησε τη σωλήνα που κρατάς στο δάπεδο');
+    this.dropPipeControl.addEventListener('click',()=>this.queue.push(()=>this.leaveCarriedPipe()));
+    this.pipeActions=document.createElement('div');this.pipeActions.id='pvc-pipe-actions';this.pipeActions.hidden=true;this.pipeActions.append(this.newBendControl,this.dropPipeControl);
     for(const button of this.fitControls.querySelectorAll<HTMLButtonElement>('#pvc-cut-height-up,#pvc-cut-height-down')){
       const direction=button.id==='pvc-cut-height-up'?-1:1;
       button.addEventListener('pointerdown',event=>{
@@ -177,7 +188,7 @@ export class PvcWorkshop {
       });
       button.addEventListener('click',event=>{if(event.detail===0)this.queue.push(()=>this.setCut(this.cutS+direction*.005));});
     }
-    game.hud.shell.append(this.prompt,this.liveMeasure,this.markConfirm,this.zoomControl,this.drillControl,this.controls,this.fitControls);
+    game.hud.shell.append(this.prompt,this.liveMeasure,this.markConfirm,this.zoomControl,this.drillControl,this.controls,this.fitControls,this.pipeActions);
     const handArrows=document.createElement('span');handArrows.className='pvc-hand-arrows';handArrows.setAttribute('aria-hidden','true');handArrows.innerHTML='<span>↑</span><span>↓</span>';game.hud.shell.querySelector('#joystick-thumb')!.append(handArrows);
     this.bendHud=new PvcBendHUD(game.hud.shell,action=>this.queue.push(()=>action==='use'?this.use():this.command(action)),held=>this.toolbarHold=held);
     try{this.customPresets=readPvcPresets(localStorage);}catch{/* Storage can be unavailable in private/embedded contexts. */}
@@ -215,6 +226,9 @@ export class PvcWorkshop {
       if(e.target instanceof Element&&e.target.closest('input,textarea,select,[contenteditable="true"]')||!this.game.started)return;
       if(e.code==='KeyR'&&(this.blocksWork||['spring','cutter'].includes(this.game.selectedTool)||this.aimsInstalledPipe())){
         e.preventDefault();if(!e.repeat)this.queue.push(()=>this.toggleTransparent());return;
+      }
+      if(e.code==='KeyN'&&this.carried&&['carrying','fitting','cut'].includes(this.phase)){
+        e.preventDefault();if(!e.repeat)this.queue.push(()=>this.startNewBend());return;
       }
       if(!this.focused)return;
       if(e.code==='Escape'){this.queue.push(()=>this.pause());return;}
@@ -370,6 +384,77 @@ export class PvcWorkshop {
     if(pipe.highlight)pipe.highlight.visible=false;
     this.bend=PvcBend.from(pipe.recipe);this.cutFrom=pipe.cutFrom;this.transition('carrying');
   }
+  private dropPipe(pipe:StockPipe):void{
+    const mesh=pipe.mesh,camera=this.game.renderer.camera;
+    mesh.update(PvcBend.from(pipe.recipe),pipe.cutFrom);
+    if(pipe.highlight){mesh.remove(pipe.highlight);pipe.highlight.geometry.dispose();(pipe.highlight.material as THREE.Material).dispose();pipe.highlight=undefined;}
+    // Release around the player's position; the physics system owns the fall.
+    const forward=v(-Math.sin(this.game.player.yaw),0,-Math.cos(this.game.player.yaw));
+    const right=v(-forward.z,0,forward.x),lane=this.dropSequence++;
+    const flat=new THREE.Quaternion().setFromAxisAngle(v(1,0,0),Math.PI/2);
+    const centre=camera.getWorldPosition(v())
+      .addScaledVector(forward,.65+Math.floor(lane/5)*.38)
+      .addScaledVector(right,(lane%5-2)*.38);
+    // Keep the whole settled tube inside the room, including its bent end.
+    const flatBounds=mesh.geometry.boundingBox!.clone();
+    flatBounds.translate(flatBounds.getCenter(v()).negate());
+    flatBounds.applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(flat));
+    const xLimit=GAME_CONFIG.room.width/2-.16,zLimit=GAME_CONFIG.room.depth/2-.16;
+    centre.x=THREE.MathUtils.clamp(centre.x,-xLimit-flatBounds.min.x,xLimit-flatBounds.max.x);
+    centre.z=THREE.MathUtils.clamp(centre.z,-zLimit-flatBounds.min.z,zLimit-flatBounds.max.z);
+    centre.y=Math.max(.48,(PVC.length-pipe.cutFrom)*.45);
+    // The bend lives in the local XY plane. Finish the fall with that plane
+    // parallel to the floor, so neither leg balances upright after impact.
+    mesh.quaternion.setFromAxisAngle(v(0,0,1),-Math.PI/2).multiply(flat);
+    mesh.position.copy(centre).sub(mesh.geometry.boundingBox!.getCenter(v()).applyQuaternion(mesh.quaternion));
+    this.offcutMotion.release(mesh);this.game.renderer.scene.add(mesh);this.dropped.push(pipe);
+    this.addPreparedHighlight(pipe);
+  }
+  private floorTarget(includeWhileCarrying=false):StockPipe|null{
+    if(!this.dropped.length||this.carried&&!includeWhileCarrying||this.focused)return null;
+    const camera=this.game.renderer.camera;camera.updateMatrixWorld(true);
+    this.ray.setFromCamera(new THREE.Vector2(),camera);this.ray.far=2.3;
+    // Sample each distinct centreline. A close visual hit wins over the
+    // forgiving margin; among overlapping tubes the nearer one wins.
+    let nearest:StockPipe|null=null,distance=.065*.065;
+    let direct:StockPipe|null=null,directReach=Infinity;
+    const point=v(),delta=v();
+    for(const pipe of this.dropped){
+      const mesh=pipe.mesh,position=mesh.geometry.getAttribute('position');mesh.updateMatrixWorld(true);
+      for(let section=0;section<=mesh.sections;section+=5){
+        const a=section*mesh.sides,b=a+mesh.sides/2;
+        point.set((position.getX(a)+position.getX(b))/2,(position.getY(a)+position.getY(b))/2,(position.getZ(a)+position.getZ(b))/2).applyMatrix4(mesh.matrixWorld);
+        const reach=delta.subVectors(point,this.ray.ray.origin).dot(this.ray.ray.direction);
+        if(reach<0||reach>this.ray.far)continue;
+        const d=this.ray.ray.distanceSqToPoint(point);
+        if(d<.035*.035&&reach<directReach){direct=pipe;directReach=reach;}
+        if(d<distance){nearest=pipe;distance=d;}
+      }
+    }
+    return direct??nearest;
+  }
+  private pickFloorPipe(pipe:StockPipe):void{
+    if(this.carried)return;
+    this.offcutMotion.take(pipe.mesh);this.dropped.splice(this.dropped.indexOf(pipe),1);pipe.mesh.removeFromParent();
+    pipe.mesh.update(PvcBend.from(pipe.recipe),pipe.cutFrom);pipe.mesh.position.set(0,0,0);pipe.mesh.quaternion.identity();
+    if(pipe.highlight)pipe.highlight.visible=false;
+    this.carried=pipe;this.bend=PvcBend.from(pipe.recipe);this.cutFrom=pipe.cutFrom;this.cutS=this.cutFrom;
+    this.target=null;this.focused=false;this.transition('carrying');
+    this.message='Πήρες τη σωλήνα από το δάπεδο.';
+  }
+  private leaveCarriedPipe():void{
+    if(!this.carried||!['carrying','fitting','cut'].includes(this.phase))return;
+    this.dropPipe(this.carried);this.carried=null;this.target=null;this.focused=false;
+    this.transition('batch');this.message=this.instruction('Η σωλήνα έμεινε στο δάπεδο. Στόχευσέ τη και πάτησε E για να την πιάσεις.','Η σωλήνα έμεινε στο δάπεδο. Στόχευσέ τη και άγγιξε την οδηγία για να την πιάσεις.');
+  }
+  private startNewBend():void{
+    if(!this.carried||!['carrying','fitting','cut'].includes(this.phase))return;
+    if(this.rawCount<1){this.message='Δεν υπάρχει άλλη άκοπη σωλήνα σε αυτή τη μάτσα.';return;}
+    this.dropPipe(this.carried);this.carried=null;this.target=null;
+    this.bend=new PvcBend();this.cutFrom=this.cutS=0;this.insertion=0;this.quantity=1;this.markingProgress=0;
+    this.transition('marking');this.setFocus();
+    this.message='Η παλιά σωλήνα έπεσε στο δάπεδο. Σημάδεψε και λύγισε τη νέα.';
+  }
   private fastenerPrepTarget():InstallationPoint|null{
     if(this.focused||this.game.selectedTool!=='drill')return null;
     const camera=this.game.renderer.camera,origin=camera.getWorldPosition(v()),direction=camera.getWorldDirection(v());if(direction.z>=-.01)return null;
@@ -399,13 +484,13 @@ export class PvcWorkshop {
     if(action&&!this.focused&&this.game.selectedTool==='drill'){
       const point=this.fastenerPrepTarget();if(point){this.startIndependentFastening(point);if(!interaction&&this.phase==='fastener-marking')this.drillFastenerAtAim();action=false;startedFasteners=true;}
     }
-    if(interaction&&(wasBlocking||this.stockAimed()||this.target&&this.game.boxPlacement.target(this.game.renderer.camera)===this.target)){this.interact();action=false;interaction=false;}
+    if(interaction&&(wasBlocking||this.stockAimed()||this.floorTarget()||this.target&&this.game.boxPlacement.target(this.game.renderer.camera)===this.target)){this.interact();action=false;interaction=false;}
     // A short mobile AIM tap supplies the ordinary primary action.
     // It advances every PVC work phase and also performs the contextual stock /
     // box action while carrying, instead of replacing the joysticks with a row
     // of text-labelled buttons.
     if(action){
-      const contextual=!this.focused&&(this.stockAimed()||this.phase==='carrying'&&Boolean(this.game.boxPlacement.targetNear(this.game.renderer.camera)));
+      const contextual=!this.focused&&(this.stockAimed()||this.floorTarget()||this.phase==='carrying'&&Boolean(this.game.boxPlacement.targetNear(this.game.renderer.camera)));
       if(this.focused&&!(this.touch&&this.phase==='marking'))this.use();
       else if(contextual)this.interact();
     }
@@ -547,6 +632,12 @@ export class PvcWorkshop {
   }
   private interact():void{
     if(!this.game.started)return;
+    const floorPipe=!this.focused?this.floorTarget(true):null;
+    if(floorPipe){
+      if(this.carried)this.message='Άφησε πρώτα τη σωλήνα που κρατάς.';
+      else this.pickFloorPipe(floorPipe);
+      return;
+    }
     const stockTarget=this.stockTarget();
     if(!this.focused&&this.phase!=='carrying'&&stockTarget){
       if(stockTarget.prepared){this.takePrepared(stockTarget.prepared);return;}
@@ -971,13 +1062,20 @@ export class PvcWorkshop {
     }
   }
   private renderUI():void{
-    const aimed=this.game.started&&!this.focused&&!this.apprenticeLease?this.stockTarget():null;
-    const near=Boolean(aimed),show=this.focused,nearBox=this.phase==='carrying'?this.game.boxPlacement.targetNear(this.game.renderer.camera):null;
+    const floorHit=this.game.started&&!this.focused&&!this.apprenticeLease?this.floorTarget(true):null;
+    const floorPipe=this.carried?null:floorHit;
+    const aimed=this.game.started&&!this.focused&&!this.apprenticeLease&&!floorHit?this.stockTarget():null;
+    const near=Boolean(aimed),show=this.focused,nearBox=this.phase==='carrying'&&!floorHit?this.game.boxPlacement.targetNear(this.game.renderer.camera):null;
     this.stock.updateInteractionHighlights(aimed&&!aimed.prepared?aimed.bundle:null);
     for(const pipe of this.prepared){const material=pipe.highlight?.material as THREE.MeshBasicMaterial|undefined;if(material){const color=pipe===aimed?.prepared?0x36a8ff:0xffd43b;if(material.color.getHex()!==color)material.color.setHex(color);}}
+    for(const pipe of this.dropped)if(pipe.highlight){
+      pipe.highlight.visible=true;
+      const material=pipe.highlight.material as THREE.MeshBasicMaterial,color=pipe===floorPipe?0x36a8ff:0xffd43b;
+      if(material.color.getHex()!==color)material.color.setHex(color);
+    }
     // The idle, out-of-reach bundle has no changing prompt or controls. Run
     // its full DOM update once, then resume immediately when aim/state changes.
-    const idleUi=this.game.started&&!show&&!near&&!nearBox&&this.phase==='sealed'&&!this.fastenerPrepAvailable;
+    const idleUi=this.game.started&&!show&&!near&&!floorPipe&&!nearBox&&this.phase==='sealed'&&!this.fastenerPrepAvailable;
     if(idleUi&&this.idleUiPresented)return;
     this.idleUiPresented=idleUi;
     const touchModifiers=this.touch&&['bending','review'].includes(this.phase);
@@ -993,7 +1091,7 @@ export class PvcWorkshop {
       moveStick.classList.toggle('pvc-hand-control',handControl);moveStick.setAttribute('aria-label',handControl?'Αριστερό χέρι: πάνω ή κάτω στη σωλήνα':moveStick.dataset.pvcMoveLabel??'Movement joystick');
       if(!handControl)delete moveStick.dataset.pvcMoveLabel;
     }
-    this.prompt.hidden=bendUi||!this.game.started||(this.touch&&show)||(!show&&!near&&this.phase!=='carrying')||(this.phase==='carrying'&&!near&&!nearBox);
+    this.prompt.hidden=bendUi||!this.game.started||(this.touch&&show)||(!show&&!near&&!floorPipe&&this.phase!=='carrying')||(this.phase==='carrying'&&!near&&!floorPipe&&!nearBox);
     const tips:Partial<Record<Phase,string>>={
       marking:'Mouse: γωνία · E: σημάδεψε όλες τις σωλήνες · P: preset · Tab: επόμενο',
       spring:'LMB: βάλε το spring · R: διαφάνεια · ESC: πίσω',
@@ -1025,12 +1123,13 @@ export class PvcWorkshop {
     const aimedPhase=aimed?this.bundlePhase(aimed.bundle):this.phase;
     const ready=aimed?this.prepared.filter(p=>p.bundle===aimed.bundle).length:this.prepared.length;
     const hint=show?(this.message||tips[this.phase]||`${key}: συνέχεια`):
+      floorPipe?`${key} · ΠΑΡΕ ΑΥΤΗ ΤΗ ΣΩΛΗΝΑ ΑΠΟ ΤΟ ΔΑΠΕΔΟ`:
       this.phase==='carrying'?(near?`${key} · ΕΠΙΣΤΡΟΦΗ ΣΤΗ ΜΑΤΣΑ`:this.message||`${key} · ΕΦΑΡΜΟΣΕ ΣΤΟ ΚΟΥΤΙ`):
       aimed?.prepared?`${key} · ΠΑΡΕ ΣΩΛΗΝΑ`:aimedPhase==='sealed'?`${key} · ΚΟΨΕ ΤΑ ΔΕΣΙΜΑΤΑ · ${this.stock.bundleRemaining[aimed?.bundle??this.activeBundle]} × 3 m`:
       aimedPhase==='loose'?`${key} · ΑΠΛΩΣΕ ΤΙΣ ΣΩΛΗΝΕΣ`:
       aimedPhase==='batch'?`${key} · ${ready?'ΠΑΡΕ ΣΩΛΗΝΑ':'ΝΕΑ ΠΡΟΕΤΟΙΜΑΣΙΑ'} · ${ready} έτοιμες / ${this.stock.bundleRemaining[aimed?.bundle??this.activeBundle]} άκοπες`:`${key} · ΣΥΝΕΧΙΣΕ`;
     this.prompt.dataset.phase=this.phase;
-    this.prompt.classList.remove('pvc-primary-action');
+    this.prompt.classList.toggle('pvc-primary-action',Boolean(floorPipe&&this.touch));
     this.prompt.classList.toggle('pvc-world-action',!show);
     if(!this.touch)this.markConfirm.textContent='E · ΣΗΜΑΔΕΨΕ ΤΙΣ ΣΩΛΗΝΕΣ';
     this.controls.querySelector('[data-pvc="confirm"]')!.textContent=this.phase==='review'?`ΕΤΟΙΜΑΣΕ ×${this.quantity} ΚΑΙ ΚΡΑΤΑ 1`:this.phase==='cut'?'ΕΦΑΡΜΟΣΕ':'ΕΛΕΓΧΟΣ';
@@ -1039,6 +1138,10 @@ export class PvcWorkshop {
     this.zoomControl.hidden=!this.touch||!show||!['fitting','cut'].includes(this.phase);
     this.drillControl.hidden=true;
     this.fitControls.hidden=!show||!['fitting','cut'].includes(this.phase);
+    this.pipeActions.hidden=!this.game.started||!this.carried||!['carrying','fitting','cut'].includes(this.phase);
+    this.newBendControl.hidden=this.pipeActions.hidden;
+    this.newBendControl.disabled=this.rawCount<1;
+    this.pipeActions.dataset.mode=this.phase==='carrying'?'carrying':'fitting';
     if(!this.fitControls.hidden){
       const entries=this.entries();
       (this.fitControls.querySelector('#pvc-entry-previous') as HTMLButtonElement).disabled=this.entryIndex<=0;
@@ -1086,5 +1189,5 @@ export class PvcWorkshop {
       mobileAction.textContent='AIM';mobileDetail.textContent=this.game.input.actionHeld?'STOP':'JUMP';joystick.setAttribute('aria-label',`Drag to aim; tap to ${action==='AIM'?'use':action}; hold still to jump`);
     }
   }
-  get telemetry(){const fitError=this.fitErrorAt(this.phase==='fitting'?this.cutS:this.cutFrom);return{phase:this.phase,focused:this.focused,activeBundle:this.activeBundle,aimedBundle:this.game.started&&!this.focused?this.stockTarget()?.bundle??null:null,stockHighlights:this.stock.interactionHighlights.map(h=>(h.material as THREE.MeshBasicMaterial).color.getHex()===0x36a8ff?'blue':'yellow'),bundles:this.stock.bundleRemaining.map((remaining,index)=>({remaining,opened:this.stock.bundleOpened[index],spread:this.stock.bundleSpread[index],phase:this.bundlePhase(index)})),raw:this.rawCount,prepared:this.prepared.length,carrying:Boolean(this.carried),installed:this.installedCount,total:this.rawCount+this.prepared.filter(p=>p.originBundle===this.activeBundle).length+Number(this.carried?.originBundle===this.activeBundle)+this.installedByBundle[this.activeBundle],totalAll:this.stock.bundleRemaining.reduce((a,b)=>a+b,0)+this.prepared.length+Number(Boolean(this.carried))+this.installedCount,markCm:this.bend.mark*100,markingProgress:this.markingProgress,markingActive:this.markingActive,springInsertion:this.insertion,springCentreM:this.bend.mark,springLengthM:PVC.springLength,retrievalCableM:PVC.cableLength,grip:this.bend.grip,angle:this.bend.angle,radiusMm:this.bend.radius?this.bend.radius*1000:null,ready:this.bend.ready,angles:[...this.bend.angles],quantity:this.quantity,target:this.target?.definition.id??null,guideTarget:this.guideTarget?.definition.id??null,boxBottomCm:this.boxBottomHeight()===null?null:this.boxBottomHeight()!*100,cutCm:this.cutS*100,cutFromCm:this.cutFrom*100,cutHeightCm:(this.bend.topHeight-this.bend.at(this.phase==='fitting'?this.cutS:this.cutFrom).x)*100,entryHeightCm:this.entry()?.position.y===undefined?null:this.entry()!.position.y*100,entryPosition:this.entry()?.position.toArray()??null,entryIndex:this.entryIndex,entryCount:this.entries().length,cutSnapped:this.cutSnapped,fitErrorMm:fitError,fitReady:fitError>=-SHORT_PIPE_TOLERANCE_MM&&fitError<=BOX_ENTRY_ALLOWANCE_MM,boxEntryAllowanceMm:BOX_ENTRY_ALLOWANCE_MM,offcuts:this.offcuts.length,message:this.message,preview:this.pipe.visible,bendHighlight:{visible:this.bendHighlight.visible,activeVisible:this.bendHighlight.active.visible,protectedRangeM:this.bendHighlight.userData.range??null,activeRangeM:this.bendHighlight.userData.activeRange??null},fasteners:{holes:this.fastenerHoles.length,pairs:this.fastenerPairs.length,drilled:this.fastenerHoles.filter(h=>h.drilled).length,index:this.fastenerIndex,progress:this.fastenerProgress,bitDiameterMm:12,aim:{...this.fastenerAim},positions:this.fastenerHoles.map(h=>({side:h.side,x:h.marker.position.x,y:h.y,z:h.marker.position.z})),rebars:this.fastenerPairs.map(p=>({visible:p.rebar.visible,position:p.rebar.position.toArray(),scale:p.rebar.scale.toArray(),left:p.rebar.userData.leftHole,right:p.rebar.userData.rightHole}))},arms:this.arms.map(a=>({side:a.side,reach:a.shoulder.distanceTo(a.wrist)}))};}
+  get telemetry(){const fitError=this.fitErrorAt(this.phase==='fitting'?this.cutS:this.cutFrom);return{phase:this.phase,focused:this.focused,activeBundle:this.activeBundle,aimedBundle:this.game.started&&!this.focused?this.stockTarget()?.bundle??null:null,stockHighlights:this.stock.interactionHighlights.map(h=>(h.material as THREE.MeshBasicMaterial).color.getHex()===0x36a8ff?'blue':'yellow'),bundles:this.stock.bundleRemaining.map((remaining,index)=>({remaining,opened:this.stock.bundleOpened[index],spread:this.stock.bundleSpread[index],phase:this.bundlePhase(index)})),raw:this.rawCount,prepared:this.prepared.length,carrying:Boolean(this.carried),installed:this.installedCount,total:this.rawCount+this.prepared.filter(p=>p.originBundle===this.activeBundle).length+this.dropped.filter(p=>p.originBundle===this.activeBundle).length+Number(this.carried?.originBundle===this.activeBundle)+this.installedByBundle[this.activeBundle],totalAll:this.stock.bundleRemaining.reduce((a,b)=>a+b,0)+this.prepared.length+this.dropped.length+Number(Boolean(this.carried))+this.installedCount,markCm:this.bend.mark*100,markingProgress:this.markingProgress,markingActive:this.markingActive,springInsertion:this.insertion,springCentreM:this.bend.mark,springLengthM:PVC.springLength,retrievalCableM:PVC.cableLength,grip:this.bend.grip,angle:this.bend.angle,radiusMm:this.bend.radius?this.bend.radius*1000:null,ready:this.bend.ready,angles:[...this.bend.angles],quantity:this.quantity,target:this.target?.definition.id??null,guideTarget:this.guideTarget?.definition.id??null,boxBottomCm:this.boxBottomHeight()===null?null:this.boxBottomHeight()!*100,cutCm:this.cutS*100,cutFromCm:this.cutFrom*100,cutHeightCm:(this.bend.topHeight-this.bend.at(this.phase==='fitting'?this.cutS:this.cutFrom).x)*100,entryHeightCm:this.entry()?.position.y===undefined?null:this.entry()!.position.y*100,entryPosition:this.entry()?.position.toArray()??null,entryIndex:this.entryIndex,entryCount:this.entries().length,cutSnapped:this.cutSnapped,fitErrorMm:fitError,fitReady:fitError>=-SHORT_PIPE_TOLERANCE_MM&&fitError<=BOX_ENTRY_ALLOWANCE_MM,boxEntryAllowanceMm:BOX_ENTRY_ALLOWANCE_MM,offcuts:this.offcuts.length,dropped:this.dropped.length,floorAimed:Boolean(this.floorTarget()),message:this.message,preview:this.pipe.visible,bendHighlight:{visible:this.bendHighlight.visible,activeVisible:this.bendHighlight.active.visible,protectedRangeM:this.bendHighlight.userData.range??null,activeRangeM:this.bendHighlight.userData.activeRange??null},fasteners:{holes:this.fastenerHoles.length,pairs:this.fastenerPairs.length,drilled:this.fastenerHoles.filter(h=>h.drilled).length,index:this.fastenerIndex,progress:this.fastenerProgress,bitDiameterMm:12,aim:{...this.fastenerAim},positions:this.fastenerHoles.map(h=>({side:h.side,x:h.marker.position.x,y:h.y,z:h.marker.position.z})),rebars:this.fastenerPairs.map(p=>({visible:p.rebar.visible,position:p.rebar.position.toArray(),scale:p.rebar.scale.toArray(),left:p.rebar.userData.leftHole,right:p.rebar.userData.rightHole}))},arms:this.arms.map(a=>({side:a.side,reach:a.shoulder.distanceTo(a.wrist)}))};}
 }
