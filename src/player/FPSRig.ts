@@ -376,7 +376,7 @@ export class FPSRig extends THREE.Group {
     hammer.updateWorldMatrix(true, true);
     this.seatHammerFeed(camera,direction);
     const rearCamera=camera.worldToLocal(hammer.localToWorld(new THREE.Vector3().fromArray(hammer.userData.gripPoint)));
-    if(rearCamera.z>-.22&&Math.abs(rearCamera.y)<.24){
+    if(rearCamera.length()<.22){
       this.restHammer(camera);this.contactStatus='too-close';this.reachReason='Step back to give the full-length SDS Max room.';return null;
     }
     const housing=camera.worldToLocal(hammer.localToWorld(new THREE.Vector3(.02,-.055,-.1)));
@@ -923,7 +923,8 @@ export class FPSRig extends THREE.Group {
     // This is a small neck lean, not extra arm reach or a stretched forearm.
     if(this.selectedTool==='hammer'&&(this.workPositionLocked||this.masonryBraced)){
       const swapped=THREE.MathUtils.smoothstep(this.hammerGripBlend,0,1);
-      const strokeLean=Math.abs(this.workStanceSide)>.01?-.12*Math.sign(this.workStanceSide):THREE.MathUtils.lerp(.12,-.12,swapped);
+      const strokeLean=this.workHeadLeanM!==null?THREE.MathUtils.clamp(-this.workHeadLeanM,-.12,.12)
+        :Math.abs(this.workStanceSide)>.01?-.12*Math.sign(this.workStanceSide):THREE.MathUtils.lerp(.12,-.12,swapped);
       eye.addScaledVector(right,strokeLean);
     }
     const hammerWork=this.selectedTool==='hammer'&&(this.workPositionLocked||this.masonryBraced);
