@@ -1,0 +1,50 @@
+[
+  {
+    "model": "FID3",
+    "source": "https://www.milwaukeetool.eu/en-eu/m18-fuel-1-4-hex-impact-driver/m18-fid3/",
+    "image": "https://static.milwaukeetool.eu/remote.axd/milwaukee-media-images.s3.amazonaws.com/hi/M18_FID3-502X--Hero_1.jpg",
+    "sha256": "4ebd671449d27d51eeb8d514194c85897628efbd84bc1d18e5330adca59b767e"
+  },
+  {
+    "model": "FID3",
+    "source": "https://www.milwaukeetool.eu/en-eu/m18-fuel-1-4-hex-impact-driver/m18-fid3/",
+    "image": "https://static.milwaukeetool.eu/remote.axd/milwaukee-media-images.s3.amazonaws.com/hi/M18_FID3-502X--App_1.jpg",
+    "sha256": "4d731026ba7e65daced42ec53c775e8f2981d6819e7903ec0e8dbb7c8b9a5aeb"
+  },
+  {
+    "model": "FID3",
+    "source": "https://www.milwaukeetool.eu/en-eu/m18-fuel-1-4-hex-impact-driver/m18-fid3/",
+    "image": "https://static.milwaukeetool.eu/remote.axd/milwaukee-media-images.s3.amazonaws.com/hi/M18_FID3-502X--App_2.jpg",
+    "sha256": "8b8c758ed2219ef6796c87c78eefef680744ee726d07829a7ad785d6a8333cc6"
+  },
+  {
+    "model": "FID3",
+    "source": "https://www.milwaukeetool.eu/en-eu/m18-fuel-1-4-hex-impact-driver/m18-fid3/",
+    "image": "https://static.milwaukeetool.eu/remote.axd/milwaukee-media-images.s3.amazonaws.com/hi/M18_FID3-502X--Hero_2.jpg",
+    "sha256": "f536f051c4587c7376c933ab10120adb483d1daa1294b53be2ff4b0e0111fda6"
+  },
+  {
+    "model": "FPD3",
+    "source": "https://www.milwaukeetool.eu/en-eu/m18-fuel-percussion-drill/m18-fpd3/",
+    "image": "https://static.milwaukeetool.eu/remote.axd/milwaukee-media-images.s3.amazonaws.com/hi/M18_FPD3-502X--Hero_1.jpg",
+    "sha256": "e67aa0bb6fe2154f375064e26b00d4efedb6784d2de9241b172edd0145a3cce6"
+  },
+  {
+    "model": "FPD3",
+    "source": "https://www.milwaukeetool.eu/en-eu/m18-fuel-percussion-drill/m18-fpd3/",
+    "image": "https://static.milwaukeetool.eu/remote.axd/milwaukee-media-images.s3.amazonaws.com/hi/M18_FPD3-502X--App_1.jpg",
+    "sha256": "5a880255c9da4faf99bfc35ffe0bc2717884c75855fa9f3a36302d8244b61c20"
+  },
+  {
+    "model": "FPD3",
+    "source": "https://www.milwaukeetool.eu/en-eu/m18-fuel-percussion-drill/m18-fpd3/",
+    "image": "https://static.milwaukeetool.eu/remote.axd/milwaukee-media-images.s3.amazonaws.com/hi/M18_FPD3-502X--App_2.jpg",
+    "sha256": "22298ccc3ac7fd74924008d5e74f0605166ba6065a64d9a4a85a92b3573dab0d"
+  },
+  {
+    "model": "FPD3",
+    "source": "https://www.milwaukeetool.eu/en-eu/m18-fuel-percussion-drill/m18-fpd3/",
+    "image": "https://static.milwaukeetool.eu/remote.axd/milwaukee-media-images.s3.amazonaws.com/hi/M18_FPD3-502X--Hero_2.jpg",
+    "sha256": "cffae4a34f24765777a81b8289974fe978f16eabc1b4e0ca10ed876ad7ede991"
+  }
+]

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {m18ToolModelsReady} from '../player/M18ToolModels';
 import { Renderer } from './Renderer';
 import { Input } from './Input';
 import { AssetManager } from './AssetManager';
@@ -445,7 +446,7 @@ export class Game {
     let preparedStages = 0;
     const markPrepared = (): void => {
       if (startButton.dataset.preparing === 'false') return;
-      const percent = Math.round(++preparedStages / (9+viewStages) * 100);
+      const percent = Math.round(++preparedStages / (10+viewStages) * 100);
       startLoadPercent.value = `${percent}%`;
       startLoadPercent.setAttribute('aria-label', `Site preparation ${percent}%`);
       startScreen.style.setProperty('--load-progress', `${percent}%`);
@@ -456,6 +457,7 @@ export class Game {
       observePreparation(this.renderer.ready),
       observePreparation(this.workerBody.ready),
       observePreparation(this.fpsRig.hammerReady),
+      observePreparation(m18ToolModelsReady()),
       observePreparation(this.apprentice.ready),
       this.masonryBatch?.ready ?? Promise.resolve(),
     ]).then(async () => {
