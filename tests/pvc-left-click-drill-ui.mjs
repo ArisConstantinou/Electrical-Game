@@ -42,6 +42,9 @@ try{
    assert.equal(report.firstClick.phase,'fastener-drilling','The first left click must drill directly, without E or prior circles');
    assert.equal(report.firstClick.fasteners.holes,1);assert.equal(ePresses,0);
    assert(await page.evaluate(()=>{const p=window.__wireTheHouse.pvc;return !p.securingCursor.visible&&p.fastenerHoles.every(h=>h.marker.children.every(m=>!m.visible));}),'No red aiming/marking circles before the real hole');
+   await step(12);await snap('drill-in-progress');
+   const grips=await page.evaluate(()=>window.__wireTheHouse.workerBody.telemetry.gripReachErrors);report.drillGrips??=[];report.drillGrips.push({touch,...grips});
+   assert(grips.R<.015&&grips.L<.015,`Both drilling hands must contact their real handles: ${JSON.stringify(grips)}`);
    await step(55);assert.equal((await state()).fasteners.drilled,1);assert.equal((await state()).phase,'fastener-marking');
    assert(await page.evaluate(before=>window.__wireTheHouse.room.brickWall.volume.removedNodeCount>before,removed),'First click must remove actual masonry');
    await (touch?mark:click)();await step(55);assert.equal((await state()).fasteners.holes,1,'An already drilled unpaired hole must not duplicate');

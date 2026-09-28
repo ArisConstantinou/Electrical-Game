@@ -51,7 +51,8 @@ export class FPSRig extends THREE.Group {
       }
       if(this.selectedTool==='drill'||this.selectedTool==='driver'){
         grip.contactLocked=this.reachable;
-        grip.section=[.020,.029];grip.shape='box';
+        grip.section=arm.side>0?[.019,.021]:[.013,.013];grip.shape=arm.side>0?'box':'round';
+        if(arm.side<0&&this.selectedTool==='drill'){grip.surfaceContact=this.reachable;grip.firstPersonClearance=.17;}
         const tool=this.tools.get(this.selectedTool)!,trigger=tool.getObjectByName('Index finger trigger');
         if(arm.side>0&&trigger)grip.trigger=trigger.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0,0,-.013).applyQuaternion(tool.getWorldQuaternion(new THREE.Quaternion())));
       }
@@ -1216,13 +1217,14 @@ export class FPSRig extends THREE.Group {
     const arms:WorkerArm[]=[];
     const primary=new THREE.Vector3().fromArray(group.userData.gripPoint);
     for(const side of [1,-1]){
-      const resting=side<0&&kind!=='hammer';
+      const resting=side<0&&kind!=='hammer'&&kind!=='drill';
       const grip=side===1?primary.clone():resting?new THREE.Vector3():new THREE.Vector3().fromArray(group.userData.secondaryGripPoint);
       const style=kind==='measure'&&side<0?'spring':resting?'relaxed':side<0?'hammer-support':kind==='measure'||kind==='laser'?'fitting':kind==='drill'||kind==='driver'?'hose':kind;
       const hand=workerHand(side,style); hand.position.copy(grip);
       if(kind==='measure'&&side<0){const pencil=buildMeasurePencil();pencil.userData.heldAccessory=true;hand.add(pencil);}
       if(!resting&&group.userData.gripQuaternion)hand.quaternion.fromArray(group.userData.gripQuaternion);
-      hand.userData.gripping=!resting;hand.userData.gripRole=resting?'resting':'primary';
+      if(side<0&&kind==='drill')hand.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),new THREE.Vector3(1,0,0));
+      hand.userData.gripping=!resting;hand.userData.gripRole=resting?'resting':side<0&&kind==='drill'?'support':'primary';
       const arm=workerArm(side,hand,grip);arms.push(arm);this.add(arm.group);
       if(resting)arm.group.add(hand);else group.add(hand);
     }

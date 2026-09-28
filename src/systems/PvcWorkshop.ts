@@ -768,6 +768,10 @@ export class PvcWorkshop {
     const cutting=this.cutter.visible&&this.work.visible;
     return this.arms.map(arm=>{
       const cutter=cutting&&arm.side>0;
+      if(this.drill.visible&&this.work.visible){
+        const primary=arm.side>0,grip=workerGripTarget(arm,true);
+        return {...grip,object:this.drill,section:(primary?[.019,.021]:[.013,.013]) as [number,number],shape:primary?'box' as const:'round' as const,contactLocked:true,surfaceContact:!primary,firstPersonClearance:.17,trigger:primary?this.drill.getObjectByName('Index finger trigger')?.getWorldPosition(v()):undefined};
+      }
       return {...workerGripTarget(arm,this.work.visible&&this.phase!=='fastener-marking'&&(this.phase!=='carrying'||arm.side>0)),section:(cutter?[.020,.014]:this.phase.startsWith('fastener-')?(arm.side<0?[.005,.005]:[.011,.011]):[.01,.01]) as [number,number],shape:cutter?'box' as const:'round' as const,contactLocked:true,surfaceContact:true,cutter:cutter?this.cutter:undefined,thumbWrap:this.phase==='carrying',firstPersonClearance:this.phase==='carrying'?.28:cutting?.20:clearFirstPerson?.42:undefined};
     });
   }
@@ -887,7 +891,8 @@ export class PvcWorkshop {
       if(this.phase==='fastener-drilling'&&holes.length){
         const hole=holes[Math.min(this.fastenerIndex,holes.length-1)],tip=c.worldToLocal(hole.marker.position.clone()),direction=v(0,0,-1),q=new THREE.Quaternion();
         const pulse=Math.sin(Math.min(1,this.fastenerProgress)*Math.PI)*.015;this.drill.quaternion.copy(q);this.drill.position.copy(tip).sub(v().fromArray(this.drill.userData.tipPoint).applyQuaternion(q)).addScaledVector(direction,-.05+pulse);
-        right.copy(v().fromArray(this.drill.userData.gripPoint).applyQuaternion(q).add(this.drill.position));rightQ.copy(q);left.copy(tip).add(v(-hole.side*.09,-.04,.04));leftQ.copy(q);
+        right.copy(v().fromArray(this.drill.userData.gripPoint).applyQuaternion(q).add(this.drill.position));rightQ.copy(q);
+        left.copy(v().fromArray(this.drill.userData.secondaryGripPoint).applyQuaternion(q).add(this.drill.position));leftQ.copy(q).multiply(new THREE.Quaternion().setFromUnitVectors(v(0,1,0),v(1,0,0)));
       }else{
         const pair=pairs[Math.min(this.fastenerIndex,Math.max(0,pairs.length-1))],world=pair?pair.left.marker.position.clone().add(pair.right.marker.position).multiplyScalar(.5):this.target!.boxGroup.getWorldPosition(v()).add(v(0,-.16,.12)),centre=c.worldToLocal(world);
         this.heldRebar.position.copy(centre).add(v(-.16,-.03,.10));this.heldRebar.rotation.set(0,0,.08);left.copy(this.heldRebar.position).add(v(0,-.02,0));leftQ.identity();

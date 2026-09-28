@@ -874,6 +874,12 @@ export class WorkerBody extends THREE.Group {
     }
     if(!contact){
       const turn=pose.rotation.clone().multiply(inverse);
+      if(!station&&primary.referenceKey==='drill:R'){
+        // The support hand shares the auxiliary handle on the same rigid tool.
+        // Follow the carried tool after its primary grasp is placed.
+        const support=grips.find(grip=>grip.side<0&&grip.active);
+        if(support){support.center.sub(primary.center).applyQuaternion(turn).add(pose.center);support.rotation.premultiply(turn);}
+      }
       if(!station)fps.transformAnatomicalGrasp(primary.center,pose.center,turn);
       else{
         const position=object.getWorldPosition(new THREE.Vector3()).sub(primary.center).applyQuaternion(turn).add(pose.center);
