@@ -12,14 +12,14 @@ const { launchManagedBrowser, runManagedClient } = await import(pathToFileURL(pa
   '.codex/skills/develop-web-game/scripts/browser_lifecycle.mjs')).href);
 const baseline = process.argv.includes('--before');
 const renderer = process.env.QA_RENDERER ?? 'webgl';
-const out = `output/editor-column-idle/${baseline ? 'before' : process.env.QA_LIVE === '1' ? 'live' : 'candidate'}${renderer === 'webgl' ? '' : `-${renderer}`}`;
+const out = `output/editor-column-idle/${process.env.QA_LABEL ?? (baseline ? 'before' : process.env.QA_LIVE === '1' ? 'live' : 'candidate')}${renderer === 'webgl' ? '' : `-${renderer}`}`;
 await mkdir(out, { recursive: true });
 const report = { errors: [], baseline, renderer, samples: {} };
 const session = await launchManagedBrowser(chromium, { channel: 'chrome', headless: true, screenshotDir: out });
-const url = `http://127.0.0.1:5365/Electrical-Game/?mansion=preview&editor=1&renderer=${renderer}`;
+const url = `${process.env.QA_URL ?? 'http://127.0.0.1:5365/Electrical-Game/'}?mansion=preview&editor=1&renderer=${renderer}`;
 const legacyId = 'site-asset:continuous-reinforced-concrete-court-edge-columns:1';
 async function setup(context) {
-  await routeBuildingDist(context);
+  if (!process.env.QA_URL) await routeBuildingDist(context);
   await blockPointerLock(context);
   // Exercise real browser persistence without writing to the shared checkout.
   await context.route('**/__wire-house-mansion-level*', route => route.fulfill({
