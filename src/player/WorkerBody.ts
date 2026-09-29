@@ -7,6 +7,7 @@ import type { WorkerGripTarget } from './WorkerArm';
 import referenceGrips from './referenceGrips.json';
 import {solveRigidGrasp,type GraspHistory} from './RigidGrasp';
 import { loadStartupAsset } from '../core/StartupAsset';
+import { FirstPersonWorkerArms } from './FirstPersonWorkerArms';
 
 const Y=new THREE.Vector3(0,1,0);
 async function loadWorkerModel(asset:string):Promise<THREE.Group>{
@@ -68,6 +69,8 @@ export class WorkerBody extends THREE.Group {
   private rest=new Map<THREE.Bone,{q:THREE.Quaternion;p:THREE.Vector3}>();
   private headParts:THREE.Object3D[]=[];
   private headMaterials:THREE.Material[]=[];
+  private firstPersonArms:FirstPersonWorkerArms|undefined;
+  private bodyMaterials:THREE.Material[]=[];
   private phase=0;
   private gaitBlend=0;
   private travelTurn=0;
@@ -92,7 +95,7 @@ export class WorkerBody extends THREE.Group {
   private armTwist:Record<string,{upperDegrees:number;foreDegrees:number}>={};
   private footRest=new Map<string,THREE.Quaternion>();
   private locomotionState={speed:0,forward:0,sideways:0,pelvisBobM:0,pelvisSwayM:0,pelvisYawDegrees:0,spineCounterDegrees:0,headCounterDegrees:0};
-  constructor(scene:THREE.Scene,options:{detail?:'full'|'apprentice';castShadow?:boolean}={}){
+  constructor(scene:THREE.Scene,options:{detail?:'full'|'apprentice';castShadow?:boolean;firstPerson?:boolean}={}){
     super();this.name='Anatomical full body worker';this.userData.studioEntityId='worker:full-body';scene.add(this);
     const detail=options.detail??'full',asset=detail==='apprentice'?'worker-apprentice-lod.glb':'worker.glb';
     let template=WorkerBody.templates.get(asset);
@@ -127,6 +130,18 @@ export class WorkerBody extends THREE.Group {
         const materials=originals.map(m=>m.clone());
         part.material=Array.isArray(part.material)?materials:materials[0];
         this.headMaterials.push(...materials);
+      }
+      if(options.firstPerson){
+        this.firstPersonArms=new FirstPersonWorkerArms(source,this.bones);
+        this.add(this.firstPersonArms);
+        for(const mesh of skins){
+          if(headMeshes.has(mesh))continue;
+          const originals=Array.isArray(mesh.material)?mesh.material:[mesh.material];
+          const materials=originals.map(material=>{
+            const copy=material.clone();this.bodyMaterials.push(copy);return copy;
+          });
+          mesh.material=Array.isArray(mesh.material)?materials:materials[0];
+        }
       }
       this.updateMatrixWorld(true);
       for(const side of ['L','R'])this.footRest.set(side,this.bone('foot.'+side).getWorldQuaternion(new THREE.Quaternion()));
@@ -576,6 +591,14 @@ export class WorkerBody extends THREE.Group {
     // visited this skeleton earlier; tools and skin must use the same pose.
     this.updateMatrixWorld(true);
     for(const skeleton of this.skeletons)skeleton.update();
+    if(this.firstPersonArms){
+      const useArms=hammerHeld&&!this.overview;
+      // Retain the complete worker in shadow passes and external views. The
+      // braced torso can cross the independent eye, so FP uses its own arms.
+      for(const material of this.bodyMaterials){material.colorWrite=!useArms;material.depthWrite=!useArms;}
+      this.firstPersonArms.visible=useArms;
+      if(useArms)this.firstPersonArms.update(camera);
+    }
   }
   private poseHammerGrasps(grips:WorkerGripTarget[],right:THREE.Vector3,working:boolean):void {
     for(const grip of grips.filter(g=>g.active))this.poseHammerGrip(grip.side>0?'R':'L',grip,right,working);

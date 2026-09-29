@@ -208,7 +208,7 @@ export class Game {
     this.player = new PlayerController(this.renderer.camera, this.input);
     this.renderer.camera.add(this.fpsRig);
     this.renderer.scene.add(this.renderer.camera);
-    this.workerBody=new WorkerBody(this.renderer.scene);
+    this.workerBody=new WorkerBody(this.renderer.scene,{firstPerson:true});
     const sceneParams = new URLSearchParams(location.search);
     const mansionPreview = sceneParams.get('mansion') !== 'basic';
     root.querySelector('#start-level-current')!.textContent = mansionPreview ? 'MANSION SITE · PREVIEW' : 'ORIGINAL FIRST FIX ROOM';
