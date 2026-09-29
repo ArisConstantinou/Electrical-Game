@@ -27,18 +27,29 @@ try{
   await page.addStyleTag({content:'#fps-counter{visibility:hidden!important}'});
   await page.evaluate(()=>{const g=window.__wireTheHouse;window.qaBodyStep=g.step.bind(g);g.step=()=>{};});
   report.processes=ownedProcesses();
-  for(const pose of [...[-1.15,-.55,0,.55,1.15].map(pitch=>({name:String(pitch),pitch})),{name:'crouch-down',pitch:-1.15,crouch:true},{name:'free-down',pitch:-1.15,free:true},{name:'side-left',pitch:-.55,yaw:-.6},{name:'side-right',pitch:-.55,yaw:.6}]){
+  for(const pose of [...[-1.15,-.55,0,.55,1.15].map(pitch=>({name:String(pitch),pitch})),{name:'crouch-down',pitch:-1.15,crouch:true},{name:'free-down',pitch:-1.15,free:true},{name:'side-left',pitch:-.55,yaw:-.6},{name:'side-right',pitch:-.55,yaw:.6},...[-1.15,0,1.15].map(pitch=>({name:`left-main-${pitch}`,pitch,left:true}))]){
+   if(process.env.QA_BODY_MATCH&&!new RegExp(process.env.QA_BODY_MATCH).test(pose.name))continue;
+   if(pose.left)await page.locator('#hammer-view-left').dispatchEvent('click');
    const state=await page.evaluate(async({pose,baseline})=>{
     const g=window.__wireTheHouse,camera=g.player.camera,body=g.workerBody;
     g.input.actionHeld=false;g.player.crouched=!!pose.crouch;g.player.velocity.set(0,0,0);
+    if(!pose.left){g.hammerAutoSide=true;g.fpsRig.hammerHandedness='right';}
     camera.position.set(0,pose.crouch?.95:1.65,pose.free?1:g.room.brickWall.volume.frontZ+1.08);g.player.yaw=pose.yaw??0;g.player.pitch=pose.pitch;
     g.player.workPosition.locked=!pose.free;g.player.workPosition.released=!!pose.free;g.player.workPosition.targetDistanceM=1.08;
     for(let i=0;i<90;i++)window.qaBodyStep(1/60,1/60,false);
     await g.renderer.waitForFrame();g.renderer.render();await g.renderer.waitForFrame();
-    const errors=[];
+    const errors=[],joints=[];
     if(!baseline)for(const side of ['L','R'])for(const name of ['forearm.','hand.','thumb.03.','index.03.','little.03.']){
      const world=body.bone(name+side),view=body.firstPersonArms.bone(name+side);
      errors.push({name:name+side,distance:world.getWorldPosition(camera.position.clone()).distanceTo(view.getWorldPosition(camera.position.clone())),rotation:world.getWorldQuaternion(camera.quaternion.clone()).normalize().angleTo(view.getWorldQuaternion(camera.quaternion.clone()).normalize())});
+    }
+    if(!baseline)for(const side of ['L','R']){
+     const arm=body.firstPersonArms,upper=arm.bone('upper_arm.'+side),fore=arm.bone('forearm.'+side),hand=arm.bone('hand.'+side),rest=body.rest.get(body.bone('forearm.'+side));
+     const V=camera.position.constructor,Q=camera.quaternion.constructor,y=new V(0,1,0),s=upper.getWorldPosition(new V()),e=fore.getWorldPosition(new V()),w=hand.getWorldPosition(new V());
+     const u=e.clone().sub(s).normalize(),f=w.clone().sub(e).normalize(),uq=upper.getWorldQuaternion(new Q()).normalize(),fq=fore.getWorldQuaternion(new Q()).normalize();
+     const hinge=y.clone().cross(y.clone().applyQuaternion(rest.q)).normalize().applyQuaternion(uq);
+     const neutral=uq.clone().multiply(rest.q);neutral.premultiply(new Q().setFromUnitVectors(y.clone().applyQuaternion(neutral).normalize(),f));
+     joints.push({side,bindGapM:rest.p.clone().applyMatrix4(upper.matrixWorld).distanceTo(e),hingeDegrees:hinge.angleTo(u.clone().cross(f))*180/Math.PI,forearmTwistDegrees:neutral.normalize().angleTo(fq)*180/Math.PI,flexionDegrees:u.angleTo(f)*180/Math.PI,upperLengthM:s.distanceTo(e)});
     }
     // The old shirt/neck entering the reticle is a geometric obstruction,
     // independently of the hand-contact assertions above.
@@ -65,7 +76,32 @@ try{
       const a=camera.position.clone(),b=a.clone();for(let i=0;i<mesh.geometry.attributes.position.count;i+=29){mesh.getVertexPosition(i,a);copy.getVertexPosition(i,b);gloveSurfaceDelta=Math.max(gloveSurfaceDelta,a.applyMatrix4(mesh.matrixWorld).distanceTo(b.applyMatrix4(copy.matrixWorld)));}
      }
     }
-    return {name:pose.name,pitch:pose.pitch,grips:body.telemetry.gripReachErrors,errors,gloveSurfaceDelta,obstructions,renderer:g.renderer.renderError,position:camera.position.toArray(),rotation:camera.quaternion.toArray()};
+    let batteryPenetrationM=0;const batteryHits=[];
+    const hammer=g.fpsRig.tools.get('hammer'),battery=['D1_sloping_rear_battery_foot','D3_removable_battery_shell'].map(name=>hammer.getObjectByName(name));
+    const testRay=g.mortar.ray.ray.clone(),direction=camera.position.clone().set(1,.371,.197).normalize(),a=direction.clone(),b=a.clone(),c=a.clone(),hit=a.clone();
+    const insideDepth=(part,point)=>{
+     if(!part.geometry.boundingBox.containsPoint(point))return 0;
+     testRay.set(point,direction);const positions=part.geometry.attributes.position,index=part.geometry.index,distances=[];
+     for(let t=0;t<(index?.count??positions.count);t+=3){
+      a.fromBufferAttribute(positions,index?index.getX(t):t);b.fromBufferAttribute(positions,index?index.getX(t+1):t+1);c.fromBufferAttribute(positions,index?index.getX(t+2):t+2);
+      if(testRay.intersectTriangle(a,b,c,false,hit))distances.push(point.distanceTo(hit));
+     }
+     const unique=distances.sort((a,b)=>a-b).filter((d,i,all)=>i===0||d-all[i-1]>1e-6);
+     return unique.length%2?unique[0]:0;
+    };
+    body.firstPersonArms.traverse(mesh=>{
+     if(!mesh.visible||!mesh.isSkinnedMesh||!/skin/i.test(mesh.material.name))return;
+     const point=camera.position.clone(),color=mesh.geometry.getAttribute('color');
+     for(let i=0;i<mesh.geometry.attributes.position.count;i++){
+      if(color.getW(i)<.8)continue;
+      for(const part of battery){
+       mesh.getVertexPosition(i,point);point.applyMatrix4(mesh.matrixWorld);part.worldToLocal(point);
+       const depth=insideDepth(part,point);
+       if(depth>batteryPenetrationM){batteryPenetrationM=depth;batteryHits.push({part:part.name,depth,bones:Array.from({length:4},(_,j)=>[mesh.skeleton.bones[mesh.geometry.getAttribute('skinIndex').getComponent(i,j)].name,mesh.geometry.getAttribute('skinWeight').getComponent(i,j)])});}
+      }
+     }
+    });
+    return {name:pose.name,pitch:pose.pitch,grips:body.telemetry.gripReachErrors,wristBend:['L','R'].map(side=>body.telemetry.fingerFit['hammerWrist'+side]?.bendDegrees??0),batteryPenetrationM,batteryHits,errors,joints,gloveSurfaceDelta,obstructions,renderer:g.renderer.renderError,position:camera.position.toArray(),rotation:camera.quaternion.toArray()};
    },{pose,baseline});
    report.cases.push({viewport,...state});
    await page.screenshot({path:`${out}/${viewport.width}-${pose.name}.png`});
@@ -73,6 +109,15 @@ try{
    if(!baseline)for(const error of state.errors){assert(error.distance<1e-6,`${error.name}: contact moved`);assert(error.rotation<1e-6,`${error.name}: contact rotated`);}
    if(!baseline)assert.equal(state.obstructions.length,0,`${pose.name}: shirt in aiming region`);
    if(!baseline)assert(state.gloveSurfaceDelta<.001,`${pose.name}: glove surface left its grip`);
+   assert(state.batteryPenetrationM<.001,`${pose.name}: skin penetrates battery by ${state.batteryPenetrationM} m`);
+   for(const error of Object.values(state.grips))assert(error<.006,`${pose.name}: physical hand detached from grip`);
+   for(const bend of state.wristBend)assert(bend<15,`${pose.name}: bent wrist ${bend} degrees`);
+   for(const joint of state.joints){
+    assert(joint.bindGapM<.0005,`${pose.name}/${joint.side}: elbow skin influences separated by ${joint.bindGapM} m`);
+    assert(joint.hingeDegrees<1,`${pose.name}/${joint.side}: elbow crease rotated out of its bend plane`);
+    assert(joint.forearmTwistDegrees<1,`${pose.name}/${joint.side}: twisted forearm skin`);
+    assert(joint.upperLengthM<.8,`${pose.name}/${joint.side}: excessive view-arm extension`);
+   }
   }
   const transition=await page.evaluate(async baseline=>{
    const g=window.__wireTheHouse,body=g.workerBody;
@@ -91,6 +136,7 @@ try{
   await page.keyboard.press('Digit4');
   report.performance.push({viewport,...await page.evaluate(async()=>{
    const g=window.__wireTheHouse,frame=[],bodyTimes=[],body=g.workerBody,original=body.update.bind(body);
+   g.fpsRig.hammerHandedness='right';
    g.player.crouched=false;g.player.yaw=0;g.player.pitch=-.55;g.player.camera.position.set(0,1.65,g.room.brickWall.volume.frontZ+1.08);
    g.player.workPosition.locked=true;g.player.workPosition.released=false;
    for(let i=0;i<60;i++)window.qaBodyStep(1/60,1/60,false);

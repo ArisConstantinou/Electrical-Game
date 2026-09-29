@@ -61,7 +61,17 @@ export class FPSRig extends THREE.Group {
         Object.defineProperty(grip,'object',{value:arm.side>0?this.fittingCandidateRoot:this.fittingAssemblyRoot});
       }
       if(this.selectedTool==='trowel')grip.straightWrist=true;
-      if(this.selectedTool==='hammer')grip.contactLocked=this.reachable;
+      if(this.selectedTool==='hammer'){
+        grip.contactLocked=this.reachable;
+        const hammer=this.tools.get('hammer')!;
+        grip.forearmObstacles=['D1_sloping_rear_battery_foot','D3_removable_battery_shell'].flatMap(name=>{
+          const mesh=hammer.getObjectByName(name) as THREE.Mesh|undefined;
+          if(!mesh)return [];
+          if(!mesh.geometry.boundingBox)mesh.geometry.computeBoundingBox();
+          mesh.updateWorldMatrix(true,false);
+          return [{inverse:mesh.matrixWorld.clone().invert(),bounds:mesh.geometry.boundingBox!}];
+        });
+      }
       if(this.selectedTool==='measure'){
         if(arm.side>0){grip.contactLocked=this.tools.get('measure')!.userData.measuring===true;grip.section=[.031,.025];grip.shape='box';}
         else {grip.section=[.005,.003];grip.shape='box';grip.contactLocked=this.measureMarkTime>0;Object.defineProperty(grip,'object',{value:arm.hand});}

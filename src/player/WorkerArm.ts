@@ -172,6 +172,7 @@ export interface WorkerGripTarget {
   firstPersonClearance?:number;
   straightWrist?:boolean;
   palmDirection?:THREE.Vector3;
+  forearmObstacles?:{inverse:THREE.Matrix4;bounds:THREE.Box3}[];
   bodyFrame?:{position:THREE.Vector3;quaternion:THREE.Quaternion};
 }
 export function workerGripTarget(arm:WorkerArm,active=arm.hand.userData.gripRole!=='resting'):WorkerGripTarget {

@@ -597,13 +597,25 @@ export class WorkerBody extends THREE.Group {
       // braced torso can cross the independent eye, so FP uses its own arms.
       for(const material of this.bodyMaterials){material.colorWrite=!useArms;material.depthWrite=!useArms;}
       this.firstPersonArms.visible=useArms;
-      if(useArms)this.firstPersonArms.update(camera);
+      if(useArms)this.firstPersonArms.update(camera,grips.find(grip=>grip.forearmObstacles?.length)?.forearmObstacles);
     }
   }
   private poseHammerGrasps(grips:WorkerGripTarget[],right:THREE.Vector3,working:boolean):void {
     for(const grip of grips.filter(g=>g.active))this.poseHammerGrip(grip.side>0?'R':'L',grip,right,working);
   }
-  private hammerGraspFrame(side:string,grip:WorkerGripTarget,right:THREE.Vector3) {
+  private hammerForearmPenetration(grip:WorkerGripTarget,wrist:THREE.Vector3,elbow:THREE.Vector3):number {
+    let penetration=0;
+    for(const obstacle of grip.forearmObstacles??[]){
+      const w=wrist.clone().applyMatrix4(obstacle.inverse),e=elbow.clone().applyMatrix4(obstacle.inverse),p=new THREE.Vector3();
+      for(let i=0;i<=12;i++){
+        // Include the skin envelope and 5 mm of clearance, not just bone centres.
+        const t=i/12,radius=THREE.MathUtils.lerp(.033,.052,t);p.copy(w).lerp(e,t);
+        penetration=Math.max(penetration,radius-obstacle.bounds.distanceToPoint(p));
+      }
+    }
+    return Math.max(0,penetration);
+  }
+  private hammerGraspFrame(side:string,grip:WorkerGripTarget,right:THREE.Vector3,retainGrasp=false) {
     const sign=side==='R'?1:-1,axis=Y.clone().applyQuaternion(grip.rotation).normalize();
     if(axis.y<-.05)axis.negate();
     const frame=this.handFrames.get(side)!,upperLength=this.lengths.get('upper_arm.'+side)!,foreLength=this.lengths.get('forearm.'+side)!;
@@ -614,9 +626,11 @@ export class WorkerBody extends THREE.Group {
     const baseQ=this.handOrientation(side,axis,long);
     const neutral=baseQ.clone().multiply(frame.foreToHand.clone().invert());
     baseQ.premultiply(new THREE.Quaternion().setFromUnitVectors(Y.clone().applyQuaternion(neutral),long));
+    if(retainGrasp)baseQ.copy(this.bone('hand.'+side).getWorldQuaternion(new THREE.Quaternion()));
     const foreQ=baseQ.clone().multiply(frame.foreToHand.clone().invert());
     const back=long.clone().multiplyScalar(-sign).cross(axis).normalize(),across=axis.clone().cross(back);
     const wristOffset=across.clone().multiplyScalar(-sign*grip.section[0]*.6).addScaledVector(back,-grip.section[1]-.012).sub(frame.knuckle.clone().applyQuaternion(baseQ));
+    if(retainGrasp)wristOffset.copy(this.point('hand.'+side)).sub(grip.center);
     const elbowOffset=wristOffset.clone().addScaledVector(Y.clone().applyQuaternion(foreQ),-foreLength);
     // A neutral power grasp defines the forearm. Choose its swivel on the
     // handle together with the nearest shoulder position on the clavicle's
@@ -642,7 +656,8 @@ export class WorkerBody extends THREE.Group {
       neutralFore.premultiply(new THREE.Quaternion().setFromUnitVectors(Y.clone().applyQuaternion(neutralFore),f));
       const upperRoll=uq.angleTo(neutralUpper),foreRoll=neutralFore.angleTo(turn.clone().multiply(foreQ));
       const error=e.distanceTo(s)-upperLength;
-      const score=10000*error**2+1.5*shoulderAngle**2+.2*upperRoll**2+.12*foreRoll**2
+      const collision=this.hammerForearmPenetration(grip,wristOffset.clone().applyQuaternion(turn).add(grip.center),e);
+      const score=10000*error**2+1000000*collision**2+1.5*shoulderAngle**2+.2*upperRoll**2+.12*foreRoll**2
         +8*Math.max(0,upperRoll-1.35)**2+8*Math.max(0,foreRoll-1.6)**2
         +25*Math.max(0,-sign*e.clone().sub(s).dot(right)-.02)**2+20*Math.max(0,e.y-grip.center.y-.04)**2+.015*phi**2;
       if(score<best){best=score;angle=phi;clavicleQ=cq;}
@@ -652,7 +667,7 @@ export class WorkerBody extends THREE.Group {
     const swivel=new THREE.Quaternion().setFromAxisAngle(axis,angle),q=swivel.clone().multiply(baseQ);
     const elbow=elbowOffset.clone().applyQuaternion(swivel).add(grip.center),wrist=wristOffset.clone().applyQuaternion(swivel).add(grip.center);
     const rotation=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(across.applyQuaternion(swivel),axis,back.applyQuaternion(swivel)));
-    return {elbow,wrist,q,rotation,clavicleQ};
+    return {elbow,wrist,q,rotation,clavicleQ,score:best,retainGrasp};
   }
   private poseHammerGrip(side:string,grip:WorkerGripTarget,right:THREE.Vector3,working:boolean):void {
     // Most grips allow the knuckle row to sit obliquely on the cylinder.
@@ -660,16 +675,24 @@ export class WorkerBody extends THREE.Group {
     // its residual before publishing the pose and use the rigid-grasp branch.
     this.posePipeGrip(side,grip,working,true);
     const fit=this.fingerFit['hammerWrist'+side] as {bendDegrees:number};
-    if(fit.bendDegrees<2&&this.gripErrors[side]<.006)return;
+    const retainGrasp=fit.bendDegrees<2&&this.gripErrors[side]<.006;
+    if(retainGrasp&&this.hammerForearmPenetration(grip,this.point('hand.'+side),this.point('forearm.'+side))<.001)return;
     const frame=this.handFrames.get(side)!;
-    const {elbow,wrist,q,rotation,clavicleQ}=this.hammerGraspFrame(side,grip,right);
+    let solved=this.hammerGraspFrame(side,grip,right);
+    if(retainGrasp){
+      // Preserve an oblique grasp as another candidate. Forcing every wrist
+      // perpendicular to the handle makes upward work anatomically unreachable.
+      const retained=this.hammerGraspFrame(side,grip,right,true);
+      if(retained.score<solved.score)solved=retained;
+    }
+    const {elbow,wrist,q,rotation,clavicleQ}=solved;
     this.worldRotation(this.bone('clavicle.'+side),clavicleQ);
     this.orient('upper_arm.'+side,elbow);
     this.orient('forearm.'+side,wrist);
     const handFrame=q.clone().multiply(frame.basis.clone().invert());
     this.setHandOrientation(side,new THREE.Vector3(1,0,0).applyQuaternion(handFrame),Y.clone().applyQuaternion(handFrame),true);
     this.gripErrors[side]=this.point('hand.'+side).distanceTo(wrist);
-    this.wrapGrip(side,grip.center,rotation,grip.section,false,working,'round',undefined,undefined,true);
+    if(!solved.retainGrasp)this.wrapGrip(side,grip.center,rotation,grip.section,false,working,'round',undefined,undefined,true);
     const actualFore=this.point('hand.'+side).sub(this.point('forearm.'+side)).normalize();
     const neutralFore=Y.clone().applyQuaternion(q.clone().multiply(frame.foreToHand.clone().invert()));
     this.fingerFit['hammerWrist'+side]={bendDegrees:THREE.MathUtils.radToDeg(actualFore.angleTo(neutralFore))};

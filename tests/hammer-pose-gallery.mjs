@@ -33,10 +33,11 @@ try{
    if(view==='outside'){c.position.set(20.5,2.15,-15.25);c.lookAt(new V(23,1.10,-12.15));}
    else {c.position.copy(feet).add(new V(view==='side'?-2.1:2.1,1.8,1.8));c.lookAt(feet.clone().add(new V(0,.95,-.4)));}
    c.fov=43;c.updateProjectionMatrix();g.workerBody.headMaterials.forEach(m=>{m.colorWrite=true;m.depthWrite=true;});g.siteOcclusion.restore();
+   body.bodyMaterials.forEach(m=>{m.colorWrite=true;m.depthWrite=true;});body.firstPersonArms.visible=false;
    await g.renderer.waitForFrame();g.renderer.render();await g.renderer.waitForFrame();return state;
   },{name,view});
   await page.screenshot({path:`${out}/${name}.png`});report.cases.push(state);
-  await page.evaluate(()=>{const g=window.__wireTheHouse,c=g.renderer.camera,s=window.qaView;c.position.copy(s.position);c.quaternion.copy(s.quaternion);c.fov=s.fov;c.updateProjectionMatrix();c.updateMatrixWorld(true);s.parent.attach(g.fpsRig);g.workerBody.headMaterials.forEach(m=>{m.colorWrite=false;m.depthWrite=false;});});
+  await page.evaluate(()=>{const g=window.__wireTheHouse,c=g.renderer.camera,s=window.qaView;c.position.copy(s.position);c.quaternion.copy(s.quaternion);c.fov=s.fov;c.updateProjectionMatrix();c.updateMatrixWorld(true);s.parent.attach(g.fpsRig);g.workerBody.headMaterials.forEach(m=>{m.colorWrite=false;m.depthWrite=false;});g.workerBody.bodyMaterials.forEach(m=>{m.colorWrite=false;m.depthWrite=false;});g.workerBody.firstPersonArms.visible=true;});
  }
  async function outside(crouched=false){await page.evaluate(crouched=>{const g=window.__wireTheHouse;g.input.actionHeld=false;g.player.crouched=crouched;g.player.camera.position.set(23,crouched?.95:1.65,-12);g.player.yaw=0;g.player.pitch=-.22;g.player.workPosition.locked=false;g.player.workPosition.released=true;for(let i=0;i<90;i++)window.qaStep(1/60,1/60,false);},crouched);}
  await outside();await capture('01-standing');await outside(true);await capture('02-crouched');
