@@ -98,6 +98,7 @@ try{
    g.step=window.qaBodyStep;
    await new Promise(resolve=>{let last=0,count=0;const sample=t=>{if(last&&count>30)frame.push(t-last);last=t;if(++count<151)requestAnimationFrame(sample);else resolve();};requestAnimationFrame(sample);});
    g.step=()=>{};body.update=original;
+   await g.renderer.waitForFrame();g.renderer.render();await g.renderer.waitForFrame();
    const stats=values=>{const sorted=values.toSorted((a,b)=>a-b);return {median:sorted[Math.floor(sorted.length*.5)],p95:sorted[Math.floor(sorted.length*.95)],max:Math.max(...values),count:values.length};};
    return {framesMs:stats(frame),bodyUpdateMs:stats(bodyTimes),drawCalls:g.renderer.webgl.info.render.calls,triangles:g.renderer.webgl.info.render.triangles,memory:g.renderer.webgl.info.memory,heapBytes:performance.memory?.usedJSHeapSize,backend:g.renderer.webgl.backend.isWebGPUBackend?'WebGPU':'WebGL',userAgent:navigator.userAgent};
   })});
