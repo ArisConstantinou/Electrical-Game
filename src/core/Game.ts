@@ -571,10 +571,8 @@ export class Game {
     if (this.levelEditor.active) {
       this.siteOcclusion?.restore();
       this.masonryBatch?.disableForEditor();
-      this.renderer.invalidateMaterialPreparation();
       this.levelEditor.update();
       this.room.update(dt);
-      this.room.invalidateSunShadow();
       if (present) this.renderer.render();
       return;
     }

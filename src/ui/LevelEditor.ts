@@ -1517,6 +1517,7 @@ export class LevelEditor {
   }
   private invalidateEditorShadows(): void {
     mapBuildingSurfaces(this.game.room);
+    this.game.renderer.invalidateMaterialPreparation();
     for (const shadow of this.editorShadows.keys()) shadow.needsUpdate = true;
   }
   private restoreEditorShadowCache(): void {
@@ -1702,12 +1703,14 @@ export class LevelEditor {
   }
   private editables(): THREE.Group[] {
     const wing = this.game.room.mansionWing;
-    return wing ? [...wing.editableWalls.values(), ...wing.editableSurfaces.values(), ...wing.editableAssets.values()] : [];
+    return wing ? [...wing.editableWalls.values(), ...wing.editableSurfaces.values(), ...wing.editableAssets.values()]
+      .filter(object => !object.userData.levelEditorContainer) : [];
   }
   private usesSurfaceAnchor(size: number[]): boolean {
     return Math.max(...size) > 25 || (size[1] < 1 && Math.max(size[0], size[2]) > 6);
   }
   private isSelectableVisible(object: THREE.Object3D): boolean {
+    if (object.userData.levelEditorContainer) return false;
     const wing = this.game.room.mansionWing;
     for (let current: THREE.Object3D | null = object; current && current !== wing; current = current.parent)
       if (!current.visible) return false;
@@ -2371,6 +2374,14 @@ export class LevelEditor {
         surface.rotation.y = record.rotationY;
         surface.scale.fromArray(record.scale);
       }
+      // Documents written before individual columns existed only contain the
+      // aggregate transform. Reset absent child records before applying it.
+      const assetIds = new Set((data.assets ?? []).map(record => record?.id));
+      for (const asset of wing.editableAssets.values()) {
+        if (!asset.userData.levelEditorDefaultPosition || assetIds.has(asset.name)) continue;
+        asset.position.fromArray(asset.userData.levelEditorDefaultPosition);
+        asset.rotation.set(0, 0, 0); asset.scale.set(1, 1, 1);
+      }
       for (const record of data.assets ?? []) {
         if (typeof record?.id !== 'string' || !finiteTriplet(record.position) || !finiteTriplet(record.scale) ||
           !Number.isFinite(record.rotationY) || record.scale.some(value => Math.abs(value) < .001)) continue;
@@ -2426,7 +2437,11 @@ export class LevelEditor {
       this.groups.clear();
       if (Array.isArray(data.groups)) for (const group of data.groups) {
         if (typeof group?.id !== 'string' || typeof group.name !== 'string' || !Array.isArray(group.members)) continue;
-        const members = [...new Set(group.members.filter(id => typeof id === 'string' && (wing.editableWalls.has(id) || wing.editableSurfaces.has(id) || wing.editableAssets.has(id))))];
+        const members = [...new Set(group.members.filter(id => typeof id === 'string' && (wing.editableWalls.has(id) || wing.editableSurfaces.has(id) || wing.editableAssets.has(id)))
+          .flatMap(id => {
+            const asset = wing.editableAssets.get(id);
+            return asset?.userData.levelEditorContainer ? asset.children.map(child => child.name) : [id];
+          }))];
         if (members.length >= 2) this.groups.set(group.id, { id: group.id, name: group.name.slice(0, 48), members });
       }
       if (this.activeGroupId && !this.groups.has(this.activeGroupId)) this.activeGroupId = null;
