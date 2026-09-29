@@ -178,6 +178,39 @@ export class MansionGroundWing extends THREE.Group {
         pivot.add(pickProxy);
       }
       this.editableAssets.set(id, pivot);
+      if (object instanceof THREE.InstancedMesh && object.userData.levelEditorIndependentColumns) {
+        // Retain the old aggregate pivot/ID for saved transforms, but expose
+        // each authored column to picking, history and collision independently.
+        pivot.userData.levelEditorContainer = true;
+        object.updateMatrix();
+        const instance = new THREE.Matrix4();
+        object.geometry.computeBoundingBox();
+        const columnSize = object.geometry.boundingBox!.getSize(new THREE.Vector3());
+        for (let index = 0; index < object.count; index++) {
+          object.getMatrixAt(index, instance);
+          instance.premultiply(object.matrix);
+          const column = new THREE.Group();
+          column.name = `${id}:column:${index + 1}`;
+          column.userData.levelEditorKind = 'asset';
+          column.userData.levelEditorLabel = `Courtyard structural column ${index + 1}`;
+          column.userData.baseSize = columnSize.toArray();
+          column.userData.studioEntityId = `mansion:${column.name}`;
+          instance.decompose(column.position, column.quaternion, column.scale);
+          column.userData.levelEditorDefaultPosition = column.position.toArray();
+          const mesh = new THREE.Mesh(object.geometry, object.material);
+          mesh.name = column.userData.levelEditorLabel;
+          mesh.castShadow = object.castShadow; mesh.receiveShadow = object.receiveShadow;
+          mesh.userData.constructionRenderBatch = true;
+          column.add(mesh); pivot.add(column);
+          this.editableAssets.set(column.name, column);
+          const obstacle = this.obstacles.find(item => item.id === `court-structural-column-${index}`);
+          if (obstacle) this.editableAssetColliders.set(column, {
+            obstacle, matrix: new THREE.Matrix4().makeScale(0, 0, 0), source: mesh,
+          });
+        }
+        object.removeFromParent();
+        object.dispose();
+      }
       if (object.name === 'Existing olive tree retained in open mansion court') {
         const obstacle = this.obstacles.find(item => item.id === 'retained-olive-trunk');
         const proxy = object.getObjectByName('Retained olive trunk collision proxy');

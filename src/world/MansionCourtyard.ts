@@ -264,6 +264,7 @@ export class MansionCourtyard extends THREE.Group {
     const columnGeometry = new RoundedBoxGeometry(.34, 6.6, .34, 2, .009);
     const columns = new THREE.InstancedMesh(columnGeometry, concrete, 7);
     columns.name = 'Continuous reinforced-concrete court edge columns';
+    columns.userData.levelEditorIndependentColumns = true;
     const matrix = new THREE.Matrix4();
     for (const [i, [x, z]] of [[18, 6], [18, 10.9], [18, 16], [13.5, 16], [9, 16], [9, 6], [13.5, 6]].entries()) {
       columns.setMatrixAt(i, matrix.makeTranslation(x, 3.3, z));

@@ -41,7 +41,8 @@ try {
     });
     try {
       await frames(8);
-      const opening = { autoUpdate: shadow.autoUpdate, needsUpdate: shadow.needsUpdate };
+      const opening = { autoUpdate: shadow.autoUpdate, needsUpdate: shadow.needsUpdate,
+        previousAutoUpdate: editor.editorShadows.get(shadow) };
       draws = [];
       await frames(10);
       const cached = draws.slice(-6);
@@ -103,7 +104,8 @@ try {
     'Wall edit did not render a new shadow map');
   assert.equal(report.measurement.afterFloorChange.needsUpdate, true, 'Floor switch did not invalidate shadow');
   assert.equal(report.measurement.afterFloorRender.needsUpdate, false, 'Floor switch shadow did not refresh');
-  assert.equal(report.restored.autoUpdate, true, 'Gameplay shadow auto-update not restored');
+  assert.equal(report.restored.autoUpdate, report.measurement.opening.previousAutoUpdate,
+    'The previous gameplay shadow policy was not restored');
   assert.equal(report.restored.editorActive, false);
   assert.equal(report.measurement.renderError, '');
   assert.deepEqual(report.errors, []);
