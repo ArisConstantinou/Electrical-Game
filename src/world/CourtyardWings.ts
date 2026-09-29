@@ -18,7 +18,10 @@ export function addCourtyardWings(root:THREE.Group, wall:WallBuilder, obstacles:
     mesh.userData.constructionRenderBatch=true;root.add(mesh);return mesh;
   };
   const floor=(name:string,x0:number,x1:number,z0:number,z1:number,y:number)=>{
-    const mesh=box(name,(x0+x1)/2,y-.11,(z0+z1)/2,x1-x0,.22,z1-z0,screed);
+    // Keep the walkable top at y while the underside bears on the 3 m wall
+    // below. A 22 cm slab stopped 8 cm above its masonry head.
+    const slabThickness=.32;
+    const mesh=box(name,(x0+x1)/2,y-slabThickness/2,(z0+z1)/2,x1-x0,slabThickness,z1-z0,screed);
     mesh.userData.authoredWalkable=true;floors.push(mesh);return mesh;
   };
   const guard=(name:string,x0:number,z0:number,x1:number,z1:number,y:number)=>{

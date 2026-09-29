@@ -930,7 +930,9 @@ export class MansionGroundWing extends THREE.Group {
       this.add(roof);
       // Keep the stair void open, but make each supported underside continuous
       // cast concrete rather than a grid of fictitious overhead clay cells.
-      const soffit = createConcreteSoffit(roofPanel.w, roofPanel.d, 3.07);
+      // Embed the cast underside 1 cm into the 3 m masonry heads. The former
+      // 3.07 m underside left a sky-visible opening above these walls.
+      const soffit = createConcreteSoffit(roofPanel.w, roofPanel.d, 2.99);
       soffit.name = `${name} cast concrete soffit`;
       soffit.position.set(roofPanel.x, 0, roofPanel.z);
       this.add(soffit);
