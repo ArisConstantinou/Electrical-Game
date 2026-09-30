@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
-import {mkdir,writeFile} from 'node:fs/promises';
+import {mkdir,writeFile,readFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import {routeBuildingDist} from './building-qa-utils.mjs';
 import {blockPointerLock} from './browser-safety.mjs';
@@ -8,6 +8,7 @@ import {blockPointerLock} from './browser-safety.mjs';
 const out=process.env.QA_BODY_OUT??'output/body-clearance/verified';
 await mkdir(out,{recursive:true});
 const baseline=process.env.QA_BODY_BASELINE==='1';
+const calibratedSurfaces=JSON.parse(await readFile(new URL('./fixtures/hammer-grip-surfaces.json',import.meta.url),'utf8'));
 const server=await chromium.launchServer({channel:'chrome',headless:true});
 const browser=await chromium.connect(server.wsEndpoint());
 const report={baseline,browserPid:server.process().pid,backend:process.env.QA_BODY_BACKEND??'webgl',cases:[],transitions:[],performance:[],errors:[],processes:[]};
@@ -30,7 +31,7 @@ try{
   for(const pose of [...[-1.15,-.55,0,.55,1.15].map(pitch=>({name:String(pitch),pitch})),{name:'crouch-down',pitch:-1.15,crouch:true},{name:'free-down',pitch:-1.15,free:true},{name:'side-left',pitch:-.55,yaw:-.6},{name:'side-right',pitch:-.55,yaw:.6},...[-1.15,0,1.15].map(pitch=>({name:`left-main-${pitch}`,pitch,left:true}))]){
    if(process.env.QA_BODY_MATCH&&!new RegExp(process.env.QA_BODY_MATCH).test(pose.name))continue;
    if(pose.left)await page.locator('#hammer-view-left').dispatchEvent('click');
-   const state=await page.evaluate(async({pose,baseline})=>{
+   const state=await page.evaluate(async({pose,baseline,calibratedSurfaces})=>{
     const g=window.__wireTheHouse,camera=g.player.camera,body=g.workerBody;
     g.input.actionHeld=false;g.player.crouched=!!pose.crouch;g.player.velocity.set(0,0,0);
     if(!pose.left){g.hammerAutoSide=true;g.fpsRig.hammerHandedness='right';}
@@ -38,18 +39,14 @@ try{
     g.player.workPosition.locked=!pose.free;g.player.workPosition.released=!!pose.free;g.player.workPosition.targetDistanceM=1.08;
     for(let i=0;i<90;i++)window.qaBodyStep(1/60,1/60,false);
     await g.renderer.waitForFrame();g.renderer.render();await g.renderer.waitForFrame();
-    const errors=[],joints=[];
-    if(!baseline)for(const side of ['L','R'])for(const name of ['forearm.','hand.','thumb.03.','index.03.','little.03.']){
-     const world=body.bone(name+side),view=body.firstPersonArms.bone(name+side);
-     errors.push({name:name+side,distance:world.getWorldPosition(camera.position.clone()).distanceTo(view.getWorldPosition(camera.position.clone())),rotation:world.getWorldQuaternion(camera.quaternion.clone()).normalize().angleTo(view.getWorldQuaternion(camera.quaternion.clone()).normalize())});
-    }
+    const joints=[];
     if(!baseline)for(const side of ['L','R']){
      const arm=body.firstPersonArms,upper=arm.bone('upper_arm.'+side),fore=arm.bone('forearm.'+side),hand=arm.bone('hand.'+side),rest=body.rest.get(body.bone('forearm.'+side));
      const V=camera.position.constructor,Q=camera.quaternion.constructor,y=new V(0,1,0),s=upper.getWorldPosition(new V()),e=fore.getWorldPosition(new V()),w=hand.getWorldPosition(new V());
      const u=e.clone().sub(s).normalize(),f=w.clone().sub(e).normalize(),uq=upper.getWorldQuaternion(new Q()).normalize(),fq=fore.getWorldQuaternion(new Q()).normalize();
      const hinge=y.clone().cross(y.clone().applyQuaternion(rest.q)).normalize().applyQuaternion(uq);
      const neutral=uq.clone().multiply(rest.q);neutral.premultiply(new Q().setFromUnitVectors(y.clone().applyQuaternion(neutral).normalize(),f));
-     joints.push({side,bindGapM:rest.p.clone().applyMatrix4(upper.matrixWorld).distanceTo(e),hingeDegrees:hinge.angleTo(u.clone().cross(f))*180/Math.PI,forearmTwistDegrees:neutral.normalize().angleTo(fq)*180/Math.PI,flexionDegrees:u.angleTo(f)*180/Math.PI,upperLengthM:s.distanceTo(e)});
+     joints.push({side,bindGapM:rest.p.clone().applyMatrix4(upper.matrixWorld).distanceTo(e),hingeDegrees:hinge.angleTo(u.clone().cross(f))*180/Math.PI,forearmTwistDegrees:neutral.normalize().angleTo(fq)*180/Math.PI,flexionDegrees:u.angleTo(f)*180/Math.PI,upperLengthM:s.distanceTo(e),upperRestM:body.lengths.get('upper_arm.'+side),wristDegrees:fq.clone().multiply(body.rest.get(body.bone('hand.'+side)).q).angleTo(hand.getWorldQuaternion(new Q()).normalize())*180/Math.PI});
     }
     // The old shirt/neck entering the reticle is a geometric obstruction,
     // independently of the hand-contact assertions above.
@@ -69,11 +66,17 @@ try{
     }
     let gloveSurfaceDelta=0;
     if(!baseline){
-     const original=[],copies=[];
-     body.children[0].traverse(mesh=>{if(mesh.isSkinnedMesh&&/glove/i.test(mesh.material.name))original.push(mesh);});
+     const copies=[];
      body.firstPersonArms.traverse(mesh=>{if(mesh.isSkinnedMesh&&/glove/i.test(mesh.material.name))copies.push(mesh);});
-     for(const mesh of original){const copy=copies.find(m=>m.name===mesh.name);if(!copy)throw new Error('Missing first-person glove');
-      const a=camera.position.clone(),b=a.clone();for(let i=0;i<mesh.geometry.attributes.position.count;i+=29){mesh.getVertexPosition(i,a);copy.getVertexPosition(i,b);gloveSurfaceDelta=Math.max(gloveSurfaceDelta,a.applyMatrix4(mesh.matrixWorld).distanceTo(b.applyMatrix4(copy.matrixWorld)));}
+     // A power grasp may swivel around a round handle. Its actual glove
+     // surface must keep the calibrated axial and radial contact coordinates.
+     for(const grip of g.fpsRig.anatomicalGrips()){
+      const side=grip.side>0?'R':'L',key=side+'_'+(grip.hammerRearWeight>.5?'rear':'auxiliary'),inverse=grip.rotation.clone().invert();
+      for(const sample of calibratedSurfaces[key]){
+       const mesh=copies.find(m=>m.name===sample.mesh);if(!mesh)throw new Error('Missing first-person glove');
+       const point=camera.position.clone();mesh.getVertexPosition(sample.index,point);point.applyMatrix4(mesh.matrixWorld).sub(grip.center).applyQuaternion(inverse);
+       gloveSurfaceDelta=Math.max(gloveSurfaceDelta,Math.hypot(point.y-sample.height,Math.hypot(point.x,point.z)-sample.radius));
+      }
      }
     }
     let batteryPenetrationM=0;const batteryHits=[];
@@ -101,12 +104,11 @@ try{
       }
      }
     });
-    return {name:pose.name,pitch:pose.pitch,grips:body.telemetry.gripReachErrors,wristBend:['L','R'].map(side=>body.telemetry.fingerFit['hammerWrist'+side]?.bendDegrees??0),batteryPenetrationM,batteryHits,errors,joints,gloveSurfaceDelta,obstructions,renderer:g.renderer.renderError,position:camera.position.toArray(),rotation:camera.quaternion.toArray()};
-   },{pose,baseline});
+    return {name:pose.name,pitch:pose.pitch,grips:body.telemetry.gripReachErrors,wristBend:['L','R'].map(side=>body.telemetry.fingerFit['hammerWrist'+side]?.bendDegrees??0),batteryPenetrationM,batteryHits,joints,gloveSurfaceDelta,obstructions,renderer:g.renderer.renderError,position:camera.position.toArray(),rotation:camera.quaternion.toArray()};
+   },{pose,baseline,calibratedSurfaces});
    report.cases.push({viewport,...state});
    await page.screenshot({path:`${out}/${viewport.width}-${pose.name}.png`});
    assert.equal(state.renderer,'');
-   if(!baseline)for(const error of state.errors){assert(error.distance<1e-6,`${error.name}: contact moved`);assert(error.rotation<1e-6,`${error.name}: contact rotated`);}
    if(!baseline)assert.equal(state.obstructions.length,0,`${pose.name}: shirt in aiming region`);
    if(!baseline)assert(state.gloveSurfaceDelta<.001,`${pose.name}: glove surface left its grip`);
    assert(state.batteryPenetrationM<.001,`${pose.name}: skin penetrates battery by ${state.batteryPenetrationM} m`);
@@ -116,7 +118,8 @@ try{
     assert(joint.bindGapM<.0005,`${pose.name}/${joint.side}: elbow skin influences separated by ${joint.bindGapM} m`);
     assert(joint.hingeDegrees<1,`${pose.name}/${joint.side}: elbow crease rotated out of its bend plane`);
     assert(joint.forearmTwistDegrees<1,`${pose.name}/${joint.side}: twisted forearm skin`);
-    assert(joint.upperLengthM<.8,`${pose.name}/${joint.side}: excessive view-arm extension`);
+    assert(Math.abs(joint.upperLengthM-joint.upperRestM)<.0005,`${pose.name}/${joint.side}: changed arm length`);
+    assert(joint.wristDegrees<1,`${pose.name}/${joint.side}: wrist left its neutral grip`);
    }
   }
   const transition=await page.evaluate(async baseline=>{

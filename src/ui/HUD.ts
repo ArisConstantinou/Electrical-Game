@@ -66,7 +66,7 @@ export class HUD {
               <circle id="chisel-point-marker" cx="24" cy="24" r="5" fill="#d8e0df" stroke="#f8be79" stroke-width="2" style="display:none"/>
               <circle class="chisel-dial-pivot" cx="24" cy="24" r="2"/>
             </svg>
-            <div class="chisel-orientation-values"><div><strong><span id="chisel-edge-label">EDGE</span> <output id="chisel-edge-degrees">0°</output></strong><span id="chisel-live-width">50 mm</span></div><div class="chisel-aim-values"><span id="chisel-live-tilt">TILT 15° ↓</span><span id="chisel-requested-tilt" hidden></span><span id="chisel-live-side">SIDE 15° →</span></div><div class="hammer-view-buttons" role="group" aria-label="Hammer screen side"><button id="hammer-view-left" type="button" aria-label="Hold hammer on the left" aria-pressed="false">TOOL LEFT</button><button id="hammer-view-right" type="button" aria-label="Hold hammer on the right" aria-pressed="true">TOOL RIGHT</button></div></div>
+            <div class="chisel-orientation-values"><div><strong><span id="chisel-edge-label">EDGE</span> <output id="chisel-edge-degrees">0°</output></strong><span id="chisel-live-width">50 mm</span></div><div class="chisel-aim-values"><span id="chisel-live-tilt">TILT 15° ↓</span><span id="chisel-requested-tilt" hidden></span><span id="chisel-live-side">SIDE 15° →</span></div><div class="hammer-view-buttons" role="group" aria-label="Hammer screen side"><button id="hammer-view-left" type="button" aria-label="Hold hammer on the left" aria-pressed="false">TOOL LEFT</button><button id="hammer-view-right" type="button" aria-label="Hold hammer on the right" aria-pressed="true">TOOL RIGHT</button></div><div class="hammer-view-buttons"><button id="hammer-depth-mode" type="button" aria-label="Hammer depth: full depth. Switch to 75 millimetre chase">FULL DEPTH</button></div></div>
           </aside>
           <button id="settings-toggle" type="button" aria-label="Open settings" aria-expanded="false" aria-controls="settings-panel">
             <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M13 2h6l1 4 3 1 4-2 3 5-3 3v6l3 3-3 5-4-2-3 1-1 4h-6l-1-4-3-1-4 2-3-5 3-3v-6l-3-3 3-5 4 2 3-1z"/><circle cx="16" cy="16" r="5"/></svg>
@@ -204,13 +204,13 @@ export class HUD {
               ${quickButton('quick-aim-speed','LOOK','NORMAL','speed','all','cycle-aim-speed')}
             </nav>
             <nav id="tool-quick-controls" aria-label="Selected tool controls">
+              ${quickButton('quick-tool-mode','MODE','FULL DEPTH','mode','hammer spray','quick-mode')}
               ${quickButton('quick-chisel-width','WIDTH','50 mm','width','hammer','quick-width')}
               ${quickButton('quick-chisel-tilt','TILT','15° ↓','tilt','hammer','tilt-chisel')}
               ${quickButton('quick-hammer-side','SIDE','RIGHT','side','hammer','side-chisel')}
               ${quickButton('quick-hammer-speed','SPEED','250%','speed','hammer','quick-speed')}
               ${quickButton('quick-chisel-type','CHISEL','FLAT','type','hammer','cycle-chisel')}
               ${quickButton('quick-chisel-edge','EDGE','0°','edge','hammer','rotate-chisel')}
-              ${quickButton('quick-tool-mode','MODE','DEMOLISH','mode','hammer spray','quick-mode')}
               ${quickButton('quick-spray-color','COLOR','BLUE','color','spray','cycle-spray-color')}
               ${quickButton('quick-water-flow','FLOW','FLOOD','color','hose','cycle-water-mode')}
               ${quickButton('quick-loft-down','LOFT −','12°','down','trowel','mortar-angle',-5)}
@@ -332,6 +332,7 @@ export class HUD {
     bindHammerButton('#measure-mark',()=>{if(!root.querySelector<HTMLButtonElement>('#measure-mark')!.disabled)dispatchEvent(new CustomEvent('wirehouse:measure-mark'));});
     bindHammerButton('#laser-place',()=>{if(!root.querySelector<HTMLButtonElement>('#laser-place')!.disabled)dispatchEvent(new CustomEvent('wirehouse:laser-place'));});
     bindHammerButton('#hammer-view-left',()=>window.dispatchEvent(new CustomEvent('wirehouse:hammer-view-side',{detail:1})));
+    bindHammerButton('#hammer-depth-mode',()=>window.dispatchEvent(new CustomEvent('wirehouse:cycle-hammer-mode')));
     bindHammerButton('#hammer-view-right',()=>window.dispatchEvent(new CustomEvent('wirehouse:hammer-view-side',{detail:-1})));
     bindHammerButton('#hammer-view-toggle',()=>window.dispatchEvent(new CustomEvent('wirehouse:hammer-view-side',{detail:0})));
     bindHammerButton('#hammer-auto-side',()=>window.dispatchEvent(new CustomEvent('wirehouse:hammer-auto-side')));
@@ -794,8 +795,15 @@ export class HUD {
 
   updateHammerControls(mode: string, visible: boolean, trimming = false): void {
     const modeText = this.shell.querySelector<HTMLElement>('#tool-mode-toggle span');
-    if (visible && modeText) modeText.textContent = mode.toUpperCase();
-    if(visible)this.shell.querySelector('#quick-tool-mode b')!.textContent=mode.toUpperCase();
+    const label=mode==='demolish'?'FULL DEPTH':'CHASE 75 mm';
+    if (visible && modeText) modeText.textContent = label;
+    if(visible){
+      this.shell.querySelector('#quick-tool-mode b')!.textContent=mode==='demolish'?'THROUGH':'75 mm';
+      const button=this.shell.querySelector<HTMLButtonElement>('#hammer-depth-mode')!;
+      button.textContent=label;button.setAttribute('aria-pressed',String(mode==='demolish'));
+      const description=mode==='demolish'?'Hammer depth: full depth. Switch to 75 millimetre chase':'Hammer depth: chase limited to 75 millimetres. Switch to full depth';
+      for(const id of ['#hammer-depth-mode','#quick-tool-mode','#tool-mode-toggle'])this.shell.querySelector(id)!.setAttribute('aria-label',description);
+    }
     if (visible) this.tool.querySelector('em')!.textContent = trimming ? 'UP · EDGE CLEANUP' : 'LEFT CLICK TO USE';
   }
 

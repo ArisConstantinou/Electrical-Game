@@ -597,7 +597,7 @@ export class WorkerBody extends THREE.Group {
       // braced torso can cross the independent eye, so FP uses its own arms.
       for(const material of this.bodyMaterials){material.colorWrite=!useArms;material.depthWrite=!useArms;}
       this.firstPersonArms.visible=useArms;
-      if(useArms)this.firstPersonArms.update(camera,grips.find(grip=>grip.forearmObstacles?.length)?.forearmObstacles);
+      if(useArms)this.firstPersonArms.update(camera,grips,dt);
     }
   }
   private poseHammerGrasps(grips:WorkerGripTarget[],right:THREE.Vector3,working:boolean):void {

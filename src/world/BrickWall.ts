@@ -298,7 +298,7 @@ export class BrickWall extends THREE.Group {
     const edgeScale = transformed
       ? contact.edge.clone().applyMatrix3(new THREE.Matrix3().setFromMatrix4(inverse!)).length() / Math.max(1e-6, contact.edge.length())
       : 1;
-    const result = this.volume.impact({ ...localContact, widthM: (contact.widthM ?? this.chiselWidthM) * edgeScale, trim: this.chiselTiltDegrees < 0, maxDepthM });
+    const result = this.volume.impact({ ...localContact, widthM: (contact.widthM ?? this.chiselWidthM) * edgeScale, trim: maxDepthM!==undefined&&this.chiselTiltDegrees < 0, maxDepthM });
     if (!result.contact) return null;
     this.lastResult = result;
     this.impactCount++;

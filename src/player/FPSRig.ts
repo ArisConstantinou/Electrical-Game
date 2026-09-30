@@ -63,6 +63,7 @@ export class FPSRig extends THREE.Group {
       if(this.selectedTool==='trowel')grip.straightWrist=true;
       if(this.selectedTool==='hammer'){
         grip.contactLocked=this.reachable;
+        grip.hammerRearWeight=arm.hand.userData.hammerRearWeight;
         const hammer=this.tools.get('hammer')!;
         grip.forearmObstacles=['D1_sloping_rear_battery_foot','D3_removable_battery_shell'].flatMap(name=>{
           const mesh=hammer.getObjectByName(name) as THREE.Mesh|undefined;
@@ -245,7 +246,12 @@ export class FPSRig extends THREE.Group {
   readonly hammerFit={housingCameraZ:0,wristReachM:[] as number[],feedM:0,postureY:0};
 
   /** Contact can be queried several times per impact; advance the pose once per frame. */
+  private hammerPresentation:{position:THREE.Vector3;rotation:THREE.Quaternion}|null=null;
+  private hammerFrameStart:typeof this.hammerPresentation=null;
+  private hammerPoseDt=1/60;
   beginFrame(dt: number, wallTravelM: number | null = null, working=true): void {
+    this.hammerPoseDt=Math.min(.05,Math.max(0,dt));
+    this.hammerFrameStart=this.hammerPresentation?{position:this.hammerPresentation.position.clone(),rotation:this.hammerPresentation.rotation.clone()}:null;
     this.updateFittingAttachment(dt);
     if(this.hammerWasWorking&&!working)this.holdHammerFeed=true;
     if(working)this.holdHammerFeed=false;
@@ -257,8 +263,12 @@ export class FPSRig extends THREE.Group {
   }
 
   /** Seat the real visible tip on the first remaining solid, then read it back. */
-  carryHammer(camera:THREE.Camera):void {this.restHammer(camera);this.contactStatus='out-of-reach';this.reachReason='Land before using the demolition hammer.';}
+  carryHammer(camera:THREE.Camera):void {this.restHammer(camera);this.presentHammerPose(camera);this.contactStatus='out-of-reach';this.reachReason='Land before using the demolition hammer.';}
   contact(camera: THREE.Camera, wall: BrickWall): ChiselContact | null {
+    const contact=this.solveHammerContact(camera,wall);
+    return this.presentHammerPose(camera)?null:contact;
+  }
+  private solveHammerContact(camera: THREE.Camera, wall: BrickWall): ChiselContact | null {
     this.masonryBraced=false;
     this.selectedTool='hammer';
     this.contactStatus='out-of-reach';
@@ -387,7 +397,7 @@ export class FPSRig extends THREE.Group {
     hammer.updateWorldMatrix(true, true);
     this.seatHammerFeed(camera,direction);
     const rearCamera=camera.worldToLocal(hammer.localToWorld(new THREE.Vector3().fromArray(hammer.userData.gripPoint)));
-    if(rearCamera.length()<.22){
+    if(rearCamera.length()<.22||!this.hammerClearsEyes(camera)){
       this.restHammer(camera);this.contactStatus='too-close';this.reachReason='Step back to give the full-length SDS Max room.';return null;
     }
     const housing=camera.worldToLocal(hammer.localToWorld(new THREE.Vector3(.02,-.055,-.1)));
@@ -436,8 +446,7 @@ export class FPSRig extends THREE.Group {
     }
     if(!this.gripsReachable(camera,hammer)){
       this.reachable=false;this.chiselInAir=true;
-      if(this.workPositionLocked){this.constrainHeldTool(camera);this.poseArms(camera);this.chiselTipWorld.copy(hammer.localToWorld(this.tipAnchor.clone()));}
-      else this.restHammer(camera);
+      this.restHammer(camera);
       return null;
     }
     this.reachable = true;
@@ -454,6 +463,10 @@ export class FPSRig extends THREE.Group {
   /** Seat the same physical hammer model on an authored masonry wall outside
    * the original mission room. No original-wall coordinates are involved. */
   contactMasonry(camera: THREE.Camera, point: THREE.Vector3, plane?: WallWorkPlane, solid=true): boolean {
+    const contact=this.solveMasonryContact(camera,point,plane,solid);
+    return !this.presentHammerPose(camera)&&contact;
+  }
+  private solveMasonryContact(camera: THREE.Camera, point: THREE.Vector3, plane?: WallWorkPlane, solid=true): boolean {
     this.selectedTool = 'hammer';
     const hammer = this.tools.get('hammer')!;
     const eye = camera.getWorldPosition(new THREE.Vector3());
@@ -509,6 +522,9 @@ export class FPSRig extends THREE.Group {
     hammer.quaternion.copy(this.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(orientation));
     hammer.position.copy(this.worldToLocal(visualPoint.clone())).sub(this.tipAnchor.clone().applyQuaternion(hammer.quaternion));
     hammer.updateWorldMatrix(true, true);
+    if(!this.hammerClearsEyes(camera)){
+      this.restHammer(camera);this.contactStatus='too-close';this.reachReason='Step back to give the hammer and both hands room.';return false;
+    }
     // Feed the braced shoulders as on the original wall. Translating the
     // whole tool to fit the arms moved the visible blade away from its hit.
     this.masonryBraced=true;
@@ -517,7 +533,7 @@ export class FPSRig extends THREE.Group {
     this.chiselTipWorld.copy(hammer.localToWorld(this.tipAnchor.clone()));
     // Judge both finite grip reaches with the blade still anchored.
     const reachable = this.gripsReachable(camera, hammer);
-    if (!reachable && !this.workPositionLocked) {
+    if (!reachable) {
       this.restHammer(camera);
       this.chiselTipWorld.copy(hammer.localToWorld(this.tipAnchor.clone()));
     }
@@ -881,6 +897,7 @@ export class FPSRig extends THREE.Group {
       arm.hand.position.y-=Math.sin(t*Math.PI)*.09;
       arm.grip.copy(arm.hand.position);
       const supporting=arm.side<0?1-t:t;
+      arm.hand.userData.hammerRearWeight=1-supporting;
       arm.hand.rotation.set(0,0,arm.side*supporting*Math.PI/4+supporting*this.sideHandleAngle);
       arm.hand.userData.gripRole=supporting>.99?'auxiliary':supporting<.01?'rear':'regripping';
       arm.hand.userData.gripping=t===0||t===1;
@@ -1086,6 +1103,36 @@ export class FPSRig extends THREE.Group {
     }
     return retracted;
   }
+  /** Reserve physical space for both gripping hands around the eye. */
+  private hammerClearsEyes(camera:THREE.Camera):boolean {
+    for(const arm of this.armSets.get('hammer')??[]){
+      const point=camera.worldToLocal(arm.hand.getWorldPosition(new THREE.Vector3()));
+      if(point.length()<.22)return false;
+    }
+    return true;
+  }
+  /** One camera-space motion budget per frame, including repeated contact queries. */
+  private presentHammerPose(camera:THREE.Camera):boolean {
+    const hammer=this.tools.get('hammer')!,cameraQ=camera.getWorldQuaternion(new THREE.Quaternion());
+    const position=camera.worldToLocal(hammer.getWorldPosition(new THREE.Vector3()));
+    const rotation=cameraQ.clone().invert().multiply(hammer.getWorldQuaternion(new THREE.Quaternion()));
+    const start=this.hammerFrameStart;
+    let moving=false;
+    if(start){
+      const distance=start.position.distanceTo(position),angle=start.rotation.angleTo(rotation);
+      const t=Math.min(1,this.hammerPoseDt*1.2/Math.max(1e-8,distance),this.hammerPoseDt*2/Math.max(1e-8,angle));
+      moving=t<1;
+      position.lerpVectors(start.position,position,t);
+      rotation.copy(start.rotation.clone().slerp(rotation,t));
+    }
+    this.hammerPresentation={position:position.clone(),rotation:rotation.clone()};
+    hammer.position.copy(this.worldToLocal(camera.localToWorld(position)));
+    hammer.quaternion.copy(this.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(cameraQ).multiply(rotation));
+    hammer.updateWorldMatrix(true,true);this.poseArms(camera);
+    this.chiselTipWorld.copy(hammer.localToWorld(this.tipAnchor.clone()));
+    if(moving){this.reachable=false;this.chiselInAir=true;if(this.contactStatus==='ready')this.contactStatus='feeding';}
+    return moving;
+  }
   restHammer(camera:THREE.Camera):void {
     this.masonryBraced=false;
     this.reachable=false;this.chiselInAir=true;
@@ -1097,14 +1144,12 @@ export class FPSRig extends THREE.Group {
     // Carry the tool forward and slightly down, anchored by its actual rear
     // grip. Placing the model origin hid this shorter housing below the screen
     // and the old sideways rotation sent the bit across the player's torso.
-    const {eye,right,forward}=this.bodyFrame(camera),view=camera.getWorldDirection(new THREE.Vector3());
-    const worldQ=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(right,new THREE.Vector3(0,1,0),forward.clone().negate()));
-    const pitch=THREE.MathUtils.clamp(Math.asin(view.y),-.65,.45)-.18;
-    worldQ.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(pitch,THREE.MathUtils.lerp(.26,-.26,this.hammerGripBlend),0)));
+    const worldQ=camera.getWorldQuaternion(new THREE.Quaternion()).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(-.18,THREE.MathUtils.lerp(.26,-.26,this.hammerGripBlend),0)));
     hammer.quaternion.copy(this.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(worldQ));
     const lateral=innerWidth<innerHeight?.12:.20;
-    const target=eye.clone().addScaledVector(forward,.29).addScaledVector(right,THREE.MathUtils.lerp(lateral,-lateral,this.hammerGripBlend));
-    target.y-=.28;
+    // Match the authored upright carry at its -0.22 rad viewing pitch, then
+    // carry that same placement with the eye when looking down or up.
+    const target=camera.localToWorld(new THREE.Vector3(THREE.MathUtils.lerp(lateral,-lateral,this.hammerGripBlend),-.21,-.344));
     const rear=new THREE.Vector3().fromArray(hammer.userData.gripPoint).applyQuaternion(worldQ);
     hammer.position.copy(this.worldToLocal(target.sub(rear)));
     this.constrainHeldTool(camera);this.poseArms(camera);

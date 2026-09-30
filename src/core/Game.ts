@@ -106,7 +106,7 @@ export class Game {
   boxAssemblyActive = false;
   sprayMode: 'dots' | 'live' = 'live';
   sprayColorIndex = 0;
-  hammerMode: HammerMode = 'chase';
+  hammerMode: HammerMode = 'demolish';
   hammerSpeed = 2.5;
   hammerAutoSide = true;
   waterGunModeIndex = 3;
@@ -820,7 +820,7 @@ export class Game {
     if(settingsKey!==this.hudSettingsKey){
       this.hudSettingsKey=settingsKey;
       this.hud.updateSprayControls(this.sprayMode, sprayColor.name, sprayColor.css, this.selectedTool === 'spray');
-      this.hud.updateHammerControls(this.hammerMode, this.selectedTool === 'hammer', this.room.brickWall.chiselTiltDegrees < 0);
+      this.hud.updateHammerControls(this.hammerMode, this.selectedTool === 'hammer', this.hammerMode==='chase'&&this.room.brickWall.chiselTiltDegrees < 0);
       this.hud.updateChiselWidth(this.room.brickWall.chiselWidthM,this.room.brickWall.chiselType==='flat');
       this.hud.updateAimControl(this.aimControlMode);
       this.hud.updateAimSpeed(this.aimProfile);
@@ -1197,7 +1197,8 @@ export class Game {
     addEventListener('wirehouse:cycle-hammer-mode', () => {
       this.hammerMode = this.hammerMode === 'chase' ? 'demolish' : 'chase';
       this.interaction.setHammerMode(this.hammerMode);
-      this.hud.notify(`Hammer method: ${this.hammerMode.toUpperCase()}`);
+      this.hud.updateHammerControls(this.hammerMode,this.selectedTool==='hammer',this.hammerMode==='chase'&&this.room.brickWall.chiselTiltDegrees<0);
+      this.hud.notify(this.hammerMode==='demolish'?'FULL DEPTH · keep hammering to break through the brick':'CHASE 75 mm · preserves the back of the brick');
     });
     addEventListener('wirehouse:cycle-aim-control', () => {
       // Legacy integrations cannot re-enable automatic work from camera input.

@@ -13,7 +13,7 @@ export type HammerMode = 'chase' | 'demolish';
 
 export class InteractionSystem {
   placementSystem?:BoxPlacementSystem;
-  hammerMode: HammerMode = 'chase';
+  hammerMode: HammerMode = 'demolish';
   constructor(
     private readonly marking: MarkingSystem,
     private readonly chasing: ChasingSystem,

@@ -1,0 +1,4534 @@
+{
+  "R_rear": [
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 0,
+      "height": -0.047388194828798906,
+      "radius": 0.03773475434249896
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 13,
+      "height": -0.016167106183137183,
+      "radius": 0.036694175006415884
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 26,
+      "height": 0.008413092259073466,
+      "radius": 0.033093937808950466
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 39,
+      "height": 0.05201084815310346,
+      "radius": 0.0401645791637657
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 52,
+      "height": -0.0237299159346135,
+      "radius": 0.037411591931255025
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 65,
+      "height": -0.028604822118595986,
+      "radius": 0.03154855256948639
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 78,
+      "height": -0.017673419198909846,
+      "radius": 0.03883736212453179
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 91,
+      "height": -0.0375952879682733,
+      "radius": 0.03073954414979521
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 104,
+      "height": -0.052820810365213376,
+      "radius": 0.040312090564189294
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 117,
+      "height": 0.006829890242797008,
+      "radius": 0.028996542666590762
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 130,
+      "height": 0.02520533634808289,
+      "radius": 0.0336280492132111
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 143,
+      "height": 0.026793087922715918,
+      "radius": 0.02422370435882229
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 156,
+      "height": 0.022284409941487553,
+      "radius": 0.022393208884166252
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 169,
+      "height": 0.0013633360122954582,
+      "radius": 0.02272198207140927
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 182,
+      "height": -0.01049687119952281,
+      "radius": 0.03771348181429616
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 195,
+      "height": -0.05218843811495062,
+      "radius": 0.03011547383195635
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 208,
+      "height": 0.004961613953649169,
+      "radius": 0.03680370977193493
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 221,
+      "height": -0.042638459631337944,
+      "radius": 0.037891305635994015
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 234,
+      "height": 0.015291566226230067,
+      "radius": 0.03705216673031487
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 247,
+      "height": 0.0225106325706247,
+      "radius": 0.030719881266583683
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 260,
+      "height": -0.0035278237978261257,
+      "radius": 0.0368807332894851
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 273,
+      "height": -0.04724706706171423,
+      "radius": 0.028558651611835628
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 286,
+      "height": 0.04800262452235955,
+      "radius": 0.0409797807538752
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 299,
+      "height": 0.05357126529570791,
+      "radius": 0.028596612765413216
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 312,
+      "height": 0.010805042560181184,
+      "radius": 0.06666004564970128
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 325,
+      "height": 0.023481873962983298,
+      "radius": 0.055336902480262525
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 338,
+      "height": 0.021146627872041666,
+      "radius": 0.03818838415609588
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 351,
+      "height": -0.034268691432662104,
+      "radius": 0.05962370897488442
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 364,
+      "height": -0.05850581007518778,
+      "radius": 0.05073147169861422
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 377,
+      "height": -0.057913271222598664,
+      "radius": 0.023085341150433692
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 390,
+      "height": -0.02499977818447617,
+      "radius": 0.06719191812709044
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 403,
+      "height": 0.013330859165965712,
+      "radius": 0.028403674643383187
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 416,
+      "height": -0.00018304036710144775,
+      "radius": 0.0387766885223967
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 442,
+      "height": -0.049116743736036514,
+      "radius": 0.05574867137529873
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 468,
+      "height": 0.0031480166831432165,
+      "radius": 0.03390871698678095
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 494,
+      "height": -0.017916486552908024,
+      "radius": 0.050820809189875644
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 507,
+      "height": -0.048645658671077306,
+      "radius": 0.03532476576051693
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 520,
+      "height": 0.011558810996177936,
+      "radius": 0.043853154145011584
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 533,
+      "height": -0.004393162732112469,
+      "radius": 0.04654459247201988
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 546,
+      "height": -0.06782706769976425,
+      "radius": 0.041047153029787634
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 559,
+      "height": 0.026544779063405816,
+      "radius": 0.02469812231860003
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 572,
+      "height": -0.005113980422008661,
+      "radius": 0.024613748803958543
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 585,
+      "height": 0.0017643045618988085,
+      "radius": 0.02286616513906989
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 598,
+      "height": 0.010862676041466209,
+      "radius": 0.03244444494510212
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 611,
+      "height": 0.009706111296065903,
+      "radius": 0.041131274518283245
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 624,
+      "height": -0.026997381376161558,
+      "radius": 0.024950322597569723
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 637,
+      "height": -0.005627097111481484,
+      "radius": 0.04697098704354363
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 663,
+      "height": 0.019321934829189126,
+      "radius": 0.05995701141793096
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 676,
+      "height": -0.02377362742556921,
+      "radius": 0.06711115511299323
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 689,
+      "height": -0.011546546453462602,
+      "radius": 0.03329093884013751
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1404,
+      "height": 0.024175308264526685,
+      "radius": 0.03518795012174623
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1430,
+      "height": 0.01940701573440756,
+      "radius": 0.032385722813101946
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1456,
+      "height": 0.020120962866742597,
+      "radius": 0.035791373440366085
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1482,
+      "height": -0.01061855412808142,
+      "radius": 0.037260728555691805
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1599,
+      "height": -0.02718695936110098,
+      "radius": 0.031413332995141645
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1638,
+      "height": -0.0468331759562299,
+      "radius": 0.04487217818910798
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1716,
+      "height": 0.008493368589530217,
+      "radius": 0.04041970299676481
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1755,
+      "height": 0.014712198373449148,
+      "radius": 0.029860403566126608
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1781,
+      "height": -0.008060737017708255,
+      "radius": 0.03581050373141752
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1807,
+      "height": -0.027760679561853192,
+      "radius": 0.04244053317731611
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1820,
+      "height": 0.01176148840618418,
+      "radius": 0.04858275864423543
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1872,
+      "height": -0.02047439323286726,
+      "radius": 0.0600160677674289
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1885,
+      "height": -0.049778292472903544,
+      "radius": 0.05158626342616419
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1937,
+      "height": 0.013570140700873007,
+      "radius": 0.036391153678473634
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1963,
+      "height": -0.014985483212033773,
+      "radius": 0.03365268307382816
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2002,
+      "height": -0.050514309421062095,
+      "radius": 0.04775259814149606
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2015,
+      "height": 0.012326906558329624,
+      "radius": 0.027207644711538963
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2028,
+      "height": 0.01773897851912677,
+      "radius": 0.03853604593551482
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2041,
+      "height": 0.03285041635335024,
+      "radius": 0.04143931676712841
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2080,
+      "height": -0.004240130607967287,
+      "radius": 0.019928806032825593
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2106,
+      "height": 0.01876077040628165,
+      "radius": 0.0442662210978142
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2119,
+      "height": 0.01156033984485447,
+      "radius": 0.027440691788191113
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2145,
+      "height": -0.03643007902026889,
+      "radius": 0.05550109540043744
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2171,
+      "height": -0.01578732007935078,
+      "radius": 0.06750031315093195
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2184,
+      "height": 0.007440908171205544,
+      "radius": 0.03817446258350291
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2197,
+      "height": -0.036357783823845045,
+      "radius": 0.03143269794470474
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2210,
+      "height": -0.02888825907137712,
+      "radius": 0.038118242097273256
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2314,
+      "height": 0.005094161648196557,
+      "radius": 0.025897548554754693
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2327,
+      "height": -0.02640596643831092,
+      "radius": 0.0326559164878012
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2340,
+      "height": -0.020525991117336082,
+      "radius": 0.03374919567559003
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2392,
+      "height": -0.008225020519194043,
+      "radius": 0.03277640245845456
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2405,
+      "height": -0.0285968440889538,
+      "radius": 0.03755890885183282
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2431,
+      "height": 0.03403820980041988,
+      "radius": 0.045661580154849765
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2470,
+      "height": 0.025076838019122593,
+      "radius": 0.033797686097338006
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2496,
+      "height": 0.009963045207983193,
+      "radius": 0.028861374881813544
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2509,
+      "height": -0.027836349631481353,
+      "radius": 0.04705327349449025
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2522,
+      "height": -0.012810171451536604,
+      "radius": 0.03418827044445661
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2535,
+      "height": -0.020182648123673853,
+      "radius": 0.031810862749345276
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2548,
+      "height": -0.03391927780484469,
+      "radius": 0.03858972291531112
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2561,
+      "height": 0.044648003620086474,
+      "radius": 0.042192194731326765
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2574,
+      "height": -0.035239493128028376,
+      "radius": 0.03324652836538721
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2587,
+      "height": 0.007700186631881941,
+      "radius": 0.027429121622820022
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2613,
+      "height": 0.007901365252750567,
+      "radius": 0.036263736906223566
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2626,
+      "height": 0.020462832068304918,
+      "radius": 0.04288767348187912
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2808,
+      "height": -0.043741933851948245,
+      "radius": 0.03725120647478696
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2821,
+      "height": -0.028187417289984883,
+      "radius": 0.06461545925031872
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2860,
+      "height": -0.001647275900396242,
+      "radius": 0.023965709525118048
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2873,
+      "height": 0.007588072054955953,
+      "radius": 0.02437707163311099
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2886,
+      "height": 0.001792156929969401,
+      "radius": 0.0492464781703371
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2899,
+      "height": -0.04442921222684678,
+      "radius": 0.027204476572229675
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2912,
+      "height": -0.046541130169447525,
+      "radius": 0.02994963239563227
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2951,
+      "height": -0.04822274120834795,
+      "radius": 0.03547767719024908
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3003,
+      "height": -0.012586717238670941,
+      "radius": 0.03600108845570176
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3055,
+      "height": -0.02669545476564416,
+      "radius": 0.029659623425328553
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3081,
+      "height": -0.009599970347597726,
+      "radius": 0.029797986363986076
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3094,
+      "height": -0.02359816545673907,
+      "radius": 0.04938531644169697
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3146,
+      "height": -0.05278714442624664,
+      "radius": 0.03901196741523313
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3159,
+      "height": -0.004734180642991527,
+      "radius": 0.05591224996819259
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3185,
+      "height": 0.013050055807058985,
+      "radius": 0.062207991428716
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3211,
+      "height": 0.009187336208902974,
+      "radius": 0.0277769451761448
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3237,
+      "height": -0.0009282278997538969,
+      "radius": 0.023685103505548463
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3276,
+      "height": -0.04266545407019549,
+      "radius": 0.03539619110111341
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3289,
+      "height": -0.018092914834114824,
+      "radius": 0.031974972283727615
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3315,
+      "height": -0.0087544484754613,
+      "radius": 0.053676516822015526
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3328,
+      "height": 0.009533941552430989,
+      "radius": 0.04444863216683637
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3354,
+      "height": -0.00962877879537945,
+      "radius": 0.06444297077881316
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3406,
+      "height": 0.022128255931436684,
+      "radius": 0.03571101133996695
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3419,
+      "height": -0.04537434543898895,
+      "radius": 0.037521024354877745
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3575,
+      "height": 0.021250183095040513,
+      "radius": 0.03063094214805026
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3601,
+      "height": 0.026586199510187196,
+      "radius": 0.024183024788495815
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3614,
+      "height": -0.03981048802152715,
+      "radius": 0.027014863179610632
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3627,
+      "height": 0.0375043612927127,
+      "radius": 0.029373199190754956
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3640,
+      "height": -0.0017190715503809925,
+      "radius": 0.03279446112647964
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3653,
+      "height": 0.015727098473307867,
+      "radius": 0.04044727302052593
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3666,
+      "height": -0.00875783083710197,
+      "radius": 0.028237264939059543
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3679,
+      "height": -0.017923457373208038,
+      "radius": 0.04152356516202521
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3692,
+      "height": -0.023688699164498405,
+      "radius": 0.030543923271127624
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3744,
+      "height": -0.04697544502341776,
+      "radius": 0.040404560369606386
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3770,
+      "height": 0.02697902487537219,
+      "radius": 0.030864831913714297
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3796,
+      "height": 0.019732133847537133,
+      "radius": 0.035832277962160625
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3809,
+      "height": -0.00440678819860763,
+      "radius": 0.05890941053919701
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3822,
+      "height": -0.04320889822757822,
+      "radius": 0.03795463311819485
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3835,
+      "height": 0.026440965995328795,
+      "radius": 0.031310489242570204
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3848,
+      "height": -0.04837279220366814,
+      "radius": 0.03161673768823632
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3861,
+      "height": -0.02031175505466413,
+      "radius": 0.04838397031796869
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3874,
+      "height": -0.008203079764842323,
+      "radius": 0.031598407938003586
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3913,
+      "height": 0.053688609553521296,
+      "radius": 0.040685002042303194
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3926,
+      "height": 0.009489929431176082,
+      "radius": 0.040845054589840835
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3978,
+      "height": -0.036729579449454104,
+      "radius": 0.040044752740433225
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3991,
+      "height": -0.04765304013503247,
+      "radius": 0.05258185227402953
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4121,
+      "height": 0.008618133312525752,
+      "radius": 0.04381819077768783
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4173,
+      "height": -0.0182372564462962,
+      "radius": 0.03784459782182696
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4186,
+      "height": 0.048836733828830484,
+      "radius": 0.04158330821641846
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4199,
+      "height": -0.027355968435071223,
+      "radius": 0.03636703655153783
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4212,
+      "height": -0.02854119607114765,
+      "radius": 0.038278647682097
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4225,
+      "height": -0.020499011197315536,
+      "radius": 0.026812142729822176
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4238,
+      "height": -0.03578035518555219,
+      "radius": 0.034329461698929135
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4251,
+      "height": 0.00895752110372019,
+      "radius": 0.035274760290180784
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4264,
+      "height": 0.027043308895311598,
+      "radius": 0.02921425291208495
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4277,
+      "height": 0.019198207002109134,
+      "radius": 0.023578686986260224
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4290,
+      "height": -0.007756447823530631,
+      "radius": 0.02802233397360803
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4303,
+      "height": -0.02129832840128662,
+      "radius": 0.03977023010759742
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4316,
+      "height": -0.04992055696175974,
+      "radius": 0.03860597502913649
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4329,
+      "height": 0.001781121715475766,
+      "radius": 0.03720798996788565
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4342,
+      "height": 0.007514398417417858,
+      "radius": 0.03700758010998919
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4355,
+      "height": -0.04509094633552989,
+      "radius": 0.03726099007600151
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4368,
+      "height": 0.017731071912104927,
+      "radius": 0.03822174273665763
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4381,
+      "height": 0.013373886877781078,
+      "radius": 0.026718749601609613
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4394,
+      "height": -0.002061114738345632,
+      "radius": 0.026494578072511103
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4407,
+      "height": 0.004657298031111772,
+      "radius": 0.027590049938516395
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4420,
+      "height": -0.04944104636795636,
+      "radius": 0.03517513805594807
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4433,
+      "height": 0.04468767208105677,
+      "radius": 0.04243986523394495
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4446,
+      "height": 0.012545447472441603,
+      "radius": 0.042578720682637225
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4459,
+      "height": 0.03344478354798805,
+      "radius": 0.03194804168999562
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4472,
+      "height": 0.05055337712210688,
+      "radius": 0.03150063114827926
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4485,
+      "height": -0.003918047456202305,
+      "radius": 0.0536672747043099
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4511,
+      "height": 0.00681039880722858,
+      "radius": 0.05456460215257777
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4537,
+      "height": -0.027689775590986093,
+      "radius": 0.029344063923081847
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4550,
+      "height": -0.021271131219295993,
+      "radius": 0.033798903535298054
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4563,
+      "height": -0.025407404847820548,
+      "radius": 0.03210363532514321
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4615,
+      "height": -0.04701597491016953,
+      "radius": 0.035612978733258534
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4641,
+      "height": -0.013658962898527837,
+      "radius": 0.04705111498655243
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4654,
+      "height": -0.016352162662328355,
+      "radius": 0.05080620767901833
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4680,
+      "height": -0.012268703749527302,
+      "radius": 0.03444431300002065
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4693,
+      "height": -0.048827729132508685,
+      "radius": 0.04869959153765093
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4719,
+      "height": -0.03280788281405221,
+      "radius": 0.03745349426704311
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4732,
+      "height": 0.0040603436865726625,
+      "radius": 0.032012215753849486
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4745,
+      "height": -0.04111378395091978,
+      "radius": 0.0488666360154811
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4758,
+      "height": 0.02701639855020096,
+      "radius": 0.027597201651198666
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4771,
+      "height": -0.04311039263123737,
+      "radius": 0.03316996771607185
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4784,
+      "height": 0.012952840313392505,
+      "radius": 0.04307376882905075
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4797,
+      "height": -0.0325048306067527,
+      "radius": 0.025697206088512
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4810,
+      "height": -0.015236643199013246,
+      "radius": 0.05006088543589643
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4823,
+      "height": 0.009459747456072311,
+      "radius": 0.04265720349177998
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4849,
+      "height": -0.03808682733194787,
+      "radius": 0.02937752679736723
+    }
+  ],
+  "L_auxiliary": [
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 702,
+      "height": -0.050495339998582446,
+      "radius": 0.03466060528178752
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 715,
+      "height": -0.01735822719044482,
+      "radius": 0.033276811115421384
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 728,
+      "height": 0.018415854598608276,
+      "radius": 0.03549958206948051
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 741,
+      "height": 0.05649473312905179,
+      "radius": 0.04181098852348077
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 754,
+      "height": -0.015655427884720755,
+      "radius": 0.03520793825447755
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 767,
+      "height": -0.024130609943855914,
+      "radius": 0.024209765950013028
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 780,
+      "height": -0.021117257441121483,
+      "radius": 0.04296243987664865
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 793,
+      "height": -0.05019213360755369,
+      "radius": 0.03759540213624794
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 806,
+      "height": -0.04098448718054172,
+      "radius": 0.03925982913639419
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 819,
+      "height": -0.005246360863565235,
+      "radius": 0.03984035981524492
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 832,
+      "height": 0.013506313679271104,
+      "radius": 0.037255808414785055
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 845,
+      "height": 0.015672603224084963,
+      "radius": 0.03591355603497383
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 858,
+      "height": 0.020041229233650145,
+      "radius": 0.037681569145093664
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 871,
+      "height": -0.007226499500278107,
+      "radius": 0.03206402558161055
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 884,
+      "height": -0.03175755757598193,
+      "radius": 0.030530215132134247
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 897,
+      "height": -0.04446700662362773,
+      "radius": 0.037722339366051745
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 910,
+      "height": 0.0026700478778185874,
+      "radius": 0.035892373672272035
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 923,
+      "height": -0.05105621888700297,
+      "radius": 0.03381856022193013
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 936,
+      "height": 0.02917041504833131,
+      "radius": 0.02959843964418421
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 949,
+      "height": 0.01795513266454267,
+      "radius": 0.031922816040160805
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 962,
+      "height": 0.000012664751788788624,
+      "radius": 0.02921109316926005
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 975,
+      "height": -0.05139167183277034,
+      "radius": 0.031668788550303716
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 988,
+      "height": 0.049100375376406484,
+      "radius": 0.03369069421771876
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1001,
+      "height": 0.046800204887229156,
+      "radius": 0.03964844148077604
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1014,
+      "height": 0.015340380789136961,
+      "radius": 0.05438439241634934
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1027,
+      "height": 0.03301085211636223,
+      "radius": 0.04273696765322461
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1040,
+      "height": 0.06424957892462901,
+      "radius": 0.030931877590581552
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1053,
+      "height": -0.02689299448295104,
+      "radius": 0.06261036336899115
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1066,
+      "height": -0.06353414252743968,
+      "radius": 0.03623486588651181
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1079,
+      "height": -0.04447755057174141,
+      "radius": 0.02457407562340718
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1105,
+      "height": -0.006829352242202477,
+      "radius": 0.019054512982073536
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1118,
+      "height": -0.004873542691895979,
+      "radius": 0.03249730050350946
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1144,
+      "height": -0.044092899562372764,
+      "radius": 0.02945350308324012
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1170,
+      "height": 0.022730993394600767,
+      "radius": 0.03227772130791227
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1183,
+      "height": 0.011019704448817662,
+      "radius": 0.02993276153686559
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1209,
+      "height": -0.055124637559000274,
+      "radius": 0.03700693111719592
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1222,
+      "height": 0.003772011014261856,
+      "radius": 0.018700265547532124
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1235,
+      "height": -0.052843267545492574,
+      "radius": 0.027962541166172854
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1248,
+      "height": -0.05046208212918502,
+      "radius": 0.02486390431852807
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1261,
+      "height": 0.009911548309437723,
+      "radius": 0.02763789413431954
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1274,
+      "height": -0.05421756401767229,
+      "radius": 0.024537664742358155
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1287,
+      "height": 0.00838043410115898,
+      "radius": 0.027353578670884615
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1300,
+      "height": 0.009498876271972302,
+      "radius": 0.03277781071529605
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1313,
+      "height": 0.02721123655817673,
+      "radius": 0.035134981760992785
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1339,
+      "height": -0.026269776116919354,
+      "radius": 0.04678752622882424
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1352,
+      "height": -0.010479125943029265,
+      "radius": 0.024813995870189315
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1365,
+      "height": 0.02161304291958203,
+      "radius": 0.050534099128004197
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1391,
+      "height": -0.0034666598638675764,
+      "radius": 0.03670608560501457
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1443,
+      "height": -0.002922532897250481,
+      "radius": 0.024876835033036053
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1495,
+      "height": -0.029034448757823683,
+      "radius": 0.0377413602994304
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1508,
+      "height": -0.0013047176923170738,
+      "radius": 0.025829869261382754
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1521,
+      "height": -0.04949661805755098,
+      "radius": 0.03552479258633493
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1534,
+      "height": 0.009619141837510071,
+      "radius": 0.03173870255121576
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1547,
+      "height": -0.021807648054248938,
+      "radius": 0.024496788065280443
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1560,
+      "height": 0.025878293098900346,
+      "radius": 0.0348049604082046
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1573,
+      "height": -0.046620732637449744,
+      "radius": 0.02623601997834951
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1612,
+      "height": -0.028708933490363357,
+      "radius": 0.06609237067764383
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1625,
+      "height": -0.023066412633177824,
+      "radius": 0.02364936722668094
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1651,
+      "height": 0.02240306088813945,
+      "radius": 0.05957775396388871
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1664,
+      "height": -0.06357132562319795,
+      "radius": 0.03373303443287753
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1677,
+      "height": -0.05366147715977078,
+      "radius": 0.027623537001000786
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1690,
+      "height": -0.04672171723558975,
+      "radius": 0.02456418513575185
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1703,
+      "height": 0.025830962670608075,
+      "radius": 0.03594407796626636
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1729,
+      "height": -0.02307144257941028,
+      "radius": 0.0259947997927693
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1742,
+      "height": -0.03609583991462493,
+      "radius": 0.03984323995398246
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1768,
+      "height": -0.0413178527655451,
+      "radius": 0.02773574916247553
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1794,
+      "height": 0.023411009550857332,
+      "radius": 0.01655469711148417
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1846,
+      "height": 0.01579804177393313,
+      "radius": 0.02330267025498769
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1898,
+      "height": -0.004183770114251417,
+      "radius": 0.031175760538763923
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1911,
+      "height": 0.019066653546254825,
+      "radius": 0.02518821693592808
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1924,
+      "height": -0.05327838665390101,
+      "radius": 0.04614549067348363
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1950,
+      "height": -0.021143250440234126,
+      "radius": 0.021777380775335267
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1976,
+      "height": -0.038864383760517096,
+      "radius": 0.03283800042255394
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1989,
+      "height": -0.011869178838995962,
+      "radius": 0.0399341080274825
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2054,
+      "height": -0.051805654788811925,
+      "radius": 0.025844018881079494
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2067,
+      "height": 0.01905097109994751,
+      "radius": 0.035571161273326914
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2132,
+      "height": 0.0005167918585117907,
+      "radius": 0.04125729877797043
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2158,
+      "height": 0.006997036932248881,
+      "radius": 0.04212574186760335
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2223,
+      "height": 0.026276248001570246,
+      "radius": 0.023263126326930412
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2236,
+      "height": 0.017048616528952534,
+      "radius": 0.04005808880232499
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2249,
+      "height": 0.004383856795280156,
+      "radius": 0.03503377078288565
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2262,
+      "height": 0.06490055825558565,
+      "radius": 0.03982155314669201
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2275,
+      "height": 0.0277862454547189,
+      "radius": 0.058447706110945845
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2288,
+      "height": -0.054141337313576225,
+      "radius": 0.0245170850875936
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2301,
+      "height": -0.025197004900710487,
+      "radius": 0.038012848778752543
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2353,
+      "height": -0.027449135400523874,
+      "radius": 0.06993740289712934
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2366,
+      "height": 0.020518747590950452,
+      "radius": 0.04116755454819912
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2379,
+      "height": -0.024985617103950645,
+      "radius": 0.03452955957778504
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2418,
+      "height": -0.017723383406125556,
+      "radius": 0.034487645048063044
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2444,
+      "height": -0.024341823222788928,
+      "radius": 0.02351160360677959
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2483,
+      "height": -0.027541868178383857,
+      "radius": 0.023447866344001225
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2600,
+      "height": -0.01241589884715484,
+      "radius": 0.036824599952248384
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2665,
+      "height": 0.04788271478584569,
+      "radius": 0.0433548577906698
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2678,
+      "height": -0.0008594978927238091,
+      "radius": 0.02168829557296342
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2691,
+      "height": -0.03378727667797904,
+      "radius": 0.030492573648896033
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2704,
+      "height": 0.021312779075664676,
+      "radius": 0.035938903101652014
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2717,
+      "height": 0.03782463629101625,
+      "radius": 0.05200027046695588
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2730,
+      "height": 0.0028285484647443517,
+      "radius": 0.02136782325840148
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2743,
+      "height": 0.05894820869230359,
+      "radius": 0.0428900359216581
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2756,
+      "height": -0.013284642997108497,
+      "radius": 0.021286250291410427
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2769,
+      "height": -0.020651635263548174,
+      "radius": 0.022531270199247434
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2782,
+      "height": 0.022104612079955937,
+      "radius": 0.015677727945932335
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2795,
+      "height": 0.02950694056593338,
+      "radius": 0.02831426197668389
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2834,
+      "height": -0.005631843203833452,
+      "radius": 0.03264216377289021
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2847,
+      "height": -0.04856887147543499,
+      "radius": 0.02764761107897554
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2925,
+      "height": 0.0077779421390975784,
+      "radius": 0.03287980210557934
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2938,
+      "height": -0.044745154359519444,
+      "radius": 0.02797672486380665
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2990,
+      "height": -0.006945245022620695,
+      "radius": 0.05005707789509493
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3016,
+      "height": -0.010019465015669157,
+      "radius": 0.02595648865139448
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3029,
+      "height": 0.02457967088918171,
+      "radius": 0.0344553978323409
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3068,
+      "height": 0.025646431813250152,
+      "radius": 0.03429584204334404
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3107,
+      "height": -0.019753090125685227,
+      "radius": 0.025172037046435763
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3120,
+      "height": -0.044057742700818955,
+      "radius": 0.02673649692504581
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3133,
+      "height": -0.04177317973518965,
+      "radius": 0.04745298543023787
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3172,
+      "height": -0.02883066005465649,
+      "radius": 0.03089522847085553
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3198,
+      "height": 0.0009447538330079829,
+      "radius": 0.021493164130844178
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3250,
+      "height": 0.007375673608783156,
+      "radius": 0.024705638983870258
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3263,
+      "height": 0.04288870585542256,
+      "radius": 0.03985455156108719
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3367,
+      "height": 0.006575266871996119,
+      "radius": 0.03263759176716431
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3380,
+      "height": -0.006857526675976217,
+      "radius": 0.025034150927413575
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3393,
+      "height": 0.002379277413917831,
+      "radius": 0.07092740022112239
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3445,
+      "height": -0.05525270153435329,
+      "radius": 0.028445029490984437
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3484,
+      "height": -0.008899629027809528,
+      "radius": 0.03606901442892608
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3497,
+      "height": -0.045787276195122684,
+      "radius": 0.025244601896300265
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3510,
+      "height": -0.029481595429614316,
+      "radius": 0.04714738599148311
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3523,
+      "height": -0.03239666074943354,
+      "radius": 0.05446799492627538
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3549,
+      "height": 0.0286176140486612,
+      "radius": 0.05842069055966812
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3562,
+      "height": 0.004409308189646293,
+      "radius": 0.027784207428171816
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3588,
+      "height": 0.008958347169309749,
+      "radius": 0.06231201725267877
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3705,
+      "height": -0.014480534600049316,
+      "radius": 0.0283370783089141
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3731,
+      "height": 0.0017141241559586289,
+      "radius": 0.02453313371771613
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3757,
+      "height": 0.004121265002418591,
+      "radius": 0.037258849449710744
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3887,
+      "height": -0.054149355009399075,
+      "radius": 0.028285365962295368
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3900,
+      "height": -0.041659599813861,
+      "radius": 0.03816955661231566
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3939,
+      "height": -0.02309164881974229,
+      "radius": 0.029520682273109108
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3952,
+      "height": 0.012043190674553084,
+      "radius": 0.05078618925253597
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3965,
+      "height": 0.014615305814943424,
+      "radius": 0.04522787215483138
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4004,
+      "height": -0.028406051934518377,
+      "radius": 0.02811803645298675
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4017,
+      "height": 0.018206601048932413,
+      "radius": 0.030112636214095934
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4030,
+      "height": -0.010014000923357769,
+      "radius": 0.07443220441453753
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4043,
+      "height": 0.02551212225885924,
+      "radius": 0.05889869844098783
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4056,
+      "height": 0.03798179763674645,
+      "radius": 0.02701298188318144
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4069,
+      "height": -0.007944823739263003,
+      "radius": 0.02515060923563049
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4082,
+      "height": 0.01871763675447246,
+      "radius": 0.043585773432817436
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4095,
+      "height": -0.01789761022334026,
+      "radius": 0.03751683815810184
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4108,
+      "height": 0.017923515362826187,
+      "radius": 0.017284093540069784
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4134,
+      "height": 0.027346209434856897,
+      "radius": 0.03303743307950441
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4147,
+      "height": -0.04706521573108206,
+      "radius": 0.04207914546873519
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4160,
+      "height": 0.029873023396854725,
+      "radius": 0.04449822049415346
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4862,
+      "height": -0.018179655797045967,
+      "radius": 0.03452996068918796
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4875,
+      "height": -0.019215144976318044,
+      "radius": 0.03414973556680901
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4888,
+      "height": -0.014643460608535335,
+      "radius": 0.028445703689039103
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4901,
+      "height": -0.027466158368883015,
+      "radius": 0.024654031008014405
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4914,
+      "height": -0.042043012729227745,
+      "radius": 0.03684014258460787
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4927,
+      "height": -0.046172984509130446,
+      "radius": 0.025108324216702026
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4940,
+      "height": 0.009970140376013605,
+      "radius": 0.02622068199952109
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4953,
+      "height": 0.018706959686135272,
+      "radius": 0.03618811101053496
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4966,
+      "height": 0.029775363820381758,
+      "radius": 0.03170041051025744
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4979,
+      "height": -0.007784860618030607,
+      "radius": 0.0377660496875851
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4992,
+      "height": -0.03151695592649789,
+      "radius": 0.027227103808504075
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5005,
+      "height": -0.04200720014901024,
+      "radius": 0.0371823966169696
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5018,
+      "height": 0.005269647220956381,
+      "radius": 0.035295712028425026
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5031,
+      "height": -0.014898674593505619,
+      "radius": 0.03199944390856881
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5044,
+      "height": -0.05071115583836087,
+      "radius": 0.0337778047300748
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5057,
+      "height": 0.01694968416587283,
+      "radius": 0.034361900522968995
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5070,
+      "height": 0.018409436861081506,
+      "radius": 0.023596404136475225
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5083,
+      "height": 0.009457131289503,
+      "radius": 0.02965971379022071
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5096,
+      "height": -0.05227683998413836,
+      "radius": 0.034799362972349146
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5109,
+      "height": -0.0524784983366376,
+      "radius": 0.030187256598273482
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5122,
+      "height": 0.05213138812560718,
+      "radius": 0.036502433555850776
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5135,
+      "height": 0.030903595806570143,
+      "radius": 0.05572290648903444
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5148,
+      "height": 0.05110257617837982,
+      "radius": 0.02831230111691288
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5161,
+      "height": 0.061439025481397735,
+      "radius": 0.02854190222233234
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5174,
+      "height": -0.0007198534238784904,
+      "radius": 0.05187410500269635
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5200,
+      "height": 0.02665790578592269,
+      "radius": 0.029420281053388415
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5226,
+      "height": 0.010642390034359238,
+      "radius": 0.051501110469777706
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5291,
+      "height": -0.021445428010308812,
+      "radius": 0.02964449690541212
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5304,
+      "height": -0.0496793607519605,
+      "radius": 0.030602701964010316
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5330,
+      "height": -0.03570311248206205,
+      "radius": 0.038397951672271176
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5343,
+      "height": 0.005776056307964471,
+      "radius": 0.04425296471128778
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5356,
+      "height": -0.028136505218359642,
+      "radius": 0.05885427355808728
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5369,
+      "height": -0.006631542580617348,
+      "radius": 0.025040194304183964
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5382,
+      "height": -0.058356226595775565,
+      "radius": 0.03024083686384391
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5395,
+      "height": -0.006601081621243902,
+      "radius": 0.046005139030799946
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5408,
+      "height": -0.02686669458029858,
+      "radius": 0.024818724129338065
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5421,
+      "height": -0.005294062695281453,
+      "radius": 0.024218257486390313
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5434,
+      "height": -0.012222445543349315,
+      "radius": 0.04833475015073915
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5447,
+      "height": -0.007724176835997738,
+      "radius": 0.03617358016628293
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5460,
+      "height": -0.039072622029586855,
+      "radius": 0.036009063006913526
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5473,
+      "height": 0.015235183518182654,
+      "radius": 0.025391923032931227
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5499,
+      "height": -0.0206262748321887,
+      "radius": 0.04625602410720523
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5538,
+      "height": -0.010636239298792038,
+      "radius": 0.034401298600484846
+    }
+  ],
+  "R_auxiliary": [
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 0,
+      "height": -0.050615177321370004,
+      "radius": 0.03521300504703859
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 13,
+      "height": -0.018951269028912407,
+      "radius": 0.035497449628872274
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 26,
+      "height": 0.008340082459346103,
+      "radius": 0.03192146942305121
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 39,
+      "height": 0.0654459655183981,
+      "radius": 0.03748937380830426
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 52,
+      "height": -0.026720137752638193,
+      "radius": 0.034720718768241565
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 65,
+      "height": -0.029998934214354095,
+      "radius": 0.028350715007045297
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 78,
+      "height": -0.021243252583782988,
+      "radius": 0.037161723117481976
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 91,
+      "height": -0.03977188476376191,
+      "radius": 0.029801881671229963
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 104,
+      "height": -0.0556304468038109,
+      "radius": 0.03080657720293785
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 117,
+      "height": 0.007411235732907215,
+      "radius": 0.027780107513024878
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 130,
+      "height": 0.028371294557506296,
+      "radius": 0.03167526220640348
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 143,
+      "height": 0.029929905632501006,
+      "radius": 0.02186691910746729
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 156,
+      "height": 0.02537087081663297,
+      "radius": 0.020319424568415498
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 169,
+      "height": 0.00218466900681509,
+      "radius": 0.020660966740437135
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 182,
+      "height": -0.013577585759440024,
+      "radius": 0.036505021992040615
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 195,
+      "height": -0.05430012040700886,
+      "radius": 0.026849287908565247
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 208,
+      "height": 0.0044088200074757795,
+      "radius": 0.03519046122447491
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 221,
+      "height": -0.04603356724341848,
+      "radius": 0.03603325225938245
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 234,
+      "height": 0.018437362394667693,
+      "radius": 0.035016844321543776
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 247,
+      "height": 0.02569191877350122,
+      "radius": 0.028733893281698276
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 260,
+      "height": -0.003988132541172643,
+      "radius": 0.03437041337839975
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 273,
+      "height": -0.04911003691034779,
+      "radius": 0.02615995481101301
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 286,
+      "height": 0.06395558285626837,
+      "radius": 0.03596186110396223
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 299,
+      "height": 0.06400562888015728,
+      "radius": 0.028625784649728685
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 312,
+      "height": 0.02136756040540222,
+      "radius": 0.06852050622878546
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 325,
+      "height": 0.0366379658547518,
+      "radius": 0.056299107864716175
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 338,
+      "height": 0.0250681066272211,
+      "radius": 0.036302034853218534
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 351,
+      "height": -0.02166411381282719,
+      "radius": 0.06337503885296636
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 364,
+      "height": -0.06011012023556165,
+      "radius": 0.041324412395333875
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 377,
+      "height": -0.053591714458781026,
+      "radius": 0.023986745022801976
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 390,
+      "height": -0.006474423755181002,
+      "radius": 0.07340431995666855
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 403,
+      "height": 0.016767595725178695,
+      "radius": 0.027029789355355285
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 416,
+      "height": 0.011377999633709841,
+      "radius": 0.04132161055243998
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 442,
+      "height": -0.05261727025277398,
+      "radius": 0.04648091773238391
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 468,
+      "height": 0.003163987034971989,
+      "radius": 0.03224924861027241
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 494,
+      "height": -0.0218432375686531,
+      "radius": 0.0463880871732414
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 507,
+      "height": -0.050342038311916755,
+      "radius": 0.024729720840803833
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 520,
+      "height": 0.015109840410158656,
+      "radius": 0.041793947838408306
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 533,
+      "height": 0.000404657729425505,
+      "radius": 0.04501497089726766
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 546,
+      "height": -0.06700337115451843,
+      "radius": 0.034133244504417536
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 559,
+      "height": 0.029683279266940095,
+      "radius": 0.022274185421470007
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 572,
+      "height": -0.004176893320207545,
+      "radius": 0.021721671053570674
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 585,
+      "height": 0.002564743141634714,
+      "radius": 0.020843962209057553
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 598,
+      "height": 0.010577370884710332,
+      "radius": 0.03134080506648432
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 611,
+      "height": 0.012910018371009227,
+      "radius": 0.039028659687151385
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 624,
+      "height": -0.020073371984947738,
+      "radius": 0.027777550993099302
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 637,
+      "height": -0.00679113148304817,
+      "radius": 0.04397573630750472
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 663,
+      "height": 0.029326125112069452,
+      "radius": 0.061694796802588804
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 676,
+      "height": -0.00914243897398271,
+      "radius": 0.07042325838515393
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 689,
+      "height": -0.0006381644843190869,
+      "radius": 0.0360794517228175
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1404,
+      "height": 0.027327743141290675,
+      "radius": 0.033163393981690346
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1430,
+      "height": 0.022582348434400965,
+      "radius": 0.030420462253591237
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1456,
+      "height": 0.03178591814936073,
+      "radius": 0.037071878136452796
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1482,
+      "height": -0.01259641545453324,
+      "radius": 0.03426854281623915
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1599,
+      "height": -0.028818670182207164,
+      "radius": 0.028297714782030296
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1638,
+      "height": -0.051049745377774014,
+      "radius": 0.03766762814283329
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1716,
+      "height": 0.007663244439326971,
+      "radius": 0.03890174972420728
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1755,
+      "height": 0.017899003816479738,
+      "radius": 0.0278409919918782
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1781,
+      "height": -0.008252998463576413,
+      "radius": 0.03296379312329566
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1807,
+      "height": -0.03079931415105777,
+      "radius": 0.03667584092829981
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1820,
+      "height": 0.017222332919203925,
+      "radius": 0.047005993378898644
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1872,
+      "height": -0.0005367467747819073,
+      "radius": 0.06651062065024603
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1885,
+      "height": -0.04938332325998939,
+      "radius": 0.047019227043818196
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1937,
+      "height": 0.016717589124101633,
+      "radius": 0.034324476169517885
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1963,
+      "height": -0.01730360320926945,
+      "radius": 0.032705270374885936
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2002,
+      "height": -0.04761042059231049,
+      "radius": 0.04636076549759506
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2015,
+      "height": 0.015523018008022062,
+      "radius": 0.025097760606096378
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2028,
+      "height": 0.020873528932363137,
+      "radius": 0.03648337265173894
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2041,
+      "height": 0.041170963341462884,
+      "radius": 0.04363292749676492
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2080,
+      "height": -0.001344674510063049,
+      "radius": 0.01853412959274066
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2106,
+      "height": 0.02303475742528802,
+      "radius": 0.041927984976729976
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2119,
+      "height": 0.014694926295570655,
+      "radius": 0.025538365353323374
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2145,
+      "height": -0.024982070353374207,
+      "radius": 0.05934877346402605
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2171,
+      "height": 0.0007543527690415776,
+      "radius": 0.07038216489866321
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2184,
+      "height": 0.010631377961787137,
+      "radius": 0.03611459761954713
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2197,
+      "height": -0.0383044056537524,
+      "radius": 0.025859764844814847
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2210,
+      "height": -0.03138947476511996,
+      "radius": 0.03250611239431516
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2314,
+      "height": 0.006043343113172162,
+      "radius": 0.024091188367547815
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2327,
+      "height": -0.027337945588501972,
+      "radius": 0.027146019165011373
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2340,
+      "height": -0.022474517820698686,
+      "radius": 0.03190216543732028
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2392,
+      "height": -0.00809822182214311,
+      "radius": 0.029904682633264165
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2405,
+      "height": -0.028848866643673598,
+      "radius": 0.030766512374307515
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2431,
+      "height": 0.04978345531486995,
+      "radius": 0.04389129803085979
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2470,
+      "height": 0.028242436761772714,
+      "radius": 0.031603113802189484
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2496,
+      "height": 0.013134788536190564,
+      "radius": 0.026815166594719834
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2509,
+      "height": -0.023237837893022546,
+      "radius": 0.04640098808074561
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2522,
+      "height": -0.015618368531468177,
+      "radius": 0.03350662050015803
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2535,
+      "height": -0.02178032006066612,
+      "radius": 0.03006093766040971
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2548,
+      "height": -0.03629854673985283,
+      "radius": 0.030781217752000926
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2561,
+      "height": 0.05944716176234193,
+      "radius": 0.039244201567221505
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2574,
+      "height": -0.02082469772895128,
+      "radius": 0.042378127442427624
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2587,
+      "height": 0.008306945782051184,
+      "radius": 0.02626164133340624
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2613,
+      "height": 0.01106745318146085,
+      "radius": 0.03409061985604751
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2626,
+      "height": 0.02481343401250394,
+      "radius": 0.04066476401309513
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2808,
+      "height": -0.046881031256265915,
+      "radius": 0.035303568185938536
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2821,
+      "height": -0.016107320543675554,
+      "radius": 0.06730384062628463
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2860,
+      "height": -0.0007613652060483367,
+      "radius": 0.021689716413974207
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2873,
+      "height": 0.008121788069893679,
+      "radius": 0.022926510874558454
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2886,
+      "height": 0.017147645477816897,
+      "radius": 0.05204642995682643
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2899,
+      "height": -0.04587217852538586,
+      "radius": 0.0228164617680135
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2912,
+      "height": -0.048557830221482336,
+      "radius": 0.027680116779097215
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2951,
+      "height": -0.05120055388602181,
+      "radius": 0.03279609778503497
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3003,
+      "height": -0.015295886742415403,
+      "radius": 0.03562370787712013
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3055,
+      "height": -0.02773868976184729,
+      "radius": 0.02684573757317551
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3081,
+      "height": -0.009222269311355155,
+      "radius": 0.026263724507643204
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3094,
+      "height": -0.015027615718134438,
+      "radius": 0.050434359115127336
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3146,
+      "height": -0.0556612558204472,
+      "radius": 0.030125245095335405
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3159,
+      "height": 0.01224348883500811,
+      "radius": 0.058346215459301395
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3185,
+      "height": 0.025643633680019103,
+      "radius": 0.06395794138005235
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3211,
+      "height": 0.009378855793288432,
+      "radius": 0.02650349024858336
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3237,
+      "height": -0.0002086507870252875,
+      "radius": 0.021360247396192588
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3276,
+      "height": -0.04471730596961968,
+      "radius": 0.026531096783509327
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3289,
+      "height": -0.0102283032454768,
+      "radius": 0.03377710648103582
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3315,
+      "height": -0.00007340909128915568,
+      "radius": 0.05321072481770182
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3328,
+      "height": 0.022261965512990076,
+      "radius": 0.04642238263244478
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3354,
+      "height": 0.0013189795941792293,
+      "radius": 0.0656787462150135
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3406,
+      "height": 0.02527437069679256,
+      "radius": 0.03363757524773405
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3419,
+      "height": -0.04856313038817032,
+      "radius": 0.035316030943405304
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3575,
+      "height": 0.024433174202455825,
+      "radius": 0.028653350320021753
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3601,
+      "height": 0.029724349768640714,
+      "radius": 0.02175645014171939
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3614,
+      "height": -0.03066887054213849,
+      "radius": 0.03389072698763379
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3627,
+      "height": 0.046228685552775144,
+      "radius": 0.03154479000801932
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3640,
+      "height": -0.0015687477487898414,
+      "radius": 0.030637182365667124
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3653,
+      "height": 0.02859572175575904,
+      "radius": 0.04188011890040111
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3666,
+      "height": -0.0032624389273630443,
+      "radius": 0.02816539631703026
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3679,
+      "height": -0.021609279510954125,
+      "radius": 0.04000459426554895
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3692,
+      "height": -0.01474097826751604,
+      "radius": 0.033826918027094414
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3744,
+      "height": -0.050654622197204645,
+      "radius": 0.03809229365466337
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3770,
+      "height": 0.03015033546523734,
+      "radius": 0.028568358885790634
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3796,
+      "height": 0.022887226791780964,
+      "radius": 0.03385017326801513
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3809,
+      "height": 0.00563200163263319,
+      "radius": 0.05854918149263078
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3822,
+      "height": -0.046588120480407634,
+      "radius": 0.036020096028760024
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3835,
+      "height": 0.02964256631496602,
+      "radius": 0.028894769050046943
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3848,
+      "height": -0.045966674572219035,
+      "radius": 0.026993372203667355
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3861,
+      "height": -0.01828367243482517,
+      "radius": 0.046165816693630096
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3874,
+      "height": -0.008316503555078672,
+      "radius": 0.02841905013433279
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3913,
+      "height": 0.06916698668574894,
+      "radius": 0.035161741927388544
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3926,
+      "height": 0.012673152321587024,
+      "radius": 0.03873234206294393
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3978,
+      "height": -0.04040362358244424,
+      "radius": 0.03530539668999723
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3991,
+      "height": -0.037400799548568224,
+      "radius": 0.057327271921234754
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4121,
+      "height": 0.015174745531681294,
+      "radius": 0.04256785097503034
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4173,
+      "height": -0.02127160587095552,
+      "radius": 0.03622570490809434
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4186,
+      "height": 0.0629543810792525,
+      "radius": 0.038694393483462264
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4199,
+      "height": -0.03006128429036264,
+      "radius": 0.033027915229587916
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4212,
+      "height": -0.03147064826348188,
+      "radius": 0.034861656350083425
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4225,
+      "height": -0.020798954110430302,
+      "radius": 0.022875543579127196
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4238,
+      "height": -0.03854683344551884,
+      "radius": 0.03256397507712014
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4251,
+      "height": 0.00828294656317679,
+      "radius": 0.03390986339164397
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4264,
+      "height": 0.030213968643672196,
+      "radius": 0.026826703440710416
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4277,
+      "height": 0.02236156856330292,
+      "radius": 0.021369222506354913
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4290,
+      "height": -0.007029614932769596,
+      "radius": 0.025173858792300764
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4303,
+      "height": -0.02500958451587667,
+      "radius": 0.03738118391844653
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4316,
+      "height": -0.05327031935197657,
+      "radius": 0.03592575494027742
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4329,
+      "height": 0.0011886300288787648,
+      "radius": 0.035235064750511594
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4342,
+      "height": 0.007096202746955876,
+      "radius": 0.035712142102611144
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4355,
+      "height": -0.04838026171231933,
+      "radius": 0.03503082824545249
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4368,
+      "height": 0.020869198874378353,
+      "radius": 0.036187629700692156
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4381,
+      "height": 0.01656863602370541,
+      "radius": 0.02471634976318477
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4394,
+      "height": -0.001218872135676479,
+      "radius": 0.024361228693697584
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4407,
+      "height": 0.0052656531397022735,
+      "radius": 0.026089676422003872
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4420,
+      "height": -0.05235978916192195,
+      "radius": 0.03231151629975323
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4433,
+      "height": 0.05864701506451296,
+      "radius": 0.040336793277903134
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4446,
+      "height": 0.02531948856012556,
+      "radius": 0.044310314950829086
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4459,
+      "height": 0.04197763554259004,
+      "radius": 0.03414512527057645
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4472,
+      "height": 0.06051611673413656,
+      "radius": 0.03240737732742543
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4485,
+      "height": 0.004005191281934966,
+      "radius": 0.05269280233218128
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4511,
+      "height": 0.013165538549230964,
+      "radius": 0.055913874760845104
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4537,
+      "height": -0.01860658455643256,
+      "radius": 0.033473649281927614
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4550,
+      "height": -0.007544673166722438,
+      "radius": 0.03975878228477355
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4563,
+      "height": -0.02391776016501025,
+      "radius": 0.027719341996716627
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4615,
+      "height": -0.049837316263153235,
+      "radius": 0.0332245654072591
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4641,
+      "height": -0.017298769277531434,
+      "radius": 0.04362917270679496
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4654,
+      "height": -0.018938078066817063,
+      "radius": 0.04683349989764249
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4680,
+      "height": -0.013728391141799155,
+      "radius": 0.031074485823909787
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4693,
+      "height": -0.05251793026700456,
+      "radius": 0.03955156391450168
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4719,
+      "height": -0.03214420604229399,
+      "radius": 0.031129452141063635
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4732,
+      "height": 0.008885301971011648,
+      "radius": 0.03108987827643913
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4745,
+      "height": -0.03833360436684975,
+      "radius": 0.04733654061764892
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4758,
+      "height": 0.030184968751983704,
+      "radius": 0.025171459253560922
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4771,
+      "height": -0.04501764924788471,
+      "radius": 0.025094721358835042
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4784,
+      "height": 0.01614060902780263,
+      "radius": 0.04094106278318813
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4797,
+      "height": -0.02504527742524269,
+      "radius": 0.02980571257016456
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4810,
+      "height": -0.014748279961227804,
+      "radius": 0.047308306907680536
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4823,
+      "height": 0.01866181876212386,
+      "radius": 0.044469864925582164
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4849,
+      "height": -0.026615406864720487,
+      "radius": 0.037413918254446635
+    }
+  ],
+  "L_rear": [
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 702,
+      "height": -0.047251955270311764,
+      "radius": 0.037201344637191006
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 715,
+      "height": -0.014853565984621918,
+      "radius": 0.03422540504670246
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 728,
+      "height": 0.015264723592870953,
+      "radius": 0.03758486012793106
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 741,
+      "height": 0.04792377108982801,
+      "radius": 0.04196339911316369
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 754,
+      "height": -0.013082183100673066,
+      "radius": 0.0358526218956237
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 767,
+      "height": -0.023330884381025138,
+      "radius": 0.026533653840438206
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 780,
+      "height": -0.01689940632680943,
+      "radius": 0.04661580016417342
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 793,
+      "height": -0.04663844062157276,
+      "radius": 0.04001262212471248
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 806,
+      "height": -0.03749773677140316,
+      "radius": 0.046737767027763784
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 819,
+      "height": -0.004135873964187533,
+      "radius": 0.04283022562106776
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 832,
+      "height": 0.01034284374211389,
+      "radius": 0.03933057783732462
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 845,
+      "height": 0.013185937370180742,
+      "radius": 0.03781131200909764
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 858,
+      "height": 0.016859925277114343,
+      "radius": 0.039882208493200046
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 871,
+      "height": -0.006699314820765277,
+      "radius": 0.03512174030656257
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 884,
+      "height": -0.029267841993252275,
+      "radius": 0.03429817762670769
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 897,
+      "height": -0.04074004444458285,
+      "radius": 0.03930357733728131
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 910,
+      "height": 0.0031892892226410476,
+      "radius": 0.037643746072749514
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 923,
+      "height": -0.04804020721542666,
+      "radius": 0.036411441248014986
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 936,
+      "height": 0.02598791086100397,
+      "radius": 0.03162555636276738
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 949,
+      "height": 0.014777623802081485,
+      "radius": 0.03392111046225513
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 962,
+      "height": -0.0003159790534536924,
+      "radius": 0.03120199001089458
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 975,
+      "height": -0.04873000104776433,
+      "radius": 0.03431842716480852
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 988,
+      "height": 0.0396894285941457,
+      "radius": 0.03815912879724959
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1001,
+      "height": 0.04054954928745298,
+      "radius": 0.0349803385739181
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1014,
+      "height": 0.003140918049165187,
+      "radius": 0.05054082044981956
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1027,
+      "height": 0.024198770000398436,
+      "radius": 0.03984173024707646
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1040,
+      "height": 0.05802003271450942,
+      "radius": 0.03054436634110061
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1053,
+      "height": -0.03939111670567986,
+      "radius": 0.05792316100656115
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1066,
+      "height": -0.06230554417898471,
+      "radius": 0.04664913144253231
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1079,
+      "height": -0.04944702461604828,
+      "radius": 0.021098998494634185
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1105,
+      "height": -0.01110306073636369,
+      "radius": 0.019702770765959738
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1118,
+      "height": -0.013541853830831181,
+      "radius": 0.029022843197395152
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1144,
+      "height": -0.043980390342609615,
+      "radius": 0.03893765278042593
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1170,
+      "height": 0.019554504864010967,
+      "radius": 0.034243665538341114
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1183,
+      "height": 0.01052165883986843,
+      "radius": 0.031249539386715576
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1209,
+      "height": -0.052294244173422634,
+      "radius": 0.04666847053300172
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1222,
+      "height": 0.0017152272622584037,
+      "radius": 0.02036121098770374
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1235,
+      "height": -0.052406039527675446,
+      "radius": 0.03864033278539652
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1248,
+      "height": -0.05270761475585856,
+      "radius": 0.02961944808032037
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1261,
+      "height": 0.006711025812180499,
+      "radius": 0.029893155850957562
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1274,
+      "height": -0.05222461286732529,
+      "radius": 0.032682222929146805
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1287,
+      "height": 0.007737244019693375,
+      "radius": 0.028439244972222454
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1300,
+      "height": 0.0063125675620730685,
+      "radius": 0.03478477420405769
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1313,
+      "height": 0.024031536547448724,
+      "radius": 0.037312869562623995
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1339,
+      "height": -0.03005303240637011,
+      "radius": 0.04781281350889761
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1352,
+      "height": -0.011177795730744866,
+      "radius": 0.028214809667888287
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1365,
+      "height": 0.010122341007657713,
+      "radius": 0.047813951086693084
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1391,
+      "height": -0.013337765609067926,
+      "radius": 0.032130119688665
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1443,
+      "height": -0.003581712326925006,
+      "radius": 0.02722391091913927
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1495,
+      "height": -0.02558794400608895,
+      "radius": 0.04068155361203749
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1508,
+      "height": -0.0020448720246127507,
+      "radius": 0.027917465474826937
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1521,
+      "height": -0.04613192445670382,
+      "radius": 0.03790463818587419
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1534,
+      "height": 0.006425815168040272,
+      "radius": 0.033792287142045595
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1547,
+      "height": -0.021263681382782756,
+      "radius": 0.026299086443603042
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1560,
+      "height": 0.0227225108986081,
+      "radius": 0.03684130596578122
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1573,
+      "height": -0.044932722802672215,
+      "radius": 0.02820482600758263
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1612,
+      "height": -0.04225111517137053,
+      "radius": 0.06068344474323556
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1625,
+      "height": -0.02683545307773485,
+      "radius": 0.02482158866260279
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1651,
+      "height": 0.008758279263555248,
+      "radius": 0.05743816749527597
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1664,
+      "height": -0.0626750459348216,
+      "radius": 0.04432820584548633
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1677,
+      "height": -0.051426680801430355,
+      "radius": 0.030739058324402886
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1690,
+      "height": -0.045046531123244735,
+      "radius": 0.026666795666384056
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1703,
+      "height": 0.022671665177421772,
+      "radius": 0.037949934076345844
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1729,
+      "height": -0.03006833686942113,
+      "radius": 0.021839968550387823
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1742,
+      "height": -0.033182281105810375,
+      "radius": 0.04671824878826467
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1768,
+      "height": -0.039441155548712366,
+      "radius": 0.028906304470152192
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1794,
+      "height": 0.019898569263355575,
+      "radius": 0.01885277884711543
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1846,
+      "height": 0.012624645417621814,
+      "radius": 0.025471702128049372
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1898,
+      "height": -0.004187890485324993,
+      "radius": 0.03365191095725773
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1911,
+      "height": 0.01588358032949489,
+      "radius": 0.027203102736033557
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1924,
+      "height": -0.05705977997865202,
+      "radius": 0.04630420436921301
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1950,
+      "height": -0.020907706267205426,
+      "radius": 0.025120855258585865
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1976,
+      "height": -0.035666319862104966,
+      "radius": 0.03825460314195043
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 1989,
+      "height": -0.009481720980442074,
+      "radius": 0.04311165718563474
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2054,
+      "height": -0.050208230475286254,
+      "radius": 0.02835178591704197
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2067,
+      "height": 0.015896404591805084,
+      "radius": 0.03761227440461976
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2132,
+      "height": -0.009672571270830032,
+      "radius": 0.03615918530527742
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2158,
+      "height": 0.00736062984801317,
+      "radius": 0.04376093314366787
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2223,
+      "height": 0.02222662465138199,
+      "radius": 0.025640972756385737
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2236,
+      "height": 0.006618206713991115,
+      "radius": 0.038809489585078225
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2249,
+      "height": 0.004766956048182446,
+      "radius": 0.036594453235079843
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2262,
+      "height": 0.0577255037944476,
+      "radius": 0.03882064277987073
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2275,
+      "height": 0.014041735471636728,
+      "radius": 0.057713739656579596
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2288,
+      "height": -0.05214484840234313,
+      "radius": 0.03156535589454811
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2301,
+      "height": -0.021433112023676294,
+      "radius": 0.04041011185868491
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2353,
+      "height": -0.04237034498737653,
+      "radius": 0.06425102896311265
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2366,
+      "height": 0.017316805547632427,
+      "radius": 0.043299210062686715
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2379,
+      "height": -0.02214009617007524,
+      "radius": 0.036875165076008465
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2418,
+      "height": -0.015117033352010124,
+      "radius": 0.03547457260707706
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2444,
+      "height": -0.023849256933130652,
+      "radius": 0.02815739087176904
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2483,
+      "height": -0.026648961608474755,
+      "radius": 0.026499999130162887
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2600,
+      "height": -0.021904269400494468,
+      "radius": 0.030134745718665586
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2665,
+      "height": 0.03686520612632482,
+      "radius": 0.04662323026641825
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2678,
+      "height": -0.0017491480497413342,
+      "radius": 0.023975367815192397
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2691,
+      "height": -0.033578573954101396,
+      "radius": 0.03838623946327961
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2704,
+      "height": 0.018165927309130574,
+      "radius": 0.038031148400181736
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2717,
+      "height": 0.02481930495116825,
+      "radius": 0.0540358205497909
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2730,
+      "height": 0.0017422384929531485,
+      "radius": 0.023541321495884896
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2743,
+      "height": 0.05109091613086728,
+      "radius": 0.04169092456358078
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2756,
+      "height": -0.01604178316669077,
+      "radius": 0.02345644932528367
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2769,
+      "height": -0.025861015003074448,
+      "radius": 0.02149006891918443
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2782,
+      "height": 0.019019598395189595,
+      "radius": 0.018004466422629477
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2795,
+      "height": 0.026353225248726575,
+      "radius": 0.0303557806521031
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2834,
+      "height": -0.005367519104025459,
+      "radius": 0.035331686959274834
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2847,
+      "height": -0.046536165937550444,
+      "radius": 0.02992262456082697
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2925,
+      "height": 0.007964565382918717,
+      "radius": 0.034106619394726166
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2938,
+      "height": -0.04270957832618181,
+      "radius": 0.029682640403567124
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 2990,
+      "height": -0.01601531479313371,
+      "radius": 0.04971023561768623
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3016,
+      "height": -0.009998123563632074,
+      "radius": 0.029360765710035097
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3029,
+      "height": 0.021418691984008118,
+      "radius": 0.03646173331539022
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3068,
+      "height": 0.02249026948962567,
+      "radius": 0.03635871341555596
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3107,
+      "height": -0.019058245317371568,
+      "radius": 0.026643305256538644
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3120,
+      "height": -0.04225388507556693,
+      "radius": 0.02834119270514946
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3133,
+      "height": -0.0437286865813318,
+      "radius": 0.04985013674437845
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3172,
+      "height": -0.028569765004291574,
+      "radius": 0.03768672277247497
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3198,
+      "height": -0.004254320439822412,
+      "radius": 0.022131006265625842
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3250,
+      "height": 0.0010008576451744527,
+      "radius": 0.025106871684027088
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3263,
+      "height": 0.036186662610430534,
+      "radius": 0.03548712236629119
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3367,
+      "height": 0.006858291248677789,
+      "radius": 0.03403211821819731
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3380,
+      "height": -0.007521924036080937,
+      "radius": 0.02829755744202367
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3393,
+      "height": -0.01530978845468195,
+      "radius": 0.06758517902399265
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3445,
+      "height": -0.05284655609545292,
+      "radius": 0.03806557795416129
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3484,
+      "height": -0.007853912147088459,
+      "radius": 0.0394549193202907
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3497,
+      "height": -0.04831927401666855,
+      "radius": 0.029073499490162483
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3510,
+      "height": -0.032472497087696985,
+      "radius": 0.04863244272071193
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3523,
+      "height": -0.04191099328742234,
+      "radius": 0.05085528221126817
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3549,
+      "height": 0.013521489825689159,
+      "radius": 0.06042752494664398
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3562,
+      "height": 0.00393072671674844,
+      "radius": 0.02934102056149705
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3588,
+      "height": -0.004958209757841544,
+      "radius": 0.05749893515299304
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3705,
+      "height": -0.012980160129312081,
+      "radius": 0.028834385644902916
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3731,
+      "height": 0.0012402112548755527,
+      "radius": 0.026707590229707312
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3757,
+      "height": 0.00475159338118336,
+      "radius": 0.038868616437986024
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3887,
+      "height": -0.0519880790484824,
+      "radius": 0.03140585903248173
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3900,
+      "height": -0.03802799483085597,
+      "radius": 0.0395075156936197
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3939,
+      "height": -0.021887169177182635,
+      "radius": 0.03481040678705066
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3952,
+      "height": -0.0015240104857196335,
+      "radius": 0.052425484588560056
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 3965,
+      "height": 0.004915321222586203,
+      "radius": 0.0477673756642713
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4004,
+      "height": -0.03583479900887992,
+      "radius": 0.02218873031291593
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4017,
+      "height": 0.01043405635648956,
+      "radius": 0.03201301167768014
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4030,
+      "height": -0.027096217409816006,
+      "radius": 0.06690776587049216
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4043,
+      "height": 0.00997869080488612,
+      "radius": 0.06136569438252713
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4056,
+      "height": 0.030631904749857802,
+      "radius": 0.027968465492318427
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4069,
+      "height": -0.0081329143560742,
+      "radius": 0.028364844097635438
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4082,
+      "height": 0.007415495878856728,
+      "radius": 0.046522922153042795
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4095,
+      "height": -0.014806584215567195,
+      "radius": 0.038537605389885786
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4108,
+      "height": 0.01483652736314918,
+      "radius": 0.019461501184524457
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4134,
+      "height": 0.02418054566486349,
+      "radius": 0.035059451183182
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4147,
+      "height": -0.04410396778693258,
+      "radius": 0.049942588828005154
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4160,
+      "height": 0.02032661561808279,
+      "radius": 0.04182926372701434
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4862,
+      "height": -0.015487776977168157,
+      "radius": 0.03560526462198763
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4875,
+      "height": -0.01645052156382348,
+      "radius": 0.035438325494578655
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4888,
+      "height": -0.013039506018392053,
+      "radius": 0.02897295982172688
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4901,
+      "height": -0.026558377620827772,
+      "radius": 0.02742222787439498
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4914,
+      "height": -0.038633482529721236,
+      "radius": 0.03805282796654082
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4927,
+      "height": -0.04463655977402407,
+      "radius": 0.027777581940400576
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4940,
+      "height": 0.009787493866962321,
+      "radius": 0.02744188114251302
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4953,
+      "height": 0.01543151126965308,
+      "radius": 0.03851670482707788
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4966,
+      "height": 0.026594501924041402,
+      "radius": 0.03380417422060262
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4979,
+      "height": -0.006972009737269651,
+      "radius": 0.04074014235501214
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 4992,
+      "height": -0.02958893322055074,
+      "radius": 0.031043949268332798
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5005,
+      "height": -0.038552171080263604,
+      "radius": 0.03816793355885092
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5018,
+      "height": 0.005711041972372743,
+      "radius": 0.03677224817791954
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5031,
+      "height": -0.012816879705014392,
+      "radius": 0.032562226954279516
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5044,
+      "height": -0.04756788433082043,
+      "radius": 0.03637376125357726
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5057,
+      "height": 0.013793926477144487,
+      "radius": 0.03647017118730487
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5070,
+      "height": 0.015195763174498033,
+      "radius": 0.025684907668654205
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5083,
+      "height": 0.009140597525135657,
+      "radius": 0.030686251367836214
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5096,
+      "height": -0.049103715056786214,
+      "radius": 0.037565113817338285
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5109,
+      "height": -0.04997463203130224,
+      "radius": 0.03303845537515154
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5122,
+      "height": 0.04270862985695528,
+      "radius": 0.03993928746399592
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5135,
+      "height": 0.017867201311064587,
+      "radius": 0.05528241026465611
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5148,
+      "height": 0.04296741554970604,
+      "radius": 0.032633287727217526
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5161,
+      "height": 0.055621375666358365,
+      "radius": 0.027655861390081433
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5174,
+      "height": -0.011126549072706103,
+      "radius": 0.052075335613621584
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5200,
+      "height": 0.02074172906254159,
+      "radius": 0.03265270384666836
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5226,
+      "height": -0.0009515339699604694,
+      "radius": 0.046856931100755526
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5291,
+      "height": -0.021978944256857015,
+      "radius": 0.03486900597681122
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5304,
+      "height": -0.04724045752105891,
+      "radius": 0.03299154842088683
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5330,
+      "height": -0.032624833920594794,
+      "radius": 0.04540247765548046
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5343,
+      "height": 0.0056423827368385325,
+      "radius": 0.046005771238509255
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5356,
+      "height": -0.03931705673623103,
+      "radius": 0.05472377775284876
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5369,
+      "height": -0.006938485232803206,
+      "radius": 0.027974348244999194
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5382,
+      "height": -0.05644069771588709,
+      "radius": 0.041279246100986974
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5395,
+      "height": -0.012074322077982147,
+      "radius": 0.04705954954635738
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5408,
+      "height": -0.030107628570629253,
+      "radius": 0.02683300735525186
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5421,
+      "height": -0.011907512873137368,
+      "radius": 0.023009757227211797
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5434,
+      "height": -0.019725491966475894,
+      "radius": 0.048097003380384556
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5447,
+      "height": -0.006927631353391532,
+      "radius": 0.03946022559586305
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5460,
+      "height": -0.03547287711820888,
+      "radius": 0.04265056073727563
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5473,
+      "height": 0.012077054322954344,
+      "radius": 0.027375656599097277
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5499,
+      "height": -0.02389106887563404,
+      "radius": 0.04781898723608794
+    },
+    {
+      "mesh": "female_v006lowresUV005_1",
+      "index": 5538,
+      "height": -0.01981359322967445,
+      "radius": 0.029091918729243126
+    }
+  ]
+}

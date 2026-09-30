@@ -174,6 +174,7 @@ export interface WorkerGripTarget {
   palmDirection?:THREE.Vector3;
   forearmObstacles?:{inverse:THREE.Matrix4;bounds:THREE.Box3}[];
   bodyFrame?:{position:THREE.Vector3;quaternion:THREE.Quaternion};
+  hammerRearWeight?:number;
 }
 export function workerGripTarget(arm:WorkerArm,active=arm.hand.userData.gripRole!=='resting'):WorkerGripTarget {
   const frame=arm.hand.children.find(o=>String(o.userData.gripStyle).startsWith('mixer-'))??arm.hand;
