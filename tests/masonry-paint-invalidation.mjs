@@ -13,6 +13,7 @@ try {
  for(let i=0;i<100;i++)wall.clearPaint(point,.045);
  assert.equal(wall.texture.version,start,'blank canvas triggered redundant uploads');assert.deepEqual(commands,[]);
  wall.aim=()=>({point});wall.samples=new Map();wall.lastCoverage=new Map();wall.lastPaintPoint=null;
+ wall.matrixWorld=new THREE.Matrix4();
  wall.spray({},'A');assert.equal(wall.paintCount,1);assert.equal(wall.texture.version,start+1);assert(commands.some(c=>c[0]==='stroke'));
  commands.length=0;wall.clearPaint(point,.045);
  assert.equal(wall.texture.version,start+2,'painted canvas was not uploaded after erasing');

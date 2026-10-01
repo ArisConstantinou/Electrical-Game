@@ -265,7 +265,20 @@ export class Game {
     this.syncBoxAssembly();
     this.mortar.onRunoff = event => this.roomWater.addRunoff(event);
     this.mortar.onWaterEmission = event => this.roomWater.addEmission(event);
-    this.interaction = new InteractionSystem(new MarkingSystem(this.room.brickWall), this.chasing, this.leveling, this.mortar, this.conduit);
+    this.interaction = new InteractionSystem(new MarkingSystem(this.room.brickWall,
+      () => {
+        const wing = this.room.mansionWing;
+        const walls = [...this.room.referenceWalls, ...(wing?.editableWalls.values() ?? [])];
+        // Authored concrete walls/reveals have asset pivots rather than the
+        // editor-wall kind. Include their real meshes, without editor proxies
+        // or a second registration for the original electrical work wall.
+        for (const asset of wing?.editableAssets.values() ?? []) {
+          if (/\b(?:wall|column|jamb|lintel|pier|retaining)\b/i.test(asset.userData.levelEditorLabel ?? '') &&
+              !asset.children.some(child => child === this.room.brickWall || walls.includes(child))) walls.push(asset);
+        }
+        return walls;
+      },
+      () => this.room.mansionWing?.masonryDemolition.values() ?? []), this.chasing, this.leveling, this.mortar, this.conduit);
     this.interaction.placementSystem=this.boxPlacement;
     this.leveling.placementSystem=this.boxPlacement;
     this.applySpraySettings();
@@ -785,7 +798,8 @@ export class Game {
     else this.fpsRig.poseArms(this.renderer.camera);
     this.audio.setContinuous('hammer',this.started&&!apprenticeOwnedInput&&!blockingWork&&!leveling&&this.selectedTool==='hammer'&&this.input.actionHeld&&this.hammerSpeed>0&&this.fpsRig.contactStatus==='ready');
     if(!['hammer','hose','measure','drill','driver'].includes(this.selectedTool))this.fpsRig.constrainWorkSurfaces(this.renderer.camera,this.workSurfaces.frontForBounds);
-    const waterHit = this.selectedTool === 'spray' || mortarTool ? this.room.brickWall.aim(this.renderer.camera) : null;
+    const waterHit = this.selectedTool === 'spray' ? this.interaction.sprayAim(this.renderer.camera)
+      : mortarTool ? this.room.brickWall.aim(this.renderer.camera) : null;
     const wallAim = Boolean(waterHit);
     const aimedBox=['fitting','level','spring','cutter'].includes(this.selectedTool)?this.boxPlacement.target(this.renderer.camera):null;
     this.boxFitPreview.update(this.renderer.camera,this.boxAssembly.snapshot.modules,this.started&&!this.apprentice.ownsInput&&!mixingOwnedInput&&!this.mixing.interactionTargeted&&this.selectedTool==='fitting'&&this.boxAssemblyActive&&this.fpsRig.fittingBoxAvailable,Boolean(aimedBox),dt,point=>this.fpsRig.canReachPoint(this.renderer.camera,point),false,aimedBox?.boxGroup.position.z??0);
@@ -906,7 +920,7 @@ export class Game {
       mode: !this.started ? 'start' : this.mission.complete ? 'mission-complete' : point?.stage === 'leveling' ? 'leveling' : 'playing',
       player: { crouched:this.player.eyeHeight<1.1, grounded:this.player.grounded, jumpHeightM:Number(this.player.jumpOffset.toFixed(3)), verticalSpeedMps:Number(this.player.verticalVelocity.toFixed(3)), x: Number(this.renderer.camera.position.x.toFixed(3)), y: Number(this.renderer.camera.position.y.toFixed(3)), z: Number(this.renderer.camera.position.z.toFixed(3)), yaw: Number(this.player.yaw.toFixed(3)), pitch: Number(this.player.pitch.toFixed(3)) },
       mission: { boxPreset:this.mission.boxPreset, boxAssembly:this.boxAssembly.snapshot, boxAssemblyActive:this.boxAssemblyActive, name: 'Living Room First Fix', progressPercent: this.mission.progress, selectedTool: this.selectedTool, complete: this.mission.complete },
-      workSurface: { ...this.room.brickWall.telemetry, stanceSideDegrees:this.hammerWorkStance.sideDegrees, stanceCameraOffset:this.hammerWorkStance.offset.toArray(), freeSprayMarks: this.room.brickWall.freeMarkCount, activeFragments: this.chasing.activeFragmentCount, debrisStrikes:this.chasing.debrisStrikeCount, debrisSplits:this.chasing.debrisSplitCount, debrisCrushes:this.chasing.debrisCrushCount, insideFragments: this.chasing.insideFragmentCount, inwardFragments: this.chasing.inwardFragmentCount, physicsMs:this.chasing.lastUpdateMs, peakPhysicsMs:this.chasing.maximumUpdateMs, fragmentBudget:this.chasing.fragmentBudget, chiselTip:{x:this.fpsRig.chiselTipWorld.x,y:this.fpsRig.chiselTipWorld.y,z:this.fpsRig.chiselTipWorld.z,inAir:this.fpsRig.chiselInAir}, airborneFragments: this.chasing.airborneFragmentCount, settledFragments: this.chasing.settledFragmentCount, sprayMode: this.sprayMode, sprayColor: SPRAY_COLORS[this.sprayColorIndex].name, hammerMode: this.hammerMode, chisel: this.room.brickWall.chiselType, chiselEnergyJ: this.room.brickWall.chiselEnergyJ, chiselWidthMm: this.room.brickWall.chiselWidthM*1000, chiselTiltDegrees:this.room.brickWall.chiselTiltDegrees, actualTiltDegrees:this.fpsRig.actualTiltDegrees, chiselSideDegrees:this.room.brickWall.chiselSideDegrees, chiselEdgeDegrees: this.room.brickWall.chiselEdgeAngle*180/Math.PI, aimControlMode:this.aimControlMode, aimInputMode:this.aimInputMode, aimProfile:this.aimProfile, wallAssist:this.wallAssistEnabled, proximityPrecision:Number(this.player.wallAssistAmount.toFixed(3)) },
+      workSurface: { ...this.room.brickWall.telemetry, stanceSideDegrees:this.hammerWorkStance.sideDegrees, stanceCameraOffset:this.hammerWorkStance.offset.toArray(), freeSprayMarks: this.interaction.freeSprayMarks, activeFragments: this.chasing.activeFragmentCount, debrisStrikes:this.chasing.debrisStrikeCount, debrisSplits:this.chasing.debrisSplitCount, debrisCrushes:this.chasing.debrisCrushCount, insideFragments: this.chasing.insideFragmentCount, inwardFragments: this.chasing.inwardFragmentCount, physicsMs:this.chasing.lastUpdateMs, peakPhysicsMs:this.chasing.maximumUpdateMs, fragmentBudget:this.chasing.fragmentBudget, chiselTip:{x:this.fpsRig.chiselTipWorld.x,y:this.fpsRig.chiselTipWorld.y,z:this.fpsRig.chiselTipWorld.z,inAir:this.fpsRig.chiselInAir}, airborneFragments: this.chasing.airborneFragmentCount, settledFragments: this.chasing.settledFragmentCount, sprayMode: this.sprayMode, sprayColor: SPRAY_COLORS[this.sprayColorIndex].name, hammerMode: this.hammerMode, chisel: this.room.brickWall.chiselType, chiselEnergyJ: this.room.brickWall.chiselEnergyJ, chiselWidthMm: this.room.brickWall.chiselWidthM*1000, chiselTiltDegrees:this.room.brickWall.chiselTiltDegrees, actualTiltDegrees:this.fpsRig.actualTiltDegrees, chiselSideDegrees:this.room.brickWall.chiselSideDegrees, chiselEdgeDegrees: this.room.brickWall.chiselEdgeAngle*180/Math.PI, aimControlMode:this.aimControlMode, aimInputMode:this.aimInputMode, aimProfile:this.aimProfile, wallAssist:this.wallAssistEnabled, proximityPrecision:Number(this.player.wallAssistAmount.toFixed(3)) },
       activePoint: point ? { id: point.definition.id, kind: point.definition.kind, bottomHeightM: point.boxGroup.getWorldPosition(new THREE.Vector3()).y-point.boxGroup.groupHeight/2, boxes: point.definition.boxes, stage: point.stage, chaseHits: point.chaseHits, chaseCoverage: Number(this.room.brickWall.getChaseCoverage(point.definition.id).toFixed(3)), pipeStep: point.pipeStep, targeted: this.mission.target(this.renderer.camera) === point, tiltDegrees: Number(point.boxGroup.tiltDegrees.toFixed(2)), depthErrorMm: Number((point.boxGroup.depthError * 1000).toFixed(1)), levelPass: point.boxGroup.isLevel, flushPass: point.boxGroup.isFlush } : null,
       points: this.mission.points.map(item => ({ id: item.definition.id, stage: item.stage, boxes:item.definition.boxes, visible:item.boxGroup.visible, position:item.boxGroup.getWorldPosition(new THREE.Vector3()).toArray(), tiltDegrees:item.boxGroup.tiltDegrees, levelVisible:item.boxGroup.levelBar.visible, conduitVisible: Boolean(item.conduit) })),
     });
@@ -914,6 +928,13 @@ export class Game {
 
   private performAction(continuing = false): void {
     if(this.apprentice.ownsInput){if(this.apprentice.mode==='layout')this.apprentice.confirm();return;}
+    if (this.selectedTool === 'spray') {
+      const result = this.interaction.spray(this.renderer.camera, this.mission.activePoint ?? undefined);
+      if (result.success) this.fpsRig.toolAction = 1;
+      if (result.materialsChanged) this.renderer.invalidateMaterialPreparation();
+      if (result.message) this.hud.notify(result.message, result.success, 700);
+      return;
+    }
     if (this.selectedTool === 'hammer') {
       const masonry = this.hammerMasonryAim();
       if (masonry) {

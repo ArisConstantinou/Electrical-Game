@@ -8,7 +8,7 @@ import type { MortarSystem } from './MortarSystem';
 import type { MarkingSystem } from './MarkingSystem';
 import type { BoxPlacementSystem } from './BoxPlacementSystem';
 
-export interface InteractionResult { success: boolean; message: string }
+export interface InteractionResult { success: boolean; message: string; materialsChanged?: boolean }
 export type HammerMode = 'chase' | 'demolish';
 
 export class InteractionSystem {
@@ -27,15 +27,23 @@ export class InteractionSystem {
     this.marking.color = color;
   }
   endSprayStroke(): void { this.marking.endStroke(); }
+  sprayAim(camera: THREE.Camera): { point: THREE.Vector3 } | null { return this.marking.aim(camera); }
+  get freeSprayMarks(): number { return this.marking.freeMarkCount; }
+  spray(camera: THREE.Camera, point?: InstallationPoint): InteractionResult {
+    const stage = point?.stage;
+    const revision = this.marking.materialRevision;
+    const painted = this.marking.spray(camera, point);
+    return { success: painted, materialsChanged: revision !== this.marking.materialRevision,
+      message: !painted ? 'Aim the spray at a wall.' :
+      stage === 'inspect' && point?.stage === 'marked' ? `Point ${point.definition.id}: free mark started.` : '' };
+  }
   setHammerMode(mode: HammerMode): void { this.hammerMode = mode; }
 
   action(point: InstallationPoint, tool: RigTool, camera: THREE.Camera, continuing = false): InteractionResult {
     if(tool==='fitting'&&this.placementSystem)return this.placementSystem.place(point,camera);
     if(['spring','cutter'].includes(tool)&&point.boxGroup.userData.placement&&!point.boxGroup.userData.placement.secured)return{success:false,message:'The box is loose. Support and secure it with mortar before continuing.'};
     if (tool === 'spray') {
-      const firstMark = point.stage === 'inspect';
-      const painted = this.marking.spray(camera, point);
-      return { success: painted, message: !painted ? 'Aim the spray at brick.' : firstMark ? `Point ${point.definition.id}: free mark started.` : '' };
+      return this.spray(camera, point);
     }
     if (tool === 'hammer') {
       if (this.hammerMode === 'chase') {
