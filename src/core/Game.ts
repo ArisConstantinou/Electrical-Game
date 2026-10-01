@@ -278,7 +278,10 @@ export class Game {
         }
         return walls;
       },
-      () => this.room.mansionWing?.masonryDemolition.values() ?? []), this.chasing, this.leveling, this.mortar, this.conduit);
+      () => this.room.mansionWing?.masonryDemolition.values() ?? [],
+      () => this.renderer.scene.children.filter(object => object !== this.renderer.camera &&
+        object !== this.workerBody && object !== this.fpsRig && !object.userData.transient)),
+      this.chasing, this.leveling, this.mortar, this.conduit);
     this.interaction.placementSystem=this.boxPlacement;
     this.leveling.placementSystem=this.boxPlacement;
     this.applySpraySettings();

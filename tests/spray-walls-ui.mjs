@@ -8,8 +8,10 @@ import { blockPointerLock } from './browser-safety.mjs';
 const dist = process.argv.find(arg => arg.startsWith('--dist='))?.slice(7);
 const expectBug = process.argv.includes('--expect-bug');
 const benchmarkOnly = process.argv.includes('--benchmark-only');
-const label = (expectBug ? 'before' : dist ? 'candidate' : 'live') + (benchmarkOnly ? '-performance' : '');
-const out = path.resolve('output/playwright/spray-all-walls', label);
+const anywhere = process.argv.includes('--anywhere');
+const beforeSurfaces = process.argv.includes('--before-surfaces');
+const label = (expectBug || beforeSurfaces ? 'before' : dist ? 'candidate' : 'live') + (benchmarkOnly ? '-performance' : '');
+const out = path.resolve(`output/playwright/${anywhere ? 'spray-anywhere' : 'spray-all-walls'}`, label);
 await mkdir(out, { recursive: true });
 const report = { label, dist: dist ?? null, url: 'http://127.0.0.1:5365/Electrical-Game/', cases: [], errors: [] };
 const census = () => {
@@ -24,7 +26,7 @@ const rootPid = server.process().pid;
 const browser = await chromium.connect(server.wsEndpoint());
 let owned = [rootPid];
 try {
-  for (const mobile of expectBug || benchmarkOnly ? [false] : [false, true]) {
+  for (const mobile of expectBug || beforeSurfaces || benchmarkOnly ? [false] : [false, true]) {
     const platform = mobile ? 'mobile-emulation' : 'desktop';
     const context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1280, height: 720 },
       isMobile: mobile, hasTouch: mobile });
@@ -46,19 +48,21 @@ try {
     await page.locator('#apprentice-count').selectOption('0');
     await page.locator('#start-button')[mobile ? 'tap' : 'click']();
     await page.waitForFunction(() => Number(getComputedStyle(document.querySelector('#start-screen')).opacity) < .01);
-    await page.evaluate(() => {
+    await page.evaluate(anywhere => {
       const g = window.__wireTheHouse;
       window.__sprayStep = g.step.bind(g); g.step = () => {};
+      if (anywhere) g.player.update = () => {};
       g.mission.activePoint.setStage('inspect');
-    });
+    }, anywhere);
     const step = async n => page.evaluate(n => { for (let i = 0; i < n; i++) window.__sprayStep(1 / 60, 1 / 60, false); }, n);
     const aim = async (eye, target) => page.evaluate(({ eye, target }) => {
       const g = window.__wireTheHouse, c = g.renderer.camera;
       c.position.fromArray(eye); c.lookAt(...target);
       g.player.yaw = c.rotation.y; g.player.pitch = c.rotation.x;
       c.updateWorldMatrix(true, false); g.actionCooldown = 0;
+      const spray = g.interaction.sprayAim?.(c);
       return { original: Boolean(g.room.brickWall.aim(c)), mansion: g.room.mansionWing.aimMasonry(c)?.wall.group.name ?? null,
-        sprayAim: Boolean(g.interaction.sprayAim?.(c)) };
+        sprayAim: Boolean(spray), surface: spray?.object.name ?? null };
     }, { eye, target });
     const snapshot = async () => page.evaluate(() => {
       const g = window.__wireTheHouse, marks = [];
@@ -89,8 +93,155 @@ try {
       await step(1);
       await page.evaluate(async () => { const r = window.__wireTheHouse.renderer; await r.waitForFrame(); r.render(); await r.waitForFrame(); });
     };
+    const stroke = async (eye, targets) => {
+      let tap, cdp;
+      if (mobile) {
+        const box = await page.locator('#look-joystick').boundingBox(); cdp = await context.newCDPSession(page);
+        tap = async () => {
+          await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: box.x + box.width / 2, y: box.y + box.height / 2, id: 11 }] });
+          await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        };
+        await tap();
+      } else await page.mouse.down();
+      for (const target of targets) { await aim(eye, target); await step(1); }
+      if (mobile) { await tap(); await cdp.detach(); } else await page.mouse.up();
+      await step(1);
+    };
     if (mobile) assert.equal(await page.evaluate(() => window.__wireTheHouse.selectedTool), 'spray');
     else await page.keyboard.press('Digit3');
+    if (anywhere) {
+      const surfaces = [
+        { name: 'floor', eye: [0, 1.68, -.4], target: [0, 0, -1.4] },
+        { name: 'ceiling', eye: [0, 1.68, .5], target: [0, 3, -.5] },
+        { name: 'column', eye: [2.72, 1.68, -1.2], target: [2.72, 1.68, -2.5] },
+        { name: 'olive-trunk', eye: [-5.35, .8, 2.8], target: [-6.35, .8, 2.8] },
+      ];
+      // The scanned court tree intentionally disables gameplay raycasts.
+      const court = await page.evaluate(() => {
+        const g = window.__wireTheHouse, trunk = g.room.getObjectByName('courtyard_tree_trunk');
+        if (!trunk) throw new Error('Scanned court tree not ready');
+        trunk.updateWorldMatrix(true, false);
+        const tree = g.room.getObjectByName('Existing olive tree retained in open mansion court');
+        const wanted = tree.getWorldPosition(g.renderer.camera.position.clone()); wanted.y += 1.4;
+        const geometry = trunk.geometry, index = geometry.index, p = geometry.getAttribute('position');
+        const a = wanted.clone(), b = wanted.clone(), c = wanted.clone(); let best = Infinity, target, normal;
+        for (let i = 0; i < (index?.count ?? p.count); i += 3) {
+          a.fromBufferAttribute(p, index ? index.getX(i) : i).applyMatrix4(trunk.matrixWorld);
+          b.fromBufferAttribute(p, index ? index.getX(i + 1) : i + 1).applyMatrix4(trunk.matrixWorld);
+          c.fromBufferAttribute(p, index ? index.getX(i + 2) : i + 2).applyMatrix4(trunk.matrixWorld);
+          const centre = a.clone().add(b).add(c).multiplyScalar(1 / 3), score = centre.distanceToSquared(wanted);
+          if (score < best) { best = score; target = centre; normal = b.clone().sub(a).cross(c.clone().sub(a)).normalize(); }
+        }
+        return { name: 'scanned-trunk', eye: target.clone().addScaledVector(normal, 1).toArray(), target: target.toArray() };
+      });
+      surfaces.push(court);
+      for (const surface of surfaces) {
+        const selected = await aim(surface.eye, surface.target), b = await snapshot(); await hold();
+        const axis = ['floor', 'ceiling'].includes(surface.name) ? 0 : 1;
+        const targets = Array.from({ length: 13 }, (_, i) => { const target = [...surface.target]; target[axis] += -.15 + i * .025; return target; });
+        await stroke(surface.eye, targets);
+        await aim(surface.eye, surface.target);
+        const frames = await page.evaluate(async () => {
+          const g = window.__wireTheHouse, r = g.renderer, times = [];
+          let previous = performance.now(); const calls = r.gpu.info.calls;
+          for (let i = 0; i < 32; i++) {
+            await r.waitForFrame(); await new Promise(requestAnimationFrame);
+            const now = performance.now(); if (i >= 8) times.push(now - previous); previous = now;
+            window.__sprayStep(1 / 60, 1 / 60, true); await r.waitForFrame();
+          }
+          const fps = 1000 / (times.reduce((a, b) => a + b) / times.length); times.sort((a, b) => a - b);
+          g.hud.updateFps(fps); r.render(); await r.waitForFrame();
+          return { fps, p95Ms: times[Math.floor(times.length * .95)], maxMs: times.at(-1), renderCalls: r.gpu.info.calls - calls };
+        });
+        assert(frames.renderCalls >= 32, 'Surface capture did not render actual frames');
+        const a = await snapshot();
+        await page.screenshot({ path: path.join(out, `${platform}-${surface.name}.png`) });
+        const painted = a.total > b.total;
+        report.cases.push({ platform, name: surface.name, selected, painted, frames, marks: a.marks.filter(m => !b.marks.some(old => old.wall === m.wall && old.vertices === m.vertices)) });
+        if (beforeSurfaces && surface.name !== 'column') assert.equal(painted, false, `${surface.name}: baseline already paints`);
+        else assert(painted, `${surface.name}: held input did not paint`);
+        if (!beforeSurfaces) assert(selected.sprayAim, `${surface.name}: initial crosshair missed`);
+      }
+      // A real equipment model in front of a wall must receive the paint.
+      // Reuse its authored geometry; no invisible picking box stands in for it.
+      await page.evaluate(() => {
+        const g = window.__wireTheHouse, bucket = g.mixing.models.bucket.clone(true);
+        bucket.name = 'Spray test equipment bucket'; bucket.visible = true;
+        bucket.position.set(3.05, 1.1, 0); bucket.rotation.set(0, 0, 0); bucket.scale.setScalar(1);
+        g.renderer.scene.add(bucket); window.__sprayBucket = bucket;
+      });
+      await aim([2.35, 1.35, 0], [3.9, 1.35, 0]);
+      const bucketBefore = await snapshot(); await hold(); const bucketAfter = await snapshot();
+      const bucketVertices = await page.evaluate(() => {
+        let count = 0; window.__sprayBucket.traverse(o => { if (o.userData.sprayPaint) count += o.geometry.drawRange.count; });
+        return count;
+      });
+      if (beforeSurfaces) assert.equal(bucketVertices, 0, 'Baseline already paints equipment');
+      else {
+        assert(bucketVertices > 0, 'Closest equipment surface was not painted');
+        assert.deepEqual(bucketAfter.marks, bucketBefore.marks, 'Spray passed through equipment and painted the wall behind it');
+      }
+      report.cases.push({ platform, name: 'equipment-occludes-wall', bucketVertices });
+      if (!beforeSurfaces) {
+        await page.evaluate(() => {
+          const bucket = window.__sprayBucket;
+          bucket.position.z = .6; bucket.rotation.y = .5; bucket.scale.set(1.2, .8, 1.1);
+        });
+        await aim([2.35, 1.35, .6], [3.9, 1.35, .6]); await hold();
+        const moved = await page.evaluate(() => {
+          const bucket = window.__sprayBucket; bucket.updateWorldMatrix(true, true);
+          let count = 0, attached = true;
+          bucket.traverse(o => { if (o.userData.sprayPaint) { count += o.geometry.drawRange.count; attached &&= o.matrixWorld.equals(o.parent.matrixWorld); } });
+          return { count, attached };
+        });
+        assert(moved.count > bucketVertices && moved.attached, 'Moved/scaled equipment lost its target or detached its paint');
+        assert.deepEqual((await snapshot()).marks, bucketBefore.marks, 'Moving equipment exposed the wall to spray');
+        report.cases.push({ platform, name: 'equipment-transform', ...moved });
+      }
+      await page.screenshot({ path: path.join(out, `${platform}-equipment.png`) });
+      await page.evaluate(() => {
+        window.__sprayBucket.traverse(o => { if (o.userData.sprayPaint) { o.geometry.dispose(); o.material.dispose(); } });
+        window.__sprayBucket.removeFromParent();
+      });
+      await aim([2.7, 1.68, 0], [3.9, 1.68, -.6]);
+      // Move once per action tick: this reproduces the elongated, pinched dabs.
+      await stroke([2.7, 1.68, 0], Array.from({ length: 13 }, (_, i) => [3.9, 1.68, -.6 + i * .1]));
+      await page.evaluate(async () => { const r = window.__wireTheHouse.renderer; await r.waitForFrame(); r.render(); await r.waitForFrame(); });
+      await page.screenshot({ path: path.join(out, `${platform}-continuous-line.png`) });
+      if (!mobile) {
+        const png = (await readFile(path.join(out, `${platform}-continuous-line.png`))).toString('base64');
+        const width = await page.evaluate(async png => {
+          const img = new Image(); img.src = `data:image/png;base64,${png}`; await img.decode();
+          const canvas = document.createElement('canvas'); canvas.width = img.width; canvas.height = img.height;
+          const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0);
+          const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data, widths = [], metres = [];
+          const camera = window.__wireTheHouse.renderer.camera;
+          const onWall = (x, y) => {
+            const direction = camera.position.clone().set(x / canvas.width * 2 - 1, 1 - y / canvas.height * 2, .5)
+              .unproject(camera).sub(camera.position).normalize();
+            return camera.position.clone().addScaledVector(direction, (3.91 - camera.position.x) / direction.x);
+          };
+          for (let x = 20; x < 580; x++) {
+            let blue = 0;
+            for (let y = 344; y < 372; y++) {
+              const i = (y * canvas.width + x) * 4;
+              if (pixels[i + 2] > pixels[i] + 60 && pixels[i + 2] > pixels[i + 1] + 25) blue++;
+            }
+            widths.push(blue);
+            metres.push(blue * onWall(x, 360).distanceTo(onWall(x, 361)));
+          }
+          widths.sort((a, b) => a - b);
+          metres.sort((a, b) => a - b);
+          return { p10: widths[Math.floor(widths.length * .1)], p90: widths[Math.floor(widths.length * .9)],
+            metresP10: metres[Math.floor(metres.length * .1)], metresP90: metres[Math.floor(metres.length * .9)],
+            gaps: widths.filter(n => !n).length };
+        }, png);
+        report.cases.push({ platform, name: 'continuous-line', width });
+        if (beforeSurfaces) assert(width.metresP10 < width.metresP90 * .7, 'Before fixture did not reproduce the pinched stroke');
+        else assert(width.gaps === 0 && width.metresP10 >= width.metresP90 * .8, 'Continuous line has gaps or pinched oval joins');
+      } else report.cases.push({ platform, name: 'continuous-line' });
+      if (beforeSurfaces) { await context.close(); continue; }
+    }
     // Same camera, viewport, tool and held-use sequence for the reported bug.
     const rightAim = await aim([2.7, 1.68, 0], [3.9, 1.68, 0]);
     const before = await snapshot(); await hold(); const after = await snapshot();

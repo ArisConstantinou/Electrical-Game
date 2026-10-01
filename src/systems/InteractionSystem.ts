@@ -34,7 +34,7 @@ export class InteractionSystem {
     const revision = this.marking.materialRevision;
     const painted = this.marking.spray(camera, point);
     return { success: painted, materialsChanged: revision !== this.marking.materialRevision,
-      message: !painted ? 'Aim the spray at a wall.' :
+      message: !painted ? 'Aim the spray at a surface.' :
       stage === 'inspect' && point?.stage === 'marked' ? `Point ${point.definition.id}: free mark started.` : '' };
   }
   setHammerMode(mode: HammerMode): void { this.hammerMode = mode; }
