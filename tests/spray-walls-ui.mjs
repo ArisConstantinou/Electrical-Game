@@ -8,6 +8,8 @@ import { blockPointerLock } from './browser-safety.mjs';
 const dist = process.argv.find(arg => arg.startsWith('--dist='))?.slice(7);
 const expectBug = process.argv.includes('--expect-bug');
 const benchmarkOnly = process.argv.includes('--benchmark-only');
+const compareSurfaceCost = process.argv.includes('--compare-surface-cost');
+const profileAim = process.argv.includes('--profile-aim');
 const anywhere = process.argv.includes('--anywhere');
 const beforeSurfaces = process.argv.includes('--before-surfaces');
 const label = (expectBug || beforeSurfaces ? 'before' : dist ? 'candidate' : 'live') + (benchmarkOnly ? '-performance' : '');
@@ -107,6 +109,22 @@ try {
       if (mobile) { await tap(); await cdp.detach(); } else await page.mouse.up();
       await step(1);
     };
+    const sampleFrames = async () => {
+      const frames = await page.evaluate(async () => {
+        const g = window.__wireTheHouse, r = g.renderer, times = [];
+        let previous = performance.now(); const calls = r.gpu.info.calls;
+        for (let i = 0; i < 32; i++) {
+          await r.waitForFrame(); await new Promise(requestAnimationFrame);
+          const now = performance.now(); if (i >= 8) times.push(now - previous); previous = now;
+          window.__sprayStep(1 / 60, 1 / 60, true); await r.waitForFrame();
+        }
+        const fps = 1000 / (times.reduce((a, b) => a + b) / times.length); times.sort((a, b) => a - b);
+        g.hud.updateFps(fps); r.render(); await r.waitForFrame();
+        return { fps, p95Ms: times[Math.floor(times.length * .95)], maxMs: times.at(-1), renderCalls: r.gpu.info.calls - calls };
+      });
+      assert(frames.renderCalls >= 32, 'Surface capture did not render actual frames');
+      return frames;
+    };
     if (mobile) assert.equal(await page.evaluate(() => window.__wireTheHouse.selectedTool), 'spray');
     else await page.keyboard.press('Digit3');
     if (anywhere) {
@@ -141,19 +159,7 @@ try {
         const targets = Array.from({ length: 13 }, (_, i) => { const target = [...surface.target]; target[axis] += -.15 + i * .025; return target; });
         await stroke(surface.eye, targets);
         await aim(surface.eye, surface.target);
-        const frames = await page.evaluate(async () => {
-          const g = window.__wireTheHouse, r = g.renderer, times = [];
-          let previous = performance.now(); const calls = r.gpu.info.calls;
-          for (let i = 0; i < 32; i++) {
-            await r.waitForFrame(); await new Promise(requestAnimationFrame);
-            const now = performance.now(); if (i >= 8) times.push(now - previous); previous = now;
-            window.__sprayStep(1 / 60, 1 / 60, true); await r.waitForFrame();
-          }
-          const fps = 1000 / (times.reduce((a, b) => a + b) / times.length); times.sort((a, b) => a - b);
-          g.hud.updateFps(fps); r.render(); await r.waitForFrame();
-          return { fps, p95Ms: times[Math.floor(times.length * .95)], maxMs: times.at(-1), renderCalls: r.gpu.info.calls - calls };
-        });
-        assert(frames.renderCalls >= 32, 'Surface capture did not render actual frames');
+        const frames = await sampleFrames();
         const a = await snapshot();
         await page.screenshot({ path: path.join(out, `${platform}-${surface.name}.png`) });
         const painted = a.total > b.total;
@@ -198,6 +204,7 @@ try {
         assert.deepEqual((await snapshot()).marks, bucketBefore.marks, 'Moving equipment exposed the wall to spray');
         report.cases.push({ platform, name: 'equipment-transform', ...moved });
       }
+      await sampleFrames();
       await page.screenshot({ path: path.join(out, `${platform}-equipment.png`) });
       await page.evaluate(() => {
         window.__sprayBucket.traverse(o => { if (o.userData.sprayPaint) { o.geometry.dispose(); o.material.dispose(); } });
@@ -206,7 +213,7 @@ try {
       await aim([2.7, 1.68, 0], [3.9, 1.68, -.6]);
       // Move once per action tick: this reproduces the elongated, pinched dabs.
       await stroke([2.7, 1.68, 0], Array.from({ length: 13 }, (_, i) => [3.9, 1.68, -.6 + i * .1]));
-      await page.evaluate(async () => { const r = window.__wireTheHouse.renderer; await r.waitForFrame(); r.render(); await r.waitForFrame(); });
+      const lineFrames = await sampleFrames();
       await page.screenshot({ path: path.join(out, `${platform}-continuous-line.png`) });
       if (!mobile) {
         const png = (await readFile(path.join(out, `${platform}-continuous-line.png`))).toString('base64');
@@ -236,10 +243,10 @@ try {
             metresP10: metres[Math.floor(metres.length * .1)], metresP90: metres[Math.floor(metres.length * .9)],
             gaps: widths.filter(n => !n).length };
         }, png);
-        report.cases.push({ platform, name: 'continuous-line', width });
+        report.cases.push({ platform, name: 'continuous-line', width, frames: lineFrames });
         if (beforeSurfaces) assert(width.metresP10 < width.metresP90 * .7, 'Before fixture did not reproduce the pinched stroke');
         else assert(width.gaps === 0 && width.metresP10 >= width.metresP90 * .8, 'Continuous line has gaps or pinched oval joins');
-      } else report.cases.push({ platform, name: 'continuous-line' });
+      } else report.cases.push({ platform, name: 'continuous-line', frames: lineFrames });
       if (beforeSurfaces) { await context.close(); continue; }
     }
     // Same camera, viewport, tool and held-use sequence for the reported bug.
@@ -360,6 +367,41 @@ try {
         const start = performance.now(); for (let i = 0; i < 100; i++) g.interaction.sprayAim(g.renderer.camera);
         return (performance.now() - start) / 100;
       }) : null;
+      if (profileAim) {
+        const profiler = await context.newCDPSession(page);
+        await profiler.send('Profiler.enable');
+        await profiler.send('Profiler.setSamplingInterval', { interval: 100 });
+        await profiler.send('Profiler.start');
+        await page.evaluate(() => { const g = window.__wireTheHouse;
+          for (let i = 0; i < 1000; i++) g.interaction.sprayAim(g.renderer.camera); });
+        const { profile } = await profiler.send('Profiler.stop');
+        await writeFile(path.join(out, 'aim-profile.json'), JSON.stringify(profile));
+        console.log(JSON.stringify({ profile: profile.nodes.filter(n => n.hitCount).sort((a,b) => b.hitCount-a.hitCount)
+          .slice(0, 25).map(n => ({ name: n.callFrame.functionName, line: n.callFrame.lineNumber, count: n.hitCount, url: n.callFrame.url })) }));
+        await profiler.detach();
+        report.rayCosts = await page.evaluate(() => {
+          const g = window.__wireTheHouse, names = new Map(); let sample;
+          g.renderer.scene.traverse(o => { if (o.isMesh) {
+            names.set(o.geometry.getAttribute('position'), o.name || o.parent?.name);
+            if (!o.isInstancedMesh && !o.isSkinnedMesh && !sample) sample = o;
+          } });
+          let prototype = Object.getPrototypeOf(sample);
+          while (!Object.hasOwn(prototype, 'raycast')) prototype = Object.getPrototypeOf(prototype);
+          const original = prototype.raycast, costs = new Map();
+          prototype.raycast = function (...args) {
+            const name = names.get(this.geometry.getAttribute('position')) ?? this.name;
+            const saved = costs.get(name) ?? { name, calls: 0, milliseconds: 0, triangles: 0 };
+            const start = performance.now(); const result = original.apply(this, args);
+            saved.calls++; saved.milliseconds += performance.now() - start;
+            saved.triangles += (this.geometry.index?.count ?? this.geometry.getAttribute('position').count) / 3;
+            costs.set(name, saved); return result;
+          };
+          try { for (let i = 0; i < 100; i++) g.interaction.sprayAim(g.renderer.camera); }
+          finally { prototype.raycast = original; }
+          return [...costs.values()].sort((a,b) => b.milliseconds-a.milliseconds).slice(0, 12);
+        });
+        console.log(JSON.stringify({ rayCosts: report.rayCosts }));
+      }
       const performanceCase = async held => {
         if (held) await page.mouse.down();
         const result = await page.evaluate(async () => {
@@ -383,6 +425,19 @@ try {
         if (held) await page.mouse.up(); return result;
       };
       report.performance = { idle: await performanceCase(false), spraying: await performanceCase(true) };
+      if (compareSurfaceCost) {
+        // Same browser, scene and paint batch: isolate the additional world
+        // query from workstation load and development/build differences.
+        await page.evaluate(() => {
+          const marking = window.__wireTheHouse.interaction.marking;
+          window.__sprayWorldSurfaces = marking.surfaces; marking.surfaces = () => [];
+        });
+        try { report.surfaceCost = { withoutWorldQuery: await performanceCase(true) }; }
+        finally { await page.evaluate(() => {
+          window.__wireTheHouse.interaction.marking.surfaces = window.__sprayWorldSurfaces;
+        }); }
+        report.surfaceCost.withWorldQuery = await performanceCase(true);
+      }
       const batches = (await snapshot()).marks.filter(m => m.wall === rightAim.mansion);
       if (!expectBug) assert.equal(batches.length, 1, 'Spray allocated a new draw-call batch on every dab');
       assert.equal(report.performance.spraying.graphics.graphicsFault, false);
@@ -417,4 +472,4 @@ try {
   await writeFile(path.join(out, 'report.json'), JSON.stringify(report, null, 2));
   assert.deepEqual(report.browser.remaining, [], 'QA Chrome processes leaked');
 }
-console.log(JSON.stringify({ passed: report.passed, label, cases: report.cases.length, gpu: report.gpu, aimMs: report.aimMs, performance: report.performance, report: path.join(out, 'report.json') }));
+console.log(JSON.stringify({ passed: report.passed, label, cases: report.cases.length, gpu: report.gpu, aimMs: report.aimMs, performance: report.performance, surfaceCost: report.surfaceCost, report: path.join(out, 'report.json') }));

@@ -44,25 +44,11 @@ export class MarkingSystem {
       if (hit) consider({ object: wall.group, point: hit.point, normal: wall.workPlane(eye).normal });
     }
     const registered = this.walls();
+    const registeredSurfaces: THREE.Object3D[] = [];
     for (const wall of registered) {
       if (wall instanceof BrickWall) { brickWalls.add(wall); continue; }
       if (masonryGroups.has(wall) || !sprayVisible(wall)) continue;
-      wall.updateWorldMatrix(true, true);
-      for (const hit of this.raycaster.intersectObject(wall, true)) {
-        if (hit.distance > distance) break;
-        if (!hit.face || !sprayVisible(hit.object) || hit.object.userData.levelEditorPickProxy) continue;
-        const mesh = hit.object as THREE.Mesh;
-        const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-        if (!materials?.some(material => material?.visible)) continue;
-        const matrix = hit.object.matrixWorld.clone();
-        if (mesh instanceof THREE.InstancedMesh && hit.instanceId !== undefined) {
-          const instance = new THREE.Matrix4(); mesh.getMatrixAt(hit.instanceId, instance); matrix.multiply(instance);
-        }
-        const normal = hit.face.normal.clone().applyNormalMatrix(new THREE.Matrix3().getNormalMatrix(matrix));
-        if (normal.dot(direction) > 0) normal.negate();
-        consider({ object: wall, point: hit.point, normal });
-        break;
-      }
+      registeredSurfaces.push(wall);
     }
     for (const wall of brickWalls) {
       if (!sprayVisible(wall)) continue;
@@ -73,12 +59,15 @@ export class MarkingSystem {
     // Preserve the custom volume queries above: their deleted bricks and
     // cavities must not be replaced by hits on hidden backing triangles.
     const excluded = new Set<THREE.Object3D>([...registered, ...brickWalls, ...masonryGroups]);
-    const visit = (object: THREE.Object3D): void => {
-      if (!object.visible || object.userData.levelEditorDeleted || excluded.has(object) ||
+    const visit = (object: THREE.Object3D, owner?: THREE.Object3D): void => {
+      if (!object.visible || object.userData.levelEditorDeleted || excluded.has(object) && object !== owner ||
           object.userData.sprayPaint || object.userData.levelEditorPickProxy || object.userData.transient ||
           // Distant masonry render copies are already owned by the volume
           // queries above and contain thousands of unrelated wall instances.
           object instanceof THREE.InstancedMesh && object.userData.editorIgnore) return;
+      // Update each visible node once, in parent order. Updating whole roots
+      // also walked every hidden floor and already-queried masonry subtree.
+      object.updateWorldMatrix(false, false);
       if (object instanceof THREE.Mesh) {
         const materials = Array.isArray(object.material) ? object.material : [object.material];
         if (materials.some(m => m.visible && m.opacity > 0 && m.depthTest)) {
@@ -130,17 +119,23 @@ export class MarkingSystem {
               }
               const normal = (hit.normal ?? hit.face.normal).clone().applyNormalMatrix(new THREE.Matrix3().getNormalMatrix(matrix));
               if (normal.dot(direction) > 0) normal.negate();
-              consider({ object, point: hit.point, normal, instanceId: hit.instanceId });
+              consider({ object: owner ?? object, point: hit.point, normal,
+                instanceId: owner && owner !== object ? undefined : hit.instanceId });
               break;
             }
           }
         }
       }
-      for (const child of object.children) visit(child);
+      for (const child of object.children) visit(child, owner);
     };
+    // Registered structural groups use the same bounded triangle query as
+    // world surfaces, while keeping their existing shared paint owner.
+    for (const wall of registeredSurfaces) {
+      wall.updateWorldMatrix(true, false); visit(wall, wall);
+    }
     for (const root of this.surfaces()) {
       if (!sprayVisible(root)) continue;
-      root.updateWorldMatrix(true, true); visit(root);
+      root.updateWorldMatrix(true, false); visit(root);
     }
     return target;
   }
