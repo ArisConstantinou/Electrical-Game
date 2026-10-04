@@ -5,7 +5,7 @@ import './styles/start-menu.css';
 import './studio/webGameStudioAdapter';
 import { Game } from './core/Game';
 import './styles/worksite-theme.css';
-import { StartupAssetError } from './core/StartupAsset';
+import { showStartupFailure } from './core/StartupAsset';
 
 const root = document.querySelector<HTMLElement>('#app');
 if (!root) throw new Error('Application root not found');
@@ -31,31 +31,7 @@ function startGame(root: HTMLElement): void {
       const steps = Math.max(1, Math.round(ms / (1000 / 60)));
       for (let index = 0; index < steps; index += 1) game.step(1 / 60);
     };
-  }).catch(error => {
-    console.error('Site preparation failed', error);
-    const button = document.querySelector<HTMLButtonElement>('#start-button');
-    const label = document.querySelector<HTMLElement>('#start-button-label');
-    const progress = document.querySelector<HTMLOutputElement>('#start-load-percent');
-    if (!button || !label || !progress) return;
-    button.disabled = false;
-    button.dataset.preparing = 'false';
-    button.dataset.failed = 'true';
-    button.setAttribute('aria-label', 'Retry loading');
-    label.textContent = 'RETRY LOADING';
-    progress.value = 'LOAD FAILED';
-    progress.setAttribute('aria-label', 'Loading failed. Tap to retry');
-    const detail = document.querySelector<HTMLElement>('#start-load-error');
-    if (detail) {
-      detail.hidden = false;
-      detail.textContent = error instanceof StartupAssetError
-        ? `${error.assetLabel} could not load. Check your connection and tap Retry loading.`
-        : 'Site preparation failed. Tap Retry loading to try again.';
-    }
-    button.addEventListener('click', event => {
-      event.stopImmediatePropagation();
-      location.reload();
-    }, { capture: true, once: true });
-  });
+  }).catch(showStartupFailure);
   document.querySelector('#start-performance-test')?.addEventListener('click', () => {
     const url = new URL(import.meta.env.BASE_URL, location.origin);
     for (const key of ['renderer', 'v']) {

@@ -14,6 +14,7 @@ import { MAX_WRIST_REACH_M,type WorkerGripTarget } from '../player/WorkerArm';
 import {ApprenticePipeBatch,APPRENTICE_PIPE_LENGTH_M,APPRENTICE_PIPE_TARGET,type ApprenticePipeKind} from './ApprenticePipeBatch';
 import {ApprenticePipeYard} from './ApprenticePipeYard';
 import {ApprenticeCrewMate} from './ApprenticeCrewMate';
+import { showStartupFailure } from '../core/StartupAsset';
 import electricalDrawingUrl from '../../artifacts/site-pro-04/mansion-concept/electrical-workroom.svg?url';
 import groundFloorDrawingUrl from '../../artifacts/site-pro-04/mansion-concept/ground-floor.svg?url';
 import buildingSectionDrawingUrl from '../../artifacts/site-pro-04/mansion-concept/building-section.svg?url';
@@ -147,6 +148,7 @@ export class ApprenticeSystem {
   private pipeJob:PipeJob|null=null;
   private readonly crew:ApprenticeCrewMate[]=[];
   crewReady:Promise<void>=Promise.resolve();
+  private crewPreparationGeneration=0;
   private readonly pipeCutTarget=new THREE.Vector3();
   private message='Έτοιμος για οδηγίες';
   private readonly yellow=new THREE.MeshBasicMaterial({color:0xffdc35,transparent:true,opacity:.72,depthWrite:false});
@@ -255,22 +257,35 @@ export class ApprenticeSystem {
   }
   get ownsInput():boolean{return this.mode!=='off';}
   private async prepareCrew(count:number):Promise<void>{
+    const generation=++this.crewPreparationGeneration;
     this.count=count;
     const start=document.querySelector<HTMLButtonElement>('#start-button')!;
-    if(count>this.crew.length+1){
-      start.disabled=true;start.textContent='PREPARING APPRENTICES…';
-      for(let index=this.crew.length+2;index<=count;index++){
-        const worker=new ApprenticeCrewMate(this.game,index,this.pipeBatch,this.pipeYard);
-        const start=this.editorStartOverrides.get(index);
-        if(start)worker.camera.position.copy(start);
-        const yaw=this.editorStartYawOverrides.get(index);
-        if(yaw!==undefined)worker.camera.rotation.y=yaw;
-        this.crew.push(worker);
+    const label=document.querySelector<HTMLElement>('#start-button-label')!;
+    try {
+      if(count>this.crew.length+1){
+        if(start.dataset.failed!=='true'){
+          start.disabled=true;label.textContent='PREPARING APPRENTICES…';
+        }
+        for(let index=this.crew.length+2;index<=count;index++){
+          const worker=new ApprenticeCrewMate(this.game,index,this.pipeBatch,this.pipeYard);
+          const start=this.editorStartOverrides.get(index);
+          if(start)worker.camera.position.copy(start);
+          const yaw=this.editorStartYawOverrides.get(index);
+          if(yaw!==undefined)worker.camera.rotation.y=yaw;
+          this.crew.push(worker);
+        }
       }
+      this.crewReady=Promise.all(this.crew.slice(0,Math.max(0,count-1)).map(worker=>worker.ready)).then(()=>{});
+      void this.crewReady.catch(()=>{});
+      await this.crewReady;
+      if(generation===this.crewPreparationGeneration&&this.game.isReadyForStart&&start.dataset.failed!=='true'){
+        start.disabled=false;label.textContent='READY';start.setAttribute('aria-label','Ready. Start work');
+      }
+    } catch(error) {
+      if(generation!==this.crewPreparationGeneration)return;
+      this.crewReady=Promise.reject(error);void this.crewReady.catch(()=>{});
+      showStartupFailure(error);
     }
-    this.crewReady=Promise.all(this.crew.slice(0,Math.max(0,count-1)).map(worker=>worker.ready)).then(()=>{});
-    await this.crewReady;
-    if(this.game.isReadyForStart){start.disabled=false;start.textContent='START';}
   }
   collisionObstacles(){return !this.game.started||this.count===0?[]:[{id:'apprentice-1',minX:this.camera.position.x-.18,maxX:this.camera.position.x+.18,minZ:this.camera.position.z-.08,maxZ:this.camera.position.z+.28},...this.crew.slice(0,this.count-1).map(worker=>worker.obstacle)];}
   get bareHands():boolean{return this.mode==='point'||this.mode==='pipe-choice'||this.mode==='plan';}

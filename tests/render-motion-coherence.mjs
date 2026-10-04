@@ -10,17 +10,21 @@ const report={base,method:'Native A/D and touch movement on the live RAF loop. A
 try{for(const mobile of [false,true]){
  const context=await browser.newContext({viewport:mobile?{width:390,height:844}:{width:1366,height:768},isMobile:mobile,hasTouch:mobile});await blockPointerLock(context);
  const page=await context.newPage();page.on('pageerror',e=>report.errors.push(e.message));
- await page.goto(base+(mobile?'?renderer=webgl':''));await page.waitForFunction(()=>window.__wireTheHouse?.roomWater.waterProActive);
+ await page.goto(base+(mobile?'?renderer=webgl':''));await page.waitForFunction(()=>window.__wireTheHouse?.isReadyForStart);
  await page.locator('#start-button')[mobile?'tap':'click']();
+ // Water Pro is loaded lazily by gameplay when a real puddle becomes visible.
+ await page.evaluate(()=>{const g=window.__wireTheHouse;g.roomWater.addFloorWater(0,0,12);g.roomWater.rebuildGeometry();});
+ await page.waitForFunction(()=>window.__wireTheHouse.roomWater.waterProActive,undefined,{timeout:90000});
  await page.evaluate(async()=>{
   const g=window.__wireTheHouse,r=g.renderer,c=r.camera;await r.waitForFrame();
-  // Exercise real optical passes: dry floors intentionally skip Water Pro.
-  g.roomWater.addFloorWater(0,0,12);g.roomWater.rebuildGeometry();
-  c.position.set(-.7,1.65,-1.5);c.lookAt(-.7,1.3,g.room.brickWall.volume.frontZ);g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;g.selectTool('hammer');
-  const audit=window.__motionAudit={frames:0,pendingLooks:0,maxPositionError:0,maxAngleError:0,maxPassPositionError:0,maxPassAngleError:0,simulationSeconds:0,waterSeconds:0,catchupSteps:0};
+  // Open floor with the real puddle in view, rather than an occupied wall bay
+  // that also leaves the optical water behind the camera.
+  c.position.set(0,1.65,1.7);c.lookAt(0,0,0);g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;g.selectTool('hammer');
+  const audit=window.__motionAudit={frames:0,opticalFrames:0,pendingLooks:0,maxPositionError:0,maxAngleError:0,maxPassPositionError:0,maxPassAngleError:0,simulationSeconds:0,waterSeconds:0,catchupSteps:0};
   const step=g.step.bind(g);g.step=(dt,waterDt=dt,present=true)=>{audit.simulationSeconds+=dt;audit.waterSeconds+=waterDt;if(!present)audit.catchupSteps++;return step(dt,waterDt,present);};
   const update=r.water.update.bind(r.water);let n=0;
   r.water.update=async dt=>{
+   audit.opticalFrames++;
    const position=c.position.clone(),rotation=c.quaternion.clone();
    if((n++%2)===0)await new Promise(resolve=>setTimeout(resolve,100));
    audit.maxPassPositionError=Math.max(audit.maxPassPositionError,c.position.distanceTo(position));
@@ -50,11 +54,14 @@ try{for(const mobile of [false,true]){
  // deliberately stalled optical workload on every backend/device.
  await page.waitForFunction(()=>window.__motionAudit.frames>=12,undefined,{timeout:15000});
  const state=await page.evaluate(()=>({audit:window.__motionAudit,x:window.__wireTheHouse.renderer.camera.position.x,error:window.__wireTheHouse.renderer.renderError,pointerLock:!!document.pointerLockElement,backend:window.__wireTheHouse.roomWater.waterProBackend}));
+ report.cases.push({...state,mobile,movedM:state.x-x0});
+ await page.screenshot({path:`${out}/${mobile?'mobile':'desktop'}-moving.png`});
  assert(state.audit.frames>8);assert(state.audit.pendingLooks>0);assert(state.x-x0>.1,'Held lateral movement must survive pending frames');
+ assert(state.audit.opticalFrames>8,'Exercise actual Water Pro passes, not only GPU completion fences');
  assert(state.audit.catchupSteps>0,'Slow frames must catch up physics before presenting');
  assert(Math.abs(state.audit.simulationSeconds-state.audit.waterSeconds)<1e-8,'Slow rendering must not slow movement relative to water');
  for(const key of ['maxPositionError','maxAngleError','maxPassPositionError','maxPassAngleError'])assert(state.audit[key]<1e-6,`${state.backend}/${key}: ${state.audit[key]}`);
  assert.equal(state.error,'');assert.equal(state.pointerLock,false);
- await page.screenshot({path:`${out}/${mobile?'mobile':'desktop'}-moving.png`});report.cases.push({...state,movedM:state.x-x0});await context.close();
+ await context.close();
 }}finally{await browser.close();await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));}
 assert.deepEqual(report.errors,[]);console.log(JSON.stringify(report,null,2));

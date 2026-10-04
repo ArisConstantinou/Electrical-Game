@@ -5,13 +5,15 @@ import {prepareFinishedMortar} from './prepared-mortar-fixture.mjs';
 const browser=await chromium.launch({channel:'chrome',headless:true});
 try{
  const context=await browser.newContext();await blockPointerLock(context);const page=await context.newPage();
- await page.goto('http://127.0.0.1:5365/Electrical-Game/');await page.waitForFunction(()=>window.__wireTheHouse?.roomWater.waterProActive);await page.locator('#start-button').click();
+ await page.goto('http://127.0.0.1:5365/Electrical-Game/');await page.waitForFunction(()=>window.__wireTheHouse?.isReadyForStart);await page.locator('#start-button').click();
+ // Trigger the same lazy optical loading as a visible puddle in gameplay.
+ await page.evaluate(()=>{const g=window.__wireTheHouse;g.roomWater.addFloorWater(0,0,12);g.roomWater.rebuildGeometry();});
+ await page.waitForFunction(()=>window.__wireTheHouse.roomWater.waterProActive,undefined,{timeout:90000});
  await prepareFinishedMortar(page);
  await page.evaluate(async()=>{
   const g=window.__wireTheHouse,r=g.renderer,c=r.camera;await r.waitForFrame();
-  // A visible puddle keeps the real optical boundary active on optimized dry floors.
-  g.roomWater.addFloorWater(0,0,12);g.roomWater.rebuildGeometry();
-  c.position.set(0,1.65,-1.95);c.lookAt(0,1.4,-2.41);g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;g.selectTool('trowel');
+  // Keep the real puddle in view so the hold intercepts an optical update.
+  c.position.set(0,1.65,1.7);c.lookAt(0,0,0);g.player.yaw=c.rotation.y;g.player.pitch=c.rotation.x;g.selectTool('trowel');
   // Observe any forbidden legacy dispatch while preserving the real method.
   window.__calls=[];
   const pack=g.mortar.pack.bind(g.mortar);
