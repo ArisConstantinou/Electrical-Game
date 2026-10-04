@@ -34,17 +34,18 @@ assert.equal(game.nextGameFrameAt, 1006); assert.equal(queued, 1, 'Yield through
 game.nextGameFrameAt = 1030; now = 1020; game.loop(1018);
 assert.equal(steps.length, 1); assert.equal(game.lastTime, 1000, 'Retain elapsed time during an actual recovery wait');
 now = 1031; workMs = 40; game.loop(1025);
-assert.equal(steps.length, 2); assert.equal(game.nextGameFrameAt, 1087, 'Retain the existing bounded recovery interval after overloaded work');
-now = 1080; game.loop(1078); assert.equal(steps.length, 2);
-now = 1088; workMs = 4; game.loop(1085);
-assert.equal(steps.length, 4); // 60 ms elapsed remains two bounded physics steps.
-assert.equal(steps[2].present, false); assert.equal(steps[3].present, true);
+assert.equal(steps.length, 2); assert.equal(game.nextGameFrameAt, 1071, 'A completed slow CPU frame must not add another artificial delay');
+now = 1072; workMs = 4; game.loop(1070);
+assert.equal(steps.length, 3, 'Accept the next ready frame immediately after slow CPU work');
+now = 1140; game.loop(1130);
+assert.equal(steps.length, 5); // 60 ms elapsed remains two bounded physics steps.
+assert.equal(steps[3].present, false); assert.equal(steps[4].present, true);
 
-game.renderer.framePending = true; now = 1110; game.loop(1100);
-assert.equal(steps.length, 4); assert.equal(game.lastTime, 1085, 'Do not mutate the live scene while GPU passes are pending');
+game.renderer.framePending = true; now = 1150; game.loop(1148);
+assert.equal(steps.length, 5); assert.equal(game.lastTime, 1130, 'Do not mutate the live scene while GPU passes are pending');
 game.renderer.framePending = false; game.nextGameFrameAt = 0;
 now = 2100; game.loop(2000);
-assert.equal(steps.length, 9); assert(steps.slice(4).every(s => s.dt <= .05));
-assert.equal(steps.slice(4).filter(s => s.present).length, 1, 'Render once after bounded catch-up steps');
+assert.equal(steps.length, 10); assert(steps.slice(5).every(s => s.dt <= .05));
+assert.equal(steps.slice(5).filter(s => s.present).length, 1, 'Render once after bounded catch-up steps');
 assert.equal(queued, 7);
-console.log('PASS: stale RAF timestamp cannot discard a ready frame; real overload wait, GPU guard, simulation elapsed time, bounded substeps and RAF yielding remain intact.');
+console.log('PASS: completed slow CPU frames add no extra wait; stale RAF handling, GPU guard, elapsed simulation time, bounded substeps and RAF yielding remain intact.');

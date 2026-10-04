@@ -13,15 +13,24 @@ const Y=new THREE.Vector3(0,1,0);
 async function loadWorkerModel(asset:string):Promise<THREE.Group>{
   const url=`${import.meta.env.BASE_URL}assets/worker/${asset}`;
   return loadStartupAsset(url, asset === 'worker.glb' ? 'Worker model' : 'Apprentice model',
-    async request => (await new GLTFLoader().loadAsync(request)).scene);
+    async (request,signal) => {
+      const manager=new THREE.LoadingManager();
+      let onAbort:()=>void;
+      const aborted=new Promise<never>((_resolve,reject)=>{
+        onAbort=()=>{manager.abort();reject(signal.reason);};
+        signal.addEventListener('abort',onAbort,{once:true});
+      });
+      try{return(await Promise.race([new GLTFLoader(manager).loadAsync(request),aborted])).scene;}
+      finally{signal.removeEventListener('abort',onAbort!);}
+    },{timeoutMs:30000});
 }
 async function loadWorkerMetadata():Promise<Record<string,{head:number[];tail:number[]}>>{
   const url=`${import.meta.env.BASE_URL}assets/worker/skeleton.json`;
-  return loadStartupAsset(url, 'Worker data', async request => {
-      const response=await fetch(request);
-      if(!response.ok)throw new Error(`Worker skeleton HTTP ${response.status}`);
-      return await response.json() as Record<string,{head:number[];tail:number[]}>;
-  });
+  return loadStartupAsset(url, 'Worker data', async (request,signal) => {
+    const response=await fetch(request,{signal});
+    if(!response.ok)throw new Error(`Worker skeleton HTTP ${response.status}`);
+    return await response.json() as Record<string,{head:number[];tail:number[]}>;
+  },{timeoutMs:30000});
 }
 /** Full anatomical sample. World-space skeleton owns the pose; camera aim remains independent. */
 export class WorkerBody extends THREE.Group {
