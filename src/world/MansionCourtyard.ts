@@ -9,6 +9,7 @@ import { laidClayGeometry, type LaidClayWear } from './LaidClayDamage';
 import { siteMaterial } from './SiteMaterials';
 import { MansionMasonryDemolition, type MasonryBrickInstance } from './MansionMasonryDemolition';
 import { createCourtyardClayStack, createTimberPallet } from './LooseClaySupplies';
+import { loadStartupAsset } from '../core/StartupAsset';
 
 /** A traversable open-air room, with reused live olive geometry rather than a backdrop. */
 export class MansionCourtyard extends THREE.Group {
@@ -46,6 +47,9 @@ export class MansionCourtyard extends THREE.Group {
       this.obstacles.push({ id: 'retained-olive-trunk', minX: 13.02, maxX: 13.68, minZ: 11.02, maxZ: 11.68 });
     }
     this.ready=this.tree?this.loadScannedCourtTree(this.tree):Promise.resolve();
+    // Game awaits the courtyard after other assets. Retain rejection for that
+    // await without an unhandled rejection if a corrupt tree fails earlier.
+    void this.ready.catch(()=>{});
   }
 
   update(dt: number): void {
@@ -65,24 +69,35 @@ export class MansionCourtyard extends THREE.Group {
     }
   }
 
-  private loadScannedCourtTree(tree: THREE.Object3D): Promise<void> {
-    return new Promise(resolve=>{
+  private async loadScannedCourtTree(tree: THREE.Object3D): Promise<void> {
     const requestedAt = performance.now();
-    const decoder = new DRACOLoader();
-    decoder.setDecoderPath(`${import.meta.env.BASE_URL}assets/draco/`);
-    const loader = new GLTFLoader();
-    loader.setDRACOLoader(decoder);
-    loader.load(`${import.meta.env.BASE_URL}assets/vegetation/courtyard-tree/courtyard-tree-optimized.glb`, asset => {
+    try {
+      const url = `${import.meta.env.BASE_URL}assets/vegetation/courtyard-tree/courtyard-tree-optimized.glb`;
+      const asset = await loadStartupAsset(url, 'Courtyard tree', async (request, signal) => {
+        const manager = new THREE.LoadingManager();
+        const decoder = new DRACOLoader(manager);
+        decoder.setDecoderPath(`${import.meta.env.BASE_URL}assets/draco/`);
+        const loader = new GLTFLoader(manager).setDRACOLoader(decoder);
+        let onAbort: () => void;
+        const aborted = new Promise<never>((_resolve, reject) => {
+          onAbort = () => { manager.abort(); reject(signal.reason); };
+          signal.addEventListener('abort', onAbort, { once: true });
+        });
+        try {
+          const loaded = await Promise.race([loader.loadAsync(request), aborted]);
+          for (const name of ['courtyard_tree_trunk', 'courtyard_tree_branches', 'courtyard_tree_leaves']) {
+            if (!(loaded.scene.getObjectByName(name) instanceof THREE.Mesh)) throw new Error('Optimized tree has missing parts');
+          }
+          return loaded;
+        } finally {
+          signal.removeEventListener('abort', onAbort!);
+          decoder.dispose();
+        }
+      }, { timeoutMs: 30000 });
       const model = asset.scene;
-      const trunk = model.getObjectByName('courtyard_tree_trunk');
-      const branches = model.getObjectByName('courtyard_tree_branches');
-      const leaves = model.getObjectByName('courtyard_tree_leaves');
-      if (!(trunk instanceof THREE.Mesh) || !(branches instanceof THREE.Mesh) || !(leaves instanceof THREE.Mesh)) {
-        tree.userData.scannedError = 'Optimized tree has missing parts';
-        decoder.dispose();
-        resolve();
-        return;
-      }
+      const trunk = model.getObjectByName('courtyard_tree_trunk') as THREE.Mesh;
+      const branches = model.getObjectByName('courtyard_tree_branches') as THREE.Mesh;
+      const leaves = model.getObjectByName('courtyard_tree_leaves') as THREE.Mesh;
       const canopy = new THREE.Group();
       canopy.name = 'Scanned olive canopy';
       model.add(canopy);
@@ -153,10 +168,10 @@ export class MansionCourtyard extends THREE.Group {
       tree.userData.scannedLoadMs = performance.now() - requestedAt;
       tree.userData.scannedTriangles = [trunk, branches, leaves].reduce((sum, part) =>
         sum + (part.geometry.index?.count ?? part.geometry.getAttribute('position').count) / 3, 0);
-      decoder.dispose();
-      resolve();
-    }, undefined, error => { tree.userData.scannedError = String(error); decoder.dispose(); resolve(); });
-    });
+    } catch (error) {
+      tree.userData.scannedError = String(error);
+      throw error;
+    }
   }
 
   private addGround(): void {

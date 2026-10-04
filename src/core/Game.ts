@@ -1364,7 +1364,6 @@ export class Game {
     // delayed callback does not discard an already available frame.
     if(performance.now()<this.nextGameFrameAt){this.animationFrame=requestAnimationFrame(this.loop);return;}
     try{
-    const frameStart=performance.now();
     const elapsed = Math.max(0,Math.min((time - this.lastTime) / 1000,.25));
     this.lastTime = time;
     // Preserve simulation time on slow GPUs using bounded physics steps, with
@@ -1378,8 +1377,9 @@ export class Game {
       const present=remaining<=1e-8;
       this.step(dt,dt,present,present?elapsed:null);
     }
-    const workMs=performance.now()-frameStart;
-    this.nextGameFrameAt=performance.now()+(workMs>32?Math.min(18,workMs-24):0);
+    // RAF already yields to input/the browser, and framePending bounds queued
+    // GPU work. A second CPU cooldown only compounds a slow frame's latency.
+    this.nextGameFrameAt=performance.now();
     this.fpsFrames++;
     if(time-this.fpsWindowStart>=500){
       this.hud.updateFps(this.fpsFrames*1000/(time-this.fpsWindowStart));
