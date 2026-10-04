@@ -9,25 +9,67 @@ import { blockPointerLock } from './browser-safety.mjs';
 const { launchManagedBrowser, runManagedClient } = await import(pathToFileURL(path.join(process.env.CODEX_HOME ?? path.join(os.homedir(), '.codex'), 'skills/develop-web-game/scripts/browser_lifecycle.mjs')));
 const stressOnly = process.argv.includes('--stress-only');
 const pacingOnly = process.argv.includes('--pacing-only'), desktop = process.argv.includes('--desktop');
-const out = `output/loading-35-recovery/${pacingOnly ? desktop ? 'desktop-pacing' : 'mobile-pacing' : stressOnly ? 'mobile-frame-stress' : 'mobile-frame-diagnosis'}`;
+const s23Profile = process.argv.includes('--s23-profile'), publicSite = process.argv.includes('--public'), smoke = process.argv.includes('--smoke');
+const base = publicSite ? 'https://arisconstantinou.github.io/Electrical-Game/' : 'http://127.0.0.1:5365/Electrical-Game/';
+const out = `output/loading-35-recovery/${s23Profile ? publicSite ? 's23-profile-public' : 's23-profile-candidate' : pacingOnly ? desktop ? 'desktop-pacing' : 'mobile-pacing' : stressOnly ? 'mobile-frame-stress' : 'mobile-frame-diagnosis'}`;
 await mkdir(out, { recursive: true });
-const report = { method: 'Intel Ultra 9 desktop Chrome. pacing=true explicitly reinstates the legacy CPU cooldown; pacing=false removes it. CPU throttling and touch emulation are controlled diagnostics, not Galaxy S23 Ultra performance proof.', desktop, cases: [], errors: [] };
+const report = { method: 'Intel Ultra 9 desktop Chrome. pacing=true explicitly reinstates the legacy CPU cooldown; pacing=false removes it. CPU throttling and touch emulation are controlled diagnostics, not Galaxy S23 Ultra performance proof.', desktop, s23Profile, base,
+  profileNote: s23Profile ? 'Chosen 360x772 CSS px / DPR4 gives a 1440x3088 screen inspired by S23 Ultra specifications; this is not a claim about its default CSS viewport, browser version or mobile CPU/GPU. Existing game pixel-ratio cap is retained.' : null,
+  loads: [], touch: [], cases: [], errors: [] };
 const session = await launchManagedBrowser(chromium, { channel: 'chrome', headless: true, screenshotDir: out });
 await runManagedClient(session, 240000, async () => {
   const browserCDP = await session.browser.newBrowserCDPSession();
   report.gpu = (await browserCDP.send('SystemInfo.getInfo')).gpu;
   await browserCDP.detach();
   for (const backend of ['webgpu', 'webgl']) {
+    const version = session.browser.version();
     const context = await session.browser.newContext(desktop
       ? { viewport: { width: 1249, height: 1221 } }
-      : { viewport: { width: 412, height: 915 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
-    await routeBuildingDist(context); await blockPointerLock(context);
+      : s23Profile ? { viewport: { width: 360, height: 772 }, deviceScaleFactor: 4, isMobile: true, hasTouch: true,
+        userAgent: `Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version} Mobile Safari/537.36` }
+        : { viewport: { width: 412, height: 915 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+    if (!publicSite) await routeBuildingDist(context); await blockPointerLock(context);
     const page = await context.newPage(); page.on('pageerror', error => report.errors.push(error.message));
-    await page.goto(`http://127.0.0.1:5365/Electrical-Game/${backend === 'webgl' ? '?renderer=webgl' : ''}`);
-    await page.waitForFunction(() => window.__wireTheHouse?.isReadyForStart, null, { timeout: 90000 });
+    const loadingAt = Date.now();
+    await page.goto(`${base}?${backend === 'webgl' ? 'renderer=webgl&' : ''}v=loading-recovery`);
+    if (!s23Profile) await page.waitForFunction(() => window.__wireTheHouse?.isReadyForStart, null, { timeout: 90000 });
     await page.locator('[data-apprentice-count="5"]')[desktop ? 'click' : 'tap']();
+    await page.waitForFunction(() => window.__wireTheHouse?.isReadyForStart, null, { timeout: 90000 });
     await page.waitForFunction(() => !document.querySelector('#start-button').disabled);
+    if (s23Profile) {
+      const loaded = await page.evaluate(() => {
+        const g = window.__wireTheHouse, b = g.renderer.gpu.backend;
+        return { backend: b.isWebGLBackend ? 'webgl' : 'webgpu', label: document.querySelector('#start-button-label')?.textContent,
+          progressPresent: !!document.querySelector('#start-load-percent'), workers: g.apprentice.crew.map(worker => worker.body.loaded),
+          ua: navigator.userAgent, dpr: devicePixelRatio, viewport: [innerWidth, innerHeight], canvas: [g.renderer.webgl.domElement.width, g.renderer.webgl.domElement.height],
+          script: document.querySelector('script[src*="/assets/index-"]')?.src ?? null };
+      });
+      assert.equal(loaded.backend, backend); assert.equal(loaded.label, 'READY'); assert(loaded.progressPresent);
+      assert.equal(loaded.workers.length, 4); assert(loaded.workers.every(Boolean));
+      report.loads.push({ ...loaded, readyMs: Date.now() - loadingAt });
+      await page.screenshot({ path: `${out}/${backend}-ready.png` });
+    }
     await page.locator('#start-button')[desktop ? 'click' : 'tap']();
+    if (s23Profile) {
+      assert.equal(await page.evaluate(() => window.__wireTheHouse.started), true);
+      await page.evaluate(() => { const g=window.__wireTheHouse;g.player.camera.position.set(0,1.65,1.7);g.player.yaw=0;g.player.pitch=-.2; });
+      const move = await page.locator('#joystick').boundingBox(), look = await page.locator('#look-joystick').boundingBox();
+      assert(move && look, 'Both mobile controls must be visible');
+      const before = await page.evaluate(() => { const g=window.__wireTheHouse;return { x:g.player.camera.position.x,z:g.player.camera.position.z,yaw:g.player.yaw }; });
+      const touchCDP = await context.newCDPSession(page);
+      const points = [{ x:move.x+move.width*.5,y:move.y+move.height*.5,id:1 },{ x:look.x+look.width*.5,y:look.y+look.height*.5,id:2 }];
+      await touchCDP.send('Input.dispatchTouchEvent',{ type:'touchStart',touchPoints:points });
+      points[0].x+=move.width*.2;points[1].x+=look.width*.28;
+      await touchCDP.send('Input.dispatchTouchEvent',{ type:'touchMove',touchPoints:points });
+      await page.waitForTimeout(350);
+      const held = await page.evaluate(() => { const g=window.__wireTheHouse;return { x:g.player.camera.position.x,z:g.player.camera.position.z,yaw:g.player.yaw,move:g.input.mobileMove,look:g.input.mobileLook }; });
+      await touchCDP.send('Input.dispatchTouchEvent',{ type:'touchEnd',touchPoints:[] });
+      await page.waitForFunction(() => { const i=window.__wireTheHouse.input;return i.mobileMove.x===0&&i.mobileMove.y===0&&i.mobileLook.x===0&&i.mobileLook.y===0; });
+      assert(Math.hypot(held.x-before.x,held.z-before.z)>.02, 'Native held touch must move the worker');
+      assert(Math.abs(held.yaw-before.yaw)>.004, 'The second simultaneous touch must turn the view');
+      report.touch.push({ backend,before,held,released:true });
+      await touchCDP.detach();
+    }
     await page.evaluate(() => {
       const g = window.__wireTheHouse, r = g.renderer;
       window.frameProbe = { active: false, methods: {}, frames: [], work: [], pacing: true };
@@ -61,12 +103,12 @@ await runManagedClient(session, 240000, async () => {
       };
     });
     const cdp = await context.newCDPSession(page);
-    for (const cpuRate of pacingOnly ? [1] : stressOnly ? [4] : [1, 4]) {
+    for (const cpuRate of s23Profile || pacingOnly ? [1] : stressOnly ? [4] : [1, 4]) {
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: cpuRate });
-      for (const [round, pacing] of (cpuRate === 1 && !pacingOnly ? [true] : [true, false, false, true]).entries()) {
-        for (const count of cpuRate === 1 && !pacingOnly ? [0, 1, 5] : [1]) {
+      for (const [round, pacing] of (s23Profile ? [false] : cpuRate === 1 && !pacingOnly ? [true] : [true, false, false, true]).entries()) {
+        for (const count of s23Profile && smoke ? [5] : cpuRate === 1 && !pacingOnly ? [0, 1, 5] : [1]) {
           await page.evaluate(count => window.__wireTheHouse.apprentice.prepareCrew(count), count);
-          for (const scene of cpuRate === 1 ? ['passage', 'foyer', 'courtyard'] : ['passage']) {
+          for (const scene of s23Profile && smoke ? ['courtyard'] : cpuRate === 1 ? ['passage', 'foyer', 'courtyard'] : ['passage']) {
             await page.evaluate(({ scene, pacing }) => {
               const g = window.__wireTheHouse, p = window.frameProbe; p.active = false; p.pacing = pacing;
               const positions = { passage: [0, 1.65, 5.2], foyer: [12, 1.65, 14.4], courtyard: [15.3, 1.65, 14.3] };
@@ -100,8 +142,16 @@ await runManagedClient(session, 240000, async () => {
         }
       }
     }
+    if (s23Profile) {
+      await page.setViewportSize({ width:772,height:360 });
+      await page.waitForFunction(() => { const r=window.__wireTheHouse.renderer;return Math.abs(r.camera.aspect-innerWidth/innerHeight)<.01&&!r.framePending; });
+      assert.equal(await page.locator('#joystick').isVisible(), true);assert.equal(await page.locator('#look-joystick').isVisible(), true);
+      const landscape = await page.evaluate(() => ({ viewport:[innerWidth,innerHeight],canvas:[window.__wireTheHouse.renderer.webgl.domElement.width,window.__wireTheHouse.renderer.webgl.domElement.height],overflow:document.documentElement.scrollWidth>innerWidth+1,graphics:window.__wireTheHouse.renderer.lifecycleTelemetry }));
+      assert.equal(landscape.overflow, false);assert.deepEqual(landscape.graphics.graphicsErrors, []);
+      report.touch.push({ backend,landscape });
+    }
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
-    await page.screenshot({ path: `${out}/${backend}-stress-passage.png` });
+    await page.screenshot({ path: `${out}/${backend}-${s23Profile ? 'landscape' : 'stress-passage'}.png` });
     await context.close();
   }
   assert.deepEqual(report.errors, []);
