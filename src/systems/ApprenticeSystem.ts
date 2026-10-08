@@ -278,6 +278,10 @@ export class ApprenticeSystem {
       this.crewReady=Promise.all(this.crew.slice(0,Math.max(0,count-1)).map(worker=>worker.ready)).then(()=>{});
       void this.crewReady.catch(()=>{});
       await this.crewReady;
+      // Crew selected after READY adds new rigs and asynchronously loaded body
+      // trees. Register their materials/hidden-transform policy before play;
+      // otherwise every frame walks all twelve stowed tools per apprentice.
+      this.game.renderer.invalidateMaterialPreparation();
       if(generation===this.crewPreparationGeneration&&this.game.isReadyForStart&&start.dataset.failed!=='true'){
         start.disabled=false;label.textContent='READY';start.setAttribute('aria-label','Ready. Start work');
       }

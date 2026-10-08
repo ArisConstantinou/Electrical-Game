@@ -1,9 +1,10 @@
 // Build input for this game's compiled Water Pro component. The licensed
 // dependency stays outside the public repository; this file contains only our integration.
-import { WaterSystem, WaterSurfaceMaterial, getPresetParams } from 'threejs-water-pro';
+import { WaterSystem, WaterSurfaceMaterial, getPresetParams, SpraySystem } from 'threejs-water-pro';
 import { MeshBasicNodeMaterial, NormalBlending, Object3D, CubeCamera, CubeRenderTarget, LinearMipmapLinearFilter } from 'three/webgpu';
 import { attribute, positionLocal, positionWorld, cameraPosition, vec3, vec4, clamp, smoothstep, cubeTexture, tanh, uniform, Fn, output, fog as sceneFog, rangeFogFactor } from 'three/tsl';
 import { skipUnusedOceanBuoyancy } from './roomBuoyancyPolicy.js';
+import { createFiniteRoomWater } from './roomWaterConstructionPolicy.js';
 
 export async function createRoomWater(renderer,scene,camera,room){
   const previous=new Set(scene.children),environment=scene.environment,background=scene.background,fog=scene.fog;
@@ -22,7 +23,7 @@ export async function createRoomWater(renderer,scene,camera,room){
     createReflectionSampler:()=>(direction,roughness)=>cubeTexture(reflectionTarget.texture,direction).level(roughness.mul(4)).rgb,
     getEnvironmentTexture:()=>reflectionTarget.texture,getMeshes:()=>[],followCamera:()=>{},dispose:()=>reflectionTarget.dispose(),
   };
-  const water=await WaterSystem.create(renderer,scene,camera,'low',{deterministic:false});
+  const water=await createFiniteRoomWater(WaterSystem,SpraySystem,renderer,scene,camera);
   const preset=getPresetParams('arctic');
   preset.waves.fft.amplitude=.008;preset.waves.fft.windSpeed=2.8;preset.waves.fft.peakWavelength=.85;preset.waves.fft.choppiness=.22;preset.waves.fft.standingWaveRatio=.6;
   preset.waves.fft.cascades.maxScale=8;
@@ -62,7 +63,7 @@ export async function createRoomWater(renderer,scene,camera,room){
   // Keep Water Pro's optical simulation and depth captures, while replacing
   // its infinite ocean geometry by this room's finite conservative water grid.
   surface.geometry=room.surfaceGeometry;surface.frustumCulled=false;surface.name='Water Pro finite room flooding surface';
-  surface.userData.waterPro={colorModel:'physical',reflectionSource:'captured-room',impactWaves:false,wakeResolution:128,waveAmplitude:.008,waveCapMetres:.065};
+  surface.userData.waterPro={colorModel:'physical',reflectionSource:'captured-room',impactWaves:false,wakeResolution:128,waveAmplitude:.008,waveCapMetres:.065,oceanSpray:false,initialCapture:'configured-room'};
   const waterMaterial=surface.material;
   const material=new MeshBasicNodeMaterial().copy(waterMaterial);
   material.onBeforeRender=()=>{};

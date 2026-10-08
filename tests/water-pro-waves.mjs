@@ -15,7 +15,11 @@ try{
     await blockPointerLock(page.context());
     page.on('pageerror',error=>errors.push(error.message));
     const target=new URL(url);if(backend==='webgl')target.searchParams.set('renderer','webgl');
-    await page.goto(target.href);await page.waitForFunction(()=>window.__wireTheHouse?.roomWater.waterProActive);
+    await page.goto(target.href);await page.waitForFunction(()=>window.__wireTheHouse?.isReadyForStart,null,{timeout:120000});
+    // Water optics are now lazy in a dry room. This explicit diagnostic fixture
+    // prepares them before injecting fixed volumes; native first use is checked
+    // separately by water-first-use-ui.mjs.
+    await page.evaluate(()=>window.__wireTheHouse.activateWaterPro());
     await page.locator('#start-button').click();await page.waitForTimeout(600);
     await page.evaluate(async()=>{
       const g=window.__wireTheHouse;g.step=()=>{};g.fpsRig.visible=false;await g.renderer.waitForFrame();

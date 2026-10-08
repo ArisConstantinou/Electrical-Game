@@ -21,6 +21,8 @@ export interface MasonryBrickInstance {
 }
 export interface MansionBrickDamage { index: number; save: MasonrySave }
 interface BrokenBrick { volume: MasonryVolume; mesh: THREE.Group; origin: THREE.Vector3; rotation: THREE.Quaternion; originalSolidNodes: number; chunkMeshes: Map<string, THREE.Mesh>; mortarMesh: THREE.Mesh | null; mortarRemoved: Uint8Array }
+type AimBrick = Pick<BrokenBrick, 'volume' | 'origin' | 'rotation' | 'mortarRemoved'>;
+interface BrickSpan { index: number; min: number; max: number; prefixMax: number }
 
 /** A light demolition layer for the authored fired-clay walls. The intact wall
  * keeps its original two draw calls; a hit swaps the solid backing for a
@@ -36,7 +38,6 @@ export class MansionMasonryDemolition {
   private readonly localBox: THREE.Box3;
   private readonly inverse = new THREE.Matrix4();
   private readonly localRay = new THREE.Ray();
-  private readonly localHit = new THREE.Vector3();
   private readonly temp = new THREE.Matrix4();
   private readonly position = new THREE.Vector3();
   private readonly scale = new THREE.Vector3();
@@ -49,6 +50,8 @@ export class MansionMasonryDemolition {
   private collisionDirty = false;
   private readonly collisionMatrix = new THREE.Matrix4();
   private readonly intactBounds: [number, number, number, number];
+  private readonly aimRows: BrickSpan[][] = [];
+  private readonly pristineAim = new Map<number, AimBrick>();
 
   constructor(
     readonly group: THREE.Group,
@@ -75,6 +78,16 @@ export class MansionMasonryDemolition {
       this.original.push(this.temp.clone());
       this.temp.decompose(this.position, this.rotation, this.scale);
       if (this.scale.y > .001 && (this.alongX ? this.scale.x : this.scale.z) > .001) this.remaining[index] = 1;
+      if (this.remaining[index]) {
+        const row = Math.floor(index / this.columns), middle = this.alongX ? this.position.x : this.position.z;
+        const half = (this.alongX ? this.scale.x : this.scale.z) / 2;
+        (this.aimRows[row] ??= []).push({ index, min: middle - half - .025, max: middle + half + .025, prefixMax: 0 });
+      }
+    }
+    for (const row of this.aimRows) if (row) {
+      row.sort((a, b) => a.min - b.min);
+      let maximum = -Infinity;
+      for (const span of row) span.prefixMax = maximum = Math.max(maximum, span.max);
     }
     this.localBox = new THREE.Box3(
       new THREE.Vector3(this.alongX ? -length / 2 : -.12, 0, this.alongX ? -.12 : -length / 2),
@@ -130,10 +143,11 @@ export class MansionMasonryDemolition {
     return this.scale.y > .001 && (this.alongX ? this.scale.x : this.scale.z) > .001;
   }
 
-  /** Test only the visible face. A camera ray through a cut-out does not hit
-   * an invisible backing and can reach the next wall behind it. */
+  /** Follow the shaft through the actual material, including neighbouring
+   * courses reached after the facing clears. A row/interval index bounds the
+   * candidates; deleted units and hollow chambers never become backing hits. */
   aim(camera: THREE.Camera, maxDistance = 2.4, eye?: THREE.Vector3, view?: THREE.Vector3, minimumDistance = .15): MasonryAim | null {
-    for(let node:THREE.Object3D|null=this.group;node;node=node.parent)if(!node.visible)return null;
+    for (let node: THREE.Object3D | null = this.group; node; node = node.parent) if (!node.visible) return null;
     const origin = eye ?? camera.getWorldPosition(new THREE.Vector3());
     if (this.obstacle.segments?.length !== 0 &&
         (origin.x < this.obstacle.minX - maxDistance || origin.x > this.obstacle.maxX + maxDistance ||
@@ -142,66 +156,73 @@ export class MansionMasonryDemolition {
         origin.y > (this.obstacle.maxFloorY ?? 3) + maxDistance)) return null;
     this.group.updateWorldMatrix(true, false);
     this.inverse.copy(this.group.matrixWorld).invert();
-    const direction = view ?? camera.getWorldDirection(new THREE.Vector3());
+    const direction = (view ?? camera.getWorldDirection(new THREE.Vector3())).clone().normalize();
     this.localRay.origin.copy(origin).applyMatrix4(this.inverse);
-    this.localRay.direction.copy(direction).transformDirection(this.inverse);
-    if (!this.localRay.intersectBox(this.localBox, this.localHit)) return null;
-    const point = this.localHit.clone().applyMatrix4(this.group.matrixWorld);
-    const distance = origin.distanceTo(point);
-    if (distance > maxDistance || distance < minimumDistance) return null;
-    const row = Math.min(this.rows - 1, Math.max(0, Math.floor(this.localHit.y / (this.height / this.rows))));
-    const coordinate = this.alongX ? this.localHit.x : this.localHit.z;
-    let best = -1, bestDistance = .31;
-    // Running-bond rows have a half brick at one end; use actual instance
-    // transforms rather than assuming a rectangular column index.
-    for (let testRow = Math.max(0, row - 1); testRow <= Math.min(this.rows - 1, row + 1); testRow++)
-      for (let col = 0; col < this.columns; col++) {
-        const index = testRow * this.columns + col;
-        if (!this.remaining[index]) continue;
-        this.original[index].decompose(this.position, this.rotation, this.scale);
-        const mid = this.alongX ? this.position.x : this.position.z;
-        const half = (this.alongX ? this.scale.x : this.scale.z) / 2;
-        const horizontal = Math.max(0, Math.abs(coordinate - mid) - half);
-        const vertical = Math.max(0, Math.abs(this.localHit.y - this.position.y) - this.scale.y / 2);
-        const score = horizontal + vertical;
-        if (score < bestDistance) { bestDistance = score; best = index; }
-      }
-    if (best < 0) return null;
-    // The bed joint belongs to the brick above it; the head joint belongs to
-    // the brick on its left. Aim at that owner so the struck mortar is updated
-    // with its supporting clay instead of chipping an unrelated neighbour.
-    this.original[best].decompose(this.position, this.rotation, this.scale);
-    const selectedRow = Math.floor(best / this.columns);
-    if (selectedRow < this.rows - 1 && this.localHit.y > this.position.y + this.scale.y / 2 - .018) {
-      for (let column = 0; column < this.columns; column++) {
-        const upper = (selectedRow + 1) * this.columns + column;
-        if (!this.remaining[upper]) continue;
-        this.original[upper].decompose(this.position, this.rotation, this.scale);
-        const middle = this.alongX ? this.position.x : this.position.z;
-        const half = (this.alongX ? this.scale.x : this.scale.z) / 2;
-        if (Math.abs(coordinate - middle) <= half + .012) { best = upper; break; }
+    // The world reach is not a local metre under a scaled facade.
+    this.localRay.direction.copy(origin).add(direction).applyMatrix4(this.inverse).sub(this.localRay.origin);
+    const localPerWorld = this.localRay.direction.length();
+    if (!localPerWorld) return null;
+    this.localRay.direction.multiplyScalar(1 / localPerWorld);
+    let enter = 0, leave = maxDistance * localPerWorld;
+    for (const axis of ['x', 'y', 'z'] as const) {
+      const lo = this.localBox.min[axis] - .025, hi = this.localBox.max[axis] + .025;
+      const o = this.localRay.origin[axis], d = this.localRay.direction[axis];
+      if (Math.abs(d) < 1e-10) { if (o < lo || o > hi) return null; continue; }
+      const a = (lo - o) / d, b = (hi - o) / d;
+      enter = Math.max(enter, Math.min(a, b)); leave = Math.min(leave, Math.max(a, b));
+    }
+    if (enter > leave) return null;
+    const start = this.localRay.at(enter, new THREE.Vector3()), end = this.localRay.at(leave, new THREE.Vector3());
+    const along = this.alongX ? 'x' : 'z';
+    const low = Math.min(start[along], end[along]), high = Math.max(start[along], end[along]);
+    const pitch = this.height / this.rows;
+    const firstRow = Math.max(0, Math.floor((Math.min(start.y, end.y) - .025) / pitch));
+    const lastRow = Math.min(this.rows - 1, Math.floor((Math.max(start.y, end.y) + .025) / pitch));
+    let nearest: MasonryAim | null = null;
+    for (let row = firstRow; row <= lastRow; row++) {
+      const spans = this.aimRows[row]; if (!spans) continue;
+      let first = 0, last = spans.length;
+      while (first < last) { const mid = (first + last) >>> 1; if (spans[mid].prefixMax < low) first = mid + 1; else last = mid; }
+      for (let col = first; col < spans.length && spans[col].min <= high; col++) {
+        const { index, max } = spans[col];
+        if (max < low || !this.remaining[index]) continue;
+        const brick = this.broken.get(index) ?? this.pristineBrick(index);
+        const rotation = brick.rotation.clone().invert();
+        const rayOrigin = this.localRay.origin.clone().sub(brick.origin).applyQuaternion(rotation);
+        const rayDirection = this.localRay.direction.clone().applyQuaternion(rotation);
+        // jointContact clamps its supported mortar point off the shaft. Its
+        // point distance can be shorter than its ray parameter under a scaled
+        // facade; prune only by the user's reach, then compare world contacts.
+        const limit: number = maxDistance * localPerWorld;
+        const joint: MasonryRayHit | undefined = this.jointContact(brick, rayOrigin, rayDirection, limit)?.contact;
+        const clay = brick.volume.raycast(rayOrigin, rayDirection, limit);
+        const contact: MasonryRayHit | null = joint && (!clay || joint.distance < clay.distance) ? joint : clay;
+        if (!contact) continue;
+        const point: THREE.Vector3 = new THREE.Vector3(contact.point.x, contact.point.y, contact.point.z)
+          .applyQuaternion(brick.rotation).add(brick.origin).applyMatrix4(this.group.matrixWorld);
+        const distance = origin.distanceTo(point);
+        if (distance < minimumDistance || distance > maxDistance || nearest && distance >= nearest.distance) continue;
+        nearest = { wall: this, index, point, distance };
       }
     }
-    this.original[best].decompose(this.position, this.rotation, this.scale);
-    const leftEdge = (this.alongX ? this.position.x - this.scale.x / 2 : this.position.z - this.scale.z / 2);
-    if (coordinate < leftEdge + .018) {
-      const owner = best - 1;
-      if (owner >= Math.floor(best / this.columns) * this.columns && this.remaining[owner]) {
-        this.original[owner].decompose(this.position, this.rotation, this.scale);
-        const rightEdge = this.alongX ? this.position.x + this.scale.x / 2 : this.position.z + this.scale.z / 2;
-        if (Math.abs(coordinate - rightEdge) < .025) best = owner;
-      }
-    }
-    const broken = this.broken.get(best);
-    if (!broken) return { wall: this, index: best, point, distance };
-    const rayOrigin = this.localRay.origin.clone().sub(broken.origin).applyQuaternion(broken.rotation.clone().invert());
-    const rayDirection = this.localRay.direction.clone().applyQuaternion(broken.rotation.clone().invert());
-    const contact = this.jointContact(broken, rayOrigin, rayDirection, maxDistance)?.contact
-      ?? broken.volume.raycast(rayOrigin, rayDirection, maxDistance);
-    if (!contact) return null;
-    const exact = new THREE.Vector3(contact.point.x, contact.point.y, contact.point.z)
-      .applyQuaternion(broken.rotation).add(broken.origin).applyMatrix4(this.group.matrixWorld);
-    return { wall: this, index: best, point: exact, distance: origin.distanceTo(exact) };
+    return nearest;
+  }
+
+  private pristineBrick(index: number): AimBrick {
+    const cached = this.pristineAim.get(index); if (cached) return cached;
+    this.original[index].decompose(this.position, this.rotation, this.scale);
+    const origin = this.position.clone(); origin.y -= this.scale.y / 2;
+    const brick: AimBrick = {
+      origin, rotation: new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.alongX ? 0 : -Math.PI / 2),
+      volume: new MasonryVolume({ width: this.alongX ? this.scale.x : this.scale.z, height: this.scale.y,
+        depth: .24, frontZ: .12, cellSize: .012,
+        seed: (Math.imul(index + 1, 2654435761) ^ Math.imul(this.columns, 2246822519)) >>> 0,
+        hollowProfile: 'single-horizontal-four-bore', maxConnectivityNodes: 1800 }),
+      mortarRemoved: new Uint8Array(13),
+    };
+    // Queries do not create scene meshes or retain a lattice for the whole wall.
+    if (this.pristineAim.size >= 32) this.pristineAim.delete(this.pristineAim.keys().next().value!);
+    this.pristineAim.set(index, brick); return brick;
   }
 
   /** The original work wall's material lattice is allocated only for bricks
@@ -217,8 +238,10 @@ export class MansionMasonryDemolition {
     const origin = wallCamera.clone().sub(entry.origin).applyQuaternion(entry.rotation.clone().invert());
     const wallDirection = (aimedDirection?.clone() ?? camera.getWorldDirection(new THREE.Vector3())).transformDirection(this.inverse);
     const direction = wallDirection.clone().applyQuaternion(entry.rotation.clone().invert());
-    const joint = this.jointContact(entry, origin, direction, 2.4);
-    const contact = joint?.contact ?? entry.volume.raycast(origin, direction, 2.4);
+    const mortar = this.jointContact(entry, origin, direction, 2.4);
+    const clay = entry.volume.raycast(origin, direction, 2.4);
+    const joint = mortar && (!clay || mortar.contact.distance <= clay.distance) ? mortar : null;
+    const contact = joint?.contact ?? clay;
     if (!contact) { if (!this.broken.has(index)) this.disposeBrokenBrick(entry); return false; }
     const maxDepthM = mode === 'chase' ? SERVICE_CHASE_DEPTH_M : undefined;
     const result = entry.volume.impact({ point: contact.point, direction,
@@ -352,7 +375,7 @@ export class MansionMasonryDemolition {
     if (ref) { ref.mesh.instanceMatrix.needsUpdate = true; ref.mesh.computeBoundingSphere(); }
   }
 
-  private jointContact(entry: BrokenBrick, origin: THREE.Vector3, direction: THREE.Vector3,
+  private jointContact(entry: AimBrick, origin: THREE.Vector3, direction: THREE.Vector3,
     maxDistance: number): { contact: MasonryRayHit; segment: number } | null {
     if (Math.abs(direction.z) < .01) return null;
     const faceZ = origin.z >= 0 ? .11 : -.11;
@@ -503,6 +526,7 @@ export class MansionMasonryDemolition {
   }
 
   reset(): void {
+    this.pristineAim.clear();
     if (!this.damaged) return;
     for (const entry of this.broken.values()) this.disposeBrokenBrick(entry);
     this.broken.clear();
