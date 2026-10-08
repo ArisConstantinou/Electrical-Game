@@ -44,7 +44,7 @@ on that same origin by the browser QA harness. No additional game server is used
   landscape WebGL; Android-UA WebGPU; tablet; 4× CPU-throttled WebGL.
   The water-only lazy module was subsequently changed. Its final build was
   checked separately with native tool use, water optics and controlled resume.
-- Final retained-source production matrix: all 32 authored scenes × seven
+- Wall/crew/water production matrix before the later idle-pose change: all 32 authored scenes × seven
   profiles × two normal-clock sweeps = 448 samples. This additional matrix uses
   runtime source commit `902bb62e065529fba259fc374382145cfdb6000b`, including the
   retained wall, crew and water changes. Profiles execute serially, with five
@@ -71,7 +71,7 @@ on that same origin by the browser QA harness. No additional game server is used
   filling, conservation and held-input release. No resolution, SSR step count,
   wave geometry, shadows, assistants or optical quality were reduced.
 
-### Full final production results
+### Full wall/crew/water production results
 
 Each FPS minimum is the lowest whole 3-second sweep average. The median is over
 64 sweeps, and each p95 belongs to an individual sweep. Submitted triangles and
@@ -111,6 +111,79 @@ proof about active wet rendering.
 report exposes all three distinct matrices and was checked at desktop 1440 px
 and portrait 390 px: all 21 dataset/profile selections, no viewport overflow and
 all local report links accessible.
+
+### Additional guarded idle-crew catch-up repair
+
+Slow frames perform up to five bounded simulation steps before presenting one
+image. Four idle additional workers previously solved their complete skeletal
+hierarchies on every step, despite having no assignment or visible tool rig.
+`Game.step` now passes presentation intent through `ApprenticeSystem` to those
+crew members. `WorkerBody` advances each original clock, gait phase and blend
+increment, and defers idle bone/IK work until the presented state. Assigned crew,
+the lead hammer carrier, active grips and work stations retain every full pose.
+Five workers, all models, shadows and physical contact cadence remain.
+
+The broad initial attempt to defer active grasps was rejected. A properly reset
+comparison exposed history-dependent grip differences; the accepted guard never
+defers those inputs. The regression's strict pose tolerance was not loosened.
+The final regression passes 24 pose/state comparisons across desktop and touch,
+including forward, reverse, lateral and low poses with a hidden rig: zero
+measured final skeletal or temporal difference. In a 0.213 s catch-up fixture,
+all five actors receive all five physics updates. The four idle crew perform one
+complete pose each; the lead carrier performs five. An assigned reachable cutter
+performs all five full poses, advances its cut timer by 0.213 s and invents no
+stock receipt. The same regression fails before the change with 16 intermediate
+hierarchy updates per idle body.
+
+CPU ×4 ABBA, two fresh contexts per source and the same four scenes:
+
+| Scene | Mean sweep FPS before / after | Apprentice CPU ms before / after | Apprentice CPU reduction |
+|---|---:|---:|---:|
+| G-work | 7.04 / 7.76 | 8.33 / 6.80 | 18.3% |
+| L1-main | 10.37 / 10.61 | 7.93 / 6.70 | 15.5% |
+| B1-service | 11.39 / 12.55 | 7.63 / 6.40 | 16.2% |
+| stairs-ground | 12.61 / 12.94 | 7.56 / 6.49 | 14.2% |
+
+These means are over whole sweep averages and are not pooled frame intervals.
+The relative CPU reduction is limited to the apprentice subsystem. It is not a
+global frame-time reduction or a physical phone result. The desktop WebGL control
+remains near 53–54 FPS in G-work and 60 FPS in the lighter three scenes.
+
+The additional build has a full 32-scene CPU ×4 route and representative
+four-scene checks for the other six profiles, including the desktop control.
+Its full stress route still has a 12.65 FPS median and a 2.90 FPS worst sweep;
+all 64 sweeps remain below 30 FPS. Median uses the mean of the two middle sweep
+averages. The later full baseline replay gives a 13.95 FPS median and 4.46 FPS
+worst sweep, also with all 64 below 30. Whole-route improvement is not established.
+The runtime toggle diagnostic is preserved separately: the original full-pose
+cadence and guarded deferral run in ABBA order in one context. Its first sweep
+still includes cold work after fixed-yaw warmup; later B2/A2 pairs retain the
+apprentice CPU benefit but also vary. The data do not establish the cause of
+every large spike. No hidden downgrade or global 60 FPS claim is made.
+
+Both native hammer-hold regressions pass on this build: two-hand carry, walking,
+20 PVC cuts and conservation, cutter visibility, construction cancellation and
+rehold, wall demolition and zero-crew visibility. The five-worker legacy test
+completes 20 socket and 20 switch cuts with length conservation on both sources,
+then fails identically at its obsolete `paper.visible === true` assertion.
+Current `ApprenticeSystem` opens the drawing panel and keeps that old world-paper
+object hidden. The original legacy assertion and failed logs are preserved;
+they are not reported as a passing full script. Separate current-panel checks
+pass on desktop and touch: all three authored drawing tabs load their real SVGs
+and `paper.visible` stays false. The mobile route first opens the worker bar,
+then COORDINATOR and the plan action. Two diagnostic attempts that selected
+hidden entry buttons are preserved; no gameplay/UI change was made to bless them.
+
+Evidence: `idle-pose-before/`, `idle-pose-after/`, `idle-pose-performance.json`,
+`idle-pose-summary.json`, `idle-pose-toggle/`, `idle-coverage-*`,
+`idle-full-baseline-mobile-cpu4-webgl/`, `idle-coverage-summary.json`,
+`current-drawing-panel/` and `idle-pose-validation.json`.
+The earlier 448-sample full matrix remains evidence for runtime `902bb62`,
+not an unchanged-source claim for the later guarded idle-pose build.
+The installed develop-web-game client also runs two real hammer/movement loops
+on the guarded production build with five workers; screenshots, state and owned
+browser cleanup evidence are retained in `skill-client-idle/`. The review checks
+all 28 dataset/profile selections at 1440 and 390 px without viewport overflow.
 
 ### Remaining first-use shader stall
 

@@ -235,15 +235,18 @@ export class WorkerBody extends THREE.Group {
     else for(let i=0;i<12;i++){const mid=(lo+hi)/2;if(distance(mid)>reach)lo=mid;else hi=mid;}
     this.worldRotation(clavicle,new THREE.Quaternion().slerp(toward,hi).multiply(restQ));
   }
-  update(dt:number,camera:THREE.PerspectiveCamera,player:Pick<PlayerController,'eyeHeight'|'velocity'|'yaw'|'pitch'>&Partial<Pick<PlayerController,'supportFloorY'|'jumpOffset'|'grounded'|'jumpPose'>>,fps:FPSRig,tool:RigTool,working:boolean,station:boolean,stationGrips:WorkerGripTarget[]=[],frontForBounds?:(bounds:THREE.Box3)=>number|null):void{
+  update(dt:number,camera:THREE.PerspectiveCamera,player:Pick<PlayerController,'eyeHeight'|'velocity'|'yaw'|'pitch'>&Partial<Pick<PlayerController,'supportFloorY'|'jumpOffset'|'grounded'|'jumpPose'>>,fps:FPSRig,tool:RigTool,working:boolean,station:boolean,stationGrips:WorkerGripTarget[]=[],frontForBounds?:(bounds:THREE.Box3)=>number|null,present=true):void{
     if(!this.loaded)return;
     this.visible=true;
     fps.useAnatomicalBody(true);
-    this.gripErrors={};
-    this.armTwist={};
-    this.fingerFit={};
+    // Active grasps retain history-dependent IK on every physics step.
+    // Deferred poses are for idle crew with a hidden rig and no work contact.
+    if(!present&&(working||station||fps.anatomicalGrips().some(grip=>grip.active)))present=true;
+    if(present){
+      this.gripErrors={};this.armTwist={};this.fingerFit={};
+      for(const [b,r]of this.rest){b.quaternion.copy(r.q);b.position.copy(r.p);}
+    }
     this.clock+=dt;
-    for(const [b,r]of this.rest){b.quaternion.copy(r.q);b.position.copy(r.p);}
     const cartGrip=stationGrips.some(g=>g.palmDirection);
     // The eye already eases between heights. Follow its actual position,
     // including low socket work, rather than snapping the torso at 1.1 m
@@ -271,6 +274,12 @@ export class WorkerBody extends THREE.Group {
     const hammerHeld=tool==='hammer'&&!station&&grips.some(grip=>grip.active);
     this.hammerBrace=THREE.MathUtils.damp(this.hammerBrace,hammerHeld&&fps.reachable&&!airborne&&speed<.1?1:0,12,Math.min(dt,.05));
     const bodyYaw=player.yaw+this.travelTurn,bodyQ=cartFrame?.quaternion.clone()??new THREE.Quaternion().setFromAxisAngle(Y,bodyYaw),bodyForward=new THREE.Vector3(0,0,-1).applyQuaternion(bodyQ),bodyRight=new THREE.Vector3(1,0,0).applyQuaternion(bodyQ);
+    const lateral=Math.abs(this.travel.dot(bodyRight));
+    const amplitude=Math.min(THREE.MathUtils.lerp(.22,.36,THREE.MathUtils.smoothstep(speed,.8,3.4)),.12/Math.max(.01,lateral))*(1-this.bend*.30);
+    // Catch-up physics keeps each original clock, blend and gait increment.
+    // Idle crew only need bone resets, world matrices and IK for the displayed
+    // state. Working crew and active grasps take the complete path above.
+    if(!present){this.phase+=speed*dt*Math.PI/(2*amplitude);return;}
     // Pipe work is held in front of the chest. Step the body under the eyes
     // instead of retaining the rearward walking stance and overreaching.
     const pipeWork=grips.some(grip=>grip.active&&grip.surfaceContact);
@@ -335,8 +344,6 @@ export class WorkerBody extends THREE.Group {
     this.locomotionState={speed,forward:along,sideways,pelvisBobM:pelvisBob,pelvisSwayM:pelvisSway,pelvisYawDegrees:THREE.MathUtils.radToDeg(pelvisYaw),spineCounterDegrees:THREE.MathUtils.radToDeg(-pelvisYaw*.72),headCounterDegrees:THREE.MathUtils.radToDeg(headCounter)};
     // A lateral step is shorter so the trailing foot never crosses the lead
     // foot. Cadence follows distance travelled, including backwards motion.
-    const lateral=Math.abs(this.travel.dot(bodyRight));
-    const amplitude=Math.min(THREE.MathUtils.lerp(.22,.36,THREE.MathUtils.smoothstep(speed,.8,3.4)),.12/Math.max(.01,lateral))*(1-this.bend*.30);
     this.phase+=speed*dt*Math.PI/(2*amplitude);
     this.updateMatrixWorld(true);
     for(const [side,sign]of [['R',1],['L',-1]] as const){

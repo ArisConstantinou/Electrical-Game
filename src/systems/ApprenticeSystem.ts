@@ -589,9 +589,9 @@ export class ApprenticeSystem {
     this.velocity.set(dx/distance*speed,0,dz/distance*speed);pos.addScaledVector(this.velocity,dt);this.camera.rotation.set(0,Math.atan2(-dx,-dz),0);
     if(distance<.06)this.path.shift();return false;
   }
-  update(dt:number):void {
+  update(dt:number,present=true):void {
     this.toolbar.hidden=!this.game.started;
-    for(const mate of this.crew)if(this.phase!=='blocked'||this.blockedFrom!=='pipe')mate.update(dt,this.game.started&&mate.index<=this.count);
+    for(const mate of this.crew)if(this.phase!=='blocked'||this.blockedFrom!=='pipe')mate.update(dt,this.game.started&&mate.index<=this.count,present);
     this.body.visible=this.game.started&&this.count>=1;this.hammer.visible=this.count>=1;this.camera.visible=this.game.started&&this.count>=1;
     if(!this.game.started||this.count===0||!this.body.loaded){this.presentUI();return;}
     const wasHammerHeld=this.hasHammer&&this.rig.visible;

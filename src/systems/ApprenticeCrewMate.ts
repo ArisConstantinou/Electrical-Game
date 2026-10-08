@@ -39,7 +39,7 @@ export class ApprenticeCrewMate {
   }
   cancel():void{this.assignment=null;this.blocked=false;this.path=[];this.cutter.visible=false;}
   resume():void{this.blocked=false;this.path=[];}
-  update(dt:number,visible:boolean):'working'|'done'|'blocked'{
+  update(dt:number,visible:boolean,present=true):'working'|'done'|'blocked'{
     this.body.visible=visible;this.camera.visible=visible;this.cutter.visible=visible&&this.assignment?.step==='cut';
     if(!visible||!this.body.loaded)return'working';
     dt=Math.min(dt,.05);this.velocity.set(0,0,0);
@@ -81,7 +81,7 @@ export class ApprenticeCrewMate {
     this.camera.updateMatrixWorld(true);
     const grips=job?.step==='cut'?this.poseCutter():[];
     this.rig.beginFrame(dt,null,false);this.rig.update(dt,this.velocity.lengthSq()>.01);this.rig.show('hammer');
-    this.body.update(dt,this.camera,{eyeHeight:this.camera.position.y,velocity:this.velocity,yaw:this.camera.rotation.y,pitch:this.camera.rotation.x},this.rig,'hammer',false,grips.length>0,grips);
+    this.body.update(dt,this.camera,{eyeHeight:this.camera.position.y,velocity:this.velocity,yaw:this.camera.rotation.y,pitch:this.camera.rotation.x},this.rig,'hammer',false,grips.length>0,grips,undefined,present||job!==null);
     this.body.overview=true;
     return this.blocked?'blocked':this.assignment?'working':'done';
   }

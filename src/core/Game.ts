@@ -869,7 +869,7 @@ export class Game {
     }
     this.mixing.useAnatomicalBody(this.workerBody.loaded);
     this.pvc.useAnatomicalBody();
-    this.apprentice.update(dt);
+    this.apprentice.update(dt,present);
     this.apprentice.presentPlayer();
     // The overhead layout view is for reading all twenty pipes and their live
     // marks. The full torso has no useful contact here and otherwise fills the
